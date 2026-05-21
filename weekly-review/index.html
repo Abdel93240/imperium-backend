@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Imperium Weekly Review V1</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./weekly-review-ui.mjs"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Imperium</p>
+          <h1>Weekly Review</h1>
+        </div>
+        <div id="statusBar" class="status-pill">Ready</div>
+      </header>
+
+      <section class="config-panel" aria-label="Backend connection">
+        <label>
+          API base URL
+          <input id="apiBaseUrl" type="url" autocomplete="off" />
+        </label>
+        <label>
+          Access token
+          <input id="accessToken" type="password" autocomplete="off" />
+        </label>
+        <button id="saveConfig" class="button button-secondary" type="button">Save</button>
+        <button id="refresh" class="button button-primary" type="button">Refresh</button>
+      </section>
+
+      <p id="errorBox" class="error-box" hidden></p>
+
+      <section class="dashboard-grid">
+        <article id="sessionCard" class="card"></article>
+        <article id="summaryCard" class="card card-wide"></article>
+        <article id="messagesCard" class="card"></article>
+        <article id="draftCard" class="card card-wide"></article>
+        <article id="actionsCard" class="card action-card">
+          <div class="section-header">
+            <h2>Actions</h2>
+          </div>
+          <textarea
+            id="actionText"
+            rows="5"
+            placeholder="Write the answer, rejection reason, or requested changes here."
+          ></textarea>
+          <p id="actionHint" class="hint">Actions come only from backend allowed_actions.</p>
+          <div id="actionsList" class="actions-list"></div>
+        </article>
+        <article id="debugCard" class="card"></article>
+      </section>
+    </main>
+  </body>
+</html>

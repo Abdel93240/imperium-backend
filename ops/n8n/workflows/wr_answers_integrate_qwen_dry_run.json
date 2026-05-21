@@ -1,0 +1,220 @@
+{
+  "id": "5c48d8f3-f173-45e2-b78d-b4a74e37d9c6",
+  "name": "IMPERIUM_WR_ANSWERS_INTEGRATE_QWEN_DRY_RUN",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "imperium/wr/answers-integrate-qwen-dry-run",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "0ca2d0d6-536b-4f3b-a6ce-2d277e111f46",
+      "name": "Webhook - WR Answers Integrate Dry Run",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        0
+      ],
+      "webhookId": "imperium-wr-answers-integrate-qwen-dry-run"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst apiBaseUrl = $env.IMPERIUM_API_BASE_URL;\nconst webhookSecret = $env.INTERNAL_WEBHOOK_SECRET;\nconst input = $input.first().json.body ?? $input.first().json;\nconst requiredFields = [\n  'task_id',\n  'session_id',\n  'task_type',\n  'week_start',\n  'week_end',\n  'user_message_id',\n  'user_answer',\n  'callback_url',\n  'wr_attach_url',\n];\n\nfor (const field of requiredFields) {\n  if (!input[field]) {\n    throw new Error(`Missing required WR answers payload field: ${field}`);\n  }\n}\n\nif (input.task_type !== 'weekly_report.answers.integrate') {\n  throw new Error(`Unsupported task_type for WR answers workflow: ${input.task_type}`);\n}\n\nconst expectedCallbackUrl = `/api/internal/ai/tasks/${input.task_id}/result`;\nconst expectedAttachUrl = `/api/internal/weekly-review/${input.session_id}/attach-ai-result`;\nif (input.callback_url !== expectedCallbackUrl) {\n  throw new Error(`Unexpected callback_url. Expected ${expectedCallbackUrl}`);\n}\nif (input.wr_attach_url !== expectedAttachUrl) {\n  throw new Error(`Unexpected wr_attach_url. Expected ${expectedAttachUrl}`);\n}\nif (!apiBaseUrl) {\n  throw new Error('Missing IMPERIUM_API_BASE_URL environment variable.');\n}\nif (!webhookSecret) {\n  throw new Error('Missing INTERNAL_WEBHOOK_SECRET environment variable.');\n}\n\nconst resultBody = {\n  result_type: 'weekly_report.draft',\n  result_payload: {\n    title: 'Draft WR from dry-run answer integration',\n    summary: 'Dry-run draft generated after integrating the latest WR answer.',\n    sections: [\n      {\n        title: 'Answer integration dry-run',\n        content: `User answer captured for message ${input.user_message_id}: ${input.user_answer}`,\n      },\n    ],\n    questions_answered: [\n      {\n        message_id: input.user_message_id,\n        answer: input.user_answer,\n      },\n    ],\n    source: 'qwen_dry_run_answers_integrate',\n  },\n  model_used: 'qwen2.5:7b-instruct',\n  provider: 'qwen-dry-run',\n  confidence: 0.7,\n  raw_payload: {\n    workflow: 'IMPERIUM_WR_ANSWERS_INTEGRATE_QWEN_DRY_RUN',\n    dry_run: true,\n  },\n};\n\nconst rawBody = JSON.stringify(resultBody);\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst message = `${timestamp}.${rawBody}`;\nconst signature = crypto.createHmac('sha256', webhookSecret).update(message).digest('hex');\n\nreturn [\n  {\n    json: {\n      ...input,\n      callbackRawBody: rawBody,\n      callbackTimestamp: timestamp,\n      callbackSignature: signature,\n      callbackIdempotencyKey: `wr_answers_integrate_result_${input.task_id}`,\n    },\n  },\n];"
+      },
+      "id": "d871d39f-7117-4512-b1a8-c0693a5e5a29",
+      "name": "Validate Payload and Sign Result Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.IMPERIUM_API_BASE_URL + $json.callback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.callbackTimestamp }}"
+            },
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.callbackSignature }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.callbackIdempotencyKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.callbackRawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "d5020b0e-2f31-4232-a996-506c53649f92",
+      "name": "POST AI Result Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nfunction normalizeHttpJson(value) {\n  if (value && typeof value === 'object' && value.body !== undefined) {\n    value = value.body;\n  }\n  if (value && typeof value === 'object' && value.data !== undefined) {\n    value = value.data;\n  }\n  if (typeof value === 'string') {\n    try {\n      return JSON.parse(value);\n    } catch (error) {\n      throw new Error('HTTP response body was not valid JSON.');\n    }\n  }\n  return value;\n}\n\nconst webhookSecret = $env.INTERNAL_WEBHOOK_SECRET;\nconst previous = $('Validate Payload and Sign Result Callback').first().json;\nconst callbackResponse = normalizeHttpJson($input.first().json);\nconst resultId = callbackResponse?.result_id;\nif (!resultId) {\n  const keys = callbackResponse && typeof callbackResponse === 'object' ? Object.keys(callbackResponse).join(',') : typeof callbackResponse;\n  throw new Error(`AI result callback did not return result_id. Response shape: ${keys}`);\n}\n\nconst attachBody = { ai_result_id: resultId };\nconst rawBody = JSON.stringify(attachBody);\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst message = `${timestamp}.${rawBody}`;\nconst signature = crypto.createHmac('sha256', webhookSecret).update(message).digest('hex');\n\nreturn [\n  {\n    json: {\n      ...previous,\n      result_id: resultId,\n      attachRawBody: rawBody,\n      attachTimestamp: timestamp,\n      attachSignature: signature,\n      attachIdempotencyKey: `wr_answers_integrate_attach_${previous.session_id}_${resultId}`,\n    },\n  },\n];"
+      },
+      "id": "4ba4cb8c-fb79-4e42-9d78-aa8ebf9035fb",
+      "name": "Normalize Callback and Sign Attach",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.IMPERIUM_API_BASE_URL + $json.wr_attach_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.attachTimestamp }}"
+            },
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.attachSignature }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.attachIdempotencyKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.attachRawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "384e353a-1906-45c3-b1a5-0f94d5bb6964",
+      "name": "POST WR Attach",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        40,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      status: 'ok',\n      workflow: 'IMPERIUM_WR_ANSWERS_INTEGRATE_QWEN_DRY_RUN',\n      task_id: $('Normalize Callback and Sign Attach').first().json.task_id,\n      session_id: $('Normalize Callback and Sign Attach').first().json.session_id,\n      result_id: $('Normalize Callback and Sign Attach').first().json.result_id,\n      message: 'Dry-run WR answer integration completed and attached as draft proposal.',\n    },\n  },\n];"
+      },
+      "id": "70f55a95-7bd5-4902-9165-210574e7fe8e",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - WR Answers Integrate Dry Run": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload and Sign Result Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload and Sign Result Callback": {
+      "main": [
+        [
+          {
+            "node": "POST AI Result Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST AI Result Callback": {
+      "main": [
+        [
+          {
+            "node": "Normalize Callback and Sign Attach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Callback and Sign Attach": {
+      "main": [
+        [
+          {
+            "node": "POST WR Attach",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST WR Attach": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "7b66a43b-b750-49df-86d8-7729f24c579e",
+  "triggerCount": 0,
+  "tags": []
+}

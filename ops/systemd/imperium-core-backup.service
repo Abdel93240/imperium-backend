@@ -1,0 +1,13 @@
+[Unit]
+Description=Imperium Core PostgreSQL encrypted backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=IMPERIUM_BACKUP_CONFIG=/etc/imperium/imperium-backup.env
+ExecStart=/usr/local/sbin/imperium_core_backup.sh
+User=root
+Group=root
+PrivateTmp=true
+NoNewPrivileges=true

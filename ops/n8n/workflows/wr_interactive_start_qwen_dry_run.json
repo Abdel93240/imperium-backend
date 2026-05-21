@@ -1,0 +1,286 @@
+{
+  "name": "IMPERIUM_WR_INTERACTIVE_START_QWEN_DRY_RUN",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "imperium/wr/interactive-start-qwen-dry-run",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "ecac74b0-04c1-4dbf-9892-6b6ed0b380a1",
+      "name": "Webhook - WR Start Qwen Dry Run",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1080,
+        0
+      ],
+      "webhookId": "imperium-wr-interactive-start-qwen-dry-run"
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst input = $input.first().json.body ?? $input.first().json;\nconst requiredFields = [\n  'task_id',\n  'session_id',\n  'task_type',\n  'week_start',\n  'week_end',\n  'callback_url',\n  'wr_attach_url',\n];\n\nfor (const field of requiredFields) {\n  if (!input[field]) {\n    throw new Error(`Missing required WR payload field: ${field}`);\n  }\n}\n\nif (input.task_type !== 'weekly_report.interactive.start') {\n  throw new Error(`Unsupported task_type for Qwen dry-run WR workflow: ${input.task_type}`);\n}\n\nconst expectedCallbackUrl = `/api/internal/ai/tasks/${input.task_id}/result`;\nconst expectedAttachUrl = `/api/internal/weekly-review/${input.session_id}/attach-ai-result`;\nif (input.callback_url !== expectedCallbackUrl) {\n  throw new Error(`Unexpected callback_url. Expected ${expectedCallbackUrl}`);\n}\nif (input.wr_attach_url !== expectedAttachUrl) {\n  throw new Error(`Unexpected wr_attach_url. Expected ${expectedAttachUrl}`);\n}\nif (!process.env.IMPERIUM_API_BASE_URL) {\n  throw new Error('Missing IMPERIUM_API_BASE_URL environment variable.');\n}\nif (!process.env.INTERNAL_WEBHOOK_SECRET) {\n  throw new Error('Missing INTERNAL_WEBHOOK_SECRET environment variable.');\n}\n\nconst qwenSmokeBody = {\n  task_type: 'weekly_report.summary',\n  mode: 'weekly_summary',\n  input_payload: {\n    week_start: input.week_start,\n    week_end: input.week_end,\n    session_id: input.session_id,\n    task_id: input.task_id,\n    source: 'n8n_qwen_dry_run_workflow',\n  },\n};\nconst qwenSmokeRawBody = JSON.stringify(qwenSmokeBody);\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst message = `${timestamp}.${qwenSmokeRawBody}`;\nconst signature = crypto\n  .createHmac('sha256', process.env.INTERNAL_WEBHOOK_SECRET)\n  .update(message)\n  .digest('hex');\n\nreturn [\n  {\n    json: {\n      ...input,\n      qwenSmokeRawBody,\n      qwenSmokeTimestamp: timestamp,\n      qwenSmokeSignature: signature,\n      qwenSmokeIdempotencyKey: `wr_qwen_dry_run_smoke_${input.task_id}`,\n    },\n  },\n];"
+      },
+      "id": "d3410de4-0fbd-4660-8e75-ee84d258481f",
+      "name": "Validate Payload and Sign Qwen Smoke",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -820,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.IMPERIUM_API_BASE_URL + '/api/internal/ai/qwen/smoke' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.qwenSmokeTimestamp }}"
+            },
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.qwenSmokeSignature }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.qwenSmokeIdempotencyKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.qwenSmokeRawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "94f255f5-72c3-4af8-965e-7f4081e3a7b3",
+      "name": "POST Internal Qwen Smoke",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst original = $('Validate Payload and Sign Qwen Smoke').first().json;\nconst qwen = $('POST Internal Qwen Smoke').first().json;\n\nif (qwen.result_type !== 'weekly_report.summary') {\n  throw new Error(`Unexpected Qwen result_type: ${qwen.result_type}`);\n}\n\nconst aiCallbackBody = {\n  result_type: 'weekly_report.summary',\n  result_payload: {\n    summary: qwen.summary,\n    sections: qwen.sections,\n    questions: qwen.questions,\n    warnings: qwen.warnings,\n    source: 'qwen_dry_run',\n  },\n  model_used: 'qwen2.5:7b-instruct',\n  provider: 'qwen-dry-run',\n  confidence: qwen.confidence,\n  raw_payload: {\n    workflow: 'IMPERIUM_WR_INTERACTIVE_START_QWEN_DRY_RUN',\n    qwen_response: qwen,\n  },\n};\nconst rawBody = JSON.stringify(aiCallbackBody);\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst message = `${timestamp}.${rawBody}`;\nconst signature = crypto\n  .createHmac('sha256', process.env.INTERNAL_WEBHOOK_SECRET)\n  .update(message)\n  .digest('hex');\n\nreturn [\n  {\n    json: {\n      ...original,\n      aiCallbackRawBody: rawBody,\n      aiCallbackTimestamp: timestamp,\n      aiCallbackSignature: signature,\n      aiCallbackIdempotencyKey: `wr_qwen_dry_run_result_${original.task_id}`,\n    },\n  },\n];"
+      },
+      "id": "b242f434-c67f-4b61-b6c3-75a20bb311bd",
+      "name": "Build and Sign AI Result Callback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.IMPERIUM_API_BASE_URL + $json.callback_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.aiCallbackTimestamp }}"
+            },
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.aiCallbackSignature }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.aiCallbackIdempotencyKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.aiCallbackRawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "545035bf-a391-4aa8-882a-8899fbcd4d04",
+      "name": "POST AI Result Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -40,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\n\nconst original = $('Build and Sign AI Result Callback').first().json;\nconst callbackResponse = $('POST AI Result Callback').first().json;\n\nif (!callbackResponse.result_id) {\n  throw new Error('Backend AI result callback did not return result_id.');\n}\n\nconst attachBody = {\n  ai_result_id: callbackResponse.result_id,\n};\nconst rawBody = JSON.stringify(attachBody);\nconst timestamp = Math.floor(Date.now() / 1000).toString();\nconst message = `${timestamp}.${rawBody}`;\nconst signature = crypto\n  .createHmac('sha256', process.env.INTERNAL_WEBHOOK_SECRET)\n  .update(message)\n  .digest('hex');\n\nreturn [\n  {\n    json: {\n      session_id: original.session_id,\n      wr_attach_url: original.wr_attach_url,\n      result_id: callbackResponse.result_id,\n      attachRawBody: rawBody,\n      attachTimestamp: timestamp,\n      attachSignature: signature,\n      attachIdempotencyKey: `wr_qwen_dry_run_attach_${original.session_id}_${callbackResponse.result_id}`,\n    },\n  },\n];"
+      },
+      "id": "59a25e6e-84df-40ec-859d-bd82964f7352",
+      "name": "Sign WR Attach Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.IMPERIUM_API_BASE_URL + $json.wr_attach_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Timestamp",
+              "value": "={{ $json.attachTimestamp }}"
+            },
+            {
+              "name": "X-Signature",
+              "value": "={{ $json.attachSignature }}"
+            },
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $json.attachIdempotencyKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.attachRawBody }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "0876ba91-f8e0-4fd9-8f4a-6ace95080dcf",
+      "name": "POST WR Attach Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - WR Start Qwen Dry Run": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload and Sign Qwen Smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload and Sign Qwen Smoke": {
+      "main": [
+        [
+          {
+            "node": "POST Internal Qwen Smoke",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Internal Qwen Smoke": {
+      "main": [
+        [
+          {
+            "node": "Build and Sign AI Result Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build and Sign AI Result Callback": {
+      "main": [
+        [
+          {
+            "node": "POST AI Result Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST AI Result Callback": {
+      "main": [
+        [
+          {
+            "node": "Sign WR Attach Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sign WR Attach Request": {
+      "main": [
+        [
+          {
+            "node": "POST WR Attach Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "imperium"
+    },
+    {
+      "name": "weekly-review"
+    },
+    {
+      "name": "qwen-dry-run"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-04-30T00:00:00.000Z",
+  "versionId": "patch-2f-wr-interactive-start-qwen-dry-run"
+}

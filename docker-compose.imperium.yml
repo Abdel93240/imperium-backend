@@ -1,0 +1,58 @@
+services:
+  imperium-api:
+    container_name: imperium-api
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      APP_NAME: ${APP_NAME:-Personal AI OS API}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DEBUG: ${DEBUG:-false}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be provided from the deployment environment and must point to imperium_core}
+      DATABASE_CONNECT_TIMEOUT_SECONDS: ${DATABASE_CONNECT_TIMEOUT_SECONDS:-5}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be provided from the deployment environment}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_TTL_MINUTES: ${ACCESS_TOKEN_TTL_MINUTES:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      INTERNAL_WEBHOOK_SECRET: ${INTERNAL_WEBHOOK_SECRET:?INTERNAL_WEBHOOK_SECRET must be provided from the deployment environment}
+      WEBHOOK_SIGNATURE_ALGORITHM: ${WEBHOOK_SIGNATURE_ALGORITHM:-HMAC-SHA256}
+      WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS: ${WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS:-60}
+      IMPERIUM_CANONICAL_USER_ID: ${IMPERIUM_CANONICAL_USER_ID:?IMPERIUM_CANONICAL_USER_ID must be provided}
+      QWEN_ENABLED: ${QWEN_ENABLED:-false}
+      QWEN_BASE_URL: ${QWEN_BASE_URL:-}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen2.5:7b-instruct}
+      QWEN_REQUEST_TIMEOUT_SECONDS: ${QWEN_REQUEST_TIMEOUT_SECONDS:-60}
+      QWEN_DRY_RUN: ${QWEN_DRY_RUN:-true}
+      N8N_DRY_RUN: ${N8N_DRY_RUN:-true}
+      N8N_BASE_URL: ${N8N_BASE_URL:-}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      WR_N8N_QWEN_DRY_RUN_WEBHOOK_PATH: ${WR_N8N_QWEN_DRY_RUN_WEBHOOK_PATH:-imperium/wr/interactive-start-qwen-dry-run}
+      WR_N8N_ANSWERS_INTEGRATE_WEBHOOK_PATH: ${WR_N8N_ANSWERS_INTEGRATE_WEBHOOK_PATH:-imperium/wr/answers-integrate-qwen-dry-run}
+    ports:
+      - "127.0.0.1:8000:8000"
+    expose:
+      - "8000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - imperium-internal
+
+networks:
+  imperium-internal:
+    # Set this to the existing n8n Docker network name on the VPS before deployment.
+    # Example:
+    # name: n8n-postgresql_default
+    name: ${IMPERIUM_DOCKER_NETWORK:-n8n-postgresql_default}
+    external: true
