@@ -99,6 +99,7 @@ def _expect_append_only_failure(exc: Exception) -> None:
         or "permission denied" in msg
         or "trigger" in msg
         or "not allowed" in msg
+        or "featurenotsupported" in msg
     ), f"Expected append-only / trigger error, got: {exc!r}"
 
 

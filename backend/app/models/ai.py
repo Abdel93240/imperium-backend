@@ -35,10 +35,10 @@ class AITask(UUIDPrimaryKeyMixin, Base):
         ),
     )
 
-    user_id: Mapped[UUID | None] = mapped_column(
+    user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id"),
-        nullable=True,
+        nullable=False,
     )
     task_type: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="queued", server_default=text("'queued'"))
@@ -89,10 +89,10 @@ class AIResult(UUIDPrimaryKeyMixin, Base):
         ForeignKey("ai_tasks.id", ondelete="CASCADE"),
         nullable=False,
     )
-    user_id: Mapped[UUID | None] = mapped_column(
+    user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id"),
-        nullable=True,
+        nullable=False,
     )
     result_type: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -142,10 +142,10 @@ class AIResultValidation(UUIDPrimaryKeyMixin, Base):
         ForeignKey("ai_tasks.id", ondelete="CASCADE"),
         nullable=False,
     )
-    user_id: Mapped[UUID | None] = mapped_column(
+    user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id"),
-        nullable=True,
+        nullable=False,
     )
     validation_status: Mapped[str] = mapped_column(Text, nullable=False)
     validated_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

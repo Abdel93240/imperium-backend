@@ -160,6 +160,10 @@ def mock_weekly_review_ai_summary_route(
     db: SessionDep,
 ) -> WeeklyReviewSessionRead:
     """Temporary mock-only endpoint for local WR/n8n contract smoke testing."""
+    settings = get_settings()
+    if settings.environment not in {"local", "test"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not available in this environment.")
+
     try:
         result, _duplicate = mock_weekly_review_summary(
             db,
