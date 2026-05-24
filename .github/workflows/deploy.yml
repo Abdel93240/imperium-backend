@@ -49,6 +49,11 @@ jobs:
       - name: Lint (ruff)
         working-directory: backend
         run: ruff check .
+      - name: Security scan (bandit)
+        working-directory: backend
+        run: |
+          pip install bandit
+          bandit -r app/ --severity-level high
       - name: Run migrations on test DB
         working-directory: backend
         env:

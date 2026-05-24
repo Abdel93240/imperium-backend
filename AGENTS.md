@@ -334,3 +334,37 @@ Do not treat this project like a normal app.
 Treat it like a **personal operating system**.
 
 > Faithfulness to the user's vision is more important than technical elegance.
+
+---
+
+## Development Method (ECC-derived)
+
+> Méthodologie de dev dérivée d'Everything Claude Code (affaan-m/ECC), adaptée au
+> stack Python/FastAPI de ce projet. Ces règles complètent — elles ne remplacent
+> pas — les règles produit non-négociables ci-dessus, qui restent prioritaires.
+
+### Security (mandatory before any commit)
+- No hardcoded secrets (API keys, passwords, tokens) — use env vars / secret manager.
+- Validate that required secrets are present at startup (`os.environ["KEY"]` raises if missing).
+- All user inputs validated; SQL via parameterized queries only (no string concat).
+- Error messages must not leak sensitive data.
+- **Rotate any secret that may have been exposed** (ex. clé SSH GitHub Actions exposée → à régénérer).
+- Run `bandit -r backend/app/` for static security analysis.
+
+### FastAPI rules
+- App construction in `create_app()`. Keep routers thin; business logic in services/CRUD.
+- Separate request / update / response schemas. DB sessions + auth via `Depends`.
+- `async def` for I/O endpoints; never call sync `requests`/sync SQLAlchemy from async routes.
+- **Never expose** passwords, hashes, access/refresh tokens, or internal auth state in response models. Use `response_model`.
+- CORS origins environment-specific; no wildcard origin + credentials.
+- Validate JWT expiry, issuer, audience, algorithm. Rate-limit auth and write-heavy endpoints.
+- Redact credentials, cookies, auth headers, tokens from logs.
+
+### Testing (TDD — already enforced by CI)
+- Write the test FIRST (red → green → refactor). CI blocks deploy if tests fail.
+- Target ~80% coverage. Unit + integration (API/DB) at minimum.
+- AAA structure (Arrange-Act-Assert) with descriptive test names that state the behavior.
+- Override the exact `Depends` dependency in tests; clear `app.dependency_overrides` after. Prefer async test clients.
+
+### Before major changes
+Always state: what changes, why, which module, which tables/contracts, MVP impact.
