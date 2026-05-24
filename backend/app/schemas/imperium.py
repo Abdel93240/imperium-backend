@@ -304,8 +304,6 @@ class BacklogMissionRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
-    started_at: datetime
-    ended_at: datetime | None
     created_at: datetime
     updated_at: datetime
     decision_score: MissionDecisionScoreSummary | None = None

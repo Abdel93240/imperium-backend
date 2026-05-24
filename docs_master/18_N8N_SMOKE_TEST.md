@@ -1188,3 +1188,50 @@ Expected:
   order;
 - no n8n workflow, AI call, pgvector write, embedding, memory write, or
   public coefficient exposure is involved.
+
+## Patch 8A - Mission Backlog Foundation Smoke Checks
+
+Patch 8A backlog endpoints are backend-only. They do not require an n8n
+workflow, n8n AI Agent, n8n database access, AI provider call, pgvector write,
+embedding generation, memory commit, calendar consumption, or automatic
+replanning.
+
+Create a backlog mission:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: backlog-create-$(date +%s)" \
+  -d '{"title":"Prepare invoice","domain":"business","priority_level":4,"mission_type_category":"cat_e"}' \
+  "$IMPERIUM_API_BASE_URL/api/imperium/missions/backlog"
+```
+
+List backlog missions:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$IMPERIUM_API_BASE_URL/api/imperium/missions/backlog?limit=20&offset=0&domain=business&priority_level=4"
+```
+
+Promote a backlog mission:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Idempotency-Key: backlog-promote-$(date +%s)" \
+  "$IMPERIUM_API_BASE_URL/api/imperium/missions/backlog/$MISSION_ID/promote"
+```
+
+Expected:
+
+- POST routes require `Idempotency-Key`;
+- all routes are JWT-scoped to the current user;
+- creation and promotion remain deterministic backend writes only;
+- no monthly or daily planning is generated;
+- no automatic replanning is triggered;
+- calendar constraints are not consumed yet;
+- public score output may include `intrinsic_score`, `priority_bucket`,
+  `score_status`, `missing_fields`, and `source`;
+- public output must not include `domain_coefficient`, `weighted_score`,
+  `final_weighted_score`, or `position_to_coefficient`.

@@ -1187,6 +1187,24 @@ Decision Framework impact:
 - no AI scheduling, auto-replan, recurrence handling, n8n AI Agent, pgvector
   write, or embeddings are introduced by Patch 7H.
 
+Patch 8A adds the mission backlog foundation.
+
+Decision Framework impact:
+
+- backlog missions are created and listed through backend-owned Imperium APIs;
+- backlog scoring is deterministic and backend-only;
+- a score row is created only when the mission has a domain and at least one
+  supported scoring signal;
+- public backlog APIs expose the `priority_bucket` summary, not internal
+  coefficients or weighted scores;
+- promotion from backlog to active preserves the one-active-mission rule;
+- GET backlog supports pagination and optional `domain` / `priority_level`
+  filtering.
+
+Patch 8A intentionally does not add monthly plan generation, daily plan
+generation, AI calls, n8n workflows, automatic replanning, calendar constraint
+consumption, pgvector writes, embeddings, or automatic memory commits.
+
 ---
 
 ## 18. References

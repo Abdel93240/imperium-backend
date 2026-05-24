@@ -653,3 +653,96 @@ def test_patch_7h_calendar_foundation_stays_minimal_and_backend_owned() -> None:
     assert "providers" not in service_text
     assert "n8n_client" not in service_text
     assert "trigger_n8n" not in service_text
+
+
+def test_backlog_path_has_no_ai_provider_imports() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    backlog_route_section = route_text.split('@router.post(\n    "/missions/backlog"', maxsplit=1)[1].split(
+        '@router.get("/missions/{mission_id}/decision-score"',
+        maxsplit=1,
+    )[0]
+    backlog_service_section = service_text.split("def create_backlog_mission", maxsplit=1)[1].split(
+        "def complete_mission",
+        maxsplit=1,
+    )[0]
+    backlog_text = "\n".join([backlog_route_section, backlog_service_section])
+
+    assert "QwenClient" not in backlog_text
+    assert "providers" not in backlog_text
+    assert "openai" not in backlog_text.lower()
+    assert "anthropic" not in backlog_text.lower()
+    assert "gemini" not in backlog_text.lower()
+    assert "claude" not in backlog_text.lower()
+    assert "opus" not in backlog_text.lower()
+
+
+def test_backlog_path_has_no_n8n_client_imports() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    backlog_route_section = route_text.split('@router.post(\n    "/missions/backlog"', maxsplit=1)[1].split(
+        '@router.get("/missions/{mission_id}/decision-score"',
+        maxsplit=1,
+    )[0]
+    backlog_service_section = service_text.split("def create_backlog_mission", maxsplit=1)[1].split(
+        "def complete_mission",
+        maxsplit=1,
+    )[0]
+    backlog_text = "\n".join([backlog_route_section, backlog_service_section])
+
+    assert "n8n_client" not in backlog_text
+    assert "trigger_n8n" not in backlog_text
+    assert "n8n" not in backlog_text.lower()
+
+
+def test_backlog_path_introduces_no_pgvector_or_embedding_fields() -> None:
+    model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    model_text = model_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    mission_model_section = model_text.split("class ImperiumMission", maxsplit=1)[1].split(
+        "class ImperiumPriorityRule",
+        maxsplit=1,
+    )[0]
+    backlog_schema_section = schema_text.split("class BacklogMissionCreateRequest", maxsplit=1)[1].split(
+        "class CompleteMissionRequest",
+        maxsplit=1,
+    )[0]
+    backlog_service_section = service_text.split("def create_backlog_mission", maxsplit=1)[1].split(
+        "def complete_mission",
+        maxsplit=1,
+    )[0]
+    backlog_text = "\n".join([mission_model_section, backlog_schema_section, backlog_service_section]).lower()
+
+    assert "pgvector" not in backlog_text
+    assert "embedding" not in backlog_text
+    assert "vector =" not in backlog_text
+    assert "vector:" not in backlog_text
+
+
+def test_backlog_public_response_has_no_score_coefficient_exposure() -> None:
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    schema_text = schema_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    backlog_read_section = schema_text.split("class MissionDecisionScoreSummary", maxsplit=1)[1].split(
+        "class MissionWriteResponse",
+        maxsplit=1,
+    )[0]
+    backlog_response_section = service_text.split("def _backlog_mission_read", maxsplit=1)[1].split(
+        "def _promote_response",
+        maxsplit=1,
+    )[0]
+    public_text = "\n".join([backlog_read_section, backlog_response_section])
+
+    assert "priority_bucket" in backlog_read_section
+    assert "domain_coefficient" not in public_text
+    assert "weighted_score" not in public_text
+    assert "final_weighted_score" not in public_text
+    assert "position_to_coefficient" not in public_text

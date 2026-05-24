@@ -214,14 +214,28 @@ def create_backlog_mission(
     return response, False
 
 
-def list_backlog_missions(db: Session, *, current_user: User) -> BacklogMissionListResponse:
+def list_backlog_missions(
+    db: Session,
+    *,
+    current_user: User,
+    limit: int = 20,
+    offset: int = 0,
+    domain: str | None = None,
+    priority_level: int | None = None,
+) -> BacklogMissionListResponse:
+    filters = [
+        ImperiumMission.user_id == current_user.id,
+        ImperiumMission.status == "backlog",
+    ]
+    if domain is not None:
+        filters.append(ImperiumMission.domain == domain)
+    if priority_level is not None:
+        filters.append(ImperiumMission.priority_level == priority_level)
+
     missions = list(
         db.scalars(
             select(ImperiumMission)
-            .where(
-                ImperiumMission.user_id == current_user.id,
-                ImperiumMission.status == "backlog",
-            )
+            .where(*filters)
             .order_by(ImperiumMission.created_at.asc(), ImperiumMission.id.asc())
         )
     )
@@ -248,15 +262,16 @@ def list_backlog_missions(db: Session, *, current_user: User) -> BacklogMissionL
         missions,
         key=lambda mission: _backlog_sort_key(mission, score_by_mission_id.get(mission.id)),
     )
+    page = sorted_missions[offset : offset + limit]
     return BacklogMissionListResponse(
         items=[
             _backlog_mission_read(
                 mission=mission,
                 decision_score=_score_summary_or_none(score_by_mission_id.get(mission.id)),
             )
-            for mission in sorted_missions
+            for mission in page
         ],
-        count=len(sorted_missions),
+        count=len(page),
         ordering=BACKLOG_ORDERING_NOTE,
     )
 

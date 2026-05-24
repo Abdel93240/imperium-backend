@@ -988,8 +988,22 @@ def create_backlog_mission_route(
 def backlog_missions_route(
     current_user: CurrentUserDep,
     db: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    domain: Annotated[
+        str | None,
+        Query(pattern="^(religious|business|finance|health)$"),
+    ] = None,
+    priority_level: Annotated[int | None, Query(ge=1, le=10)] = None,
 ) -> BacklogMissionListResponse:
-    return list_backlog_missions(db, current_user=current_user)
+    return list_backlog_missions(
+        db,
+        current_user=current_user,
+        limit=limit,
+        offset=offset,
+        domain=domain,
+        priority_level=priority_level,
+    )
 
 
 @router.post("/missions/backlog/{mission_id}/promote", response_model=PromoteBacklogMissionResponse)
