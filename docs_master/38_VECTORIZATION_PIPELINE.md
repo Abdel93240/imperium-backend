@@ -89,34 +89,43 @@ V1 implements only HIGH PRIORITY. The pipeline is designed to extend.
 
 ## 5. Embedding Model Choice
 
-### 5.1 V1 default: cloud embedding (OpenAI or Voyage)
+> **DÉCISION V1 (mise à jour) : embedding LOCAL bge-m3 par défaut.**
+> Choix tranché pour la cohérence avec la philosophie privacy de l'écosystème :
+> les données ne doivent pas sortir vers un fournisseur cloud par défaut (cf.
+> règles PRIV-001 / PRIV-002, doc 08). Le cloud (OpenAI/Voyage) devient une
+> option de secours, pas le défaut.
+
+### 5.1 V1 default: local embedding (bge-m3)
 
 ```text
-Model:    text-embedding-3-small (OpenAI) or voyage-3-lite
-Dimension: 1536 (small) or 1024 (voyage-3-lite)
-Cost:     ~$0.02 per million tokens (very cheap)
-Latency:  ~200ms per element
+Model:     bge-m3 (local via Ollama ou HF)
+Dimension: 1024
+Cost:      0€
+Latency:   ~500ms per element
+RAM:       ~2 GB
 ```
 
 Reasoning:
 
-- batch-friendly (vectorize 10-50 elements per batch)
-- low latency overhead
-- excellent quality
-- well-supported in pgvector
-- cheap at our volume (~50 elements/week max)
+- **privacy** : aucune donnée vectorisée ne quitte l'écosystème (cohérent avec la
+  vision « les données restent chez l'utilisateur »)
+- multilingue (FR + AR + EN) — adapté au contenu (dont Path/Dars)
+- coût nul
+- hébergeable sur la machine orchestrateur ou le NAS (cf. F10 topologie infra)
+- volume faible (~50 éléments/semaine max) → la latence locale est sans impact
 
-### 5.2 V2 option: local embedding
+### 5.2 Option de secours: cloud embedding (OpenAI / Voyage)
 
 ```text
-Model:     bge-m3 (local via Ollama or HF)
-Dimension: 1024
-Cost:      0€
-Latency:   ~500ms per element on VPS
-RAM:       ~2 GB
+Model:    text-embedding-3-small (OpenAI) or voyage-3-lite
+Dimension: 1536 (small) or 1024 (voyage-3-lite)
+Cost:     ~$0.02 per million tokens
+Latency:  ~200ms per element
 ```
 
-V1 sticks with cloud. Switch to local if cost or privacy becomes a concern.
+À n'utiliser que si bge-m3 local devient impossible à héberger, et uniquement
+pour des données non sensibles ayant passé le privacy gate. **Ce n'est pas le
+défaut.**
 
 ### 5.3 Embedding consistency
 
@@ -407,10 +416,10 @@ class EmbeddingProvider(Protocol):
         ...
 
 class OpenAIEmbedding(EmbeddingProvider):
-    """V1 default. Calls OpenAI text-embedding-3-small."""
+    """Fallback option. Calls OpenAI text-embedding-3-small (non-default, privacy gate required)."""
 
 class LocalBgeEmbedding(EmbeddingProvider):
-    """V2 fallback. Calls local Ollama bge-m3."""
+    """V1 DEFAULT. Calls local bge-m3 (privacy-first)."""
 
 def get_embedding_provider() -> EmbeddingProvider:
     """Returns the configured provider based on env."""
@@ -419,8 +428,8 @@ def get_embedding_provider() -> EmbeddingProvider:
 Configuration via env:
 
 ```text
-EMBEDDING_PROVIDER=openai
-EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_PROVIDER=local
+EMBEDDING_MODEL=bge-m3
 OPENAI_API_KEY=sk-...
 ```
 

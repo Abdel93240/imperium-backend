@@ -1142,6 +1142,24 @@ Patch 7F-2 still adds no monthly planning, no daily adaptation, no frontend,
 no real AI call, no n8n workflow, no pgvector write, no embeddings, and no
 public coefficient exposure.
 
+Patch 7G makes `imperium_user_priorities` the canonical priority source.
+
+Priority source policy:
+
+- canonical reads/writes use
+  `GET/POST /api/imperium/decision-framework/priorities`;
+- legacy `imperium_priority_rules` rows are kept for historical compatibility
+  and are not deleted;
+- legacy `GET /api/imperium/priorities` returns a compatibility projection
+  generated from `imperium_user_priorities`;
+- legacy priority writes are disabled and return a clear error directing the
+  caller to `/api/imperium/decision-framework/priorities`;
+- dashboard and daily plan priority context read the Decision Framework order;
+- no double-write bridge is introduced between the old and new tables.
+
+Patch 7G adds no migration, no destructive legacy data change, no frontend, no
+real AI call, no n8n workflow, no pgvector write, and no embeddings.
+
 ---
 
 ## 18. References

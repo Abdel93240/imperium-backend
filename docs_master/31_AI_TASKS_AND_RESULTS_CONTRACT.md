@@ -2383,3 +2383,22 @@ Storage contract:
 Patch 7F-2 does not add real AI calls, n8n orchestration, frontend behavior,
 monthly planning, daily adaptation, pgvector writes, embeddings, automatic
 memory writes, or public coefficient exposure.
+
+Patch 7G reconciles legacy Imperium priority rules with the Decision Framework.
+
+Priority source of truth:
+
+- `imperium_user_priorities` is canonical;
+- `/api/imperium/decision-framework/priorities` is the only write surface for
+  user priority order;
+- `imperium_priority_rules` remains as historical/compatibility storage and is
+  not dropped;
+- `GET /api/imperium/priorities` returns a compatibility projection from
+  Decision Framework priorities;
+- `POST /api/imperium/priorities` returns `410 Gone` and instructs callers to
+  use `/api/imperium/decision-framework/priorities`;
+- dashboard and daily plan priority context use `imperium_user_priorities`.
+
+Patch 7G introduces no double-write bridge, no migration, no destructive
+legacy data deletion, no n8n workflow, no AI call, no pgvector write, no
+embedding, and no public coefficient exposure.

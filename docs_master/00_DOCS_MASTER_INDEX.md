@@ -30,3 +30,20 @@ The next backend/n8n work should follow this order:
 3. WR conversational session tables and endpoints.
 4. n8n workflow for WR launch → Qwen → Opus → callback.
 5. Qwen/Ollama Docker deployment on shared n8n network.
+
+---
+
+## Nomenclature (mise à jour)
+
+- **Docs `NN_` (00-58)** : architecture actée / en cours. Numéros inchangés.
+- **Docs `FNN_` (F01-F10)** : features futures (non implémentées, documentées
+  pour plus tard). Espace séparé pour éviter les collisions de numéros.
+- **Docs `99_`** : méta-documentation (règles de nomenclature, audit de cohérence).
+
+Voir `99_REGLES_NOMENCLATURE_DOCS.md` pour les règles complètes.
+
+### Changements de ce nettoyage
+- `43` = ex-`43_v2` (l'ancien a été supprimé, le v2 est devenu officiel).
+- `45` = `N8N_RESPONSIBILITY_MATRIX` ; l'ancien `45_USER_OBJECTIVES` est devenu `F01`.
+- Fichiers corrompus supprimés.
+- Doc 38 : embedding V1 = **bge-m3 local** par défaut (privacy), cloud en secours.
