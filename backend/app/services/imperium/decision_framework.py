@@ -154,39 +154,55 @@ def get_domain_coefficient(position: int) -> int:
 
 
 def get_or_initialize_user_priorities(db: Session, *, current_user: User) -> DecisionFrameworkPrioritiesResponse:
-    priorities = _get_active_user_priorities(db, current_user=current_user)
-    if not priorities:
-        priorities = [
-            ImperiumUserPriority(
-                user_id=current_user.id,
-                domain=domain,
-                position=position,
-                coefficient=get_domain_coefficient(position),
-                is_active=True,
-            )
-            for position, domain in enumerate(DEFAULT_PRIORITY_ORDER, start=1)
-        ]
-        db.add_all(priorities)
-        db.flush()
-        db.commit()
+    priorities = get_canonical_priority_order(db, current_user=current_user, persist_defaults=True)
     return _priorities_response(priorities, status="ok")
 
 
 def get_user_priority_context(db: Session, *, current_user: User) -> list[ImperiumUserPriority]:
+    return get_canonical_priority_order(db, current_user=current_user)
+
+
+def get_canonical_priority_order(
+    db: Session,
+    *,
+    current_user: User,
+    persist_defaults: bool = False,
+) -> list[ImperiumUserPriority]:
+    """Return the Decision Framework priority hierarchy in canonical order.
+
+    `imperium_user_priorities` is the canonical read source. When no persisted
+    rows exist yet, callers can either receive the deterministic V1 default as a
+    transient context or persist that default for public read endpoints.
+    """
+
     priorities = _get_active_user_priorities(db, current_user=current_user)
     if priorities:
-        return priorities
+        return sorted(priorities, key=lambda item: item.position)
+    if persist_defaults:
+        priorities = _build_default_priorities(current_user=current_user)
+        db.add_all(priorities)
+        db.flush()
+        db.commit()
+        return sorted(priorities, key=lambda item: item.position)
+    return _build_default_priorities(current_user=current_user, transient=True)
+
+
+def _build_default_priorities(
+    *,
+    current_user: User,
+    transient: bool = False,
+) -> list[ImperiumUserPriority]:
     now = datetime.now(UTC)
     return [
         ImperiumUserPriority(
-            id=None,
+            id=None if transient else None,
             user_id=current_user.id,
             domain=domain,
             position=position,
             coefficient=get_domain_coefficient(position),
             is_active=True,
-            created_at=now,
-            updated_at=now,
+            created_at=now if transient else None,
+            updated_at=now if transient else None,
         )
         for position, domain in enumerate(DEFAULT_PRIORITY_ORDER, start=1)
     ]

@@ -31,6 +31,7 @@ from app.schemas.imperium import (
     MissionWriteResponse,
     PathItemResponse,
     PathItemWriteResponse,
+    PriorityRuleResponse,
     PriorityRulesResponse,
     ReplacePriorityRulesRequest,
     SkipPathItemRequest,
@@ -109,6 +110,7 @@ from app.services.imperium.decision_framework import (
     DecisionFrameworkIdempotencyConflictError,
     DecisionFrameworkValidationError,
     get_decision_framework_schema,
+    get_canonical_priority_order,
     get_or_initialize_user_priorities,
     get_user_priority_context,
     preview_decision_framework_score,
@@ -138,11 +140,6 @@ from app.services.imperium.path_items import (
     get_today_path_items,
     skip_path_item,
     start_path_item,
-)
-from app.services.imperium.priorities import (
-    IdempotencyConflictError as PriorityIdempotencyConflictError,
-    get_active_priority_rules,
-    replace_priority_rules,
 )
 from app.services.imperium.weekly_report import (
     InvalidWeekStartError,
@@ -191,6 +188,17 @@ from app.services.imperium.weekly_review_conversation import (
 )
 
 router = APIRouter()
+
+_DECISION_FRAMEWORK_PRIORITY_LABELS = {
+    "religious": "Religious",
+    "business": "Business",
+    "finance": "Finance",
+    "health": "Health",
+}
+
+
+def _decision_framework_priority_label(domain: str) -> str:
+    return _DECISION_FRAMEWORK_PRIORITY_LABELS.get(domain, domain.replace("_", " ").title())
 
 
 @router.get("/decision-framework/schema", response_model=DecisionFrameworkSchemaResponse)
@@ -968,8 +976,35 @@ def mission_decision_score_route(
 
 @router.get("/priorities", response_model=PriorityRulesResponse)
 def get_priorities_route(current_user: CurrentUserDep, db: SessionDep) -> PriorityRulesResponse:
-    priorities = get_active_priority_rules(db, current_user=current_user)
-    return PriorityRulesResponse(priorities=priorities, status="ok")
+    """Deprecated legacy priority read.
+
+    Decision Framework priorities in `imperium_user_priorities` are canonical.
+    This route remains only as a compatibility projection for old clients.
+    """
+
+    priorities = get_canonical_priority_order(db, current_user=current_user, persist_defaults=True)
+    return PriorityRulesResponse(
+        priorities=[
+            PriorityRuleResponse(
+                id=priority.id,
+                priority_key=priority.domain,
+                label=_decision_framework_priority_label(priority.domain),
+                rank_order=priority.position,
+                importance_score=None,
+                is_active=priority.is_active,
+                updated_by_event_id=None,
+                created_at=priority.created_at,
+                updated_at=priority.updated_at,
+            )
+            for priority in priorities
+        ],
+        status="legacy_superseded",
+        deprecated=True,
+        legacy=True,
+        superseded_by="/api/imperium/decision-framework/priorities",
+        canonical_source="imperium_user_priorities",
+        message="Legacy priority rules are superseded; Decision Framework priorities are canonical.",
+    )
 
 
 @router.post("/priorities", response_model=PriorityRulesResponse)
@@ -981,34 +1016,25 @@ def replace_priorities_route(
     db: SessionDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> PriorityRulesResponse:
-    if not idempotency_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing Idempotency-Key header.",
-        )
+    """Deprecated legacy priority write.
 
-    try:
-        result, duplicate = replace_priority_rules(
-            db,
-            current_user=current_user,
-            payload=payload,
-            idempotency_key=idempotency_key,
-            request_method=request.method,
-            request_path=request.url.path,
-        )
-    except PriorityIdempotencyConflictError as exc:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Priority rules or event conflict with an existing record.",
-        ) from exc
+    Decision Framework priorities in `imperium_user_priorities` are canonical.
+    Legacy `imperium_priority_rules` writes are blocked to prevent two active
+    hierarchy writers from coexisting.
+    """
 
-    if duplicate:
-        response.status_code = status.HTTP_200_OK
-    return result
+    _ = (payload, request, response, current_user, db, idempotency_key)
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "status": "legacy_superseded",
+            "deprecated": True,
+            "legacy": True,
+            "superseded_by": "/api/imperium/decision-framework/priorities",
+            "canonical_source": "imperium_user_priorities",
+            "message": "Use Decision Framework priorities; legacy priority rule writes are disabled.",
+        },
+    )
 
 
 @router.get("/weekly-review/state", response_model=WeeklyReviewStateResponse | None)

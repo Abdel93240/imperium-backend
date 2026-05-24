@@ -65,22 +65,6 @@ The 4 default domains are: Religieux, Business, Finances, Santé.
 
 The hierarchy is **fully user-controllable**. If the user decides tomorrow that finances must come first, that's their right.
 
-### Patch 7G — Priority Reconciliation
-
-Patch 7G makes `imperium_user_priorities` the canonical read source for the
-user's priority hierarchy.
-
-- Dashboard priority context is read from `imperium_user_priorities`.
-- Daily plan priority context is read from `imperium_user_priorities`.
-- Mission scoring continues to use the Decision Framework hierarchy.
-- Legacy `imperium_priority_rules` remains compatibility-only and must not be
-  used as canonical ordering.
-- Legacy priority writes are disabled; callers must use
-  `/api/imperium/decision-framework/priorities`.
-
-No AI call, n8n AI Agent, n8n DB write, pgvector write, embedding generation,
-or automatic memory commit is introduced by this reconciliation patch.
-
 ### 3.2 The coefficients (invisible)
 
 Behind each position sits a multiplier:
@@ -1068,116 +1052,6 @@ The system gets sharper with every WR.
 
 ---
 
-## 17A. Backend V1 Public Contract Status
-
-Patch 7E aligns the implemented backend score-preview contract with this
-document before mission score storage is enabled.
-
-Public score-preview criteria are:
-
-```text
-deadline
-impact
-mission_type
-dependency
-recurrence
-```
-
-The public explanation uses these keys:
-
-```text
-deadline_points
-impact_points
-mission_type_points
-dependency_points
-recurrence_points
-```
-
-Temporary input aliases:
-
-- `effort` may still be accepted as an alias for `mission_type`;
-- `alignment` may still be accepted as an alias for `recurrence`;
-- both aliases are reported through explicit warnings and are not canonical
-  public vocabulary.
-
-Coefficient privacy:
-
-- the user-facing API exposes the user's domain order and `domain_position`;
-- raw coefficients remain internal;
-- public responses do not expose `domain_coefficient`,
-  `position_to_coefficient`, `weighted_score`, or `final_weighted_score`;
-- score-preview returns a `priority_bucket` from 1 to 10 instead of raw
-  coefficient math.
-
-Patch 7E adds no mission score persistence, no calendar tables, no frontend,
-no real AI call, no n8n workflow, no pgvector write, and no embeddings.
-
-Patch 7F-1 prepares `imperium_missions` for later Decision Framework scoring.
-
-Structural mission fields now available:
-
-```text
-domain                 nullable, one of religious/business/finance/health
-priority_level         nullable, 1..10
-mission_type_category  nullable, cat_a..cat_i
-status                 now also allows backlog
-```
-
-Important boundaries:
-
-- these fields are nullable while legacy and active mission flows migrate;
-- `priority_level` existed before Patch 7F-1 and now receives explicit
-  database validation;
-- no score is calculated from these fields by 7F-1 alone;
-- the backlog status is storage-compatible, but the full backlog engine is not
-  implemented yet;
-- coefficients remain internal and are not accepted from clients.
-
-Patch 7F-2 adds controlled backend-only mission score storage on
-`POST /api/imperium/missions/start`.
-
-Storage rules:
-
-- if `domain` is absent, no score row is created;
-- if no scoring signal is present, no score row is created;
-- scoring signals are `deadline_at`, `impact`, `mission_type`,
-  `dependency`, `recurrence`, or `mission_type_category`;
-- when `mission_type` is absent, `mission_type_category` can be used as the
-  mission type scoring signal;
-- client-submitted score values are rejected (`intrinsic_score`,
-  `weighted_score`, `domain_coefficient`, `final_weighted_score`,
-  `coefficient`, `score`, `priority_bucket`);
-- the backend computes and stores internal coefficient/weighted score fields
-  in `imperium_mission_scores`;
-- the public response only exposes `intrinsic_score`, `priority_bucket`,
-  `score_status`, `missing_fields`, and `source`;
-- `(user_id, mission_id, source)` is unique for mission scores so retries
-  cannot create duplicate `decision_framework_v1` score rows.
-
-Patch 7F-2 still adds no monthly planning, no daily adaptation, no frontend,
-no real AI call, no n8n workflow, no pgvector write, no embeddings, and no
-public coefficient exposure.
-
-Patch 7G makes `imperium_user_priorities` the canonical priority source.
-
-Priority source policy:
-
-- canonical reads/writes use
-  `GET/POST /api/imperium/decision-framework/priorities`;
-- legacy `imperium_priority_rules` rows are kept for historical compatibility
-  and are not deleted;
-- legacy `GET /api/imperium/priorities` returns a compatibility projection
-  generated from `imperium_user_priorities`;
-- legacy priority writes are disabled and return a clear error directing the
-  caller to `/api/imperium/decision-framework/priorities`;
-- dashboard and daily plan priority context read the Decision Framework order;
-- no double-write bridge is introduced between the old and new tables.
-
-Patch 7G adds no migration, no destructive legacy data change, no frontend, no
-real AI call, no n8n workflow, no pgvector write, and no embeddings.
-
----
-
 ## 18. References
 
 - `08_NON_NEGOTIABLE_RULES.md` — backend authority
@@ -1205,6 +1079,38 @@ The brain is unified, the logic is shared, the user is master.
 
 ---
 
+## 20. Patch 6I-6L Implementation Status
+
+Patch 6I-6L implements the deterministic V1 foundation only.
+
+Backend tables:
+
+- `imperium_user_priorities`
+- `imperium_mission_scores`
+
+Implemented endpoints:
+
+```http
+GET  /api/imperium/decision-framework/schema
+GET  /api/imperium/decision-framework/priorities
+POST /api/imperium/decision-framework/priorities
+POST /api/imperium/decision-framework/score-preview
+```
+
+Rules:
+
+- the user-facing priority hierarchy exposes the ordered domains, not the internal coefficients;
+- the internal coefficient mapping is fixed at position 1 = 10, position 2 = 8, position 3 = 5, position 4 = 4;
+- default hierarchy is `religious`, `business`, `finance`, `health`;
+- priority updates must contain the four supported domains exactly once;
+- score preview is deterministic and read-only;
+- `score-preview` does not write `imperium_mission_scores`;
+- no monthly planning, daily adaptation, real AI call, embedding, pgvector write, or n8n workflow is implemented in this patch.
+
+The optional persisted mission-score recompute endpoint is deferred until the mission/backlog model has enough structured fields for stable scoring without guessing.
+
+---
+
 **Document version:** 1.0
-**Status:** Architectural specification — V2 implementation
-**Last updated:** 2026-04-29
+**Status:** Architectural specification + deterministic V1 backend foundation
+**Last updated:** 2026-05-09

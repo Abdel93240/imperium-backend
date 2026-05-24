@@ -1,32 +1,10 @@
 # 26 - Priority Rules Workflow
 
-## SUPERSEDED BY DECISION FRAMEWORK
-
-Patch 7G supersedes `imperium_priority_rules` as a priority hierarchy source.
-
-The canonical hierarchy is now `imperium_user_priorities`, owned by the
-Decision Framework endpoints:
-
-```text
-GET  /api/imperium/decision-framework/priorities
-POST /api/imperium/decision-framework/priorities
-```
-
-`imperium_priority_rules` remains legacy compatibility only. It must not be
-used by dashboard, daily plan generation, mission scoring, or new planning
-logic as the canonical priority order. Legacy read surfaces may project the
-Decision Framework hierarchy for old clients, but legacy writes are disabled.
-
-No legacy table is deleted in Patch 7G.
-
 ## Scope
 
-Historically, Imperium V1 stored the user's explicit priority hierarchy in
-`imperium_priority_rules`.
+Imperium V1 stores the user's explicit priority hierarchy.
 
-This workflow is retained only to document the legacy compatibility table. New
-strategy, planning, scoring, dashboard, and daily-plan reads must use
-`imperium_user_priorities` through the Decision Framework.
+The backend does not hard-code life priorities and does not decide strategy from this table yet. Future planning/AI workflows may read these rules, but they must not silently rewrite them.
 
 Not implemented in this workflow:
 
@@ -39,9 +17,9 @@ Not implemented in this workflow:
 
 ## Database Table
 
-Legacy table: `imperium_priority_rules`
+Canonical table: `imperium_priority_rules`
 
-Purpose: historical compatibility storage for old priority settings.
+Purpose: store active and historical user-owned priority settings.
 
 Columns:
 
@@ -77,9 +55,6 @@ All endpoints require JWT authentication.
 
 `GET /api/imperium/priorities`
 
-Deprecated compatibility route. It projects the canonical Decision Framework
-priority order and includes deprecation metadata.
-
 Response:
 
 ```json
@@ -99,21 +74,13 @@ Response:
   ],
   "event_id": null,
   "idempotency_key": null,
-  "status": "legacy_superseded",
-  "deprecated": true,
-  "legacy": true,
-  "superseded_by": "/api/imperium/decision-framework/priorities",
-  "canonical_source": "imperium_user_priorities",
-  "message": "Legacy priority rules are superseded; Decision Framework priorities are canonical."
+  "status": "ok"
 }
 ```
 
 ### Replace Full Priority Hierarchy
 
 `POST /api/imperium/priorities`
-
-Deprecated. Patch 7G disables legacy writes and returns `410 Gone`. Use
-`POST /api/imperium/decision-framework/priorities`.
 
 Headers:
 
@@ -160,9 +127,12 @@ Validation:
 
 Behavior:
 
-- Returns `410 Gone`.
-- Does not create or update `imperium_priority_rules`.
-- Points callers to `/api/imperium/decision-framework/priorities`.
+- Uses authenticated `user_id`; client-supplied `user_id` is not accepted.
+- Appends `priority.rules.updated`.
+- Deactivates old active rules and inserts the new hierarchy.
+- Returns the active ordered priorities.
+- Duplicate retry with same `Idempotency-Key` and same payload returns the original response.
+- Same `Idempotency-Key` with different payload returns `409`.
 
 ## Event
 
@@ -216,12 +186,11 @@ curl -sS http://127.0.0.1:8000/api/health/db
 Expected checks:
 
 - Unauthenticated `GET /api/imperium/priorities` returns `401`.
-- Authenticated `GET /api/imperium/priorities` returns a legacy projection of
-  Decision Framework priorities ordered by `rank_order`.
-- Authenticated `GET /api/imperium/priorities` includes `deprecated=true`,
-  `legacy=true`, `canonical_source=imperium_user_priorities`, and
-  `superseded_by=/api/imperium/decision-framework/priorities`.
-- Authenticated `POST /api/imperium/priorities` returns `410 Gone`.
-- Legacy `POST` creates no `priority.rules.updated` event.
-- Legacy `POST` creates or updates no `imperium_priority_rules` rows.
+- Unauthenticated `POST /api/imperium/priorities` returns `401`.
+- Valid update returns `200`.
+- Duplicate idempotency key returns the same response and creates no duplicate event.
+- Duplicate rank returns `422`.
+- Duplicate priority key returns `422`.
+- `GET` returns active priorities ordered by `rank_order`.
+- `events` contains `priority.rules.updated`.
 - `n8n_db` is not touched.

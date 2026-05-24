@@ -11,7 +11,7 @@ from app.models.imperium import (
     ImperiumDayReview,
     ImperiumMission,
     ImperiumPathItem,
-    ImperiumPriorityRule,
+    ImperiumUserPriority,
 )
 from app.models.vault import VaultTransaction
 from app.schemas.imperium import (
@@ -25,9 +25,16 @@ from app.schemas.imperium import (
     PathItemResponse,
 )
 from app.services.imperium.weekly_review_state import get_weekly_review_banner
+from app.services.imperium.decision_framework import get_canonical_priority_order
 
 PARIS_TIMEZONE = "Europe/Paris"
 ZERO = Decimal("0.00")
+CANONICAL_PRIORITY_LABELS = {
+    "religious": "Religious",
+    "business": "Business",
+    "finance": "Finance",
+    "health": "Health",
+}
 
 
 def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashboardResponse:
@@ -52,16 +59,7 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
             .limit(5)
         )
     )
-    priorities = list(
-        db.scalars(
-            select(ImperiumPriorityRule)
-            .where(
-                ImperiumPriorityRule.user_id == current_user.id,
-                ImperiumPriorityRule.is_active.is_(True),
-            )
-            .order_by(ImperiumPriorityRule.rank_order.asc(), ImperiumPriorityRule.created_at.asc())
-        )
-    )
+    priorities = get_canonical_priority_order(db, current_user=current_user)
     latest_day_review = db.scalar(
         select(ImperiumDayReview)
         .where(ImperiumDayReview.user_id == current_user.id)
@@ -152,12 +150,12 @@ def _dashboard_mission(mission: ImperiumMission) -> DashboardMission:
     )
 
 
-def _dashboard_priority(priority: ImperiumPriorityRule) -> DashboardPriority:
+def _dashboard_priority(priority: ImperiumUserPriority) -> DashboardPriority:
     return DashboardPriority(
-        priority_key=priority.priority_key,
-        label=priority.label,
-        rank_order=priority.rank_order,
-        importance_score=priority.importance_score,
+        priority_key=priority.domain,
+        label=CANONICAL_PRIORITY_LABELS.get(priority.domain, priority.domain.replace("_", " ").title()),
+        rank_order=priority.position,
+        importance_score=None,
     )
 
 

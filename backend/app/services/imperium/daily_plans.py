@@ -16,11 +16,17 @@ from app.models.imperium import (
     ImperiumDayReview,
     ImperiumMission,
     ImperiumPathItem,
-    ImperiumPriorityRule,
 )
 from app.schemas.imperium import CreateDailyPlanRequest, DailyPlanResponse, DailyPlanWriteResponse
+from app.services.imperium.decision_framework import get_canonical_priority_order
 
 PARIS_TIMEZONE = "Europe/Paris"
+CANONICAL_PRIORITY_LABELS = {
+    "religious": "Religious",
+    "business": "Business",
+    "finance": "Finance",
+    "health": "Health",
+}
 
 
 class IdempotencyConflictError(ValueError):
@@ -282,17 +288,7 @@ def _collect_plan_sources(db: Session, *, current_user: User, local_date: date) 
             )
         )
     )
-    priorities = list(
-        db.scalars(
-            select(ImperiumPriorityRule)
-            .where(
-                ImperiumPriorityRule.user_id == current_user.id,
-                ImperiumPriorityRule.is_active.is_(True),
-            )
-            .order_by(ImperiumPriorityRule.rank_order.asc(), ImperiumPriorityRule.created_at.asc())
-            .limit(5)
-        )
-    )
+    priorities = get_canonical_priority_order(db, current_user=current_user)
     latest_day_review = db.scalar(
         select(ImperiumDayReview)
         .where(ImperiumDayReview.user_id == current_user.id)
@@ -333,13 +329,17 @@ def _collect_plan_sources(db: Session, *, current_user: User, local_date: date) 
         plan_blocks.append(
             {
                 "block_type": "priority_context",
+                "source": "decision_framework",
                 "priorities": [
                     {
-                        "source_id": str(priority.id),
-                        "priority_key": priority.priority_key,
-                        "label": priority.label,
-                        "rank_order": priority.rank_order,
-                        "importance_score": priority.importance_score,
+                        "source_id": str(priority.id) if priority.id else None,
+                        "priority_key": priority.domain,
+                        "label": CANONICAL_PRIORITY_LABELS.get(
+                            priority.domain,
+                            priority.domain.replace("_", " ").title(),
+                        ),
+                        "rank_order": priority.position,
+                        "importance_score": None,
                     }
                     for priority in priorities
                 ],
@@ -351,7 +351,8 @@ def _collect_plan_sources(db: Session, *, current_user: User, local_date: date) 
         "generated_from": {
             "current_mission_id": str(current_mission.id) if current_mission else None,
             "path_item_ids": [str(item.id) for item in path_items],
-            "priority_rule_ids": [str(priority.id) for priority in priorities],
+            "priority_source": "decision_framework",
+            "decision_framework_priority_ids": [str(priority.id) for priority in priorities if priority.id],
             "latest_day_review_id": str(latest_day_review.id) if latest_day_review else None,
         },
         "plan_blocks": plan_blocks,

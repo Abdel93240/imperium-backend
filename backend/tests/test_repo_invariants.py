@@ -551,3 +551,44 @@ def test_patch_7f2_mission_score_storage_keeps_public_boundary_private() -> None
     assert "embedding =" not in service_text.lower()
     assert "embedding:" not in service_text.lower()
     assert "trigger_n8n" not in service_text
+
+
+def test_patch_7g_priority_reconciliation_uses_decision_framework_as_canonical_source() -> None:
+    dashboard_path = BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py"
+    daily_plans_path = BACKEND_ROOT / "app" / "services" / "imperium" / "daily_plans.py"
+    decision_framework_path = BACKEND_ROOT / "app" / "services" / "imperium" / "decision_framework.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    dashboard_text = dashboard_path.read_text(encoding="utf-8")
+    daily_plans_text = daily_plans_path.read_text(encoding="utf-8")
+    decision_framework_text = decision_framework_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+
+    assert "ImperiumPriorityRule" not in dashboard_text
+    assert "imperium_priority_rules" not in dashboard_text
+    assert "get_canonical_priority_order" in dashboard_text
+
+    assert "ImperiumPriorityRule" not in daily_plans_text
+    assert "imperium_priority_rules" not in daily_plans_text
+    assert "priority_rule_ids" not in daily_plans_text
+    assert "get_canonical_priority_order" in daily_plans_text
+    assert '"priority_source": "decision_framework"' in daily_plans_text
+
+    assert "def get_canonical_priority_order" in decision_framework_text
+    assert "ImperiumUserPriority" in decision_framework_text
+    assert "imperium_user_priorities" in decision_framework_text
+
+    legacy_get_section = route_text.split('@router.get("/priorities"', maxsplit=1)[1].split(
+        '@router.post("/priorities"',
+        maxsplit=1,
+    )[0]
+    legacy_post_section = route_text.split('@router.post("/priorities"', maxsplit=1)[1].split(
+        '@router.get("/weekly-review/state"',
+        maxsplit=1,
+    )[0]
+
+    assert "get_canonical_priority_order" in legacy_get_section
+    assert "get_active_priority_rules" not in legacy_get_section
+    assert "legacy_superseded" in legacy_get_section
+    assert "imperium_user_priorities" in legacy_get_section
+    assert "HTTP_410_GONE" in legacy_post_section
+    assert "replace_priority_rules" not in legacy_post_section

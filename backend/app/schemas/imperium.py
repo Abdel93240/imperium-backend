@@ -276,6 +276,11 @@ class PriorityRulesResponse(BaseModel):
     event_id: str | None = None
     idempotency_key: str | None = None
     status: str
+    deprecated: bool = False
+    legacy: bool = False
+    superseded_by: str | None = None
+    canonical_source: str | None = None
+    message: str | None = None
 
 
 class DecisionFrameworkDomain(StrEnum):

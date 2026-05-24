@@ -65,22 +65,6 @@ The 4 default domains are: Religieux, Business, Finances, Santé.
 
 The hierarchy is **fully user-controllable**. If the user decides tomorrow that finances must come first, that's their right.
 
-### Patch 7G — Priority Reconciliation
-
-Patch 7G makes `imperium_user_priorities` the canonical read source for the
-user's priority hierarchy.
-
-- Dashboard priority context is read from `imperium_user_priorities`.
-- Daily plan priority context is read from `imperium_user_priorities`.
-- Mission scoring continues to use the Decision Framework hierarchy.
-- Legacy `imperium_priority_rules` remains compatibility-only and must not be
-  used as canonical ordering.
-- Legacy priority writes are disabled; callers must use
-  `/api/imperium/decision-framework/priorities`.
-
-No AI call, n8n AI Agent, n8n DB write, pgvector write, embedding generation,
-or automatic memory commit is introduced by this reconciliation patch.
-
 ### 3.2 The coefficients (invisible)
 
 Behind each position sits a multiplier:
@@ -1157,24 +1141,6 @@ Storage rules:
 Patch 7F-2 still adds no monthly planning, no daily adaptation, no frontend,
 no real AI call, no n8n workflow, no pgvector write, no embeddings, and no
 public coefficient exposure.
-
-Patch 7G makes `imperium_user_priorities` the canonical priority source.
-
-Priority source policy:
-
-- canonical reads/writes use
-  `GET/POST /api/imperium/decision-framework/priorities`;
-- legacy `imperium_priority_rules` rows are kept for historical compatibility
-  and are not deleted;
-- legacy `GET /api/imperium/priorities` returns a compatibility projection
-  generated from `imperium_user_priorities`;
-- legacy priority writes are disabled and return a clear error directing the
-  caller to `/api/imperium/decision-framework/priorities`;
-- dashboard and daily plan priority context read the Decision Framework order;
-- no double-write bridge is introduced between the old and new tables.
-
-Patch 7G adds no migration, no destructive legacy data change, no frontend, no
-real AI call, no n8n workflow, no pgvector write, and no embeddings.
 
 ---
 
