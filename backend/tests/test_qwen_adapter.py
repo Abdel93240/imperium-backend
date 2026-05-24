@@ -111,6 +111,19 @@ def test_real_adapter_http_error_raises_provider_error() -> None:
         client.call(prompt="return json", mode="route")
 
 
+def test_real_adapter_rejects_non_http_provider_url() -> None:
+    client = QwenClient(
+        settings=_settings(
+            qwen_enabled=True,
+            qwen_dry_run=False,
+            qwen_base_url="file:///tmp/qwen.sock",
+        ),
+    )
+
+    with pytest.raises(QwenProviderError, match="provider call failed"):
+        client.call(prompt="return json", mode="route")
+
+
 def test_wr_qwen_helper_returns_proposal_without_canonical_final_report() -> None:
     session = _session()
     client = QwenClient(settings=_settings())

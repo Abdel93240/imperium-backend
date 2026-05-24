@@ -592,3 +592,64 @@ def test_patch_7g_priority_reconciliation_uses_decision_framework_as_canonical_s
     assert "imperium_user_priorities" in legacy_get_section
     assert "HTTP_410_GONE" in legacy_post_section
     assert "replace_priority_rules" not in legacy_post_section
+
+
+def test_patch_7h_calendar_foundation_stays_minimal_and_backend_owned() -> None:
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260512_0022_imperium_calendar_events_foundation.py"
+    model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "calendar.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    migration_text = migration_path.read_text(encoding="utf-8")
+    model_text = model_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    model_section = model_text.split("class ImperiumCalendarEvent", maxsplit=1)[1].split(
+        "class ImperiumMissionScore",
+        maxsplit=1,
+    )[0]
+    schema_section = schema_text.split("class CalendarEventCreate", maxsplit=1)[1].split(
+        "class DecisionFrameworkSchemaResponse",
+        maxsplit=1,
+    )[0]
+    lowered_combined = "\n".join([migration_text, model_section, schema_section, service_text]).lower()
+
+    assert 'revision: str = "20260512_0022"' in migration_text
+    assert 'down_revision: str | None = "20260511_0021"' in migration_text
+    assert "imperium_calendar_events" in migration_text
+    assert "event_type IN ('event', 'deadline', 'vacation')" in migration_text
+    assert "ends_at IS NULL OR ends_at >= starts_at" in migration_text
+    assert "imperium_calendar_events_user_starts_at_idx" in migration_text
+    assert "imperium_calendar_events_user_event_type_idx" in migration_text
+    assert "class ImperiumCalendarEvent" in model_text
+    assert "CalendarEventCreate" in schema_section
+    assert "CalendarEventRead" in schema_section
+    assert "extra=\"forbid\"" in schema_section
+    assert "Idempotency-Key" in route_text
+    assert '"/calendar/events"' in route_text
+    assert "response_model=CalendarEventRead" in route_text
+    assert 'get("/calendar/events"' in route_text.lower()
+    assert 'delete("/calendar/events/{event_id}"' in route_text.lower()
+
+    for forbidden in (
+        "recurrence",
+        "rrule",
+        "repeat",
+        "google",
+        "apple",
+        "sync_token",
+        "notification",
+        "reminder",
+        "ai_metadata",
+        "ai_schedule",
+        "embedding",
+        "pgvector",
+    ):
+        assert forbidden not in lowered_combined
+        assert forbidden not in model_section.lower()
+
+    assert "QwenClient" not in service_text
+    assert "providers" not in service_text
+    assert "n8n_client" not in service_text
+    assert "trigger_n8n" not in service_text

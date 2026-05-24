@@ -11,6 +11,10 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    CalendarEventCreate,
+    CalendarEventDeleteResponse,
+    CalendarEventRead,
+    CalendarEventType,
     CompleteMissionRequest,
     CreateDailyPlanRequest,
     CreatePathItemRequest,
@@ -76,6 +80,14 @@ from app.schemas.weekly_review import (
     WeeklyReviewRevisionRequest,
     WeeklyReviewSessionRead,
     WeeklyReviewStoredFinalReportsResponse,
+)
+from app.services.imperium.calendar import (
+    CalendarEventIdempotencyConflictError,
+    CalendarEventNotFoundError,
+    CalendarEventValidationError,
+    create_calendar_event,
+    delete_calendar_event,
+    list_calendar_events,
 )
 from app.services.ai.memories import (
     AIMemoryIdempotencyConflictError,
@@ -377,6 +389,79 @@ def memory_detail_route(memory_id: UUID, current_user: CurrentUserDep, db: Sessi
 @router.get("/dashboard", response_model=ImperiumDashboardResponse)
 def dashboard_route(current_user: CurrentUserDep, db: SessionDep) -> ImperiumDashboardResponse:
     return get_dashboard_snapshot(db, current_user=current_user)
+
+
+@router.post(
+    "/calendar/events",
+    response_model=CalendarEventRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_calendar_event_route(
+    payload: CalendarEventCreate,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> CalendarEventRead:
+    _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = create_calendar_event(
+            db,
+            current_user=current_user,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except CalendarEventIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Calendar event or event log conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.get("/calendar/events", response_model=list[CalendarEventRead])
+def list_calendar_events_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    from_: Annotated[datetime | None, Query(alias="from")] = None,
+    to: Annotated[datetime | None, Query(alias="to")] = None,
+    event_type: CalendarEventType | None = None,
+) -> list[CalendarEventRead]:
+    try:
+        events = list_calendar_events(
+            db,
+            current_user=current_user,
+            starts_from=from_,
+            starts_to=to,
+            event_type=event_type,
+        )
+    except CalendarEventValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    return [CalendarEventRead.model_validate(event) for event in events]
+
+
+@router.delete("/calendar/events/{event_id}", response_model=CalendarEventDeleteResponse)
+def delete_calendar_event_route(
+    event_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> CalendarEventDeleteResponse:
+    try:
+        deleted_id = delete_calendar_event(db, current_user=current_user, event_id=event_id)
+    except CalendarEventNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return CalendarEventDeleteResponse(id=deleted_id, status="deleted")
 
 
 @router.get("/report/week", response_model=WeeklyReportResponse)

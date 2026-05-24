@@ -1176,6 +1176,17 @@ Priority source policy:
 Patch 7G adds no migration, no destructive legacy data change, no frontend, no
 real AI call, no n8n workflow, no pgvector write, and no embeddings.
 
+Patch 7H adds the minimal Imperium Calendar foundation.
+
+Decision Framework impact:
+
+- calendar events are stored as backend-owned constraints only;
+- current daily and monthly planning do not automatically consume them yet;
+- future monthly planning may use calendar constraints as input context when
+  the planning layer is explicitly implemented;
+- no AI scheduling, auto-replan, recurrence handling, n8n AI Agent, pgvector
+  write, or embeddings are introduced by Patch 7H.
+
 ---
 
 ## 18. References

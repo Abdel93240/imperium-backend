@@ -4807,6 +4807,24 @@ def test_n8n_client_refuses_unsigned_outbound_payload_when_secret_missing() -> N
     assert n8n_client.n8n_is_configured(settings) is False
 
 
+def test_n8n_client_rejects_non_http_base_url() -> None:
+    settings = Settings(
+        jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
+        internal_webhook_secret="strong-internal-secret-for-tests-long",
+        n8n_base_url="file:///tmp/n8n.sock",
+        n8n_webhook_secret="n8n-webhook-secret-for-tests",
+    )
+
+    with pytest.raises(n8n_client.N8NConfigurationError, match="http"):
+        n8n_client.build_signed_n8n_request(
+            path="imperium/wr/interactive-start-qwen-dry-run",
+            payload={"task_id": "task"},
+            idempotency_key="n8n-trigger-bad-url",
+            settings=settings,
+            timestamp=123,
+        )
+
+
 def test_launch_with_n8n_enabled_and_secret_sends_signed_headers(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()

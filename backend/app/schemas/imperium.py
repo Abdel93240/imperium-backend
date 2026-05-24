@@ -316,6 +316,69 @@ class DecisionFrameworkPrioritiesUpdateRequest(BaseModel):
         return [domain.strip().lower() for domain in value]
 
 
+class CalendarEventType(StrEnum):
+    event = "event"
+    deadline = "deadline"
+    vacation = "vacation"
+
+
+class CalendarEventCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_type: CalendarEventType
+    title: str = Field(min_length=1, max_length=200)
+    starts_at: datetime
+    ends_at: datetime | None = None
+    blocks_time: bool = True
+    location: str | None = None
+    notes: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def strip_calendar_title(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value cannot be empty.")
+        return stripped
+
+    @field_validator("location", "notes")
+    @classmethod
+    def strip_optional_calendar_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return stripped
+
+    @model_validator(mode="after")
+    def validate_calendar_range(self) -> "CalendarEventCreate":
+        if self.ends_at is not None and self.ends_at < self.starts_at:
+            raise ValueError("ends_at must be greater than or equal to starts_at.")
+        return self
+
+
+class CalendarEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    event_type: CalendarEventType
+    title: str
+    starts_at: datetime
+    ends_at: datetime | None
+    blocks_time: bool
+    location: str | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CalendarEventDeleteResponse(BaseModel):
+    id: UUID
+    status: str
+
+
 class DecisionFrameworkSchemaResponse(BaseModel):
     scoring_enabled: bool
     monthly_planning_enabled: bool

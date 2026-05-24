@@ -240,6 +240,42 @@ class ImperiumUserPriority(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class ImperiumCalendarEvent(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_calendar_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('event', 'deadline', 'vacation')",
+            name="imperium_calendar_events_event_type_check",
+        ),
+        CheckConstraint(
+            "ends_at IS NULL OR ends_at >= starts_at",
+            name="imperium_calendar_events_date_range_check",
+        ),
+        Index("imperium_calendar_events_user_starts_at_idx", "user_id", "starts_at"),
+        Index("imperium_calendar_events_user_event_type_idx", "user_id", "event_type"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    blocks_time: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class ImperiumMissionScore(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_mission_scores"
     __table_args__ = (

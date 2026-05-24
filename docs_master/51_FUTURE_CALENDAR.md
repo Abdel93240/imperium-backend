@@ -6,6 +6,39 @@
 
 ---
 
+## Patch 7H — Minimal Foundation
+
+Patch 7H adds only the backend storage foundation for calendar constraints.
+
+Implemented scope:
+
+- `imperium_calendar_events` table;
+- event types limited to `event`, `deadline`, and `vacation`;
+- manual create/list/delete backend APIs;
+- ownership-scoped reads and deletes;
+- `Idempotency-Key` required for event creation;
+- date validation: `ends_at` must be null or greater than/equal to `starts_at`.
+
+Strict non-goals for Patch 7H:
+
+- no recurrence fields;
+- no recurrence engine;
+- no automatic replanning;
+- no AI scheduling;
+- no n8n AI Agent;
+- no n8n database write;
+- no pgvector write;
+- no embeddings;
+- no notifications;
+- no Google/Apple/Samsung calendar sync;
+- no mobile/frontend implementation.
+
+This patch is **not** the full V3 calendar system described below. It only
+creates a safe backend-owned table and API layer so future planning can consume
+calendar constraints later without inventing storage under pressure.
+
+---
+
 ## 1. Purpose
 
 Provide the AI brain with knowledge of **future contexts** that should impact its decisions:

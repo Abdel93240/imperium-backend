@@ -1,5 +1,48 @@
 # 18 - n8n Smoke Test
 
+## Patch 7H - Calendar Foundation API Smoke Examples
+
+Patch 7H calendar endpoints are backend-only. They do not require an n8n
+workflow, n8n AI Agent, or n8n database access.
+
+Manual backend smoke examples:
+
+```http
+POST /api/imperium/calendar/events
+Idempotency-Key: calendar-smoke-001
+Content-Type: application/json
+Authorization: Bearer <access_token>
+```
+
+```json
+{
+  "event_type": "event",
+  "title": "Doctor appointment",
+  "starts_at": "2026-06-01T09:00:00Z",
+  "ends_at": "2026-06-01T10:00:00Z",
+  "blocks_time": true,
+  "location": "Paris",
+  "notes": "Bring documents"
+}
+```
+
+```http
+GET /api/imperium/calendar/events?from=2026-06-01T00:00:00Z&to=2026-06-07T23:59:59Z&event_type=event
+Authorization: Bearer <access_token>
+```
+
+```http
+DELETE /api/imperium/calendar/events/{event_id}
+Authorization: Bearer <access_token>
+```
+
+Expected boundary:
+
+- backend is the only canonical writer;
+- POST requires `Idempotency-Key`;
+- no recurrence, auto-replan, AI scheduling, mobile sync, notifications,
+  pgvector write, or embeddings are triggered.
+
 ## Patch 2F - WR Qwen Dry-Run Workflow Smoke Test
 
 Workflow file:

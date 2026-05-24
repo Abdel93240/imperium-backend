@@ -3,6 +3,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 from app.core.config import Settings, get_settings
 from app.models.imperium import ImperiumWeeklyReviewSession
@@ -176,6 +177,7 @@ class QwenClient:
 
     @staticmethod
     def _post_json(url: str, payload: dict[str, Any], timeout: int) -> dict[str, Any]:
+        _validate_http_url(url)
         body = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         request = urllib.request.Request(
             url,
@@ -184,7 +186,7 @@ class QwenClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=timeout) as response:
+            with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
                 raw = response.read().decode("utf-8")
         except urllib.error.URLError as exc:
             raise QwenProviderError("Qwen HTTP request failed.") from exc
@@ -195,6 +197,12 @@ class QwenClient:
         if not isinstance(parsed, dict):
             raise QwenProviderError("Qwen HTTP response JSON was not an object.")
         return parsed
+
+
+def _validate_http_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise QwenProviderError("Qwen provider URL must be an http(s) URL.")
 
 
 def generate_wr_summary_with_qwen(

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from urllib import request
 from urllib.error import URLError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from app.core.config import Settings, get_settings
 
@@ -107,7 +107,7 @@ def trigger_n8n_webhook(
         method="POST",
     )
     try:
-        with request.urlopen(req, timeout=settings.n8n_request_timeout_seconds) as response:
+        with request.urlopen(req, timeout=settings.n8n_request_timeout_seconds) as response:  # nosec B310
             return N8NTriggerResult(
                 dry_run=False,
                 configured=True,
@@ -136,7 +136,11 @@ def _sign(*, secret: str, timestamp: int, body: bytes) -> str:
 def _base_url(settings: Settings) -> str:
     if not settings.n8n_base_url:
         raise N8NConfigurationError("N8N_BASE_URL is not configured.")
-    return settings.n8n_base_url.rstrip("/") + "/"
+    base_url = settings.n8n_base_url.rstrip("/") + "/"
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise N8NConfigurationError("N8N_BASE_URL must be an http(s) URL.")
+    return base_url
 
 
 def _webhook_secret(settings: Settings) -> str:
