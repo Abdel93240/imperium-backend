@@ -178,6 +178,80 @@ class StartMissionRequest(BaseModel):
         return self
 
 
+class BacklogMissionCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1)
+    category: str | None = None
+    domain: str | None = None
+    priority_level: int | None = Field(default=None, ge=1, le=10)
+    mission_type_category: str | None = None
+    deadline_at: datetime | None = None
+    impact: int | str | None = None
+    mission_type: int | str | None = None
+    dependency: int | str | bool | None = None
+    recurrence: int | str | None = None
+
+    @field_validator("title", "category", "domain", "mission_type_category")
+    @classmethod
+    def strip_mission_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value cannot be empty.")
+        return stripped
+
+    @field_validator("domain")
+    @classmethod
+    def validate_decision_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower().replace("_", "-").replace(" ", "-")
+        if normalized not in SUPPORTED_DECISION_DOMAINS:
+            raise ValueError("domain must be one of religious, business, finance, health.")
+        return normalized
+
+    @field_validator("mission_type_category")
+    @classmethod
+    def validate_mission_type_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        if normalized not in SUPPORTED_MISSION_TYPE_CATEGORIES:
+            raise ValueError("mission_type_category must be cat_a through cat_i.")
+        return normalized
+
+    @field_validator("impact", "mission_type", "dependency", "recurrence", mode="before")
+    @classmethod
+    def strip_scoring_text(cls, value: int | str | bool | None) -> int | str | bool | None:
+        if value is None or isinstance(value, (bool, int)):
+            return value
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value cannot be empty.")
+        return stripped
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_client_supplied_scores(cls, data):
+        if isinstance(data, dict):
+            forbidden = sorted(DISALLOWED_CLIENT_SCORE_FIELDS.intersection(data))
+            if forbidden:
+                joined = ", ".join(forbidden)
+                raise ValueError(f"Client-supplied score fields are not accepted: {joined}.")
+        return data
+
+    @model_validator(mode="after")
+    def validate_scoring_category_consistency(self) -> "BacklogMissionCreateRequest":
+        if self.mission_type is None or self.mission_type_category is None or not isinstance(self.mission_type, str):
+            return self
+        normalized_mission_type = self.mission_type.strip().lower().replace("-", "_").replace(" ", "_")
+        if normalized_mission_type in SUPPORTED_MISSION_TYPE_CATEGORIES and normalized_mission_type != self.mission_type_category:
+            raise ValueError("mission_type and mission_type_category conflict.")
+        return self
+
+
 class CompleteMissionRequest(BaseModel):
     completion_note: str | None = None
 
@@ -216,6 +290,47 @@ class MissionDecisionScoreSummary(BaseModel):
     score_status: str
     missing_fields: list[str]
     source: str
+
+
+class BacklogMissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime
+    ended_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    decision_score: MissionDecisionScoreSummary | None = None
+
+
+class BacklogMissionCreateResponse(BaseModel):
+    mission: BacklogMissionRead
+    event_id: str
+    idempotency_key: str
+    status: str
+    score_created: bool = False
+
+
+class BacklogMissionListResponse(BaseModel):
+    items: list[BacklogMissionRead]
+    count: int
+    ordering: str
+
+
+class PromoteBacklogMissionResponse(BaseModel):
+    mission: MissionResponse
+    event_id: str
+    idempotency_key: str
+    status: str
+    decision_score: MissionDecisionScoreSummary | None = None
 
 
 class MissionWriteResponse(BaseModel):

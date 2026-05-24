@@ -12,12 +12,17 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import (
+    BacklogMissionCreateRequest,
+    BacklogMissionCreateResponse,
+    BacklogMissionListResponse,
+    BacklogMissionRead,
     CompleteMissionRequest,
     FailMissionRequest,
     MissionDecisionScoreRead,
     MissionDecisionScoreSummary,
     MissionResponse,
     MissionWriteResponse,
+    PromoteBacklogMissionResponse,
     StartMissionRequest,
 )
 from app.services.imperium.decision_framework import (
@@ -47,6 +52,12 @@ class MissionStateConflictError(ValueError):
 
 class MissionScoreNotFoundError(ValueError):
     pass
+
+
+BACKLOG_ORDERING_NOTE = (
+    "Sorted by higher stored Decision Framework priority_bucket first, "
+    "then lower mission priority_level first, then created_at ascending for FIFO deterministic fallback."
+)
 
 
 def start_mission(
@@ -123,6 +134,194 @@ def start_mission(
         request_path=request_path,
         request_hash=request_hash,
         response_status_code=201,
+        response=response,
+    )
+    db.commit()
+    return response, False
+
+
+def create_backlog_mission(
+    db: Session,
+    *,
+    current_user: User,
+    payload: BacklogMissionCreateRequest,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[BacklogMissionCreateResponse, bool]:
+    request_hash = _hash_request("mission.backlog.created", payload.model_dump(mode="json"))
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        return _handle_existing_backlog_create_idempotency(existing_key, request_hash), True
+
+    now = datetime.now(UTC)
+    mission = ImperiumMission(
+        user_id=current_user.id,
+        title=payload.title,
+        category=payload.category,
+        domain=payload.domain,
+        priority_level=payload.priority_level,
+        mission_type_category=payload.mission_type_category,
+        status="backlog",
+        started_at=now,
+    )
+    db.add(mission)
+    db.flush()
+
+    event_id = f"evt_{uuid4().hex}"
+    event_payload = {
+        "mission_id": str(mission.id),
+        **payload.model_dump(mode="json", exclude_none=True),
+    }
+    event = _build_event(
+        current_user=current_user,
+        event_id=event_id,
+        event_type="mission.backlog.created",
+        idempotency_key=idempotency_key,
+        payload=event_payload,
+    )
+    db.add(event)
+    db.flush()
+
+    mission.created_by_event_id = event.id
+    db.flush()
+
+    decision_score = _maybe_create_decision_score(
+        db,
+        current_user=current_user,
+        mission=mission,
+        payload=_start_request_from_backlog_payload(payload),
+    )
+
+    response = _backlog_create_response(
+        mission=mission,
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        status_text="created",
+        decision_score=decision_score,
+    )
+    _store_idempotency(
+        db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_hash=request_hash,
+        response_status_code=201,
+        response=response,
+    )
+    db.commit()
+    return response, False
+
+
+def list_backlog_missions(db: Session, *, current_user: User) -> BacklogMissionListResponse:
+    missions = list(
+        db.scalars(
+            select(ImperiumMission)
+            .where(
+                ImperiumMission.user_id == current_user.id,
+                ImperiumMission.status == "backlog",
+            )
+            .order_by(ImperiumMission.created_at.asc(), ImperiumMission.id.asc())
+        )
+    )
+    if not missions:
+        return BacklogMissionListResponse(items=[], count=0, ordering=BACKLOG_ORDERING_NOTE)
+
+    mission_ids = [mission.id for mission in missions]
+    scores = list(
+        db.scalars(
+            select(ImperiumMissionScore)
+            .where(
+                ImperiumMissionScore.user_id == current_user.id,
+                ImperiumMissionScore.mission_id.in_(mission_ids),
+                ImperiumMissionScore.source == DECISION_FRAMEWORK_SOURCE,
+            )
+            .order_by(ImperiumMissionScore.created_at.desc())
+        )
+    )
+    score_by_mission_id: dict[UUID, ImperiumMissionScore] = {}
+    for score in scores:
+        score_by_mission_id.setdefault(score.mission_id, score)
+
+    sorted_missions = sorted(
+        missions,
+        key=lambda mission: _backlog_sort_key(mission, score_by_mission_id.get(mission.id)),
+    )
+    return BacklogMissionListResponse(
+        items=[
+            _backlog_mission_read(
+                mission=mission,
+                decision_score=_score_summary_or_none(score_by_mission_id.get(mission.id)),
+            )
+            for mission in sorted_missions
+        ],
+        count=len(sorted_missions),
+        ordering=BACKLOG_ORDERING_NOTE,
+    )
+
+
+def promote_backlog_mission(
+    db: Session,
+    *,
+    current_user: User,
+    mission_id: UUID,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[PromoteBacklogMissionResponse, bool]:
+    request_hash = _hash_request("mission.backlog.promoted", {"mission_id": str(mission_id)})
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        return _handle_existing_promote_idempotency(existing_key, request_hash), True
+
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission is None:
+        raise MissionNotFoundError("Mission not found.")
+    if mission.status != "backlog":
+        raise MissionStateConflictError("Mission is not in backlog.")
+
+    active_mission = _get_active_mission(db, current_user=current_user)
+    if active_mission is not None:
+        raise ActiveMissionExistsError("An active mission already exists for this user.")
+
+    now = datetime.now(UTC)
+    event_id = f"evt_{uuid4().hex}"
+    event_payload = {
+        "mission_id": str(mission.id),
+        "source": "backlog_promotion",
+    }
+    event = _build_event(
+        current_user=current_user,
+        event_id=event_id,
+        event_type="mission.started",
+        idempotency_key=idempotency_key,
+        payload=event_payload,
+    )
+    db.add(event)
+    db.flush()
+
+    mission.status = "active"
+    mission.started_at = now
+    if mission.created_by_event_id is None:
+        mission.created_by_event_id = event.id
+    db.flush()
+
+    score = _get_existing_decision_score(db, current_user=current_user, mission_id=mission.id)
+    response = _promote_response(
+        mission=mission,
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        decision_score=_score_summary_or_none(score),
+    )
+    _store_idempotency(
+        db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_hash=request_hash,
+        response_status_code=200,
         response=response,
     )
     db.commit()
@@ -312,6 +511,28 @@ def _handle_existing_idempotency(
     return MissionWriteResponse(**existing_key.response_body)
 
 
+def _handle_existing_backlog_create_idempotency(
+    existing_key: IdempotencyKey,
+    request_hash: str,
+) -> BacklogMissionCreateResponse:
+    if existing_key.request_hash != request_hash:
+        raise IdempotencyConflictError("Idempotency key already used with different payload.")
+    if existing_key.response_body is None:
+        raise IdempotencyConflictError("Idempotency key is already processing.")
+    return BacklogMissionCreateResponse(**existing_key.response_body)
+
+
+def _handle_existing_promote_idempotency(
+    existing_key: IdempotencyKey,
+    request_hash: str,
+) -> PromoteBacklogMissionResponse:
+    if existing_key.request_hash != request_hash:
+        raise IdempotencyConflictError("Idempotency key already used with different payload.")
+    if existing_key.response_body is None:
+        raise IdempotencyConflictError("Idempotency key is already processing.")
+    return PromoteBacklogMissionResponse(**existing_key.response_body)
+
+
 def _get_active_mission(db: Session, *, current_user: User) -> ImperiumMission | None:
     return db.scalar(
         select(ImperiumMission).where(
@@ -319,6 +540,10 @@ def _get_active_mission(db: Session, *, current_user: User) -> ImperiumMission |
             ImperiumMission.status == "active",
         )
     )
+
+
+def _start_request_from_backlog_payload(payload: BacklogMissionCreateRequest) -> StartMissionRequest:
+    return StartMissionRequest(**payload.model_dump())
 
 
 def _maybe_create_decision_score(
@@ -383,6 +608,21 @@ def _get_existing_decision_score(
         )
         .order_by(ImperiumMissionScore.created_at.desc())
     )
+
+
+def _score_summary_or_none(score: ImperiumMissionScore | None) -> MissionDecisionScoreSummary | None:
+    if score is None:
+        return None
+    return mission_decision_score_summary_from_row(score)
+
+
+def _backlog_sort_key(mission: ImperiumMission, score: ImperiumMissionScore | None) -> tuple[int, int, datetime, str]:
+    bucket = 0
+    if score is not None:
+        bucket = mission_decision_score_summary_from_row(score).priority_bucket
+    priority = mission.priority_level if mission.priority_level is not None else 999
+    created_at = mission.created_at or datetime.min.replace(tzinfo=UTC)
+    return (-bucket, priority, created_at, str(mission.id))
 
 
 def _get_user_mission(
@@ -454,6 +694,52 @@ def _store_idempotency(
             response_status_code=response_status_code,
             response_body=response.model_dump(mode="json"),
         )
+    )
+
+
+def _backlog_mission_read(
+    *,
+    mission: ImperiumMission,
+    decision_score: MissionDecisionScoreSummary | None = None,
+) -> BacklogMissionRead:
+    mission_response = BacklogMissionRead.model_validate(mission)
+    mission_response.decision_score = decision_score
+    return mission_response
+
+
+def _backlog_create_response(
+    *,
+    mission: ImperiumMission,
+    event_id: str,
+    idempotency_key: str,
+    status_text: str,
+    decision_score: MissionDecisionScoreSummary | None = None,
+) -> BacklogMissionCreateResponse:
+    return BacklogMissionCreateResponse(
+        mission=_backlog_mission_read(mission=mission, decision_score=decision_score),
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        status=status_text,
+        score_created=decision_score is not None,
+    )
+
+
+def _promote_response(
+    *,
+    mission: ImperiumMission,
+    event_id: str,
+    idempotency_key: str,
+    decision_score: MissionDecisionScoreSummary | None = None,
+) -> PromoteBacklogMissionResponse:
+    mission_response = MissionResponse.model_validate(mission)
+    mission_response.event_id = event_id
+    mission_response.idempotency_key = idempotency_key
+    return PromoteBacklogMissionResponse(
+        mission=mission_response,
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        status="promoted",
+        decision_score=decision_score,
     )
 
 

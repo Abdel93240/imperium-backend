@@ -11,6 +11,9 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    BacklogMissionCreateRequest,
+    BacklogMissionCreateResponse,
+    BacklogMissionListResponse,
     CalendarEventCreate,
     CalendarEventDeleteResponse,
     CalendarEventRead,
@@ -35,6 +38,7 @@ from app.schemas.imperium import (
     MissionWriteResponse,
     PathItemResponse,
     PathItemWriteResponse,
+    PromoteBacklogMissionResponse,
     PriorityRuleResponse,
     PriorityRulesResponse,
     ReplacePriorityRulesRequest,
@@ -135,10 +139,13 @@ from app.services.imperium.missions import (
     MissionScoreNotFoundError,
     MissionStateConflictError,
     complete_mission,
+    create_backlog_mission,
     fail_mission,
     get_current_mission,
     get_mission_decision_score,
     get_recent_missions,
+    list_backlog_missions,
+    promote_backlog_mission,
     start_mission,
 )
 from app.services.imperium.path_items import (
@@ -923,6 +930,97 @@ def start_mission_route(
     except DecisionFrameworkValidationError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mission or event conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post(
+    "/missions/backlog",
+    response_model=BacklogMissionCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_backlog_mission_route(
+    payload: BacklogMissionCreateRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> BacklogMissionCreateResponse:
+    _require_idempotency_key(idempotency_key)
+
+    try:
+        result, duplicate = create_backlog_mission(
+            db,
+            current_user=current_user,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except MissionIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except DecisionFrameworkValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mission or event conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.get("/missions/backlog", response_model=BacklogMissionListResponse)
+def backlog_missions_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> BacklogMissionListResponse:
+    return list_backlog_missions(db, current_user=current_user)
+
+
+@router.post("/missions/backlog/{mission_id}/promote", response_model=PromoteBacklogMissionResponse)
+def promote_backlog_mission_route(
+    mission_id: UUID,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PromoteBacklogMissionResponse:
+    _require_idempotency_key(idempotency_key)
+
+    try:
+        result, duplicate = promote_backlog_mission(
+            db,
+            current_user=current_user,
+            mission_id=mission_id,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (ActiveMissionExistsError, MissionStateConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except MissionIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
