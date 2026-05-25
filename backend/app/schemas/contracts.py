@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -27,16 +29,18 @@ class ImperiumContractsIndexResponse(BaseModel):
     safe_explanation: str
 
 
+class ImperiumContractsComplianceCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    status: Literal["declared"]
+    safe_explanation: str
+
+
 class ImperiumContractsComplianceResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     contract_version: str
     read_only: bool
-    metadata_only: bool
-    no_db_migration: bool
-    no_business_data_read: bool
-    not_health_check: bool
-    not_dynamic_discovery: bool
-    no_ai_n8n_ocr_scoring_coaching_recommendations: bool
-    no_cross_module_writes: bool
+    checks: list[ImperiumContractsComplianceCheck]
     safe_explanation: str

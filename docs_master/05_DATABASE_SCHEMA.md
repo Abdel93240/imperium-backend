@@ -136,6 +136,20 @@ Contracts index contract note:
 - no writes
 - no AI, n8n, OCR, scoring, coaching, or recommendation flows
 
+Contracts compliance metadata note:
+- `GET /api/imperium/contracts/compliance` is declarative metadata only
+- canonical route owner is `app/api/v1/routes/imperium_contracts.py`
+- this endpoint is not a runtime compliance audit
+- this endpoint is not OpenAPI
+- this endpoint is not a health check
+- this endpoint is not dynamic discovery
+- `checks[]` is deterministic and ordered
+- each check uses `status = declared`
+- no business data read
+- no writes
+- no AI, n8n, OCR, scoring, coaching, or recommendation flows
+- no secrets, provider metadata, infra metadata, or user id
+
 
 Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and
 `GET /api/imperium/daily-plan`, must not write canonical rows and must remain

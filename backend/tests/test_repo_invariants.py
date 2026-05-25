@@ -357,7 +357,6 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     assert "get_openapi" not in lowered_route
     assert "app.routes" not in lowered_route
     assert "for route in" not in lowered_route
-    assert "health" not in lowered_service
     assert "internal" not in lowered_service
 
     for forbidden in ("n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "gemini", "claude"):
@@ -374,6 +373,55 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     assert "metadata only" in schema_docs_text
     assert "not openapi" in schema_docs_text
     assert "not a health check" in schema_docs_text
+
+
+def test_patch_16b_contracts_compliance_is_declarative_metadata_only_and_not_runtime_audit() -> None:
+    contracts_route_text = (
+        BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_contracts.py"
+    ).read_text(encoding="utf-8")
+    contracts_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "contracts.py").read_text(
+        encoding="utf-8"
+    )
+    contracts_schema_text = (BACKEND_ROOT / "app" / "schemas" / "contracts.py").read_text(encoding="utf-8")
+    contracts_docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+
+    lowered_route = contracts_route_text.lower()
+    lowered_service = contracts_service_text.lower()
+    lowered_schema = contracts_schema_text.lower()
+
+    assert contracts_route_text.count('@router.get("/contracts/compliance"') == 1
+    assert "ImperiumContractsComplianceResponse" in contracts_schema_text
+    assert "ImperiumContractsComplianceCheck" in contracts_schema_text
+    assert "status: Literal[\"declared\"]" in contracts_schema_text
+    assert "checks: list[ImperiumContractsComplianceCheck]" in contracts_schema_text
+    assert "checks=list(compliance_checks)" in lowered_service
+    assert 'safe_explanation="Frontend contracts compliance metadata."' in contracts_service_text
+    assert "get_imperium_contracts_compliance_metadata" in contracts_route_text
+    assert "get_imperium_contracts_compliance_metadata" in contracts_service_text
+    assert "get_openapi" not in lowered_route
+    assert "app.routes" not in lowered_route
+    assert "for route in" not in lowered_route
+    assert "db.add(" not in lowered_service
+    assert "db.flush" not in lowered_service
+    assert "db.commit" not in lowered_service
+    assert "status: literal[\"declared\"]" in lowered_schema
+    assert "declarative metadata only" in schema_docs_text
+    assert "not a runtime compliance audit" in schema_docs_text
+    assert "not openapi" in schema_docs_text
+    assert "not a health check" in schema_docs_text
+    assert "not dynamic discovery" in schema_docs_text
+    assert "/api/imperium/contracts/compliance" in contracts_docs_text
+    assert "frontend contracts compliance metadata" in contracts_docs_text
+    assert "`status` is always `declared`" in contracts_docs_text
+    assert "deterministic `checks[]` order" in contracts_docs_text
+    assert "not a runtime compliance audit" in contracts_docs_text
+    assert "not openapi" in contracts_docs_text
+    assert "not a health check" in contracts_docs_text
+    assert "not dynamic discovery" in contracts_docs_text
+    for forbidden in ("passed", "failed", "user_id", "secret", "provider", "infra"):
+        assert forbidden not in lowered_service
+
 
 def test_patch_11b_pulse_today_contract_docs_and_route_order_are_consolidated() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")

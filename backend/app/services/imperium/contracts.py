@@ -1,6 +1,7 @@
 from app.schemas.contracts import (
     ContractIndexEndpoint,
     ContractIndexGroup,
+    ImperiumContractsComplianceCheck,
     ImperiumContractsComplianceResponse,
     ImperiumContractsIndexResponse,
 )
@@ -148,6 +149,34 @@ CONTRACT_INDEX_GROUPS: tuple[ContractIndexGroup, ...] = (
     ),
 )
 
+COMPLIANCE_CHECKS: tuple[ImperiumContractsComplianceCheck, ...] = (
+    ImperiumContractsComplianceCheck(
+        key="metadata_only",
+        status="declared",
+        safe_explanation="Contracts index is metadata-only.",
+    ),
+    ImperiumContractsComplianceCheck(
+        key="not_openapi",
+        status="declared",
+        safe_explanation="Contracts index is not a generated OpenAPI document.",
+    ),
+    ImperiumContractsComplianceCheck(
+        key="not_health_check",
+        status="declared",
+        safe_explanation="Contracts index is not a runtime health check.",
+    ),
+    ImperiumContractsComplianceCheck(
+        key="no_business_data_read",
+        status="declared",
+        safe_explanation="Contracts index does not read business data.",
+    ),
+    ImperiumContractsComplianceCheck(
+        key="no_dynamic_discovery",
+        status="declared",
+        safe_explanation="Contracts index is static and deterministic in V1.",
+    ),
+)
+
 
 def get_imperium_contracts_index_metadata() -> ImperiumContractsIndexResponse:
     return ImperiumContractsIndexResponse(
@@ -162,12 +191,6 @@ def get_imperium_contracts_compliance_metadata() -> ImperiumContractsComplianceR
     return ImperiumContractsComplianceResponse(
         contract_version="v1",
         read_only=True,
-        metadata_only=True,
-        no_db_migration=True,
-        no_business_data_read=True,
-        not_health_check=True,
-        not_dynamic_discovery=True,
-        no_ai_n8n_ocr_scoring_coaching_recommendations=True,
-        no_cross_module_writes=True,
-        safe_explanation="Static compliance metadata for Imperium contract surfaces.",
+        checks=list(COMPLIANCE_CHECKS),
+        safe_explanation="Frontend contracts compliance metadata.",
     )

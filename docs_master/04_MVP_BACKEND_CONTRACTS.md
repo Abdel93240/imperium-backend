@@ -173,6 +173,76 @@ Rules:
 - `Home Bootstrap` ≠ `Contract Index`
 - no duplicate/shadow route in `imperium_home.py`
 
+### Imperium Contracts Compliance Metadata
+
+`GET /api/imperium/contracts/compliance`
+
+Purpose:
+- return declarative compliance metadata for the contracts index surface
+- help frontend and dev tooling confirm that the contract surface is metadata-only
+- keep a stable, deterministic V1 summary without runtime auditing
+
+Rules:
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- read-only metadata only
+- not a runtime compliance audit
+- not OpenAPI
+- not a health check
+- not dynamic discovery
+- no business data read
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module writes
+- no secrets, provider metadata, infra metadata, or user id
+- `contract_version` is `v1`
+- `read_only` is `true`
+- deterministic `checks[]` order: `metadata_only`, `not_openapi`, `not_health_check`, `no_business_data_read`, `no_dynamic_discovery`
+- each `checks[]` item has `key`, `status`, `safe_explanation`
+- `status` is always `declared`
+- `safe_explanation` is public, read-only, and declarative
+
+Response contract:
+
+```json
+{
+  "contract_version": "v1",
+  "read_only": true,
+  "checks": [
+    {
+      "key": "metadata_only",
+      "status": "declared",
+      "safe_explanation": "Contracts index is metadata-only."
+    },
+    {
+      "key": "not_openapi",
+      "status": "declared",
+      "safe_explanation": "Contracts index is not a generated OpenAPI document."
+    },
+    {
+      "key": "not_health_check",
+      "status": "declared",
+      "safe_explanation": "Contracts index is not a runtime health check."
+    },
+    {
+      "key": "no_business_data_read",
+      "status": "declared",
+      "safe_explanation": "Contracts index does not read business data."
+    },
+    {
+      "key": "no_dynamic_discovery",
+      "status": "declared",
+      "safe_explanation": "Contracts index is static and deterministic in V1."
+    }
+  ],
+  "safe_explanation": "Frontend contracts compliance metadata."
+}
+```
+
+This endpoint is declarative metadata only.
+It is not a runtime audit and it does not scan routes dynamically.
+It does not read business data.
+It does not expose secrets, provider metadata, infra metadata, or user id.
+
 
 ## V1 Implementation Stack
 
