@@ -359,13 +359,37 @@ canonical for Imperium mission behavior.
 | POST | `/api/vault/scan-ticket` | Receipt image OCR flow | `receipt.ocr.requested` |
 | POST | `/api/vault/objectives/recalculate` | Recalculate daily targets | `vault.objectives.recalculate.requested` |
 
-Patch 9A scope for `/api/imperium/vault/transactions`:
+#### Vault V1 / Ledger Foundation
+
+Patch 9A introduces the Imperium-facing Vault ledger foundation at `/api/imperium/vault/transactions`.
+This is an append-only foundation for manual income and expense facts only. It records reality so later
+Vault, Path, and Imperium workflows can reason from canonical backend data, but Patch 9A does not
+calculate strategy or trigger downstream automation.
+
+`POST /api/imperium/vault/transactions`:
+- Requires authenticated current-user scope.
+- Requires `Idempotency-Key`.
+- Rejects client-supplied `user_id`; the backend always uses the authenticated user.
+- Rejects `amount_cents <= 0`.
+- Accepts only `transaction_type` values `income` and `expense`.
+- Creates one append-only row in `imperium_vault_transactions` and records the idempotency result.
+
+`GET /api/imperium/vault/transactions`:
+- Requires authenticated current-user scope.
+- Does not require `Idempotency-Key`.
+- Returns only transactions owned by the current user.
+- Supports filters: `transaction_type`, `category`, `source`, `occurred_from`, and `occurred_to`.
+- Supports pagination with `limit` and `offset`.
+- Sorts deterministically by `occurred_at desc`, `created_at desc`, then `id desc`.
+- Is read-only: no `db.add`, `flush`, `commit`, event creation, or workflow trigger.
+
+Patch 9A scope:
 - Stores only `income` or `expense` rows in `imperium_vault_transactions`.
 - Amount is stored as positive integer `amount_cents`; currency defaults to uppercase `EUR`.
 - Public responses never accept or expose client-controlled `user_id`.
 - `POST` is idempotent by current user and `Idempotency-Key`: same key plus same payload returns the original public response; same key plus different payload returns conflict.
 - `GET` supports `limit`, `offset`, `transaction_type`, `category`, `source`, `occurred_from`, and `occurred_to`, sorted by `occurred_at desc`, `created_at desc`, and `id`.
-- No balance, wallet automation, sadaqa, OCR ticket flow, AI analysis, n8n workflow, pgvector write, embedding, memory commit, calendar replanning, financial scoring, or internal coefficient is part of this patch.
+- No balance, wallet automation, sadaqa, OCR ticket flow, AI analysis, n8n workflow, n8n AI Agent, n8n DB write, pgvector write, embedding, memory commit, automatic replanning, calendar replanning, financial scoring, or internal coefficient is part of this patch.
 
 ### Vector
 

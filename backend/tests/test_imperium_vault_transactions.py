@@ -183,6 +183,37 @@ def test_post_requires_idempotency_key() -> None:
     assert response.json()["detail"] == "Missing Idempotency-Key header."
 
 
+def test_post_rejects_non_positive_amount_cents() -> None:
+    for amount_cents in (0, -1):
+        response = _client(FakeDb(), _user()).post(
+            "/imperium/vault/transactions",
+            headers={"Idempotency-Key": f"vault-amount-{amount_cents}"},
+            json=_payload(amount_cents=amount_cents),
+        )
+
+        assert response.status_code == 422
+
+
+def test_post_rejects_invalid_transaction_type() -> None:
+    response = _client(FakeDb(), _user()).post(
+        "/imperium/vault/transactions",
+        headers={"Idempotency-Key": "vault-invalid-type"},
+        json=_payload(transaction_type="transfer"),
+    )
+
+    assert response.status_code == 422
+
+
+def test_post_rejects_client_supplied_user_id() -> None:
+    response = _client(FakeDb(), _user()).post(
+        "/imperium/vault/transactions",
+        headers={"Idempotency-Key": "vault-client-user"},
+        json=_payload(user_id=str(uuid4())),
+    )
+
+    assert response.status_code == 422
+
+
 def test_post_idempotent_same_key_and_payload_returns_same_response() -> None:
     current_user = _user()
     payload = _payload()
@@ -272,6 +303,22 @@ def test_get_transactions_does_not_require_idempotency_and_is_user_scoped() -> N
     assert "imperium_vault_transactions.source" in query_text
 
 
+def test_get_transactions_filters_category_source_and_type_independently() -> None:
+    current_user = _user()
+
+    for query_param, expected_column in (
+        ("transaction_type=income", "imperium_vault_transactions.transaction_type"),
+        ("category=vtc", "imperium_vault_transactions.category"),
+        ("source=manual", "imperium_vault_transactions.source"),
+    ):
+        db = FakeDb(scalars_results=[[_transaction(current_user.id)]])
+
+        response = _client(db, current_user).get(f"/imperium/vault/transactions?{query_param}")
+
+        assert response.status_code == 200
+        assert expected_column in str(db.queries[0])
+
+
 def test_get_transactions_applies_occurred_range_and_stable_sort() -> None:
     current_user = _user()
     own = _transaction(current_user.id)
@@ -289,6 +336,25 @@ def test_get_transactions_applies_occurred_range_and_stable_sort() -> None:
     assert "ORDER BY imperium_vault_transactions.occurred_at DESC" in query_text
     assert "imperium_vault_transactions.created_at DESC" in query_text
     assert "imperium_vault_transactions.id" in query_text
+
+
+def test_get_transactions_respects_limit_offset_and_is_read_only() -> None:
+    current_user = _user()
+    db = FakeDb(scalars_results=[[_transaction(current_user.id)]])
+
+    response = _client(db, current_user).get("/imperium/vault/transactions?limit=1&offset=2")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["limit"] == 1
+    assert body["offset"] == 2
+    query_text = str(db.queries[0])
+    assert "LIMIT" in query_text
+    assert "OFFSET" in query_text
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
+    assert db.rolled_back is False
 
 
 def test_imperium_vault_transaction_model_constraints_match_patch_9a() -> None:

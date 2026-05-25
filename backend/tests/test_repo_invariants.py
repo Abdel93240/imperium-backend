@@ -807,6 +807,59 @@ def test_patch_7h_calendar_foundation_stays_minimal_and_backend_owned() -> None:
     assert "trigger_n8n" not in service_text
 
 
+def test_patch_9a_vault_ledger_routes_have_no_ai_n8n_or_memory_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault_transactions.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "vault.py"
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260525_0024_imperium_vault_ledger_foundation.py"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+    create_schema_section = schema_text.split("class ImperiumVaultTransactionCreate", maxsplit=1)[1].split(
+        "class ImperiumVaultTransactionRead",
+        maxsplit=1,
+    )[0]
+    list_service_section = service_text.split("def list_vault_transactions", maxsplit=1)[1].split(
+        "def _get_existing_idempotency",
+        maxsplit=1,
+    )[0]
+    get_route_section = route_text.split('@router.get("/transactions"', maxsplit=1)[1]
+    combined = "\n".join([route_text, service_text, create_schema_section, migration_text])
+    lowered = combined.lower()
+
+    assert 'revision: str = "20260525_0024"' in migration_text
+    assert 'down_revision: str | None = "20260525_0023"' in migration_text
+    assert "imperium_vault_transactions" in migration_text
+    assert "amount_cents > 0" in migration_text
+    assert "transaction_type IN ('income', 'expense')" in migration_text
+    assert "extra=\"forbid\"" in create_schema_section
+    assert "user_id" not in create_schema_section
+    assert "Idempotency-Key" in route_text
+    assert "Idempotency-Key" not in get_route_section
+    assert "db.add(" not in list_service_section
+    assert "db.flush" not in list_service_section
+    assert "db.commit" not in list_service_section
+
+    assert "QwenClient" not in combined
+    assert "providers" not in combined
+    assert "openai" not in lowered
+    assert "anthropic" not in lowered
+    assert "gemini" not in lowered
+    assert "claude" not in lowered
+    assert "n8n_client" not in combined
+    assert "trigger_n8n" not in combined
+    assert "ai agent" not in lowered
+    assert "aiagent" not in lowered
+    assert "n8n-nodes-langchain.agent" not in lowered
+    assert "pgvector" not in lowered
+    assert "embedding" not in lowered
+    assert "ai_memories" not in combined
+    assert "memory commit" not in lowered
+    assert "calendar" not in lowered
+    assert "replanning" not in lowered
+
+
 def test_backlog_path_has_no_ai_provider_imports() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
