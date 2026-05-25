@@ -112,6 +112,10 @@ For MVP, prefer status transitions and audit/history over hard deletes.
 
 Events are the primary audit log.
 
+Read-only snapshot endpoints, including `GET /api/imperium/dashboard`, must not
+write canonical rows and must remain derived from existing Mission, Vault,
+Path, and Pulse records only.
+
 For mutable domain records, use:
 - `created_at`
 - `updated_at`

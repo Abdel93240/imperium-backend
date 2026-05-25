@@ -627,7 +627,7 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
     lowered_docs = contracts_text.lower()
 
     assert "`/api/imperium/dashboard`" in contracts_text
-    assert "imperium dashboard foundation 12a" in lowered_docs
+    assert "imperium dashboard foundation 12b" in lowered_docs or "imperium dashboard foundation 12a" in lowered_docs
     assert "active mission" in lowered_docs
     assert "vault summary" in lowered_docs
     assert "path today" in lowered_docs
@@ -694,6 +694,73 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
         "recommendation",
     ):
         assert forbidden not in lowered_foundation_code
+
+
+def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")
+    dashboard_route_text = (
+        BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_dashboard.py"
+    ).read_text(encoding="utf-8")
+    dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    lowered_service = dashboard_service_text.lower()
+    lowered_docs = contracts_text.lower() + "\n" + schema_text.lower()
+
+    assert "imperium dashboard foundation 12b" in lowered_docs
+    assert "snapshot read-only" in lowered_docs
+    assert "responses are public-safe for the current authenticated user only" in lowered_docs
+    assert "no auto-creation of path rows" in lowered_docs
+    assert "no auto-creation of pulse rows" in lowered_docs
+    assert "GET /api/imperium/dashboard" in contracts_text
+    assert "currentuserdep" in lowered_docs
+    assert "idempotency-key" in lowered_docs
+    assert "query params:" in lowered_docs
+    assert "date` optional `date`" in lowered_docs
+    assert "currency` optional string" in lowered_docs
+    assert "safe_explanation" in contracts_text
+
+    for forbidden in (
+        "db.add(",
+        "db.flush",
+        "db.commit",
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "memory commit",
+        "calendar",
+        "ocr",
+        "scoring",
+        "weighted_score",
+        "coaching",
+        "recommendation",
+        "path check-in creation",
+        "pulse entry creation",
+        "automatic creation of path/pulse rows",
+        "cross-module write",
+    ):
+        assert forbidden not in lowered_service
+
+    assert "get_current_active_mission" in dashboard_service_text
+    assert "get_vault_summary" in dashboard_service_text
+    assert "get_path_today_view" in dashboard_service_text
+    assert "get_pulse_today_entry" in dashboard_service_text
+    assert "get_dashboard_snapshot" in dashboard_service_text
+    assert "return ImperiumDashboardFoundationResponse" in dashboard_service_text
+    assert "Query(min_length=3, max_length=3, pattern=r\"^[A-Za-z]{3}$\")" in dashboard_route_text
+    assert "CurrentUserDep" in dashboard_route_text
+    assert "Idempotency-Key" not in dashboard_route_text
 
 
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:

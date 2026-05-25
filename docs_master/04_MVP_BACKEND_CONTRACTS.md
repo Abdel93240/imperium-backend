@@ -345,10 +345,11 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/weekly-review/{review_id}/answer` | Store review answer | `weekly.review.answered` |
 | POST | `/api/imperium/weekly-review/{review_id}/complete` | Complete after final validation | `weekly.review.completed` |
 
-#### Imperium Dashboard Foundation 12A - read-only module snapshot
+#### Imperium Dashboard Foundation 12B - consolidated read-only module snapshot
 
-Patch 12A replaces the legacy dashboard surface with a narrow backend-owned
-read model under:
+Patch 12A introduced the dashboard surface. Patch 12B consolidates the final
+contract and audit notes without changing behavior. The backend-owned read
+model lives under:
 
 - `GET /api/imperium/dashboard`
 
@@ -378,6 +379,9 @@ Contract:
 - no write cross-module and no cross-module writes
 - deterministic: no hidden scoring, coaching, recommendation, or replanning layer
 - no user id is exposed in any dashboard response section
+- responses are public-safe for the current authenticated user only
+- no auto-creation of Path rows
+- no auto-creation of Pulse rows
 
 Boundaries:
 - no real AI call
@@ -397,6 +401,7 @@ Boundaries:
 - no automatic creation of Path/Pulse rows
 - no Mission/Vault/Path/Pulse mutation
 - no cross-module write
+- no AI routing, no model selection, no scoring, no coaching, no recommendation generation
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
