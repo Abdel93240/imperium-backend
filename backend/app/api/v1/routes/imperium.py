@@ -34,7 +34,6 @@ from app.schemas.imperium import (
     FailMissionRequest,
     FinishDayRequest,
     FinishDayResponse,
-    ImperiumDashboardResponse,
     MissionDecisionScoreRead,
     MissionCompletionResponse,
     MissionDetailResponse,
@@ -127,7 +126,6 @@ from app.services.imperium.daily_plans import (
     get_daily_plan_for_date,
     get_today_daily_plan,
 )
-from app.services.imperium.dashboard import get_dashboard_snapshot
 from app.services.imperium.decision_framework import (
     DecisionFrameworkIdempotencyConflictError,
     DecisionFrameworkValidationError,
@@ -401,11 +399,6 @@ def memory_detail_route(memory_id: UUID, current_user: CurrentUserDep, db: Sessi
         return get_ai_memory(db, current_user=current_user, memory_id=memory_id)
     except AIMemoryNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-
-@router.get("/dashboard", response_model=ImperiumDashboardResponse)
-def dashboard_route(current_user: CurrentUserDep, db: SessionDep) -> ImperiumDashboardResponse:
-    return get_dashboard_snapshot(db, current_user=current_user)
 
 
 @router.post(

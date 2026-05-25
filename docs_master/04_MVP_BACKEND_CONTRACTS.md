@@ -327,7 +327,7 @@ canonical for Imperium mission behavior.
 
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
-| GET | `/api/imperium/dashboard` | Current mission, day session, advice, weekly review status | `imperium.dashboard.requested` |
+| GET | `/api/imperium/dashboard` | Patch 12A read-only dashboard foundation: active mission, Vault summary, Path today, Pulse today | none |
 | POST | `/api/imperium/day-session/start` | Start day session | `day.started` |
 | POST | `/api/imperium/day-session/end` | End active day session | `day.finished` |
 | POST | `/api/imperium/missions/start` | Start direct active mission | `mission.started` |
@@ -344,6 +344,57 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/weekly-review/start` | Start weekly review | `weekly.review.started` |
 | POST | `/api/imperium/weekly-review/{review_id}/answer` | Store review answer | `weekly.review.answered` |
 | POST | `/api/imperium/weekly-review/{review_id}/complete` | Complete after final validation | `weekly.review.completed` |
+
+#### Imperium Dashboard Foundation 12A - read-only module snapshot
+
+Patch 12A replaces the legacy dashboard surface with a narrow backend-owned
+read model under:
+
+- `GET /api/imperium/dashboard`
+
+Purpose:
+- aggregate the current-user state already owned by stable V1 modules
+- expose a deterministic Imperium snapshot for Android/UI consumption
+- keep the dashboard as a view, not an AI brain or orchestration workflow
+
+Query params:
+- `date` optional `date`; default is backend current date by repo convention
+- `currency` optional string; default `EUR`; must match `^[A-Za-z]{3}$`; response normalizes uppercase
+
+Response sections:
+- root `date`, normalized `currency`, and `safe_explanation`
+- `mission.active_mission` from the current user's active mission read model, or `null`
+- `vault` global current-user ledger summary for the requested currency only
+- `path` today view for the current user and requested date
+- `pulse` today entry for the current user and requested date
+
+Contract:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- strict current-user scope for Mission, Vault, Path, and Pulse
+- read-only: no `db.add`, `flush`, `commit`, or cross-module write
+- deterministic: no hidden scoring, coaching, recommendation, or replanning layer
+- no user id is exposed in any dashboard response section
+
+Boundaries:
+- no real AI call
+- no n8n call or workflow trigger
+- no pgvector write
+- no embeddings
+- no memory commit
+- no calendar replanning
+- no OCR
+- no automatic scoring
+- no automatic coaching
+- no automatic recommendations
+- no Path check-in creation
+- no Pulse entry creation
+- no Mission/Vault/Path/Pulse mutation
+
+| method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, OCR, scoring, coaching, recommendations, cross-module mutation. |
 
 ### The Vault
 

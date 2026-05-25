@@ -24,6 +24,17 @@ from app.schemas.imperium import (
     ImperiumDashboardResponse,
     PathItemResponse,
 )
+from app.schemas.dashboard import (
+    ImperiumDashboardFoundationResponse,
+    ImperiumDashboardMissionSection,
+    ImperiumDashboardPathSection,
+    ImperiumDashboardPulseSection,
+    ImperiumDashboardVaultSection,
+)
+from app.services.imperium.missions import get_current_active_mission
+from app.services.imperium.vault import get_vault_summary
+from app.services.path.habits import get_path_today_view
+from app.services.pulse.entries import get_pulse_today_entry
 from app.services.imperium.weekly_review_state import get_weekly_review_banner
 from app.services.imperium.decision_framework import get_canonical_priority_order
 
@@ -35,6 +46,68 @@ CANONICAL_PRIORITY_LABELS = {
     "finance": "Finance",
     "health": "Health",
 }
+
+
+def get_imperium_dashboard_foundation(
+    db: Session,
+    *,
+    current_user: User,
+    local_date: date | None = None,
+    currency: str = "EUR",
+) -> ImperiumDashboardFoundationResponse:
+    snapshot_date = local_date or date.today()
+    normalized_currency = currency.strip().upper()
+
+    active_mission = get_current_active_mission(db, current_user=current_user)
+    vault_summary = get_vault_summary(
+        db,
+        current_user=current_user,
+        currency=normalized_currency,
+        occurred_from=None,
+        occurred_to=None,
+    )
+    path_today = get_path_today_view(
+        db,
+        current_user=current_user,
+        local_date=snapshot_date,
+        domain=None,
+        frequency=None,
+    )
+    pulse_today = get_pulse_today_entry(
+        db,
+        current_user=current_user,
+        local_date=snapshot_date,
+    )
+
+    return ImperiumDashboardFoundationResponse(
+        date=snapshot_date,
+        currency=vault_summary.currency,
+        mission=ImperiumDashboardMissionSection(
+            active_mission=active_mission.mission,
+            safe_explanation=active_mission.safe_explanation,
+        ),
+        vault=ImperiumDashboardVaultSection(
+            currency=vault_summary.currency,
+            total_income_cents=vault_summary.total_income_cents,
+            total_expense_cents=vault_summary.total_expense_cents,
+            net_cents=vault_summary.net_cents,
+            transaction_count=vault_summary.transaction_count,
+            income_count=vault_summary.income_count,
+            expense_count=vault_summary.expense_count,
+            safe_explanation=vault_summary.safe_explanation,
+        ),
+        path=ImperiumDashboardPathSection(
+            date=path_today.date,
+            items=path_today.items,
+            count=path_today.count,
+            safe_explanation=path_today.safe_explanation,
+        ),
+        pulse=ImperiumDashboardPulseSection(
+            date=pulse_today.date,
+            entry=pulse_today.entry,
+            safe_explanation=pulse_today.safe_explanation,
+        ),
+    )
 
 
 def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashboardResponse:

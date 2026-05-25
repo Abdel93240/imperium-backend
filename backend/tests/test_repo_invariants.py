@@ -606,6 +606,87 @@ def test_patch_11f_pulse_docs_mark_future_surfaces_outside_v1_contract() -> None
     assert "no automatic scoring/coaching/recommendations" in lowered_docs
 
 
+def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_safe() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    api_router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
+    dashboard_route_text = (
+        BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_dashboard.py"
+    ).read_text(encoding="utf-8")
+    legacy_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py").read_text(
+        encoding="utf-8"
+    )
+    dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    dashboard_schema_text = (BACKEND_ROOT / "app" / "schemas" / "dashboard.py").read_text(encoding="utf-8")
+    foundation_service = dashboard_service_text.split("def get_imperium_dashboard_foundation", maxsplit=1)[1].split(
+        "def get_dashboard_snapshot",
+        maxsplit=1,
+    )[0]
+    lowered_foundation_code = "\n".join([dashboard_route_text, foundation_service, dashboard_schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+
+    assert "`/api/imperium/dashboard`" in contracts_text
+    assert "imperium dashboard foundation 12a" in lowered_docs
+    assert "active mission" in lowered_docs
+    assert "vault summary" in lowered_docs
+    assert "path today" in lowered_docs
+    assert "pulse today" in lowered_docs
+    assert "no `idempotency-key` required" in lowered_docs
+    assert "no path check-in creation" in lowered_docs
+    assert "no pulse entry creation" in lowered_docs
+    assert "no mission/vault/path/pulse mutation" in lowered_docs
+
+    assert "imperium_dashboard" in api_router_text
+    assert api_router_text.index("imperium_dashboard.router") < api_router_text.index("imperium.router")
+    assert '@router.get("/dashboard"' in dashboard_route_text
+    assert '@router.get("/dashboard"' not in legacy_route_text
+    assert "response_model=ImperiumDashboardFoundationResponse" in dashboard_route_text
+    assert "CurrentUserDep" in dashboard_route_text
+    assert "SessionDep" in dashboard_route_text
+    assert "Query(min_length=3, max_length=3, pattern=r\"^[A-Za-z]{3}$\")" in dashboard_route_text
+    assert "Idempotency-Key" not in dashboard_route_text
+
+    assert "get_current_active_mission" in foundation_service
+    assert "get_vault_summary" in foundation_service
+    assert "get_path_today_view" in foundation_service
+    assert "get_pulse_today_entry" in foundation_service
+    assert "currency.strip().upper()" in foundation_service
+    assert "occurred_from=None" in foundation_service
+    assert "occurred_to=None" in foundation_service
+    assert "active_mission" in dashboard_schema_text
+    assert "user_id" not in dashboard_schema_text
+
+    for read_only_section in (dashboard_route_text, foundation_service):
+        assert "db.add(" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    for forbidden in (
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "ocr",
+        "weighted_score",
+        "coaching",
+        "recommendation",
+    ):
+        assert forbidden not in lowered_foundation_code
+
+
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
