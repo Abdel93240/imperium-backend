@@ -15,6 +15,7 @@ from app.schemas.imperium import (
     BacklogDecisionCandidate,
     BacklogDecisionPreviewResponse,
     BacklogDecisionScoreSummary,
+    BacklogPromotionSummary,
     BacklogMissionCreateRequest,
     BacklogMissionCreateResponse,
     BacklogMissionListResponse,
@@ -25,6 +26,7 @@ from app.schemas.imperium import (
     MissionDecisionScoreSummary,
     MissionResponse,
     MissionWriteResponse,
+    PromotedBacklogMissionRead,
     PromoteBacklogMissionResponse,
     StartMissionRequest,
 )
@@ -62,6 +64,13 @@ BACKLOG_ORDERING_NOTE = (
     "then lower mission priority_level first, then created_at ascending for FIFO deterministic fallback."
 )
 BACKLOG_DECISION_PREVIEW_EXPLANATION = "Deterministic backend preview based on stored backlog fields only."
+BACKLOG_PROMOTION_GUARDRAILS_CHECKED = [
+    "OWNERSHIP_CONFIRMED",
+    "MISSION_WAS_BACKLOG",
+    "NO_ACTIVE_MISSION_FOUND",
+    "IDEMPOTENCY_KEY_ACCEPTED",
+]
+BACKLOG_PROMOTION_SAFE_EXPLANATION = "Mission promoted from backlog using deterministic backend guardrails only."
 
 
 def start_mission(
@@ -392,6 +401,7 @@ def promote_backlog_mission(
 
     mission.status = "active"
     mission.started_at = now
+    mission.ended_at = None
     if mission.created_by_event_id is None:
         mission.created_by_event_id = event.id
     db.flush()
@@ -822,7 +832,7 @@ def _store_idempotency(
     request_path: str,
     request_hash: str,
     response_status_code: int,
-    response: MissionWriteResponse,
+    response: BacklogMissionCreateResponse | MissionWriteResponse | PromoteBacklogMissionResponse,
 ) -> None:
     db.add(
         IdempotencyKey(
@@ -872,16 +882,29 @@ def _promote_response(
     idempotency_key: str,
     decision_score: MissionDecisionScoreSummary | None = None,
 ) -> PromoteBacklogMissionResponse:
-    mission_response = MissionResponse.model_validate(mission)
-    mission_response.event_id = event_id
-    mission_response.idempotency_key = idempotency_key
+    mission_response = _promoted_backlog_mission_read(mission=mission, decision_score=decision_score)
     return PromoteBacklogMissionResponse(
         mission=mission_response,
+        promotion_summary=BacklogPromotionSummary(
+            status="promoted",
+            guardrails_checked=BACKLOG_PROMOTION_GUARDRAILS_CHECKED,
+            safe_explanation=BACKLOG_PROMOTION_SAFE_EXPLANATION,
+        ),
         event_id=event_id,
         idempotency_key=idempotency_key,
         status="promoted",
         decision_score=decision_score,
     )
+
+
+def _promoted_backlog_mission_read(
+    *,
+    mission: ImperiumMission,
+    decision_score: MissionDecisionScoreSummary | None = None,
+) -> PromotedBacklogMissionRead:
+    mission_response = PromotedBacklogMissionRead.model_validate(mission)
+    mission_response.decision_score = decision_score
+    return mission_response
 
 
 def _write_response(

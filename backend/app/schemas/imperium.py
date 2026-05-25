@@ -345,8 +345,33 @@ class BacklogDecisionPreviewResponse(BaseModel):
     safe_explanation: str
 
 
+class PromotedBacklogMissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime
+    created_at: datetime
+    updated_at: datetime
+    decision_score: MissionDecisionScoreSummary | None = None
+
+
+class BacklogPromotionSummary(BaseModel):
+    status: Literal["promoted"]
+    guardrails_checked: list[str]
+    safe_explanation: str
+
+
 class PromoteBacklogMissionResponse(BaseModel):
-    mission: MissionResponse
+    mission: PromotedBacklogMissionRead
+    promotion_summary: BacklogPromotionSummary
     event_id: str
     idempotency_key: str
     status: str

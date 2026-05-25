@@ -695,7 +695,7 @@ def test_backlog_decision_preview_has_no_ai_n8n_pgvector_embedding_or_writes() -
         maxsplit=1,
     )[0]
     preview_schema_section = schema_text.split("class BacklogDecisionScoreSummary", maxsplit=1)[1].split(
-        "class PromoteBacklogMissionResponse",
+        "class PromotedBacklogMissionRead",
         maxsplit=1,
     )[0]
     preview_text = "\n".join([preview_service_section, preview_route_section, preview_schema_section])
@@ -791,3 +791,42 @@ def test_backlog_public_response_has_no_score_coefficient_exposure() -> None:
     assert "weighted_score" not in public_text
     assert "final_weighted_score" not in public_text
     assert "position_to_coefficient" not in public_text
+
+
+def test_backlog_promotion_guardrails_have_no_external_or_memory_side_effects() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    promote_service_section = service_text.split("def promote_backlog_mission", maxsplit=1)[1].split(
+        "def complete_mission",
+        maxsplit=1,
+    )[0]
+    promote_route_section = route_text.split('@router.post("/missions/backlog/{mission_id}/promote"', maxsplit=1)[
+        1
+    ].split('@router.post("/missions/{mission_id}/complete"', maxsplit=1)[0]
+    promote_schema_section = schema_text.split("class PromotedBacklogMissionRead", maxsplit=1)[1].split(
+        "class MissionWriteResponse",
+        maxsplit=1,
+    )[0]
+    promote_text = "\n".join([promote_service_section, promote_route_section, promote_schema_section])
+    lowered = promote_text.lower()
+
+    assert "QwenClient" not in promote_text
+    assert "providers" not in promote_text
+    assert "openai" not in lowered
+    assert "anthropic" not in lowered
+    assert "gemini" not in lowered
+    assert "claude" not in lowered
+    assert "n8n" not in lowered
+    assert "pgvector" not in lowered
+    assert "embedding" not in lowered
+    assert "ai_memories" not in promote_text
+    assert "calendar" not in lowered
+    assert "domain_coefficient" not in promote_schema_section
+    assert "weighted_score" not in promote_schema_section
+    assert "final_weighted_score" not in promote_schema_section
+    assert "ended_at" not in promote_schema_section
+    assert "guardrails_checked" in promote_schema_section

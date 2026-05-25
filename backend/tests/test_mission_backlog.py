@@ -429,7 +429,12 @@ def test_backlog_decision_preview_route_does_not_require_idempotency_key() -> No
 
 def test_promote_backlog_mission_to_active() -> None:
     current_user = _user()
-    mission = _mission(current_user.id)
+    original_started_at = datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
+    mission = _mission(
+        current_user.id,
+        started_at=original_started_at,
+        ended_at=datetime(2026, 5, 1, 9, 0, tzinfo=UTC),
+    )
     db = FakeDb(scalar_results=[None, mission, None, None])
 
     response, duplicate = promote_backlog_mission(
@@ -443,9 +448,48 @@ def test_promote_backlog_mission_to_active() -> None:
 
     assert duplicate is False
     assert mission.status == "active"
+    assert mission.started_at != original_started_at
+    assert mission.ended_at is None
     assert response.status == "promoted"
     assert response.mission.status == "active"
+    assert response.mission.started_at == mission.started_at
+    assert response.promotion_summary.status == "promoted"
+    assert response.promotion_summary.guardrails_checked == [
+        "OWNERSHIP_CONFIRMED",
+        "MISSION_WAS_BACKLOG",
+        "NO_ACTIVE_MISSION_FOUND",
+        "IDEMPOTENCY_KEY_ACCEPTED",
+    ]
     assert any(isinstance(item, Event) and item.event_type == "mission.started" for item in db.added)
+
+
+def test_promote_backlog_route_returns_safe_public_summary() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, ended_at=datetime(2026, 5, 1, 9, 0, tzinfo=UTC))
+    db = FakeDb(scalar_results=[None, mission, None, _score(current_user.id, mission.id, bucket=4)])
+
+    response = _client(db, current_user).post(
+        f"/imperium/missions/backlog/{mission.id}/promote",
+        headers={"Idempotency-Key": "backlog-promote-summary"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["promotion_summary"]["status"] == "promoted"
+    assert body["promotion_summary"]["guardrails_checked"] == [
+        "OWNERSHIP_CONFIRMED",
+        "MISSION_WAS_BACKLOG",
+        "NO_ACTIVE_MISSION_FOUND",
+        "IDEMPOTENCY_KEY_ACCEPTED",
+    ]
+    assert body["promotion_summary"]["safe_explanation"] == (
+        "Mission promoted from backlog using deterministic backend guardrails only."
+    )
+    assert body["mission"]["status"] == "active"
+    assert body["mission"]["started_at"] is not None
+    assert mission.ended_at is None
+    for forbidden in ("ended_at", "domain_coefficient", "weighted_score", "final_weighted_score", "coefficient"):
+        assert forbidden not in response.text
 
 
 def test_promote_backlog_mission_fails_if_active_mission_exists() -> None:
@@ -463,6 +507,21 @@ def test_promote_backlog_mission_fails_if_active_mission_exists() -> None:
     assert "active mission" in response.json()["detail"]
 
 
+def test_promote_non_backlog_mission_returns_409() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, status="completed")
+    db = FakeDb(scalar_results=[None, mission])
+
+    response = _client(db, current_user).post(
+        f"/imperium/missions/backlog/{mission.id}/promote",
+        headers={"Idempotency-Key": "backlog-promote-non-backlog"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Mission is not in backlog."
+    assert db.added == []
+
+
 def test_promote_foreign_backlog_mission_not_found() -> None:
     current_user = _user()
     db = FakeDb(scalar_results=[None, None])
@@ -474,6 +533,91 @@ def test_promote_foreign_backlog_mission_not_found() -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Mission not found."
+
+
+def test_backlog_promote_replays_same_idempotency_key_without_second_write() -> None:
+    current_user = _user()
+    mission_id = uuid4()
+    now = datetime.now(UTC).isoformat()
+    cached_response = {
+        "mission": {
+            "id": str(mission_id),
+            "status": "active",
+            "title": "Replay promoted",
+            "category": None,
+            "domain": "business",
+            "priority_level": 1,
+            "mission_type_category": None,
+            "planned_start_at": None,
+            "planned_end_at": None,
+            "started_at": now,
+            "created_at": now,
+            "updated_at": now,
+            "decision_score": None,
+        },
+        "promotion_summary": {
+            "status": "promoted",
+            "guardrails_checked": [
+                "OWNERSHIP_CONFIRMED",
+                "MISSION_WAS_BACKLOG",
+                "NO_ACTIVE_MISSION_FOUND",
+                "IDEMPOTENCY_KEY_ACCEPTED",
+            ],
+            "safe_explanation": "Mission promoted from backlog using deterministic backend guardrails only.",
+        },
+        "event_id": "evt_cached_promote",
+        "idempotency_key": "backlog-promote-replay",
+        "status": "promoted",
+        "decision_score": None,
+    }
+    existing_key = IdempotencyKey(
+        user_id=current_user.id,
+        idempotency_key="backlog-promote-replay",
+        request_method="POST",
+        request_path=f"/imperium/missions/backlog/{mission_id}/promote",
+        request_hash=_hash_request("mission.backlog.promoted", {"mission_id": str(mission_id)}),
+        status=IdempotencyStatus.completed,
+        response_status_code=200,
+        response_body=cached_response,
+    )
+    db = FakeDb(scalar_results=[existing_key])
+
+    response, duplicate = promote_backlog_mission(
+        db,
+        current_user=current_user,
+        mission_id=mission_id,
+        idempotency_key="backlog-promote-replay",
+        request_method="POST",
+        request_path=f"/imperium/missions/backlog/{mission_id}/promote",
+    )
+
+    assert duplicate is True
+    assert response.mission.id == mission_id
+    assert response.promotion_summary.status == "promoted"
+    assert db.added == []
+    assert db.committed is False
+
+
+def test_backlog_promote_different_idempotency_key_after_promotion_returns_409() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalar_results=[None, mission, None, None, None, mission])
+    client = _client(db, current_user)
+
+    first_response = client.post(
+        f"/imperium/missions/backlog/{mission.id}/promote",
+        headers={"Idempotency-Key": "backlog-promote-first"},
+    )
+    second_response = client.post(
+        f"/imperium/missions/backlog/{mission.id}/promote",
+        headers={"Idempotency-Key": "backlog-promote-second"},
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 409
+    assert second_response.json()["detail"] == "Mission is not in backlog."
+    assert mission.status == "active"
+    assert sum(isinstance(item, Event) and item.event_type == "mission.started" for item in db.added) == 1
 
 
 def test_backlog_public_response_does_not_expose_coefficient_or_weighted_score() -> None:
