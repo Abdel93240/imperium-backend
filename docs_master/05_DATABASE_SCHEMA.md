@@ -112,9 +112,16 @@ For MVP, prefer status transitions and audit/history over hard deletes.
 
 Events are the primary audit log.
 
-Read-only snapshot endpoints, including `GET /api/imperium/dashboard`, must not
-write canonical rows and must remain derived from existing Mission, Vault,
-Path, and Pulse records only.
+Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and
+`GET /api/imperium/daily-plan`, must not write canonical rows and must remain
+derived from existing Mission, Vault, Path, Pulse, and snapshot read models
+only.
+
+The daily-plan snapshot is a read-only consolidation layer:
+- it does not persist a new plan row
+- it does not create Path or Pulse records
+- it does not mutate Mission, Vault, Path, or Pulse state
+- it is built from existing read models and current-user scoped reads only
 
 For mutable domain records, use:
 - `created_at`

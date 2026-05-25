@@ -2074,6 +2074,68 @@ def test_patch_12g_dashboard_audit_notes_are_documented_and_no_forbidden_engines
         assert forbidden not in lowered_code
 
 
+def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshots() -> None:
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_daily_plan.py").read_text(
+        encoding="utf-8"
+    )
+    service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "daily_plan.py").read_text(encoding="utf-8")
+    schema_text = (BACKEND_ROOT / "app" / "schemas" / "daily_plan.py").read_text(encoding="utf-8")
+    router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+
+    assert '@router.get("/daily-plan"' in route_text
+    assert "get_default_local_date" in service_text
+    assert "get_imperium_dashboard_foundation" in service_text
+    assert "get_current_active_mission" in service_text
+    assert "get_path_today_view" in service_text
+    assert "get_pulse_today_entry" in service_text
+    assert "get_dashboard_snapshot" not in service_text
+    assert "DailyPlanSummarySection" in schema_text
+    assert "DailyPlanMetaSection" in schema_text
+    assert "read_only: bool" in schema_text
+    assert "daily_plan_version: str" in schema_text
+    assert "snapshot_generated_at: datetime" in schema_text
+    assert 'api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])' in router_text
+    assert router_text.index("imperium_daily_plan.router") < router_text.index("imperium.router")
+
+    assert "/api/imperium/daily-plan" in contracts_text
+    assert "daily plan snapshot" in contracts_text
+    assert "read-only consolidation layer" in contracts_text
+    assert "no legacy dashboard aggregator" in contracts_text
+    assert "/api/imperium/daily-plan" in schema_docs_text
+    assert "does not persist a new plan row" in schema_docs_text
+
+    for forbidden in (
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "memory commit",
+        "ocr",
+        "replanning",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "health_score",
+        "db.add(",
+        "db.flush",
+        "db.commit",
+        "calendar",
+    ):
+        assert forbidden not in lowered_code
+
+
 def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
     service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"

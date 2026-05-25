@@ -6,6 +6,7 @@ from app.api.v1.routes import (
     devices,
     events,
     health,
+    imperium_daily_plan,
     imperium,
     imperium_dashboard,
     imperium_path,
@@ -22,6 +23,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(devices.router, prefix="/auth/devices", tags=["devices"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(imperium_dashboard.router, prefix="/imperium", tags=["imperium-dashboard"])
+api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])
 api_router.include_router(imperium_path.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_pulse.router, prefix="/imperium/pulse", tags=["imperium-pulse"])
 api_router.include_router(imperium.router, prefix="/imperium", tags=["imperium"])

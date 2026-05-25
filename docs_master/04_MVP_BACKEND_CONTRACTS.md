@@ -328,6 +328,7 @@ canonical for Imperium mission behavior.
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
 | GET | `/api/imperium/dashboard` | Patch 12A read-only dashboard foundation: active mission, Vault summary, Path today, Pulse today | none |
+| GET | `/api/imperium/daily-plan` | Patch 13A read-only daily plan snapshot: dashboard foundation plus active mission, Path today, and Pulse today | none |
 | POST | `/api/imperium/day-session/start` | Start day session | `day.started` |
 | POST | `/api/imperium/day-session/end` | End active day session | `day.finished` |
 | POST | `/api/imperium/missions/start` | Start direct active mission | `mission.started` |
@@ -448,6 +449,71 @@ This block contains only booleans and counts:
 - `pulse_entry_present`
 
 The `safe_explanation` for this block is:
+
+#### Imperium Daily Plan Foundation 13A - read-only consolidated daily snapshot
+
+Patch 13A adds a new daily planning snapshot for the current user.
+It is a read-only consolidation layer on top of existing V1 snapshots.
+It does not create plans, it does not score, and it does not recommend or coach.
+
+The backend-owned read model lives under:
+
+- `GET /api/imperium/daily-plan`
+
+Purpose:
+- consolidate the daily dashboard snapshot with the current active mission, Path today, and Pulse today
+- give Android/UI a single read-only daily snapshot to render
+- remain a pure snapshot view, not an AI, not a replanning workflow, and not a mutation path
+
+Query params:
+- `date` optional `date`; default date convention is Europe/Paris through the backend helper; query `date` overrides the Europe/Paris default
+
+Response sections:
+- root `date` and `safe_explanation`
+- `dashboard`: the dashboard foundation snapshot for the same date
+- `mission`: current active mission read model
+- `path`: Path today snapshot
+- `pulse`: Pulse today snapshot
+- `summary`: derived booleans/counts only
+- `meta`: snapshot metadata with UTC `snapshot_generated_at`, `daily_plan_version = v1`, and `read_only = true`
+
+Contract:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- strict current-user scope for Mission, Dashboard, Path, and Pulse
+- snapshot read-only: no `db.add`, `db.flush`, `db.commit`, or rollback-driven mutation path
+- no write cross-module and no cross-module writes
+- deterministic: no hidden scoring, coaching, recommendation, replanning, AI, n8n, or OCR layer
+- no user id is exposed in any daily-plan response section
+- no auto-creation of Path rows
+- no auto-creation of Pulse rows
+- no automatic Path/Pulse/Mission/Vault linkage beyond reading the existing snapshots
+
+Boundaries:
+- no real AI call
+- no n8n call or workflow trigger
+- no n8n AI Agent
+- no n8n DB write
+- no pgvector write
+- no embeddings
+- no automatic memory commit
+- no calendar or automatic replanning
+- no OCR
+- no automatic scoring
+- no automatic coaching
+- no automatic recommendations
+- no automatic Path check-in creation
+- no automatic Pulse entry creation
+- no Mission/Vault/Path/Pulse mutation
+- no cross-module write
+- no legacy dashboard aggregator
+- no auto-generated plan rows
+- no model selection, scoring, or routing
+
+| method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
+|---|---|---|---|---|---|---|---|---|
+| GET | `/api/imperium/daily-plan` | Read the current user's consolidated daily snapshot from stable V1 snapshots. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `dashboard`, `mission`, `path`, `pulse`, `summary`, `meta`, `safe_explanation` | `200`, `409`, `422` | Allowed: read dashboard foundation snapshot, active mission, Path today, Pulse today, derived summary, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
 
 ```text
 Dashboard readiness snapshot computed from read-only module data.
