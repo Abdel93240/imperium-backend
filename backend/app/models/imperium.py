@@ -381,6 +381,85 @@ class ImperiumPathItem(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class ImperiumPathHabit(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_path_habits"
+    __table_args__ = (
+        CheckConstraint(
+            "frequency IN ('daily', 'weekly')",
+            name="imperium_path_habits_frequency_check",
+        ),
+        Index("imperium_path_habits_user_active_created_idx", "user_id", "is_active", "created_at"),
+        Index("imperium_path_habits_user_domain_idx", "user_id", "domain"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    domain: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    frequency: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ImperiumPathCheckIn(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_path_check_ins"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('done', 'missed')",
+            name="imperium_path_check_ins_status_check",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "habit_id",
+            "check_date",
+            name="imperium_path_check_ins_user_habit_date_unique",
+        ),
+        Index(
+            "imperium_path_check_ins_user_check_date_desc_idx",
+            "user_id",
+            text("check_date DESC"),
+        ),
+        Index(
+            "imperium_path_check_ins_user_habit_check_date_idx",
+            "user_id",
+            "habit_id",
+            "check_date",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    habit_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("imperium_path_habits.id"),
+        nullable=False,
+    )
+    check_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class ImperiumDailyPlan(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_daily_plans"
     __table_args__ = (
