@@ -1218,6 +1218,62 @@ Audit/history:
 
 Pulse MVP stays simple.
 
+### Pulse Foundation 11A - `imperium_pulse_entries`
+
+Purpose:
+- Stores append-only daily Pulse entries for the authenticated user.
+- Covers simple sleep, energy, fatigue, weight, workout, and notes facts.
+- Does not create health strategy, AI coaching, opaque scores, recommendations, Mission links, Vault links, Path links, calendar events, memory records, embeddings, pgvector writes, or n8n workflow triggers.
+
+Columns:
+- `id` uuid primary key
+- `user_id` uuid foreign key to `users.id`
+- `entry_date` date not null
+- `sleep_hours` decimal(4,2) nullable
+- `energy_level` smallint nullable
+- `fatigue_level` smallint nullable
+- `weight_kg` decimal(5,2) nullable
+- `workout_done` boolean nullable
+- `workout_type` varchar(80) nullable
+- `notes` varchar(1000) nullable
+- `created_at` timestamptz not null
+- `updated_at` timestamptz not null
+
+Required fields:
+- `id`
+- `user_id`
+- `entry_date`
+- `created_at`
+- `updated_at`
+
+Foreign keys:
+- `user_id -> users.id`
+
+Indexes:
+- index on `(user_id, entry_date desc)`
+
+Unique constraints:
+- unique `(user_id, entry_date)`
+
+Check constraints:
+- `sleep_hours is null or sleep_hours between 0 and 24`
+- `energy_level is null or energy_level between 1 and 10`
+- `fatigue_level is null or fatigue_level between 1 and 10`
+- `weight_kg is null or weight_kg > 0`
+- `workout_done is distinct from false or workout_type is null`
+
+JSONB fields:
+- none
+
+Soft delete:
+- no
+
+Audit/history:
+- table is append-only daily entry history for Patch 11A
+- idempotent creates are stored through the backend idempotency table
+- Patch 11A has no update, merge, destructive edit, automatic recalculation, health score, automatic coaching, or automatic recommendations
+- Patch 11A has no automatic synchronization with Mission, Vault, Path, calendar, memory, pgvector, embedding, or n8n modules
+
 ### `body_profile_snapshots`
 
 Purpose:

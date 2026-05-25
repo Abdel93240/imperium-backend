@@ -535,6 +535,51 @@ No endpoint may auto-click, auto-accept, auto-refuse, or automate Bolt.
 
 ### Pulse
 
+#### Pulse Foundation 11A - append-only daily entries
+
+Patch 11A introduces the first backend-owned Pulse surface under `/api/imperium/pulse`.
+
+Purpose:
+- record simple daily facts for sleep, energy, fatigue, weight, workout, and notes
+- keep Pulse practical while the user is busy
+- preserve the backend as source of truth without creating health strategy, coaching, or hidden scoring
+
+Implemented endpoints:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| POST | `/api/imperium/pulse/entries` | Create one current-user Pulse daily entry | Required `Idempotency-Key` |
+| GET | `/api/imperium/pulse/entries` | List current-user Pulse entries with optional `date_from`, `date_to`, `limit`, `offset` | Not required; read-only |
+| GET | `/api/imperium/pulse/entries/{entry_id}` | Read one current-user Pulse entry by id | Not required; read-only |
+
+Contracts:
+- all endpoints are JWT-scoped through `CurrentUserDep`
+- client-provided `user_id` is forbidden
+- `POST /api/imperium/pulse/entries` requires `entry_date`
+- at least one business field is required: `sleep_hours`, `energy_level`, `fatigue_level`, `weight_kg`, `workout_done`, `workout_type`, or `notes`
+- `sleep_hours` must be between `0` and `24`
+- `energy_level` and `fatigue_level` must be between `1` and `10`
+- `weight_kg` must be greater than `0`
+- `workout_type` is forbidden when `workout_done=false`
+- `notes` is trimmed and limited to 1000 characters
+- one entry per `(user_id, entry_date)`
+- repeating the same `Idempotency-Key` with the same payload returns the original result
+- repeating the same `Idempotency-Key` with a different payload returns `409`
+- attempting the same `entry_date` with another idempotency key returns `409`
+- there is no update, merge, destructive edit, or automatic recalculation in Patch 11A
+
+Audit readiness boundaries:
+- no AI
+- no n8n
+- no pgvector write
+- no embeddings
+- no memory commit
+- no replanning
+- no automatic coaching
+- no health score
+- no automatic recommendations
+- no automatic synchronization with Mission, Vault, Path, calendar, or any other module
+
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
 | GET | `/api/pulse/dashboard` | Biological profile, health score, workout/nutrition summary | `pulse.dashboard.requested` |

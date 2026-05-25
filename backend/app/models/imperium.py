@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
@@ -10,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -227,6 +229,59 @@ class ImperiumUserPriority(UUIDPrimaryKeyMixin, Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     coefficient: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ImperiumPulseEntry(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_pulse_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "entry_date", name="imperium_pulse_entries_user_entry_date_unique"),
+        CheckConstraint(
+            "sleep_hours IS NULL OR (sleep_hours >= 0 AND sleep_hours <= 24)",
+            name="imperium_pulse_entries_sleep_hours_range",
+        ),
+        CheckConstraint(
+            "energy_level IS NULL OR (energy_level >= 1 AND energy_level <= 10)",
+            name="imperium_pulse_entries_energy_level_range",
+        ),
+        CheckConstraint(
+            "fatigue_level IS NULL OR (fatigue_level >= 1 AND fatigue_level <= 10)",
+            name="imperium_pulse_entries_fatigue_level_range",
+        ),
+        CheckConstraint(
+            "weight_kg IS NULL OR weight_kg > 0",
+            name="imperium_pulse_entries_weight_kg_positive",
+        ),
+        CheckConstraint(
+            "workout_done IS DISTINCT FROM false OR workout_type IS NULL",
+            name="imperium_pulse_entries_workout_type_requires_workout_done",
+        ),
+        Index(
+            "imperium_pulse_entries_user_entry_date_desc_idx",
+            "user_id",
+            text("entry_date DESC"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    entry_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    sleep_hours: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
+    energy_level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    fatigue_level: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    workout_done: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    workout_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
