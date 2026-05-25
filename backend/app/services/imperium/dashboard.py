@@ -27,6 +27,7 @@ from app.schemas.imperium import (
 )
 from app.schemas.dashboard import (
     ImperiumDashboardFoundationResponse,
+    ImperiumDashboardMetaSection,
     ImperiumDashboardMissionSection,
     ImperiumDashboardPathSection,
     ImperiumDashboardReadinessSection as FoundationDashboardReadinessSection,
@@ -57,6 +58,7 @@ def get_imperium_dashboard_foundation(
     local_date: date | None = None,
     currency: str = "EUR",
 ) -> ImperiumDashboardFoundationResponse:
+    snapshot_generated_at = datetime.now(UTC)
     snapshot_date = local_date or date.today()
     normalized_currency = currency.strip().upper()
 
@@ -118,6 +120,12 @@ def get_imperium_dashboard_foundation(
             vault_transaction_count=vault_summary.transaction_count,
             path_today_count=path_today.count,
             pulse_entry_present=pulse_today.entry is not None,
+        ),
+        meta=ImperiumDashboardMetaSection(
+            snapshot_generated_at=snapshot_generated_at,
+            dashboard_version="v1",
+            included_modules=["mission", "vault", "path", "pulse"],
+            read_only=True,
         ),
     )
 

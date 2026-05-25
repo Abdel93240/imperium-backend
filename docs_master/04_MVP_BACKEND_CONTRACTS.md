@@ -405,7 +405,7 @@ Boundaries:
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `readiness`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today, readiness snapshot. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
+| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `readiness`, `meta`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today, readiness snapshot, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
 
 #### Imperium Dashboard Foundation 12D - Readiness Snapshot
 
@@ -438,6 +438,37 @@ Readiness has no side effects:
 
 - no write
 - no cross-module write
+
+#### Imperium Dashboard Consistency Metadata 12E - read-only snapshot metadata
+
+Patch 12E adds a small read-only `meta` block to the existing dashboard snapshot
+without changing the dashboard mission/vault/path/pulse data model or adding
+any business logic.
+
+Purpose:
+- expose snapshot metadata only
+- support dashboard consistency checks for the current snapshot
+- keep the dashboard read-only and deterministic
+
+Metadata fields:
+- `snapshot_generated_at`: UTC ISO8601 timestamp generated at snapshot time
+- `dashboard_version`: static string `v1`
+- `included_modules`: deterministic list `["mission", "vault", "path", "pulse"]`
+- `read_only`: always `true`
+- `safe_explanation`: `Dashboard metadata for current snapshot.`
+
+Contract:
+- metadata only, not telemetry
+- no analytics
+- no tracking
+- no user id, request id, internal ids, hostnames, infra metadata, or AI provider info
+- no score, coaching, recommendation, health score, or advice
+- no AI, n8n, OCR, pgvector, embeddings, or memory commit
+- no auto-creation of Path or Pulse data
+- no cross-module writes
+
+The dashboard remains a snapshot read-only view. The new `meta` block is
+read-only metadata only and does not alter the behavior of 12A-12D.
 - no Path creation
 - no Pulse creation
 - no AI

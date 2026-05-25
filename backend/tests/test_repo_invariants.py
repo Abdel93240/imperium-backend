@@ -670,6 +670,7 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
     assert "mission_available" in dashboard_schema_text
     assert "vault_transaction_count" in dashboard_schema_text
     assert "Dashboard readiness snapshot computed from read-only module data." in dashboard_schema_text
+    assert "Dashboard metadata for current snapshot." in dashboard_schema_text
     assert "user_id" not in dashboard_schema_text
 
     for read_only_section in (dashboard_route_text, foundation_service):
@@ -699,6 +700,11 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
         "weighted_score",
         "coaching",
         "recommendation",
+        "analytics",
+        "telemetry",
+        "tracking",
+        "health score",
+        "advice",
     ):
         assert forbidden not in lowered_foundation_code
 
@@ -712,6 +718,7 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
         encoding="utf-8"
     )
+    dashboard_schema_text = (BACKEND_ROOT / "app" / "schemas" / "dashboard.py").read_text(encoding="utf-8")
     snapshot_schema_text = (BACKEND_ROOT / "app" / "schemas" / "imperium.py").read_text(encoding="utf-8")
     snapshot_service = dashboard_service_text.split("def get_dashboard_snapshot", maxsplit=1)[1]
     lowered_service = dashboard_service_text.lower()
@@ -734,7 +741,12 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     assert "readiness`" in lowered_docs
     assert "safe_explanation" in contracts_text
     assert "readiness: ImperiumDashboardReadinessSection" in snapshot_schema_text
-    assert "Dashboard readiness snapshot computed from read-only module data." in snapshot_schema_text
+    assert "Dashboard readiness snapshot computed from read-only module data." in dashboard_schema_text
+    assert "Dashboard metadata for current snapshot." in dashboard_schema_text
+    assert "snapshot_generated_at" in dashboard_schema_text
+    assert "dashboard_version" in dashboard_schema_text
+    assert "included_modules" in dashboard_schema_text
+    assert "read_only" in dashboard_schema_text
 
     for forbidden in (
         "db.add(",
@@ -760,6 +772,11 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
         "weighted_score",
         "coaching",
         "recommendation",
+        "analytics",
+        "telemetry",
+        "tracking",
+        "health score",
+        "advice",
         "path check-in creation",
         "pulse entry creation",
         "automatic creation of path/pulse rows",

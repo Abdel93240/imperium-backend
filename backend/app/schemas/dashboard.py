@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -52,6 +52,16 @@ class ImperiumDashboardReadinessSection(BaseModel):
     safe_explanation: str = "Dashboard readiness snapshot computed from read-only module data."
 
 
+class ImperiumDashboardMetaSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    snapshot_generated_at: datetime
+    dashboard_version: str
+    included_modules: list[str]
+    read_only: bool
+    safe_explanation: str = "Dashboard metadata for current snapshot."
+
+
 class ImperiumDashboardFoundationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -62,4 +72,5 @@ class ImperiumDashboardFoundationResponse(BaseModel):
     path: ImperiumDashboardPathSection
     pulse: ImperiumDashboardPulseSection
     readiness: ImperiumDashboardReadinessSection
+    meta: ImperiumDashboardMetaSection
     safe_explanation: str = "Imperium dashboard snapshot for current user."

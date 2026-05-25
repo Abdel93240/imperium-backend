@@ -82,6 +82,7 @@ def test_dashboard_contract_shape_and_query_params() -> None:
         "path",
         "pulse",
         "readiness",
+        "meta",
         "safe_explanation",
     }
     assert body["currency"] == "EUR"
@@ -101,6 +102,9 @@ def test_dashboard_contract_shape_and_query_params() -> None:
     assert body["readiness"]["vault_available"] is True
     assert body["readiness"]["path_available"] is True
     assert body["readiness"]["pulse_available"] is True
+    assert body["meta"]["dashboard_version"] == "v1"
+    assert body["meta"]["included_modules"] == ["mission", "vault", "path", "pulse"]
+    assert body["meta"]["read_only"] is True
     assert body["safe_explanation"] == "Imperium dashboard snapshot for current user."
 
 
@@ -142,6 +146,23 @@ def test_dashboard_readiness_is_read_only_and_not_a_score() -> None:
     assert "recommendation" not in readiness
     assert "health_score" not in readiness
     assert "coach" not in readiness
+
+
+def test_dashboard_meta_is_read_only_metadata_only() -> None:
+    response = _client(FakeDb(scalar_results=[None], scalars_results=[[], [], []]), _user()).get(
+        "/api/imperium/dashboard"
+    )
+
+    assert response.status_code == 200
+    meta = response.json()["meta"]
+    assert meta["dashboard_version"] == "v1"
+    assert meta["included_modules"] == ["mission", "vault", "path", "pulse"]
+    assert meta["read_only"] is True
+    assert meta["safe_explanation"] == "Dashboard metadata for current snapshot."
+    assert "analytics" not in meta
+    assert "telemetry" not in meta
+    assert "score" not in meta
+    assert "recommendation" not in meta
 
 
 def test_dashboard_route_keeps_module_routes_available() -> None:

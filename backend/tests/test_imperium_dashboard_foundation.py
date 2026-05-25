@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
@@ -195,6 +195,14 @@ def test_dashboard_empty_returns_nulls_and_zero_sections() -> None:
         "pulse_entry_present": False,
         "safe_explanation": "Dashboard readiness snapshot computed from read-only module data.",
     }
+    assert body["meta"]["dashboard_version"] == "v1"
+    assert body["meta"]["included_modules"] == ["mission", "vault", "path", "pulse"]
+    assert body["meta"]["read_only"] is True
+    assert body["meta"]["safe_explanation"] == "Dashboard metadata for current snapshot."
+    meta_generated_at = datetime.fromisoformat(body["meta"]["snapshot_generated_at"])
+    assert meta_generated_at.tzinfo is not None
+    assert meta_generated_at.utcoffset() == timedelta(0)
+    assert abs((datetime.now(UTC) - meta_generated_at).total_seconds()) < 10
     assert body["safe_explanation"] == "Imperium dashboard snapshot for current user."
     assert "current_mission" not in body
     assert "vault_week" not in body
@@ -358,3 +366,22 @@ def test_dashboard_does_not_expose_user_id() -> None:
 
     assert response.status_code == 200
     _assert_no_user_id(response.json())
+
+
+def test_dashboard_meta_does_not_expose_sensitive_identifiers() -> None:
+    response = _client(_empty_dashboard_db(), _user()).get("/api/imperium/dashboard")
+
+    assert response.status_code == 200
+    meta = response.json()["meta"]
+    assert set(meta) == {
+        "snapshot_generated_at",
+        "dashboard_version",
+        "included_modules",
+        "read_only",
+        "safe_explanation",
+    }
+    assert "user_id" not in meta
+    assert "request_id" not in meta
+    assert "host" not in meta
+    assert "hostname" not in meta
+    assert "provider" not in meta
