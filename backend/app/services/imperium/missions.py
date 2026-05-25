@@ -726,14 +726,11 @@ def get_mission_decision_score(
         status=mission.status,
         priority_level=mission.priority_level,
         priority_bucket=priority_bucket,
-        score_summary=MissionDecisionScorePublicSummary(
-            label=_backlog_score_label(priority_bucket),
-            reason_codes=_mission_decision_reason_codes(
-                priority_bucket=priority_bucket,
-                priority_level=mission.priority_level,
-            )
-            if include_reasons
-            else None,
+        score_summary=_public_score_summary(
+            MissionDecisionScorePublicSummary,
+            priority_bucket=priority_bucket,
+            priority_level=mission.priority_level,
+            include_reasons=include_reasons,
         ),
         safe_explanation=MISSION_DECISION_SCORE_SAFE_EXPLANATION,
     )
@@ -903,34 +900,51 @@ def _backlog_score_label(priority_bucket: int) -> str:
     return "low"
 
 
-def _backlog_reason_codes(*, priority_bucket: int, priority_level: int | None) -> list[str]:
+def _priority_bucket_reason_code(priority_bucket: int) -> str:
     if priority_bucket >= 4:
-        reason_codes = ["HIGH_PRIORITY_BUCKET"]
-    elif priority_bucket >= 2:
-        reason_codes = ["MEDIUM_PRIORITY_BUCKET"]
-    else:
-        reason_codes = ["LOW_PRIORITY_BUCKET"]
+        return "HIGH_PRIORITY_BUCKET"
+    if priority_bucket >= 2:
+        return "MEDIUM_PRIORITY_BUCKET"
+    return "LOW_PRIORITY_BUCKET"
 
+
+def _public_score_reason_codes(
+    *,
+    priority_bucket: int,
+    priority_level: int | None,
+    include_fifo_reason: bool,
+    include_normal_priority_reason: bool,
+) -> list[str]:
+    reason_codes = [_priority_bucket_reason_code(priority_bucket)]
     if priority_level is not None and priority_level <= 2:
         reason_codes.append("LOW_PRIORITY_LEVEL")
-    reason_codes.append("FIFO_BACKLOG")
+    elif priority_level is not None and include_normal_priority_reason:
+        reason_codes.append("NORMAL_PRIORITY_LEVEL")
+    if include_fifo_reason:
+        reason_codes.append("FIFO_BACKLOG")
     return reason_codes
 
 
-def _mission_decision_reason_codes(*, priority_bucket: int, priority_level: int | None) -> list[str]:
-    if priority_bucket >= 4:
-        reason_codes = ["HIGH_PRIORITY_BUCKET"]
-    elif priority_bucket >= 2:
-        reason_codes = ["MEDIUM_PRIORITY_BUCKET"]
-    else:
-        reason_codes = ["LOW_PRIORITY_BUCKET"]
-
-    if priority_level is not None:
-        if priority_level <= 2:
-            reason_codes.append("LOW_PRIORITY_LEVEL")
-        else:
-            reason_codes.append("NORMAL_PRIORITY_LEVEL")
-    return reason_codes
+def _public_score_summary(
+    summary_model: type[BacklogDecisionScoreSummary] | type[MissionDecisionScorePublicSummary],
+    *,
+    priority_bucket: int,
+    priority_level: int | None,
+    include_reasons: bool,
+    include_fifo_reason: bool = False,
+    include_normal_priority_reason: bool = True,
+) -> BacklogDecisionScoreSummary | MissionDecisionScorePublicSummary:
+    return summary_model(
+        label=_backlog_score_label(priority_bucket),
+        reason_codes=_public_score_reason_codes(
+            priority_bucket=priority_bucket,
+            priority_level=priority_level,
+            include_fifo_reason=include_fifo_reason,
+            include_normal_priority_reason=include_normal_priority_reason,
+        )
+        if include_reasons
+        else None,
+    )
 
 
 def _get_user_mission(
@@ -987,19 +1001,19 @@ def _backlog_decision_candidate(
     include_reasons: bool,
 ) -> BacklogDecisionCandidate:
     priority_bucket = _priority_bucket_from_score(score)
-    reason_codes = _backlog_reason_codes(
-        priority_bucket=priority_bucket,
-        priority_level=mission.priority_level,
-    )
     return BacklogDecisionCandidate(
         id=mission.id,
         title=mission.title,
         domain=mission.domain,
         priority_level=mission.priority_level,
         priority_bucket=priority_bucket,
-        score_summary=BacklogDecisionScoreSummary(
-            label=_backlog_score_label(priority_bucket),
-            reason_codes=reason_codes if include_reasons else None,
+        score_summary=_public_score_summary(
+            BacklogDecisionScoreSummary,
+            priority_bucket=priority_bucket,
+            priority_level=mission.priority_level,
+            include_reasons=include_reasons,
+            include_fifo_reason=True,
+            include_normal_priority_reason=False,
         ),
     )
 

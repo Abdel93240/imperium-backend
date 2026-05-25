@@ -456,9 +456,13 @@ class BacklogMissionListResponse(BaseModel):
     ordering: str
 
 
-class BacklogDecisionScoreSummary(BaseModel):
+class PublicDecisionScoreSummary(BaseModel):
     label: Literal["high", "medium", "low"]
     reason_codes: list[str] | None = None
+
+
+class BacklogDecisionScoreSummary(PublicDecisionScoreSummary):
+    pass
 
 
 class BacklogDecisionCandidate(BaseModel):
@@ -752,9 +756,8 @@ class DecisionFrameworkScorePreviewResponse(BaseModel):
     source: str
 
 
-class MissionDecisionScorePublicSummary(BaseModel):
-    label: Literal["high", "medium", "low"]
-    reason_codes: list[str] | None = None
+class MissionDecisionScorePublicSummary(PublicDecisionScoreSummary):
+    pass
 
 
 class MissionDecisionScoreRead(BaseModel):

@@ -16,6 +16,7 @@ from app.services.imperium.missions import (
     _hash_request,
     create_backlog_mission,
     get_backlog_decision_preview,
+    get_mission_decision_score,
     list_backlog_missions,
     promote_backlog_mission,
 )
@@ -310,6 +311,31 @@ def test_backlog_decision_preview_recommends_first_sorted_candidate() -> None:
         "LOW_PRIORITY_LEVEL",
         "FIFO_BACKLOG",
     ]
+
+
+def test_backlog_preview_and_decision_score_share_public_score_mapping() -> None:
+    current_user = _user()
+    cases = [(1, "low"), (2, "medium"), (4, "high")]
+
+    for bucket, expected_label in cases:
+        mission = _mission(current_user.id, priority_level=3)
+        preview = get_backlog_decision_preview(
+            FakeDb(scalars_results=[[mission], [_score(current_user.id, mission.id, bucket=bucket)]]),
+            current_user=current_user,
+        )
+        decision_score = get_mission_decision_score(
+            FakeDb(scalar_results=[mission, _score(current_user.id, mission.id, bucket=bucket)]),
+            current_user=current_user,
+            mission_id=mission.id,
+        )
+
+        preview_summary = preview.candidates[0].score_summary
+        decision_summary = decision_score.score_summary
+        assert preview_summary.label == expected_label
+        assert decision_summary.label == expected_label
+        assert preview_summary.reason_codes is not None
+        assert decision_summary.reason_codes is not None
+        assert preview_summary.reason_codes[0] == decision_summary.reason_codes[0]
 
 
 def test_backlog_decision_preview_is_user_scoped() -> None:
