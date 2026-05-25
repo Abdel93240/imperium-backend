@@ -518,6 +518,76 @@ def test_patch_11c_pulse_stats_summary_is_read_only_deterministic_and_no_cross_m
     assert "no automatic scoring" in lowered_docs
 
 
+def test_patch_16a_frontend_navigation_is_metadata_only_static_and_safe() -> None:
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py").read_text(
+        encoding="utf-8"
+    )
+    service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(encoding="utf-8")
+    schema_text = (BACKEND_ROOT / "app" / "schemas" / "frontend.py").read_text(encoding="utf-8")
+    router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
+    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    lowered_service = service_text.lower()
+    lowered_route = route_text.lower()
+
+    assert '@router.get("/frontend/navigation"' in route_text
+    assert "CurrentUserDep" in route_text
+    assert "Idempotency-Key" not in route_text
+    assert "imperium_frontend.router" in router_text
+    assert 'prefix="/imperium"' in router_text
+    assert "navigation_version=\"v1\"" in service_text
+    assert "read_only=True" in service_text
+    assert "ImperiumFrontendNavigationResponse" in schema_text
+    assert "order: int" in schema_text
+    assert "enabled: bool" in schema_text
+    assert "extra=\"forbid\"" in schema_text
+
+    for forbidden in ("db.add(", "db.flush", "db.commit", "session", "select("):
+        assert forbidden not in service_text
+
+    for forbidden in (
+        "app.routes",
+        "for route in",
+        "get_openapi",
+        "health",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "secret",
+        "provider",
+        "infra",
+    ):
+        assert forbidden not in lowered_service
+        assert forbidden not in lowered_route
+
+    for forbidden_service_ref in (
+        "missions",
+        "vault",
+        "path",
+        "pulse",
+        "dashboard",
+        "daily_plan",
+        "home",
+        "contracts",
+    ):
+        assert f"services.imperium.{forbidden_service_ref}" not in service_text
+
+    assert "/api/imperium/frontend/navigation" in contracts_docs
+    assert "metadata only" in contracts_docs
+    assert "static deterministic v1" in contracts_docs
+    assert "not a health check" in contracts_docs
+    assert "not a dynamic discovery" in contracts_docs
+    assert "no business data read" in contracts_docs
+    assert "no secrets/providers/infra metadata" in contracts_docs
+    assert "/api/imperium/frontend/navigation" in schema_docs
+
+
 def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
     schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")

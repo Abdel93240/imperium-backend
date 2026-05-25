@@ -2505,3 +2505,15 @@ Home bootstrap contract note:
 - no coaching
 - no recommendation
 - no cross-module write
+
+Frontend navigation contract note:
+- `GET /api/imperium/frontend/navigation` is metadata only
+- static deterministic V1 contract
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no business data read
+- no writes
+- no AI, n8n, OCR, scoring, coaching, or recommendation flows
+- no user_id exposure
+- no secrets/providers/infra metadata

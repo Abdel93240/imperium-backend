@@ -1989,3 +1989,36 @@ TODO:
 - webhook secret rotation policy
 
 - status available is contract metadata only and is not a health check
+
+### Imperium Frontend Navigation Config V1
+
+`GET /api/imperium/frontend/navigation`
+
+Purpose:
+- return frontend navigation metadata only for Imperium main navigation
+- provide static deterministic V1 navigation config for frontend routing
+- avoid dynamic route discovery and runtime route scans
+
+Rules:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- metadata only
+- no business data read
+- no writes
+- no auto-creation
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module write
+- no user_id exposure
+- no secrets/providers/infra metadata
+
+Response contract:
+- `navigation_version` is `v1`
+- `read_only` is always `true`
+- deterministic `items[]` ordered by `order`: `home`, `dashboard`, `daily_plan`, `missions`, `vault`, `path`, `pulse`
+- each `items[]` element includes: `key`, `label`, `route`, `api_endpoint`, `order`, `enabled`
+- `enabled` is always `true` in V1
+- `safe_explanation`
