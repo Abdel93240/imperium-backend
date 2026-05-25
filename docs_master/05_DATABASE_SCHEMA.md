@@ -126,6 +126,16 @@ Home bootstrap contract note:
 - it does not call AI, n8n, OCR, scoring, coaching, or recommendation flows
 - it performs no cross-module write
 
+Contracts index contract note:
+- `GET /api/imperium/contracts/index` is metadata only
+- canonical route owner is `app/api/v1/routes/imperium_contracts.py`
+- this index is not OpenAPI
+- this index is not a health check
+- this index is not dynamic runtime discovery
+- no business data read
+- no writes
+- no AI, n8n, OCR, scoring, coaching, or recommendation flows
+
 
 Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and
 `GET /api/imperium/daily-plan`, must not write canonical rows and must remain

@@ -325,18 +325,32 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     contracts_route_text = (
         BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_contracts.py"
     ).read_text(encoding="utf-8")
+    home_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_home.py").read_text(
+        encoding="utf-8"
+    )
     contracts_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "contracts.py").read_text(
         encoding="utf-8"
     )
+    home_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "home.py").read_text(encoding="utf-8")
+    contracts_schema_text = (BACKEND_ROOT / "app" / "schemas" / "contracts.py").read_text(encoding="utf-8")
+    home_schema_text = (BACKEND_ROOT / "app" / "schemas" / "home.py").read_text(encoding="utf-8")
     contracts_docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     lowered_route = contracts_route_text.lower()
     lowered_service = contracts_service_text.lower()
 
-    assert '@router.get("/contracts/index"' in contracts_route_text
+    assert contracts_route_text.count('@router.get("/contracts/index"') == 1
+    assert '@router.get("/contracts/index"' not in home_route_text
     assert "CurrentUserDep" in contracts_route_text
     assert "Idempotency-Key" not in contracts_route_text
     assert "contract_version=\"v1\"" in contracts_service_text
     assert "read_only=True" in contracts_service_text
+    assert "get_imperium_contracts_index_metadata" in contracts_route_text
+    assert "get_imperium_contracts_index_metadata" in contracts_service_text
+    assert "get_home_bootstrap_metadata" in home_route_text
+    assert "get_home_bootstrap_metadata" in home_service_text
+    assert "ImperiumContractsIndexResponse" in contracts_schema_text
+    assert "HomeBootstrapResponse" in home_schema_text
     assert "db.add(" not in contracts_service_text
     assert "db.flush" not in contracts_service_text
     assert "db.commit" not in contracts_service_text
@@ -349,9 +363,17 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     for forbidden in ("n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "gemini", "claude"):
         assert forbidden not in lowered_service
 
+    assert "route owner canonique" in contracts_docs_text
+    assert "imperium_contracts.py" in contracts_docs_text
+    assert "home bootstrap" in contracts_docs_text
+    assert "contract index" in contracts_docs_text
     assert "not a full openapi" in contracts_docs_text
     assert "not a health check" in contracts_docs_text
     assert "not a dynamic runtime discovery" in contracts_docs_text
+    assert "contracts index" in schema_docs_text
+    assert "metadata only" in schema_docs_text
+    assert "not openapi" in schema_docs_text
+    assert "not a health check" in schema_docs_text
 
 def test_patch_11b_pulse_today_contract_docs_and_route_order_are_consolidated() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")

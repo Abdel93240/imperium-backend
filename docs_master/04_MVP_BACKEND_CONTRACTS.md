@@ -169,6 +169,9 @@ Rules:
 - no exposure of `user_id`, secrets, provider metadata, or infra metadata
 - must not expose internal/admin/sensitive routes
 - no AI, n8n, OCR, scoring, coaching, or recommendations
+- route owner canonique: `app/api/v1/routes/imperium_contracts.py`
+- `Home Bootstrap` ≠ `Contract Index`
+- no duplicate/shadow route in `imperium_home.py`
 
 
 ## V1 Implementation Stack

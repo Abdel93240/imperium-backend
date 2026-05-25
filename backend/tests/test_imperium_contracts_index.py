@@ -235,3 +235,23 @@ def test_contracts_index_excludes_openapi_health_and_internal_admin_paths() -> N
     forbidden_substrings = ("/openapi", "/docs", "/redoc", "/health", "/internal", "/admin")
     for path in all_paths:
         assert not any(token in path for token in forbidden_substrings)
+
+
+def test_contracts_index_route_has_single_canonical_owner_file() -> None:
+    backend_root = __import__("pathlib").Path(__file__).resolve().parents[1]
+    contracts_route_text = (backend_root / "app" / "api" / "v1" / "routes" / "imperium_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    home_route_text = (backend_root / "app" / "api" / "v1" / "routes" / "imperium_home.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert contracts_route_text.count('@router.get("/contracts/index"') == 1
+    assert '@router.get("/contracts/index"' not in home_route_text
+
+
+def test_contracts_index_groups_order_is_deterministic() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/contracts/index")
+    assert response.status_code == 200
+    group_names = [group["name"] for group in response.json()["groups"]]
+    assert group_names == ["home", "dashboard", "daily_plan", "mission", "vault", "path", "pulse"]
