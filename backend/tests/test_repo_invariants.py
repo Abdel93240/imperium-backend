@@ -1610,3 +1610,81 @@ def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflo
     assert "no automatic mission/vault linkage" in lowered_docs
     assert "no automatic replanning" in lowered_docs
     assert "no automatic scoring" in lowered_docs
+
+
+def test_path_today_view_10b_is_read_only_and_reports_pending_done_missed_only() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "path.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    today_route = route_text.split('@router.get("/today"', maxsplit=1)[1].split(
+        "def _require_idempotency_key",
+        maxsplit=1,
+    )[0]
+    today_service = service_text.split("def get_path_today_view", maxsplit=1)[1].split(
+        "def _get_user_habit",
+        maxsplit=1,
+    )[0]
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+
+    assert "@router.get(\"/today\"" in route_text
+    assert "response_model=PathTodayResponse" in route_text
+    assert "current_user: CurrentUserDep" in today_route
+    assert "Idempotency-Key" not in today_route
+    assert "db.add(" not in today_route
+    assert "db.flush" not in today_route
+    assert "db.commit" not in today_route
+    assert "db.add(" not in today_service
+    assert "db.flush" not in today_service
+    assert "db.commit" not in today_service
+    assert "ImperiumPathHabit.is_active.is_(True)" in today_service
+    assert "ImperiumPathHabit.created_at.asc()" in today_service
+    assert "ImperiumPathHabit.id.asc()" in today_service
+    assert "ImperiumPathCheckIn.user_id == current_user.id" in today_service
+    assert "ImperiumPathCheckIn.check_date == local_date" in today_service
+    assert "PathTodayStatus.pending" in today_service
+    assert "PathTodayStatus.done" in today_service
+    assert "PathTodayStatus.missed" in today_service
+    assert "PathTodayResponse" in schema_text
+    assert "PathTodayItemRead" in schema_text
+    assert "pending" in schema_text
+    assert "done" in schema_text
+    assert "missed" in schema_text
+
+    for forbidden in (
+        "qwenclient",
+        "providers",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "automatic memory",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "discipline_score",
+        "weighted_score",
+        "mission_id",
+        "vault",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "get /api/imperium/path/today" in lowered_docs
+    assert "path today view 10b" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "pending/done/missed" in lowered_docs
+    assert "no ai/n8n/scoring/calendar" in lowered_docs
+    assert "no automatic check-in creation" in lowered_docs

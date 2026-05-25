@@ -15,6 +15,12 @@ class PathCheckInStatus(StrEnum):
     missed = "missed"
 
 
+class PathTodayStatus(StrEnum):
+    pending = "pending"
+    done = "done"
+    missed = "missed"
+
+
 SUPPORTED_PATH_HABIT_DOMAINS = {"worship", "health", "discipline", "family", "work", "custom"}
 
 
@@ -119,4 +125,17 @@ class PathCheckInListResponse(BaseModel):
     count: int
     limit: int
     offset: int
+    safe_explanation: str
+
+
+class PathTodayItemRead(BaseModel):
+    habit: PathHabitRead
+    check_in: PathCheckInRead | None
+    status: PathTodayStatus
+
+
+class PathTodayResponse(BaseModel):
+    date: date
+    items: list[PathTodayItemRead]
+    count: int
     safe_explanation: str

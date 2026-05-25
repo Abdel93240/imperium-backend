@@ -563,12 +563,14 @@ Implemented endpoints:
 |---|---|---|---|
 | POST | `/api/imperium/path/habits` | Create a Path habit for the current user | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/habits` | List current-user habits, optionally filtered by `is_active` and `domain` | Not required; read-only |
+| GET | `/api/imperium/path/today` | Read-only Path day view for the current user, including active habits and same-day check-ins | Not required; read-only |
 | POST | `/api/imperium/path/habits/{habit_id}/check-ins` | Create one check-in for a current-user active habit | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/check-ins` | List current-user check-ins, optionally filtered by `habit_id`, `status`, `date_from`, `date_to` | Not required; read-only |
 
 Canonical route keys:
 - `POST /api/imperium/path/habits`
 - `GET /api/imperium/path/habits`
+- `GET /api/imperium/path/today`
 - `POST /api/imperium/path/habits/{habit_id}/check-ins`
 - `GET /api/imperium/path/check-ins`
 
@@ -580,6 +582,9 @@ Contracts:
 - missed requires reason
 - `done` check-ins must not send `reason`; use `note` for comments
 - habit and check-in reads never expose another user's records
+- `GET /api/imperium/path/today` is read-only, user-scoped, and returns active habits with same-day check-in status only
+- `GET /api/imperium/path/today` returns `pending` when no check-in exists, `done` when a `done` check-in exists, and `missed` when a `missed` check-in exists
+- `GET /api/imperium/path/today` never creates a check-in automatically
 - check-ins for non-owned habits return 404
 - check-ins for inactive habits return 409
 - duplicate `habit_id` plus `check_date` with another idempotency key returns 409
@@ -595,6 +600,36 @@ Contracts:
 - no automatic scoring
 - no automatic mission/vault linkage
 - no automatic sadaqa calculation or Vault decision is triggered by these endpoints
+- no automatic check-in creation in `GET /api/imperium/path/today`
+- no AI/n8n/scoring/calendar in `GET /api/imperium/path/today`
+
+#### Path Today View 10B - read-only daily snapshot
+
+Path Today View 10B exposes a deterministic read-only snapshot of the current user's active Path habits for a given date.
+
+Purpose:
+- show active habits for the current user on a selected day
+- attach the same-day check-in when one exists
+- expose public status only: `pending/done/missed`
+- keep the endpoint read-only so it never creates or mutates check-ins
+
+Implemented endpoint:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| GET | `/api/imperium/path/today` | Read-only current-user Path day view with optional `date`, `domain`, and `frequency` filters | Not required; read-only |
+
+Contracts:
+- default `date` is the backend current date according to the repo convention
+- `domain` and `frequency` are optional filters
+- active habits only are returned
+- check-in lookup is done for the selected date only
+- `pending` is returned when no check-in exists
+- `done` is returned when a `done` check-in exists
+- `missed` is returned when a `missed` check-in exists
+- the endpoint never creates a check-in automatically
+- the endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar replanning, or scoring
+- the endpoint is user-scoped and never exposes another user's habit/check-in data
 
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|

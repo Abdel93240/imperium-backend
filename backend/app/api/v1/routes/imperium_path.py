@@ -11,9 +11,11 @@ from app.schemas.path import (
     PathCheckInListResponse,
     PathCheckInRead,
     PathCheckInStatus,
+    PathHabitFrequency,
     PathHabitCreate,
     PathHabitListResponse,
     PathHabitRead,
+    PathTodayResponse,
 )
 from app.services.path.habits import (
     PathCheckInConflictError,
@@ -22,6 +24,7 @@ from app.services.path.habits import (
     PathIdempotencyConflictError,
     create_path_check_in,
     create_path_habit,
+    get_path_today_view,
     list_path_check_ins,
     list_path_habits,
 )
@@ -143,6 +146,23 @@ def list_path_check_ins_route(
         date_to=date_to,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/today", response_model=PathTodayResponse)
+def path_today_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    query_date: date | None = Query(default=None, alias="date"),
+    domain: Annotated[str | None, Query(max_length=80)] = None,
+    frequency: PathHabitFrequency | None = None,
+) -> PathTodayResponse:
+    return get_path_today_view(
+        db,
+        current_user=current_user,
+        local_date=query_date or date.today(),
+        domain=domain.strip().lower() if domain else None,
+        frequency=frequency.value if frequency else None,
     )
 
 

@@ -19,9 +19,13 @@ from app.schemas.path import (
     PathHabitCreate,
     PathHabitListResponse,
     PathHabitRead,
+    PathTodayItemRead,
+    PathTodayResponse,
+    PathTodayStatus,
 )
 
 SAFE_EXPLANATION = "Path habits/check-ins for current user."
+TODAY_SAFE_EXPLANATION = "Path today view for current user."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -202,6 +206,69 @@ def list_path_check_ins(
         limit=limit,
         offset=offset,
         safe_explanation=SAFE_EXPLANATION,
+    )
+
+
+def get_path_today_view(
+    db: Session,
+    *,
+    current_user: User,
+    local_date: date,
+    domain: str | None,
+    frequency: str | None,
+) -> PathTodayResponse:
+    habit_query = select(ImperiumPathHabit).where(
+        ImperiumPathHabit.user_id == current_user.id,
+        ImperiumPathHabit.is_active.is_(True),
+    )
+    if domain is not None:
+        habit_query = habit_query.where(ImperiumPathHabit.domain == domain)
+    if frequency is not None:
+        habit_query = habit_query.where(ImperiumPathHabit.frequency == frequency)
+    habit_query = habit_query.order_by(
+        ImperiumPathHabit.created_at.asc(),
+        ImperiumPathHabit.id.asc(),
+    )
+    habits = list(db.scalars(habit_query))
+    if not habits:
+        return PathTodayResponse(
+            date=local_date,
+            items=[],
+            count=0,
+            safe_explanation=TODAY_SAFE_EXPLANATION,
+        )
+
+    habit_ids = [habit.id for habit in habits]
+    check_in_query = select(ImperiumPathCheckIn).where(
+        ImperiumPathCheckIn.user_id == current_user.id,
+        ImperiumPathCheckIn.check_date == local_date,
+        ImperiumPathCheckIn.habit_id.in_(habit_ids),
+    )
+    check_ins = list(db.scalars(check_in_query))
+    check_in_by_habit_id = {check_in.habit_id: check_in for check_in in check_ins}
+
+    items = []
+    for habit in habits:
+        check_in = check_in_by_habit_id.get(habit.id)
+        if check_in is None:
+            status = PathTodayStatus.pending
+        elif check_in.status == PathTodayStatus.done.value:
+            status = PathTodayStatus.done
+        else:
+            status = PathTodayStatus.missed
+        items.append(
+            PathTodayItemRead(
+                habit=PathHabitRead.model_validate(habit),
+                check_in=PathCheckInRead.model_validate(check_in) if check_in is not None else None,
+                status=status,
+            )
+        )
+
+    return PathTodayResponse(
+        date=local_date,
+        items=items,
+        count=len(items),
+        safe_explanation=TODAY_SAFE_EXPLANATION,
     )
 
 
