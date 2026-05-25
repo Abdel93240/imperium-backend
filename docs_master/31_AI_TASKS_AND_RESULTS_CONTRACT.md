@@ -2402,3 +2402,55 @@ Priority source of truth:
 Patch 7G introduces no double-write bridge, no migration, no destructive
 legacy data deletion, no n8n workflow, no AI call, no pgvector write, no
 embedding, and no public coefficient exposure.
+
+Patch 8B adds:
+
+```text
+GET /api/imperium/missions/backlog/decision-preview
+```
+
+Query params:
+
+```text
+limit             integer, default 10, min 1, max 50
+domain            optional religious/business/finance/health
+priority_level    optional integer 1-10
+include_reasons   boolean, default true
+```
+
+Response contract:
+
+```json
+{
+  "recommended_mission_id": "uuid-or-null",
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "id": "uuid",
+      "title": "Mission title",
+      "domain": "business",
+      "priority_level": 1,
+      "priority_bucket": 4,
+      "score_summary": {
+        "label": "high",
+        "reason_codes": ["HIGH_PRIORITY_BUCKET", "LOW_PRIORITY_LEVEL", "FIFO_BACKLOG"]
+      }
+    }
+  ],
+  "safe_explanation": "Deterministic backend preview based on stored backlog fields only."
+}
+```
+
+Rules:
+
+- GET only, no `Idempotency-Key` required;
+- user-scoped through the authenticated user;
+- deterministic sorting uses backlog ordering:
+  `priority_bucket` descending, `priority_level` ascending, `created_at`
+  ascending, then `id`;
+- `recommended_mission_id` is the first returned candidate, or `null`;
+- `include_reasons=false` returns only the safe label in `score_summary`;
+- no mission status, `started_at`, or `ended_at` is exposed;
+- no coefficient, weighted score, raw score, n8n call, AI call, pgvector write,
+  embedding, memory commit, calendar replanning, or mission status mutation is
+  introduced.

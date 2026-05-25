@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -321,6 +322,27 @@ class BacklogMissionListResponse(BaseModel):
     items: list[BacklogMissionRead]
     count: int
     ordering: str
+
+
+class BacklogDecisionScoreSummary(BaseModel):
+    label: Literal["high", "medium", "low"]
+    reason_codes: list[str] | None = None
+
+
+class BacklogDecisionCandidate(BaseModel):
+    id: UUID
+    title: str
+    domain: str | None
+    priority_level: int | None
+    priority_bucket: int
+    score_summary: BacklogDecisionScoreSummary
+
+
+class BacklogDecisionPreviewResponse(BaseModel):
+    recommended_mission_id: UUID | None
+    candidate_count: int
+    candidates: list[BacklogDecisionCandidate]
+    safe_explanation: str
 
 
 class PromoteBacklogMissionResponse(BaseModel):

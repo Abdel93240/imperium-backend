@@ -11,6 +11,7 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    BacklogDecisionPreviewResponse,
     BacklogMissionCreateRequest,
     BacklogMissionCreateResponse,
     BacklogMissionListResponse,
@@ -141,6 +142,7 @@ from app.services.imperium.missions import (
     complete_mission,
     create_backlog_mission,
     fail_mission,
+    get_backlog_decision_preview,
     get_current_mission,
     get_mission_decision_score,
     get_recent_missions,
@@ -1003,6 +1005,32 @@ def backlog_missions_route(
         offset=offset,
         domain=domain,
         priority_level=priority_level,
+    )
+
+
+@router.get(
+    "/missions/backlog/decision-preview",
+    response_model=BacklogDecisionPreviewResponse,
+    response_model_exclude_none=True,
+)
+def backlog_decision_preview_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    domain: Annotated[
+        str | None,
+        Query(pattern="^(religious|business|finance|health)$"),
+    ] = None,
+    priority_level: Annotated[int | None, Query(ge=1, le=10)] = None,
+    include_reasons: bool = True,
+) -> BacklogDecisionPreviewResponse:
+    return get_backlog_decision_preview(
+        db,
+        current_user=current_user,
+        limit=limit,
+        domain=domain,
+        priority_level=priority_level,
+        include_reasons=include_reasons,
     )
 
 

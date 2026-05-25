@@ -1235,3 +1235,38 @@ Expected:
   `score_status`, `missing_fields`, and `source`;
 - public output must not include `domain_coefficient`, `weighted_score`,
   `final_weighted_score`, or `position_to_coefficient`.
+
+## Patch 8B - Mission Backlog Decision Preview Smoke Checks
+
+Patch 8B is a backend read-only preview. It does not require an n8n workflow,
+n8n AI Agent, n8n database access, AI provider call, pgvector write, embedding
+generation, memory commit, calendar consumption, automatic replanning, or an
+`Idempotency-Key`.
+
+Preview backlog decision candidates:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$IMPERIUM_API_BASE_URL/api/imperium/missions/backlog/decision-preview?limit=10&include_reasons=true"
+```
+
+Filter preview candidates:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$IMPERIUM_API_BASE_URL/api/imperium/missions/backlog/decision-preview?domain=business&priority_level=4&limit=5"
+```
+
+Expected:
+
+- route is GET-only and does not require `Idempotency-Key`;
+- response is JWT-scoped to the current user;
+- `recommended_mission_id` is the first candidate after deterministic backlog
+  ordering;
+- ordering uses `priority_bucket` descending, `priority_level` ascending,
+  `created_at` ascending, then `id`;
+- `include_reasons=false` omits `reason_codes`;
+- public output must not include `started_at`, `ended_at`,
+  `domain_coefficient`, `weighted_score`, `final_weighted_score`, or
+  `position_to_coefficient`;
+- no mission status changes and no promotion occurs.

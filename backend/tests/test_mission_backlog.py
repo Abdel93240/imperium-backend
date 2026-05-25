@@ -15,6 +15,7 @@ from app.schemas.imperium import BacklogMissionCreateRequest
 from app.services.imperium.missions import (
     _hash_request,
     create_backlog_mission,
+    get_backlog_decision_preview,
     list_backlog_missions,
     promote_backlog_mission,
 )
@@ -275,6 +276,155 @@ def test_list_backlog_missions_sorted_by_score_then_priority_level() -> None:
         "Manual priority one",
         "Manual priority three",
     ]
+
+
+def test_backlog_decision_preview_recommends_first_sorted_candidate() -> None:
+    current_user = _user()
+    now = datetime.now(UTC)
+    high_bucket = _mission(current_user.id, title="High bucket", priority_level=10, created_at=now)
+    low_bucket = _mission(current_user.id, title="Low bucket", priority_level=1, created_at=now)
+    fifo = _mission(
+        current_user.id,
+        title="FIFO",
+        priority_level=2,
+        created_at=now - timedelta(hours=1),
+    )
+    db = FakeDb(
+        scalars_results=[
+            [low_bucket, fifo, high_bucket],
+            [
+                _score(current_user.id, low_bucket.id, bucket=2),
+                _score(current_user.id, high_bucket.id, bucket=4),
+                _score(current_user.id, fifo.id, bucket=4),
+            ],
+        ]
+    )
+
+    response = get_backlog_decision_preview(db, current_user=current_user, limit=10)
+
+    assert response.recommended_mission_id == fifo.id
+    assert [candidate.title for candidate in response.candidates] == ["FIFO", "High bucket", "Low bucket"]
+    assert response.candidates[0].score_summary.label == "high"
+    assert response.candidates[0].score_summary.reason_codes == [
+        "HIGH_PRIORITY_BUCKET",
+        "LOW_PRIORITY_LEVEL",
+        "FIFO_BACKLOG",
+    ]
+
+
+def test_backlog_decision_preview_is_user_scoped() -> None:
+    current_user = _user()
+    own = _mission(current_user.id, title="Own")
+    db = FakeDb(scalars_results=[[own], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview")
+
+    assert response.status_code == 200
+    assert response.json()["candidate_count"] == 1
+    assert response.json()["candidates"][0]["title"] == "Own"
+    query_text = str(db.queries[0])
+    assert "imperium_missions.user_id" in query_text
+    assert "imperium_missions.status" in query_text
+
+
+def test_backlog_decision_preview_respects_domain_filter() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, title="Business", domain="business")
+    db = FakeDb(scalars_results=[[mission], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview?domain=business")
+
+    assert response.status_code == 200
+    assert response.json()["candidates"][0]["domain"] == "business"
+    assert "imperium_missions.domain" in str(db.queries[0])
+
+
+def test_backlog_decision_preview_respects_priority_level_filter() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, title="Priority one", priority_level=1)
+    db = FakeDb(scalars_results=[[mission], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview?priority_level=1")
+
+    assert response.status_code == 200
+    assert response.json()["candidates"][0]["priority_level"] == 1
+    assert "imperium_missions.priority_level" in str(db.queries[0])
+
+
+def test_backlog_decision_preview_respects_limit() -> None:
+    current_user = _user()
+    first = _mission(current_user.id, title="First", created_at=datetime(2026, 5, 1, tzinfo=UTC))
+    second = _mission(current_user.id, title="Second", created_at=datetime(2026, 5, 2, tzinfo=UTC))
+    db = FakeDb(scalars_results=[[first, second], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview?limit=1")
+
+    assert response.status_code == 200
+    assert response.json()["candidate_count"] == 1
+    assert [candidate["title"] for candidate in response.json()["candidates"]] == ["First"]
+
+
+def test_backlog_decision_preview_does_not_change_mission_status() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, status="backlog")
+    db = FakeDb(scalars_results=[[mission], []])
+
+    response = get_backlog_decision_preview(db, current_user=current_user, limit=10)
+
+    assert response.recommended_mission_id == mission.id
+    assert mission.status == "backlog"
+    assert db.added == []
+    assert db.committed is False
+    assert db.flushed is False
+
+
+def test_backlog_decision_preview_does_not_expose_started_or_ended_at() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalars_results=[[mission], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview")
+
+    assert response.status_code == 200
+    body_text = response.text
+    assert "started_at" not in body_text
+    assert "ended_at" not in body_text
+
+
+def test_backlog_decision_preview_does_not_expose_internal_coefficients() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalars_results=[[mission], [_score(current_user.id, mission.id, bucket=4)]])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview")
+
+    assert response.status_code == 200
+    body_text = response.text
+    for forbidden in ("domain_coefficient", "weighted_score", "final_weighted_score", "position_to_coefficient"):
+        assert forbidden not in body_text
+
+
+def test_backlog_decision_preview_include_reasons_false_hides_reason_codes() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalars_results=[[mission], [_score(current_user.id, mission.id, bucket=2)]])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview?include_reasons=false")
+
+    assert response.status_code == 200
+    score_summary = response.json()["candidates"][0]["score_summary"]
+    assert score_summary == {"label": "medium"}
+
+
+def test_backlog_decision_preview_route_does_not_require_idempotency_key() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalars_results=[[mission], []])
+
+    response = _client(db, current_user).get("/imperium/missions/backlog/decision-preview")
+
+    assert response.status_code == 200
+    assert response.json()["recommended_mission_id"] == str(mission.id)
 
 
 def test_promote_backlog_mission_to_active() -> None:

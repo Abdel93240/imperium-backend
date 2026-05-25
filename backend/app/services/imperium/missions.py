@@ -12,6 +12,9 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import (
+    BacklogDecisionCandidate,
+    BacklogDecisionPreviewResponse,
+    BacklogDecisionScoreSummary,
     BacklogMissionCreateRequest,
     BacklogMissionCreateResponse,
     BacklogMissionListResponse,
@@ -58,6 +61,7 @@ BACKLOG_ORDERING_NOTE = (
     "Sorted by higher stored Decision Framework priority_bucket first, "
     "then lower mission priority_level first, then created_at ascending for FIFO deterministic fallback."
 )
+BACKLOG_DECISION_PREVIEW_EXPLANATION = "Deterministic backend preview based on stored backlog fields only."
 
 
 def start_mission(
@@ -273,6 +277,76 @@ def list_backlog_missions(
         ],
         count=len(page),
         ordering=BACKLOG_ORDERING_NOTE,
+    )
+
+
+def get_backlog_decision_preview(
+    db: Session,
+    *,
+    current_user: User,
+    limit: int = 10,
+    domain: str | None = None,
+    priority_level: int | None = None,
+    include_reasons: bool = True,
+) -> BacklogDecisionPreviewResponse:
+    filters = [
+        ImperiumMission.user_id == current_user.id,
+        ImperiumMission.status == "backlog",
+    ]
+    if domain is not None:
+        filters.append(ImperiumMission.domain == domain)
+    if priority_level is not None:
+        filters.append(ImperiumMission.priority_level == priority_level)
+
+    missions = list(
+        db.scalars(
+            select(ImperiumMission)
+            .where(*filters)
+            .order_by(ImperiumMission.created_at.asc(), ImperiumMission.id.asc())
+        )
+    )
+    if not missions:
+        return BacklogDecisionPreviewResponse(
+            recommended_mission_id=None,
+            candidate_count=0,
+            candidates=[],
+            safe_explanation=BACKLOG_DECISION_PREVIEW_EXPLANATION,
+        )
+
+    mission_ids = [mission.id for mission in missions]
+    scores = list(
+        db.scalars(
+            select(ImperiumMissionScore)
+            .where(
+                ImperiumMissionScore.user_id == current_user.id,
+                ImperiumMissionScore.mission_id.in_(mission_ids),
+                ImperiumMissionScore.source == DECISION_FRAMEWORK_SOURCE,
+            )
+            .order_by(ImperiumMissionScore.created_at.desc())
+        )
+    )
+    score_by_mission_id: dict[UUID, ImperiumMissionScore] = {}
+    for score in scores:
+        score_by_mission_id.setdefault(score.mission_id, score)
+
+    sorted_missions = sorted(
+        missions,
+        key=lambda mission: _backlog_sort_key(mission, score_by_mission_id.get(mission.id)),
+    )
+    candidates = [
+        _backlog_decision_candidate(
+            mission=mission,
+            score=score_by_mission_id.get(mission.id),
+            include_reasons=include_reasons,
+        )
+        for mission in sorted_missions[:limit]
+    ]
+    recommended_mission_id = candidates[0].id if candidates else None
+    return BacklogDecisionPreviewResponse(
+        recommended_mission_id=recommended_mission_id,
+        candidate_count=len(candidates),
+        candidates=candidates,
+        safe_explanation=BACKLOG_DECISION_PREVIEW_EXPLANATION,
     )
 
 
@@ -640,6 +714,34 @@ def _backlog_sort_key(mission: ImperiumMission, score: ImperiumMissionScore | No
     return (-bucket, priority, created_at, str(mission.id))
 
 
+def _priority_bucket_from_score(score: ImperiumMissionScore | None) -> int:
+    if score is None:
+        return 0
+    return mission_decision_score_summary_from_row(score).priority_bucket
+
+
+def _backlog_score_label(priority_bucket: int) -> str:
+    if priority_bucket >= 4:
+        return "high"
+    if priority_bucket >= 2:
+        return "medium"
+    return "low"
+
+
+def _backlog_reason_codes(*, priority_bucket: int, priority_level: int | None) -> list[str]:
+    if priority_bucket >= 4:
+        reason_codes = ["HIGH_PRIORITY_BUCKET"]
+    elif priority_bucket >= 2:
+        reason_codes = ["MEDIUM_PRIORITY_BUCKET"]
+    else:
+        reason_codes = ["LOW_PRIORITY_BUCKET"]
+
+    if priority_level is not None and priority_level <= 2:
+        reason_codes.append("LOW_PRIORITY_LEVEL")
+    reason_codes.append("FIFO_BACKLOG")
+    return reason_codes
+
+
 def _get_user_mission(
     db: Session,
     *,
@@ -684,6 +786,30 @@ def _build_event(
         causation_id=None,
         privacy_level=PrivacyLevel.medium,
         payload=payload,
+    )
+
+
+def _backlog_decision_candidate(
+    *,
+    mission: ImperiumMission,
+    score: ImperiumMissionScore | None,
+    include_reasons: bool,
+) -> BacklogDecisionCandidate:
+    priority_bucket = _priority_bucket_from_score(score)
+    reason_codes = _backlog_reason_codes(
+        priority_bucket=priority_bucket,
+        priority_level=mission.priority_level,
+    )
+    return BacklogDecisionCandidate(
+        id=mission.id,
+        title=mission.title,
+        domain=mission.domain,
+        priority_level=mission.priority_level,
+        priority_bucket=priority_bucket,
+        score_summary=BacklogDecisionScoreSummary(
+            label=_backlog_score_label(priority_bucket),
+            reason_codes=reason_codes if include_reasons else None,
+        ),
     )
 
 

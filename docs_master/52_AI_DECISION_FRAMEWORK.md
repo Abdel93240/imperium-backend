@@ -1205,6 +1205,27 @@ Patch 8A intentionally does not add monthly plan generation, daily plan
 generation, AI calls, n8n workflows, automatic replanning, calendar constraint
 consumption, pgvector writes, embeddings, or automatic memory commits.
 
+Patch 8B adds a read-only backlog decision preview.
+
+Decision Framework impact:
+
+- `GET /api/imperium/missions/backlog/decision-preview` returns the current
+  deterministic priority preview for backlog missions;
+- preview is scoped to the current authenticated user;
+- optional `domain`, `priority_level`, `limit`, and `include_reasons` query
+  parameters narrow the candidate projection;
+- candidates use the same documented backlog ordering:
+  `priority_bucket` descending, `priority_level` ascending, `created_at`
+  ascending, then `id` as stable tie-breaker;
+- the response exposes only safe score summaries: `label` and optional
+  `reason_codes`;
+- raw coefficients, weighted scores, `started_at`, and `ended_at` are not
+  exposed.
+
+Patch 8B intentionally does not change mission status, promote missions,
+generate plans, call AI providers, call n8n, write pgvector, generate
+embeddings, commit memory, or consume calendar constraints.
+
 ---
 
 ## 18. References

@@ -679,6 +679,51 @@ def test_backlog_path_has_no_ai_provider_imports() -> None:
     assert "opus" not in backlog_text.lower()
 
 
+def test_backlog_decision_preview_has_no_ai_n8n_pgvector_embedding_or_writes() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    preview_service_section = service_text.split("def get_backlog_decision_preview", maxsplit=1)[1].split(
+        "def promote_backlog_mission",
+        maxsplit=1,
+    )[0]
+    preview_route_section = route_text.split('"/missions/backlog/decision-preview"', maxsplit=1)[1].split(
+        '@router.post("/missions/backlog/{mission_id}/promote"',
+        maxsplit=1,
+    )[0]
+    preview_schema_section = schema_text.split("class BacklogDecisionScoreSummary", maxsplit=1)[1].split(
+        "class PromoteBacklogMissionResponse",
+        maxsplit=1,
+    )[0]
+    preview_text = "\n".join([preview_service_section, preview_route_section, preview_schema_section])
+    lowered = preview_text.lower()
+
+    assert "QwenClient" not in preview_text
+    assert "providers" not in preview_text
+    assert "openai" not in lowered
+    assert "anthropic" not in lowered
+    assert "gemini" not in lowered
+    assert "claude" not in lowered
+    assert "n8n" not in lowered
+    assert "pgvector" not in lowered
+    assert "embedding" not in lowered
+    assert "ai_memories" not in preview_text
+    assert "calendar" not in lowered
+    assert "db.add" not in preview_service_section
+    assert "db.flush" not in preview_service_section
+    assert "db.commit" not in preview_service_section
+    assert "mission.status =" not in preview_service_section
+    assert "started_at" not in preview_schema_section
+    assert "ended_at" not in preview_schema_section
+    assert "domain_coefficient" not in preview_text
+    assert "weighted_score" not in preview_text
+    assert "final_weighted_score" not in preview_text
+    assert "position_to_coefficient" not in preview_text
+
+
 def test_backlog_path_has_no_n8n_client_imports() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
