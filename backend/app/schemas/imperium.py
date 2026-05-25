@@ -752,17 +752,18 @@ class DecisionFrameworkScorePreviewResponse(BaseModel):
     source: str
 
 
+class MissionDecisionScorePublicSummary(BaseModel):
+    label: Literal["high", "medium", "low"]
+    reason_codes: list[str] | None = None
+
+
 class MissionDecisionScoreRead(BaseModel):
     mission_id: UUID
-    domain: DecisionFrameworkDomain
-    intrinsic_score: int
+    status: MissionStatus
+    priority_level: int | None
     priority_bucket: int
-    score_status: str
-    explanation: DecisionFrameworkScoreExplanation
-    missing_fields: list[str]
-    source: str
-    created_at: datetime
-    updated_at: datetime
+    score_summary: MissionDecisionScorePublicSummary
+    safe_explanation: str
 
 
 class PathItemStatus(StrEnum):

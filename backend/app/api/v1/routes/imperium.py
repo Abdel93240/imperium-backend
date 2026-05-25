@@ -142,7 +142,6 @@ from app.services.imperium.missions import (
     ActiveMissionExistsError,
     IdempotencyConflictError as MissionIdempotencyConflictError,
     MissionNotFoundError,
-    MissionScoreNotFoundError,
     MissionStateConflictError,
     MultipleActiveMissionsError,
     complete_mission,
@@ -1244,15 +1243,25 @@ def mission_detail_route(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.get("/missions/{mission_id}/decision-score", response_model=MissionDecisionScoreRead)
+@router.get(
+    "/missions/{mission_id}/decision-score",
+    response_model=MissionDecisionScoreRead,
+    response_model_exclude_none=True,
+)
 def mission_decision_score_route(
     mission_id: UUID,
     current_user: CurrentUserDep,
     db: SessionDep,
+    include_reasons: bool = True,
 ) -> MissionDecisionScoreRead:
     try:
-        return get_mission_decision_score(db, current_user=current_user, mission_id=mission_id)
-    except (MissionNotFoundError, MissionScoreNotFoundError) as exc:
+        return get_mission_decision_score(
+            db,
+            current_user=current_user,
+            mission_id=mission_id,
+            include_reasons=include_reasons,
+        )
+    except MissionNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 

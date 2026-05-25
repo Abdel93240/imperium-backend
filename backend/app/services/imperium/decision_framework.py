@@ -19,7 +19,6 @@ from app.schemas.imperium import (
     DecisionFrameworkScoreExplanation,
     DecisionFrameworkScorePreviewRequest,
     DecisionFrameworkScorePreviewResponse,
-    MissionDecisionScoreRead,
     MissionDecisionScoreSummary,
     StartMissionRequest,
 )
@@ -434,32 +433,6 @@ def mission_decision_score_summary_from_row(score: ImperiumMissionScore) -> Miss
         score_status=str(explanation.get("score_status", _score_status_from_explanation_payload(explanation))),
         missing_fields=list(explanation.get("missing_fields") or []),
         source=score.source,
-    )
-
-
-def mission_decision_score_read_from_row(score: ImperiumMissionScore) -> MissionDecisionScoreRead:
-    explanation_payload = score.explanation or {}
-    explanation = DecisionFrameworkScoreExplanation(
-        deadline_points=int(explanation_payload.get("deadline_points", 0)),
-        impact_points=int(explanation_payload.get("impact_points", 0)),
-        mission_type_points=int(explanation_payload.get("mission_type_points", 0)),
-        dependency_points=int(explanation_payload.get("dependency_points", 0)),
-        recurrence_points=int(explanation_payload.get("recurrence_points", 0)),
-        missing_fields=list(explanation_payload.get("missing_fields") or []),
-        final_intrinsic_score=int(explanation_payload.get("final_intrinsic_score", score.intrinsic_score)),
-        flags=list(explanation_payload.get("flags") or []),
-    )
-    return MissionDecisionScoreRead(
-        mission_id=score.mission_id,
-        domain=score.domain,
-        intrinsic_score=int(score.intrinsic_score),
-        priority_bucket=int(explanation_payload.get("priority_bucket", _priority_bucket(int(score.weighted_score)))),
-        score_status=str(explanation_payload.get("score_status", _score_status(explanation))),
-        explanation=explanation,
-        missing_fields=list(explanation.missing_fields),
-        source=score.source,
-        created_at=score.created_at,
-        updated_at=score.updated_at,
     )
 
 

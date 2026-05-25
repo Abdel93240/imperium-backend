@@ -294,6 +294,7 @@ Refresh token hashing algorithm and master key rotation ceremony: TODO.
 | POST | `/api/imperium/day-session/end` | End active day session | `day.finished` |
 | POST | `/api/imperium/missions/{mission_id}/done` | Mark current mission done | `mission.completed` |
 | POST | `/api/imperium/missions/{mission_id}/not-done` | Mark mission not done with reason | `mission.failed` |
+| GET | `/api/imperium/missions/{mission_id}/decision-score` | Read safe deterministic mission decision summary; no AI, no n8n, no writes | none |
 | POST | `/api/imperium/replan` | Explicit replanning request | `replan.requested` |
 | POST | `/api/imperium/projects` | Create/update project | `project.changed` |
 | POST | `/api/imperium/projects/{project_id}/validate-completion` | Explicit project completion | `project.completion.validated` |

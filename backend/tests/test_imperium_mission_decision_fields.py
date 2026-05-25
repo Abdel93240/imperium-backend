@@ -463,6 +463,7 @@ def test_mission_decision_score_read_does_not_expose_coefficient_or_weighted_sco
     serialized = response.model_dump_json()
 
     assert response.priority_bucket == 3
+    assert response.score_summary.label == "medium"
     assert "domain_coefficient" not in serialized
     assert "weighted_score" not in serialized
     assert "final_weighted_score" not in serialized

@@ -32,6 +32,7 @@ from app.schemas.imperium import (
     MissionDetailRead,
     MissionDetailResponse,
     MissionDecisionScoreRead,
+    MissionDecisionScorePublicSummary,
     MissionDecisionScoreSummary,
     MissionResponse,
     MissionWriteResponse,
@@ -43,7 +44,6 @@ from app.services.imperium.decision_framework import (
     SOURCE as DECISION_FRAMEWORK_SOURCE,
     build_mission_score_from_start_request,
     get_user_priority_context,
-    mission_decision_score_read_from_row,
     mission_decision_score_summary_from_row,
 )
 
@@ -65,10 +65,6 @@ class MissionStateConflictError(ValueError):
 
 
 class MultipleActiveMissionsError(ValueError):
-    pass
-
-
-class MissionScoreNotFoundError(ValueError):
     pass
 
 
@@ -95,6 +91,9 @@ ACTIVE_MISSION_SAFE_EXPLANATION = "Current active mission for user."
 ACTIVE_MISSION_NONE_SAFE_EXPLANATION = "No active mission found for current user."
 MISSION_HISTORY_SAFE_EXPLANATION = "Mission history for current user."
 MISSION_DETAIL_SAFE_EXPLANATION = "Mission detail for current user."
+MISSION_DECISION_SCORE_SAFE_EXPLANATION = (
+    "Deterministic backend decision summary based on stored mission fields only."
+)
 HISTORICAL_MISSION_STATUSES = {"completed", "failed", "abandoned"}
 
 
@@ -715,14 +714,29 @@ def get_mission_decision_score(
     *,
     current_user: User,
     mission_id: UUID,
+    include_reasons: bool = True,
 ) -> MissionDecisionScoreRead:
     mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
     if mission is None:
         raise MissionNotFoundError("Mission not found.")
     score = _get_existing_decision_score(db, current_user=current_user, mission_id=mission.id)
-    if score is None:
-        raise MissionScoreNotFoundError("Mission decision score not found.")
-    return mission_decision_score_read_from_row(score)
+    priority_bucket = _priority_bucket_from_score(score)
+    return MissionDecisionScoreRead(
+        mission_id=mission.id,
+        status=mission.status,
+        priority_level=mission.priority_level,
+        priority_bucket=priority_bucket,
+        score_summary=MissionDecisionScorePublicSummary(
+            label=_backlog_score_label(priority_bucket),
+            reason_codes=_mission_decision_reason_codes(
+                priority_bucket=priority_bucket,
+                priority_level=mission.priority_level,
+            )
+            if include_reasons
+            else None,
+        ),
+        safe_explanation=MISSION_DECISION_SCORE_SAFE_EXPLANATION,
+    )
 
 
 def _get_existing_idempotency(
@@ -900,6 +914,22 @@ def _backlog_reason_codes(*, priority_bucket: int, priority_level: int | None) -
     if priority_level is not None and priority_level <= 2:
         reason_codes.append("LOW_PRIORITY_LEVEL")
     reason_codes.append("FIFO_BACKLOG")
+    return reason_codes
+
+
+def _mission_decision_reason_codes(*, priority_bucket: int, priority_level: int | None) -> list[str]:
+    if priority_bucket >= 4:
+        reason_codes = ["HIGH_PRIORITY_BUCKET"]
+    elif priority_bucket >= 2:
+        reason_codes = ["MEDIUM_PRIORITY_BUCKET"]
+    else:
+        reason_codes = ["LOW_PRIORITY_BUCKET"]
+
+    if priority_level is not None:
+        if priority_level <= 2:
+            reason_codes.append("LOW_PRIORITY_LEVEL")
+        else:
+            reason_codes.append("NORMAL_PRIORITY_LEVEL")
     return reason_codes
 
 
