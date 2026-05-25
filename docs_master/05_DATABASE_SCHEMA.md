@@ -658,6 +658,11 @@ Columns:
 - `created_at` timestamptz not null
 - `updated_at` timestamptz not null
 
+Reversal fields:
+- `is_reversal` marks rows appended by the Patch 9F reverse endpoint.
+- `reversal_of_transaction_id` links a reversal row to the original transaction and is required only when `is_reversal = true`.
+- `reversal_reason` stores the trimmed user-provided correction reason; it is nullable on normal rows and max 500 characters on reversal writes.
+
 Required fields:
 - `id`
 - `user_id`
@@ -693,7 +698,7 @@ API and ownership rules:
 - `GET` does not require `Idempotency-Key`.
 - Reads are strictly current-user scoped and deterministic.
 - Reversals are append-only corrections: the original row is never updated or deleted.
-- A non-reversal original may have at most one reversal in Patch 9F.
+- A non-reversal original may have one and only one reversal in Patch 9F.
 
 Patch 9A exclusions:
 - no wallet/balance automation
@@ -706,10 +711,11 @@ Patch 9F reversal rules:
 - expense reverses to income with the same amount and currency.
 - Reversal rows use `source = 'reversal'`, `external_ref = null`, and store the trimmed user reason.
 - Reversal rows cannot themselves be reversed in V1.
+- The reverse endpoint never updates or deletes the original transaction; correction is represented only by the appended reversal row.
 - no wallet/balance automation
 - no sadaqa creation
 - no receipt OCR
-- no AI, n8n, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
+- no persistent AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
 - no Mission-table coupling
 
 ### `wallets`

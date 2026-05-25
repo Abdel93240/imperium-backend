@@ -1312,12 +1312,14 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
         BACKEND_ROOT / "alembic" / "versions" / "20260525_0025_imperium_vault_transaction_reversals.py"
     )
     docs_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    schema_docs_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
     route_text = route_path.read_text(encoding="utf-8")
     service_text = service_path.read_text(encoding="utf-8")
     schema_text = schema_path.read_text(encoding="utf-8")
     model_text = model_path.read_text(encoding="utf-8")
     migration_text = migration_path.read_text(encoding="utf-8")
     docs_text = docs_path.read_text(encoding="utf-8")
+    schema_docs_text = schema_docs_path.read_text(encoding="utf-8")
     route_section = route_text.split('@router.post(\n    "/transactions/{transaction_id}/reverse"', maxsplit=1)[
         1
     ].split('@router.get("/transactions"', maxsplit=1)[0]
@@ -1333,6 +1335,7 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     combined_code = "\n".join([route_section, service_section, reverse_schema_section, model_section])
     lowered_code = combined_code.lower()
     lowered_docs = docs_text.lower()
+    lowered_schema_docs = schema_docs_text.lower()
 
     assert 'revision: str = "20260525_0025"' in migration_text
     assert 'down_revision: str | None = "20260525_0024"' in migration_text
@@ -1363,7 +1366,17 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     assert "reversal_reason" in migration_text
     assert "is_reversal" in migration_text
     assert "postgresql_where=sa.text(\"is_reversal = true\")" in migration_text
-    assert "never modifies or deletes the original" in lowered_docs
+    assert "append-only correction endpoint" in lowered_docs
+    assert "the original transaction is never updated or deleted" in lowered_docs
+    assert "one and only one reversal per original transaction" in lowered_docs
+    assert "does not add persistent ai, n8n, ocr, sadaqa, wallet" in lowered_docs
+    assert "reversal fields:" in lowered_schema_docs
+    assert "`is_reversal` marks rows appended" in lowered_schema_docs
+    assert "`reversal_of_transaction_id` links a reversal row" in lowered_schema_docs
+    assert "`reversal_reason` stores the trimmed user-provided correction reason" in lowered_schema_docs
+    assert "one and only one reversal in patch 9f" in lowered_schema_docs
+    assert "never updates or deletes the original transaction" in lowered_schema_docs
+    assert "no persistent ai, n8n, ocr, sadaqa, wallet" in lowered_schema_docs
 
     assert "qwenclient" not in lowered_code
     assert "n8n_client" not in lowered_code
