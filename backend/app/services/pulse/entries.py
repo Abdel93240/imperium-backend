@@ -12,10 +12,17 @@ from app.models.auth import User
 from app.models.enums import IdempotencyStatus
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumPulseEntry
-from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead, PulseTodayResponse
+from app.schemas.pulse import (
+    PulseEntryCreate,
+    PulseEntryListResponse,
+    PulseEntryRead,
+    PulseStatsSummaryResponse,
+    PulseTodayResponse,
+)
 
 SAFE_EXPLANATION = "Pulse entries for current user."
 TODAY_SAFE_EXPLANATION = "Pulse today entry for current user."
+STATS_SUMMARY_SAFE_EXPLANATION = "Pulse summary statistics for current user."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -139,6 +146,44 @@ def get_pulse_today_entry(
     )
 
 
+def get_pulse_stats_summary(
+    db: Session,
+    *,
+    current_user: User,
+    date_from: date | None,
+    date_to: date | None,
+) -> PulseStatsSummaryResponse:
+    query = select(ImperiumPulseEntry).where(ImperiumPulseEntry.user_id == current_user.id)
+    if date_from is not None:
+        query = query.where(ImperiumPulseEntry.entry_date >= date_from)
+    if date_to is not None:
+        query = query.where(ImperiumPulseEntry.entry_date <= date_to)
+    query = query.order_by(
+        ImperiumPulseEntry.entry_date.desc(),
+        ImperiumPulseEntry.created_at.desc(),
+        ImperiumPulseEntry.id.asc(),
+    )
+    entries = list(db.scalars(query))
+    entry_count = len(entries)
+    workout_count = sum(1 for entry in entries if entry.workout_done is True)
+
+    sleep_values = [float(entry.sleep_hours) for entry in entries if entry.sleep_hours is not None]
+    energy_values = [float(entry.energy_level) for entry in entries if entry.energy_level is not None]
+    fatigue_values = [float(entry.fatigue_level) for entry in entries if entry.fatigue_level is not None]
+
+    latest_weight_kg = next((float(entry.weight_kg) for entry in entries if entry.weight_kg is not None), None)
+
+    return PulseStatsSummaryResponse(
+        entry_count=entry_count,
+        average_sleep_hours=_average_or_none(sleep_values),
+        average_energy_level=_average_or_none(energy_values),
+        average_fatigue_level=_average_or_none(fatigue_values),
+        latest_weight_kg=latest_weight_kg,
+        workout_count=workout_count,
+        safe_explanation=STATS_SUMMARY_SAFE_EXPLANATION,
+    )
+
+
 def _get_existing_entry_for_date(
     db: Session,
     *,
@@ -211,3 +256,9 @@ def _hash_request(action: str, payload: dict) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _average_or_none(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return round(sum(values) / len(values), 2)

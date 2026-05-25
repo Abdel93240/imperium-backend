@@ -6,12 +6,19 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead, PulseTodayResponse
+from app.schemas.pulse import (
+    PulseEntryCreate,
+    PulseEntryListResponse,
+    PulseEntryRead,
+    PulseStatsSummaryResponse,
+    PulseTodayResponse,
+)
 from app.services.pulse.entries import (
     PulseEntryConflictError,
     PulseEntryNotFoundError,
     PulseIdempotencyConflictError,
     create_pulse_entry,
+    get_pulse_stats_summary,
     get_pulse_today_entry,
     get_pulse_entry,
     list_pulse_entries,
@@ -30,6 +37,22 @@ def get_pulse_today_route(
         db,
         current_user=current_user,
         local_date=query_date or date.today(),
+    )
+
+
+@router.get("/stats/summary", response_model=PulseStatsSummaryResponse)
+def get_pulse_stats_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> PulseStatsSummaryResponse:
+    _validate_date_range(date_from=date_from, date_to=date_to)
+    return get_pulse_stats_summary(
+        db,
+        current_user=current_user,
+        date_from=date_from,
+        date_to=date_to,
     )
 
 

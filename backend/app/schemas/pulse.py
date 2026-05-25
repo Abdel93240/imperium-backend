@@ -75,3 +75,15 @@ class PulseTodayResponse(BaseModel):
     date: date
     entry: PulseEntryRead | None
     safe_explanation: str = "Pulse today entry for current user."
+
+
+class PulseStatsSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entry_count: int
+    average_sleep_hours: float | None
+    average_energy_level: float | None
+    average_fatigue_level: float | None
+    latest_weight_kg: float | None
+    workout_count: int
+    safe_explanation: str = "Pulse summary statistics for current user."

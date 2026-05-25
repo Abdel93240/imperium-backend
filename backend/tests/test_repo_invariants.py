@@ -371,6 +371,98 @@ def test_patch_11b_pulse_today_contract_docs_and_route_order_are_consolidated() 
     ):
         assert forbidden not in combined
 
+
+def test_patch_11c_pulse_stats_summary_is_read_only_deterministic_and_no_cross_module_linkage() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_pulse.py").read_text(encoding="utf-8")
+    service_text = (BACKEND_ROOT / "app" / "services" / "pulse" / "entries.py").read_text(encoding="utf-8")
+    schema_text = (BACKEND_ROOT / "app" / "schemas" / "pulse.py").read_text(encoding="utf-8")
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+    summary_route = route_text.split('@router.get("/stats/summary"', maxsplit=1)[1].split(
+        '@router.post("/entries"',
+        maxsplit=1,
+    )[0]
+    summary_service = service_text.split("def get_pulse_stats_summary", maxsplit=1)[1].split(
+        "def _get_existing_entry_for_date",
+        maxsplit=1,
+    )[0]
+
+    route_order = [
+        route_text.index('@router.get("/today"'),
+        route_text.index('@router.get("/stats/summary"'),
+        route_text.index('@router.post("/entries"'),
+    ]
+    assert route_order == sorted(route_order)
+    assert "response_model=PulseStatsSummaryResponse" in route_text
+    assert "current_user: CurrentUserDep" in summary_route
+    assert "Idempotency-Key" not in summary_route
+    assert "_validate_date_range" in summary_route
+    assert "PulseStatsSummaryResponse" in schema_text
+    assert "entry_count" in schema_text
+    assert "average_sleep_hours" in schema_text
+    assert "average_energy_level" in schema_text
+    assert "average_fatigue_level" in schema_text
+    assert "latest_weight_kg" in schema_text
+    assert "workout_count" in schema_text
+    assert "safe_explanation" in schema_text
+    assert "Pulse summary statistics for current user." in service_text
+    assert "Pulse summary statistics for current user." in schema_text
+    assert "ImperiumPulseEntry.user_id == current_user.id" in summary_service
+    assert "ImperiumPulseEntry.entry_date >= date_from" in summary_service
+    assert "ImperiumPulseEntry.entry_date <= date_to" in summary_service
+    assert "ImperiumPulseEntry.entry_date.desc()" in summary_service
+    assert "ImperiumPulseEntry.created_at.desc()" in summary_service
+    assert "ImperiumPulseEntry.id.asc()" in summary_service
+    assert "entry.workout_done is True" in summary_service
+    assert "entry.weight_kg is not None" in summary_service
+
+    for read_only_section in (summary_route, summary_service):
+        assert "db.add(" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    for forbidden in (
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "scoring",
+        "weighted_score",
+        "coaching",
+        "recommendation",
+        "mission_id",
+        "vault",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "/api/imperium/pulse/stats/summary" in lowered_docs
+    assert "pulse summary stats 11c" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "deterministic" in lowered_docs
+    assert "no health score" in lowered_docs
+    assert "no coaching" in lowered_docs
+    assert "no recommendations" in lowered_docs
+    assert "no cross-module linkage" in lowered_docs
+    assert "no pgvector write" in lowered_docs
+    assert "no embeddings" in lowered_docs
+    assert "no automatic memory commit" in lowered_docs
+    assert "no automatic replanning" in lowered_docs
+    assert "no automatic scoring" in lowered_docs
+
+
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"

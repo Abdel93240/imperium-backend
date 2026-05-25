@@ -552,6 +552,7 @@ Implemented endpoints:
 | GET | `/api/imperium/pulse/entries` | List current-user Pulse entries with optional `date_from`, `date_to`, `limit`, `offset` | Not required; read-only |
 | GET | `/api/imperium/pulse/entries/{entry_id}` | Read one current-user Pulse entry by id | Not required; read-only |
 | GET | `/api/imperium/pulse/today` | Read-only Pulse entry view for current user on backend current date or explicit `date` query param | Not required; read-only |
+| GET | `/api/imperium/pulse/stats/summary` | Read-only deterministic Pulse summary stats for current user with optional `date_from`, `date_to` | Not required; read-only |
 
 Contracts:
 - all endpoints are JWT-scoped through `CurrentUserDep`
@@ -600,6 +601,57 @@ Audit readiness boundaries:
 - no automatic recommendations
 - no automatic synchronization with Mission, Vault, Path, calendar, or any other module
 - no AI/n8n/scoring/coaching/calendar/memory/cross-module linkage
+
+#### Pulse Summary Stats 11C - deterministic read-only aggregates
+
+Patch 11C adds:
+- `GET /api/imperium/pulse/stats/summary`
+
+Purpose:
+- provide deterministic read-only Pulse aggregates for the current user over an optional date range
+- report raw summary numbers only, with no interpretation layer
+
+Contracts:
+- endpoint is GET only
+- endpoint is JWT-scoped via `CurrentUserDep`
+- endpoint is strict user-scoped (`user_id == current_user.id`)
+- `date_from` and `date_to` are optional query params
+- no `Idempotency-Key` required
+- endpoint is strict read-only: no `db.add`, `flush`, or `commit`
+- `entry_count` = count of entries in period
+- averages ignore null values:
+  - `average_sleep_hours`
+  - `average_energy_level`
+  - `average_fatigue_level`
+- `latest_weight_kg` uses deterministic ordering on period rows:
+  - `entry_date DESC`
+  - `created_at DESC`
+  - `id ASC` (stable tie-break)
+  - then first non-null `weight_kg`
+- `workout_count` counts only entries where `workout_done = true`
+- if no rows exist:
+  - `entry_count = 0`
+  - averages are `null`
+  - `latest_weight_kg = null`
+  - `workout_count = 0`
+- `safe_explanation` must be `Pulse summary statistics for current user.`
+
+11C boundaries:
+- no health score
+- no coaching
+- no recommendations
+- no cross-module linkage
+- no real AI call
+- no n8n AI Agent
+- no n8n DB write
+- no pgvector write
+- no embeddings
+- no automatic memory commit
+- no automatic replanning
+- no automatic scoring
+- no automatic coaching
+- no automatic recommendations
+- no automatic Mission/Vault/Path linkage
 
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
