@@ -1761,3 +1761,77 @@ def test_path_habit_detail_10d_is_read_only_user_scoped_and_no_ai_side_effects()
     assert "404" in lowered_docs
     assert "non-owned" in lowered_docs
     assert "never creates a check-in" in lowered_docs
+
+
+def test_path_check_in_detail_10e_is_read_only_user_scoped_and_no_ai_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "path.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+    detail_route = route_text.split('@router.get("/check-ins/{check_in_id}"', maxsplit=1)[1].split(
+        '@router.get("/today"',
+        maxsplit=1,
+    )[0]
+    detail_service = service_text.split("def get_path_check_in_detail", maxsplit=1)[1].split(
+        "def get_path_today_view",
+        maxsplit=1,
+    )[0]
+    route_order = [
+        route_text.index('@router.get("/check-ins"'),
+        route_text.index('@router.get("/check-ins/{check_in_id}"'),
+        route_text.index('@router.get("/today"'),
+    ]
+
+    assert "response_model=PathCheckInDetailResponse" in route_text
+    assert "current_user: CurrentUserDep" in detail_route
+    assert "Idempotency-Key" not in detail_route
+    assert "PathCheckInNotFoundError" in detail_route
+    assert "Path check-in not found." in detail_service
+    assert "ImperiumPathCheckIn.id == check_in_id" in detail_service
+    assert "ImperiumPathCheckIn.user_id == current_user.id" in detail_service
+    assert "CHECK_IN_DETAIL_SAFE_EXPLANATION" in detail_service
+    assert "PathCheckInDetailResponse" in schema_text
+    assert route_order == sorted(route_order)
+
+    for read_only_section in (detail_route, detail_service):
+        assert "db.add(" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    for forbidden in (
+        "qwenclient",
+        "providers",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "automatic memory",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "discipline_score",
+        "weighted_score",
+        "scoring",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "get /api/imperium/path/check-ins/{check_in_id}" in lowered_docs
+    assert "path check-in detail 10e" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "404" in lowered_docs
+    assert "non-owned" in lowered_docs
+    assert "never modifies any habit or check-in" in lowered_docs

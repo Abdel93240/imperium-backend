@@ -567,6 +567,7 @@ Implemented endpoints:
 | GET | `/api/imperium/path/today` | Read-only Path day view for the current user, including active habits and same-day check-ins | Not required; read-only |
 | POST | `/api/imperium/path/habits/{habit_id}/check-ins` | Create one check-in for a current-user active habit | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/check-ins` | List current-user check-ins, optionally filtered by `habit_id`, `status`, `date_from`, `date_to` | Not required; read-only |
+| GET | `/api/imperium/path/check-ins/{check_in_id}` | Read one current-user Path check-in detail by id | Not required; read-only |
 
 Canonical route keys:
 - `POST /api/imperium/path/habits`
@@ -575,6 +576,7 @@ Canonical route keys:
 - `GET /api/imperium/path/today`
 - `POST /api/imperium/path/habits/{habit_id}/check-ins`
 - `GET /api/imperium/path/check-ins`
+- `GET /api/imperium/path/check-ins/{check_in_id}`
 
 Contracts:
 - habit create payload accepts `title`, `description`, `domain`, and `frequency`; client-provided `user_id` is forbidden
@@ -658,6 +660,33 @@ Contracts:
 - the endpoint never creates a check-in automatically
 - the endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar replanning, or scoring
 - the endpoint is user-scoped and never exposes another user's habit/check-in data
+
+#### Path Check-in Detail 10E - read-only check-in detail by id
+
+Path Check-in Detail 10E adds deterministic read access for one Path check-in owned by the current user.
+
+Purpose:
+- read one check-in detail by `check_in_id` for the authenticated user
+- keep strict current-user ownership rules
+- preserve read-only behavior with no side effects
+
+Implemented endpoint:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| GET | `/api/imperium/path/check-ins/{check_in_id}` | Read-only current-user Path check-in detail by id | Not required; read-only |
+
+Contracts:
+- endpoint is JWT-scoped through `CurrentUserDep`
+- missing check-in returns `404`
+- non-owned check-in returns `404`
+- no `Idempotency-Key` required
+- endpoint is read-only: no `db.add`, `flush`, `commit`
+- endpoint never creates any check-in automatically
+- endpoint never modifies any habit or check-in
+- endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar, or scoring
+- response is deterministic and uses safe public fields only
+- `safe_explanation` must be `Path check-in detail for current user.`
 
 #### Path Habit Lifecycle 10C - archive and reactivate
 

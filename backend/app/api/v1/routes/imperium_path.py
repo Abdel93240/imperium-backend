@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.path import (
     PathCheckInCreate,
+    PathCheckInDetailResponse,
     PathCheckInListResponse,
     PathCheckInRead,
     PathCheckInStatus,
@@ -21,6 +22,7 @@ from app.schemas.path import (
 )
 from app.services.path.habits import (
     PathCheckInConflictError,
+    PathCheckInNotFoundError,
     PathHabitInactiveError,
     PathHabitNotFoundError,
     PathIdempotencyConflictError,
@@ -28,6 +30,7 @@ from app.services.path.habits import (
     create_path_check_in,
     create_path_habit,
     get_path_habit_detail,
+    get_path_check_in_detail,
     get_path_today_view,
     list_path_check_ins,
     list_path_habits,
@@ -226,6 +229,18 @@ def list_path_check_ins_route(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/check-ins/{check_in_id}", response_model=PathCheckInDetailResponse)
+def get_path_check_in_detail_route(
+    check_in_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> PathCheckInDetailResponse:
+    try:
+        return get_path_check_in_detail(db, current_user=current_user, check_in_id=check_in_id)
+    except PathCheckInNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/today", response_model=PathTodayResponse)

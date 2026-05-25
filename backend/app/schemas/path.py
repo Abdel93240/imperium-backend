@@ -126,6 +126,7 @@ class PathCheckInRead(BaseModel):
     reason: str | None
     note: str | None
     created_at: datetime
+    updated_at: datetime
 
 
 class PathHabitListResponse(BaseModel):
@@ -146,6 +147,11 @@ class PathCheckInListResponse(BaseModel):
     count: int
     limit: int
     offset: int
+    safe_explanation: str
+
+
+class PathCheckInDetailResponse(BaseModel):
+    check_in: PathCheckInRead
     safe_explanation: str
 
 

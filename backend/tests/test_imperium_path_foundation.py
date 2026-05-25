@@ -602,6 +602,7 @@ def test_create_path_check_in_replays_same_idempotency_key() -> None:
         "reason": None,
         "note": "Completed after prayer",
         "created_at": created_at.isoformat(),
+        "updated_at": created_at.isoformat(),
     }
     db = FakeDb(
         scalar_results=[

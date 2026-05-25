@@ -14,6 +14,7 @@ from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumPathCheckIn, ImperiumPathHabit
 from app.schemas.path import (
     PathCheckInCreate,
+    PathCheckInDetailResponse,
     PathCheckInListResponse,
     PathCheckInRead,
     PathHabitCreate,
@@ -31,6 +32,7 @@ SAFE_EXPLANATION = "Path habits/check-ins for current user."
 TODAY_SAFE_EXPLANATION = "Path today view for current user."
 LIFECYCLE_SAFE_EXPLANATION = "Path habit lifecycle updated without deleting history."
 HABIT_DETAIL_SAFE_EXPLANATION = "Path habit detail for current user."
+CHECK_IN_DETAIL_SAFE_EXPLANATION = "Path check-in detail for current user."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -48,6 +50,10 @@ class PathHabitInactiveError(ValueError):
 
 
 class PathCheckInConflictError(ValueError):
+    pass
+
+
+class PathCheckInNotFoundError(ValueError):
     pass
 
 
@@ -226,6 +232,26 @@ def list_path_check_ins(
         limit=limit,
         offset=offset,
         safe_explanation=SAFE_EXPLANATION,
+    )
+
+
+def get_path_check_in_detail(
+    db: Session,
+    *,
+    current_user: User,
+    check_in_id: UUID,
+) -> PathCheckInDetailResponse:
+    check_in = db.scalar(
+        select(ImperiumPathCheckIn).where(
+            ImperiumPathCheckIn.id == check_in_id,
+            ImperiumPathCheckIn.user_id == current_user.id,
+        )
+    )
+    if check_in is None:
+        raise PathCheckInNotFoundError("Path check-in not found.")
+    return PathCheckInDetailResponse(
+        check_in=PathCheckInRead.model_validate(check_in),
+        safe_explanation=CHECK_IN_DETAIL_SAFE_EXPLANATION,
     )
 
 
