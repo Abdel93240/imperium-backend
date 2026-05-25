@@ -95,6 +95,7 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
         "meta",
         "safe_explanation",
     }
+    assert body["safe_explanation"] == "Imperium daily plan snapshot for current user."
     assert body["modules"] == [
         {"name": "dashboard", "status": "included", "read_only": True},
         {"name": "mission", "status": "included", "read_only": True},
@@ -108,6 +109,12 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
     assert snapshot_generated_at.utcoffset() is not None and snapshot_generated_at.utcoffset().total_seconds() == 0
     assert body["dashboard"]["meta"]["read_only"] is True
     assert body["dashboard"]["meta"]["dashboard_version"] == "v1"
+    assert body["summary"] == {
+        "has_active_mission": False,
+        "path_items_count": 0,
+        "pulse_entry_present": False,
+        "safe_explanation": "Daily plan summary computed from existing read-only snapshots.",
+    }
     assert body["readiness"] == {
         "dashboard_present": True,
         "mission_present": False,
@@ -116,16 +123,12 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
         "read_only": True,
         "safe_explanation": "Daily plan readiness snapshot computed from existing read-only data.",
     }
-    assert body["summary"] == {
-        "has_active_mission": False,
-        "path_items_count": 0,
-        "pulse_entry_present": False,
-        "safe_explanation": "Daily plan summary computed from existing read-only snapshots.",
-    }
+    assert body["meta"]["snapshot_generated_at"].endswith("Z")
     assert "score" not in str(body).lower()
     assert "recommendation" not in str(body).lower()
     assert "health_score" not in str(body).lower()
     assert "health_check" not in str(body).lower()
+    assert "advice" not in str(body).lower()
 
 
 def test_daily_plan_is_read_only_and_does_not_require_idempotency_key() -> None:
@@ -159,6 +162,27 @@ def test_daily_plan_readiness_is_bool_count_only_and_snapshot_coherent() -> None
             assert value >= 0
 
 
+def test_daily_plan_modules_and_meta_are_metadata_only() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/daily-plan")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [module["name"] for module in body["modules"]] == ["dashboard", "mission", "path", "pulse"]
+    assert all(module["status"] == "included" for module in body["modules"])
+    assert all(module["read_only"] is True for module in body["modules"])
+    assert body["meta"] == {
+        "snapshot_generated_at": body["meta"]["snapshot_generated_at"],
+        "daily_plan_version": "v1",
+        "read_only": True,
+        "safe_explanation": "Daily plan metadata snapshot.",
+    }
+    snapshot_generated_at = datetime.fromisoformat(body["meta"]["snapshot_generated_at"].replace("Z", "+00:00"))
+    assert snapshot_generated_at.tzinfo is not None
+    assert snapshot_generated_at.utcoffset() is not None
+    assert snapshot_generated_at.utcoffset().total_seconds() == 0
+    assert body["dashboard"]["meta"]["dashboard_version"] == "v1"
+
+
 def test_daily_plan_docs_explicitly_document_contract_rules() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
     schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
@@ -173,9 +197,12 @@ def test_daily_plan_docs_explicitly_document_contract_rules() -> None:
         assert "readiness snapshot" in text
         assert "not a score" in text
         assert "not a recommendation" in text
+        assert "not a health check" in text
+        assert "no orchestration" in text
         assert "ai" in text
         assert "n8n" in text
         assert "ocr" in text
         assert "scoring" in text
         assert "coaching" in text
         assert "recommendation" in text
+        assert "legacy dashboard aggregator" in text

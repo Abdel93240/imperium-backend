@@ -2200,6 +2200,64 @@ def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
     assert "cross-module" not in lowered
 
 
+def test_patch_13e_daily_plan_contract_consolidation_v2_is_read_only_and_non_canonical() -> None:
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_daily_plan.py").read_text(
+        encoding="utf-8"
+    )
+    service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "daily_plan.py").read_text(encoding="utf-8")
+    schema_text = (BACKEND_ROOT / "app" / "schemas" / "daily_plan.py").read_text(encoding="utf-8")
+    dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    lowered = "\n".join([route_text, service_text, schema_text, dashboard_service_text]).lower()
+
+    assert "legacy dashboard aggregator" not in service_text.lower()
+    assert "legacy dashboard aggregator" not in dashboard_service_text.lower()
+    assert "get_imperium_dashboard_foundation" in service_text
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+    assert "ai router" not in service_text.lower()
+    assert "ai agent" not in service_text.lower()
+    assert "n8n" not in service_text.lower()
+    assert "ocr" not in service_text.lower()
+    assert "scoring" not in service_text.lower()
+    assert "coaching" not in service_text.lower()
+    assert "recommendation" not in service_text.lower()
+    assert "health check" not in service_text.lower()
+    assert "health_score" not in service_text.lower()
+    assert "auto create" not in service_text.lower()
+    assert "create path" not in service_text.lower()
+    assert "create pulse" not in service_text.lower()
+    assert "cross-module" not in service_text.lower()
+    assert "dashboard" in lowered
+    assert "mission" in lowered
+    assert "path" in lowered
+    assert "pulse" in lowered
+    assert 'name="dashboard", status="included", read_only=True' in service_text
+    assert 'name="mission", status="included", read_only=True' in service_text
+    assert 'name="path", status="included", read_only=True' in service_text
+    assert 'name="pulse", status="included", read_only=True' in service_text
+    assert "readiness: DailyPlanReadinessSection" in schema_text
+    assert "modules: list[DailyPlanModuleSection]" in schema_text
+    assert "daily_plan_version=\"v1\"" in service_text
+    assert "datetime.now(UTC)" in service_text
+    assert "snapshot_generated_at" in schema_text
+    assert "safe_explanation" in schema_text
+    assert "not a score" in contracts_text
+    assert "not a recommendation" in contracts_text
+    assert "not a health check" in contracts_text
+    assert "no orchestration" in contracts_text
+    assert "summary" in schema_docs_text
+    assert "meta" in schema_docs_text
+    assert "readiness" in schema_docs_text
+    assert "modules" in schema_docs_text
+    assert "legacy dashboard aggregator" in contracts_text
+    assert "no new endpoint" not in lowered
+
+
 def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
     service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"

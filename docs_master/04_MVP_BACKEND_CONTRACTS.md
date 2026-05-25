@@ -20,7 +20,7 @@ The contracts preserve the product rules:
 
 ## API Conventions
 
-### Imperium Daily Plan V1
+### Imperium Daily Plan V2
 
 `GET /api/imperium/daily-plan`
 
@@ -52,32 +52,39 @@ Response contract:
 - `mission`
 - `path`
 - `pulse`
-- `modules`
-- `readiness`
 - `summary`
 - `meta`
+- `readiness`
+- `modules`
 - `safe_explanation`
 
+Response shape notes:
+- `safe_explanation` is a public, read-only explanation string for the snapshot contract
+- no user id is exposed in any daily-plan response section
+- no legacy dashboard aggregator is used in this contract
+
 Snapshot metadata:
+- `summary` is metadata only and must contain booleans and counts only
+- `summary.safe_explanation` must stay public, deterministic, and read-only
+- `readiness` is a readiness snapshot only block and must contain booleans and counts only
+- `readiness` is bool/count only
+- `readiness` is not a score, not a health score, not a recommendation, and not a coaching surface
+- `readiness.read_only` is always `true`
+- `readiness.safe_explanation` must explain that it is computed from existing read-only data
 - `modules` is metadata only
 - `modules` is not a runtime availability check
 - `modules` is not a health check
 - `modules` is not a score
 - `modules` deterministic order is: `dashboard`, `mission`, `path`, `pulse`
 - each `modules[]` item has `name`, `status`, `read_only`
-- each `modules[].status` is always `included` in Patch 13D
+- each `modules[].status` is always `included` in Patch 13E
 - each `modules[].read_only` is always `true`
 - `modules` must not expose internal identifiers
-- `readiness` is a readiness snapshot only block and must contain booleans and counts only
-- `readiness` is bool/count only
-- `readiness` is not a score, not a health score, not a recommendation, and not a coaching surface
-- `readiness.read_only` is always `true`
-- `readiness.safe_explanation` must explain that it is computed from existing read-only data
-- `summary` is metadata only and must contain booleans and counts only
 - `meta.snapshot_generated_at` is timezone-aware UTC
 - `meta.daily_plan_version` is `v1`
 - `meta.read_only` is `true`
 - `meta` is metadata only and must not carry business actions
+- `meta` is UTC timestamp metadata only, not a business payload
 
 Response shape rules:
 - `dashboard` remains independently available as a separate snapshot contract
@@ -88,6 +95,7 @@ Response shape rules:
 Europe/Paris convention:
 - daily plan default date follows the Europe/Paris local date helper
 - this convention applies only to the snapshot date selection, not to UTC metadata timestamps
+- when `date` is omitted, selection follows Europe/Paris local date conventions
 
 ## V1 Implementation Stack
 

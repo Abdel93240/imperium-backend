@@ -125,8 +125,11 @@ The daily-plan snapshot is a read-only consolidation layer:
 - it uses the Europe/Paris local date convention for its default `date`
 - it accepts an optional `date` query parameter for snapshot selection
 - it does not use AI, n8n, OCR, scoring, coaching, recommendations, or orchestration
+- it has no orchestration
 - it does not perform cross-module writes
 - it does not rely on any legacy dashboard aggregator
+- `dashboard`, `mission`, `path`, `pulse`, `summary`, `meta`, `readiness`, and `modules` are read-only response sections
+- `summary` is metadata only and contains booleans and counts only
 - `readiness` is a readiness snapshot only block in the response and contains booleans and counts only
 - `readiness` is bool/count only
 - summary and meta are metadata-only sections
@@ -136,6 +139,10 @@ The daily-plan snapshot is a read-only consolidation layer:
 - `meta.snapshot_generated_at` is UTC timezone-aware
 - `meta.daily_plan_version` is `v1`
 - `meta.read_only` is `true`
+- `modules` is metadata only and is deterministic in the order `dashboard`, `mission`, `path`, `pulse`
+- `modules` is not a health check, not a score, and not a runtime availability probe
+- `modules[].status` is always `included`
+- `modules[].read_only` is always `true`
 - the response remains a snapshot contract, not a persisted database entity
 
 For mutable domain records, use:
