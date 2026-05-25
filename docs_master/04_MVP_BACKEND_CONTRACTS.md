@@ -638,7 +638,7 @@ Boundaries:
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/imperium/daily-plan` | Read the current user's consolidated daily snapshot from stable V1 snapshots. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `dashboard`, `mission`, `path`, `pulse`, `modules`, `summary`, `meta`, `safe_explanation` | `200`, `409`, `422` | Allowed: read dashboard foundation snapshot, active mission, Path today, Pulse today, daily-plan modules metadata list, derived summary, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
+| GET | `/api/imperium/daily-plan` | Read the current user's consolidated daily snapshot from stable V1 snapshots. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `dashboard`, `mission`, `path`, `pulse`, `summary`, `meta`, `readiness`, `modules`, `safe_explanation` | `200`, `409`, `422` | Allowed: read dashboard foundation snapshot, active mission, Path today, Pulse today, daily-plan modules metadata list, derived summary, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
 
 ```text
 Dashboard readiness snapshot computed from read-only module data.
