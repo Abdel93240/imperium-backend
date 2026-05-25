@@ -22,6 +22,8 @@ from app.schemas.imperium import (
     BacklogMissionRead,
     CompleteMissionRequest,
     FailMissionRequest,
+    MissionCompletionResponse,
+    MissionCompletionSummary,
     MissionDecisionScoreRead,
     MissionDecisionScoreSummary,
     MissionResponse,
@@ -71,6 +73,13 @@ BACKLOG_PROMOTION_GUARDRAILS_CHECKED = [
     "IDEMPOTENCY_KEY_ACCEPTED",
 ]
 BACKLOG_PROMOTION_SAFE_EXPLANATION = "Mission promoted from backlog using deterministic backend guardrails only."
+MISSION_COMPLETION_GUARDRAILS_CHECKED = [
+    "OWNERSHIP_CONFIRMED",
+    "MISSION_WAS_ACTIVE",
+    "OUTCOME_VALIDATED",
+    "IDEMPOTENCY_KEY_ACCEPTED",
+]
+MISSION_COMPLETION_SAFE_EXPLANATION = "Mission completed using deterministic backend guardrails only."
 
 
 def start_mission(
@@ -436,44 +445,49 @@ def complete_mission(
     idempotency_key: str,
     request_method: str,
     request_path: str,
-) -> tuple[MissionWriteResponse, bool]:
+) -> tuple[MissionCompletionResponse, bool]:
     request_hash = _hash_request(
-        "mission.completed",
+        "mission.completion_guardrails",
         {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
     )
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
-        return _handle_existing_idempotency(existing_key, request_hash), True
+        return _handle_existing_completion_idempotency(existing_key, request_hash), True
 
     mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
     _require_active_mission(mission)
 
+    outcome = payload.outcome.value
     event_id = f"evt_{uuid4().hex}"
     event_payload = {
         "mission_id": str(mission.id),
-        "completion_note": payload.completion_note,
+        "outcome": outcome,
+        "reason": payload.reason,
     }
     event = _build_event(
         current_user=current_user,
         event_id=event_id,
-        event_type="mission.completed",
+        event_type=f"mission.{outcome}",
         idempotency_key=idempotency_key,
         payload={key: value for key, value in event_payload.items() if value is not None},
     )
     db.add(event)
     db.flush()
 
-    mission.status = "completed"
+    mission.status = outcome
     mission.ended_at = datetime.now(UTC)
-    mission.completion_note = payload.completion_note
+    if outcome == "completed":
+        mission.completion_note = payload.reason
+        mission.failure_reason = None
+    else:
+        mission.completion_note = None
+        mission.failure_reason = payload.reason
     mission.ended_by_event_id = event.id
     db.flush()
 
-    response = _write_response(
+    response = _completion_response(
         mission=mission,
-        event_id=event_id,
-        idempotency_key=idempotency_key,
-        status_text="completed",
+        status_text=outcome,
     )
     _store_idempotency(
         db,
@@ -630,6 +644,17 @@ def _handle_existing_promote_idempotency(
     if existing_key.response_body is None:
         raise IdempotencyConflictError("Idempotency key is already processing.")
     return PromoteBacklogMissionResponse(**existing_key.response_body)
+
+
+def _handle_existing_completion_idempotency(
+    existing_key: IdempotencyKey,
+    request_hash: str,
+) -> MissionCompletionResponse:
+    if existing_key.request_hash != request_hash:
+        raise IdempotencyConflictError("Idempotency key already used with different payload.")
+    if existing_key.response_body is None:
+        raise IdempotencyConflictError("Idempotency key is already processing.")
+    return MissionCompletionResponse(**existing_key.response_body)
 
 
 def _get_active_mission(db: Session, *, current_user: User) -> ImperiumMission | None:
@@ -832,7 +857,7 @@ def _store_idempotency(
     request_path: str,
     request_hash: str,
     response_status_code: int,
-    response: BacklogMissionCreateResponse | MissionWriteResponse | PromoteBacklogMissionResponse,
+    response: BacklogMissionCreateResponse | MissionWriteResponse | PromoteBacklogMissionResponse | MissionCompletionResponse,
 ) -> None:
     db.add(
         IdempotencyKey(
@@ -925,6 +950,21 @@ def _write_response(
         status=status_text,
         score_created=decision_score is not None,
         decision_score=decision_score,
+    )
+
+
+def _completion_response(
+    *,
+    mission: ImperiumMission,
+    status_text: str,
+) -> MissionCompletionResponse:
+    return MissionCompletionResponse(
+        mission=mission,
+        completion_summary=MissionCompletionSummary(
+            status=status_text,
+            guardrails_checked=MISSION_COMPLETION_GUARDRAILS_CHECKED,
+            safe_explanation=MISSION_COMPLETION_SAFE_EXPLANATION,
+        ),
     )
 
 

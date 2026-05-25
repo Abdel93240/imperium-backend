@@ -63,7 +63,7 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_missions"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('backlog', 'active', 'completed', 'failed', 'cancelled')",
+            "status IN ('backlog', 'active', 'completed', 'failed', 'abandoned', 'cancelled')",
             name="imperium_missions_status_check",
         ),
         CheckConstraint(

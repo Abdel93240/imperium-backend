@@ -77,6 +77,7 @@ class MissionStatus(StrEnum):
     active = "active"
     completed = "completed"
     failed = "failed"
+    abandoned = "abandoned"
     cancelled = "cancelled"
 
 
@@ -253,8 +254,31 @@ class BacklogMissionCreateRequest(BaseModel):
         return self
 
 
+class MissionCompletionOutcome(StrEnum):
+    completed = "completed"
+    failed = "failed"
+    abandoned = "abandoned"
+
+
 class CompleteMissionRequest(BaseModel):
-    completion_note: str | None = None
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: MissionCompletionOutcome
+    reason: str | None = None
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def require_reason_for_non_completed_outcomes(self) -> "CompleteMissionRequest":
+        if self.outcome in {MissionCompletionOutcome.failed, MissionCompletionOutcome.abandoned} and self.reason is None:
+            raise ValueError("reason is required for failed or abandoned outcomes.")
+        return self
 
 
 class FailMissionRequest(BaseModel):
@@ -283,6 +307,37 @@ class MissionResponse(BaseModel):
     ai_usable_reason: bool | None
     event_id: str | None = None
     idempotency_key: str | None = None
+
+
+class MissionCompletionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime
+    ended_at: datetime | None
+    completion_note: str | None
+    failure_reason: str | None
+    user_reported_signals: dict | None
+    ai_usable_reason: bool | None
+
+
+class MissionCompletionSummary(BaseModel):
+    status: Literal["completed", "failed", "abandoned"]
+    guardrails_checked: list[str]
+    safe_explanation: str
+
+
+class MissionCompletionResponse(BaseModel):
+    mission: MissionCompletionRead
+    completion_summary: MissionCompletionSummary
 
 
 class MissionDecisionScoreSummary(BaseModel):

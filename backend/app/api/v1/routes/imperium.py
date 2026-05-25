@@ -35,6 +35,7 @@ from app.schemas.imperium import (
     FinishDayResponse,
     ImperiumDashboardResponse,
     MissionDecisionScoreRead,
+    MissionCompletionResponse,
     MissionResponse,
     MissionWriteResponse,
     PathItemResponse,
@@ -1075,7 +1076,7 @@ def promote_backlog_mission_route(
     return result
 
 
-@router.post("/missions/{mission_id}/complete", response_model=MissionWriteResponse)
+@router.post("/missions/{mission_id}/complete", response_model=MissionCompletionResponse)
 def complete_mission_route(
     mission_id: UUID,
     payload: CompleteMissionRequest,
@@ -1084,12 +1085,8 @@ def complete_mission_route(
     current_user: CurrentUserDep,
     db: SessionDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> MissionWriteResponse:
-    if not idempotency_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing Idempotency-Key header.",
-        )
+) -> MissionCompletionResponse:
+    _require_idempotency_key(idempotency_key)
 
     try:
         result, duplicate = complete_mission(
