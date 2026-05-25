@@ -151,7 +151,7 @@ Contracts compliance metadata note:
 - no secrets, provider metadata, infra metadata, or user id
 
 Frontend metadata layer note:
-- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/navigation`, and `GET /api/imperium/frontend/layout` are metadata only
+- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/navigation`, `GET /api/imperium/frontend/layout`, and `GET /api/imperium/frontend/theme-tokens` are metadata only
 - they are JWT-scoped and read-only
 - they do not read business data
 - they are not health checks
@@ -166,6 +166,21 @@ Frontend metadata layer note:
 - `contracts/index` is a static index of the main contracts
 - `contracts/compliance` is declarative only, not a runtime audit
 - `frontend/navigation` is static navigation metadata
+- `frontend/theme-tokens` is static deterministic V1 metadata and semantic tokens only
+
+Frontend theme tokens contract note:
+- `GET /api/imperium/frontend/theme-tokens` is metadata only
+- static deterministic V1
+- semantic tokens only
+- not a dynamic theme
+- not a user preference
+- not a health check
+- not a dynamic discovery mechanism
+- no business data read
+- no secrets/providers/infra metadata
+- no font/assets exposure
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module writes
 
 
 Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and

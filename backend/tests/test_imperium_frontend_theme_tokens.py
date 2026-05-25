@@ -161,9 +161,11 @@ def test_frontend_theme_tokens_docs_metadata_only_static_v1_not_dynamic_theme_pr
         assert "/api/imperium/frontend/theme-tokens" in text
         assert "metadata only" in text
         assert "static deterministic v1" in text
+        assert "semantic tokens only" in text
         assert "not a dynamic theme" in text
         assert "not a user preference" in text
         assert "not a health check" in text
         assert "not a dynamic discovery" in text
         assert "no business data read" in text
         assert "no secrets/providers/infra metadata" in text
+        assert "no font/assets exposure" in text

@@ -186,7 +186,8 @@ Contract notes:
 - `Contracts Compliance` is declarative only and does not perform runtime audit
 - `Frontend Navigation` is static and deterministic, not a discovery mechanism
 - `Frontend Layout` is static and deterministic, not a dynamic theme and not a discovery mechanism
-- `Frontend Theme Tokens` is static and deterministic, metadata only, not a dynamic theme, and not a user preference
+- `Frontend Theme Tokens` is static and deterministic, metadata only, semantic tokens only, not a dynamic theme, and not a user preference
+- `Frontend Theme Tokens` has no font/assets exposure
 
 ### Imperium Frontend Theme Tokens Config V1
 
