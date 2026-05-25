@@ -144,6 +144,40 @@ Frontend bootstrap usage:
 - call this endpoint once at home startup to discover core module entrypoints
 - do not treat this response as a data snapshot or health probe
 
+### Frontend Metadata Layer
+
+This layer is a static metadata surface for the frontend only.
+
+It contains four JWT-scoped, read-only, metadata-only contracts:
+- Home Bootstrap = bootstrap frontend metadata
+- Contracts Index = index static of the main contracts
+- Contracts Compliance = declarative only, not a runtime audit
+- Frontend Navigation = static navigation configuration
+
+Shared rules:
+- metadata only
+- no business data read
+- not a health check
+- not OpenAPI
+- not dynamic discovery
+- no FastAPI route scanning
+- no secrets, provider metadata, or infra metadata
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module writes
+- no user id exposure
+
+Deterministic ordering rules:
+- Home Bootstrap modules order: `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
+- Contracts Index groups order: `home`, `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
+- Contracts Compliance checks order: `metadata_only`, `not_openapi`, `not_health_check`, `no_business_data_read`, `no_dynamic_discovery`
+- Frontend Navigation items order: `home`, `dashboard`, `daily_plan`, `missions`, `vault`, `path`, `pulse`
+
+Contract notes:
+- `Home Bootstrap` is metadata only and not a runtime health check
+- `Contracts Index` is a static index of the main frontend-facing contracts
+- `Contracts Compliance` is declarative only and does not perform runtime audit
+- `Frontend Navigation` is static and deterministic, not a discovery mechanism
+
 ### Imperium Contracts Index V1
 
 `GET /api/imperium/contracts/index`

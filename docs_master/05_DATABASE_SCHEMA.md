@@ -150,6 +150,23 @@ Contracts compliance metadata note:
 - no AI, n8n, OCR, scoring, coaching, or recommendation flows
 - no secrets, provider metadata, infra metadata, or user id
 
+Frontend metadata layer note:
+- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, and `GET /api/imperium/frontend/navigation` are metadata only
+- they are JWT-scoped and read-only
+- they do not read business data
+- they are not health checks
+- they are not OpenAPI
+- they are not dynamic discovery
+- they do not scan FastAPI routes
+- they do not expose secrets, provider metadata, infra metadata, or user id
+- they do not use AI, n8n, OCR, scoring, coaching, or recommendations
+- they do not perform cross-module writes
+- their ordering is deterministic and static in V1
+- `home/bootstrap` is frontend bootstrap metadata
+- `contracts/index` is a static index of the main contracts
+- `contracts/compliance` is declarative only, not a runtime audit
+- `frontend/navigation` is static navigation metadata
+
 
 Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and
 `GET /api/imperium/daily-plan`, must not write canonical rows and must remain

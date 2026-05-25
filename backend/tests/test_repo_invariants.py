@@ -636,6 +636,73 @@ def test_patch_16a_frontend_navigation_is_metadata_only_static_and_safe() -> Non
     assert "/api/imperium/frontend/navigation" in schema_docs
 
 
+def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and_non_dynamic() -> None:
+    home_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_home.py").read_text(encoding="utf-8")
+    contracts_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_contracts.py").read_text(
+        encoding="utf-8"
+    )
+    frontend_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py").read_text(
+        encoding="utf-8"
+    )
+    home_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "home.py").read_text(encoding="utf-8")
+    contracts_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "contracts.py").read_text(
+        encoding="utf-8"
+    )
+    frontend_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(
+        encoding="utf-8"
+    )
+    lowered_services = "\n".join([home_service_text, contracts_service_text, frontend_service_text]).lower()
+    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+
+    for route_text in (home_route_text, contracts_route_text, frontend_route_text):
+        assert "CurrentUserDep" in route_text
+        assert "Idempotency-Key" not in route_text
+
+    assert home_route_text.count('@router.get("/home/bootstrap"') == 1
+    assert contracts_route_text.count('@router.get("/contracts/index"') == 1
+    assert contracts_route_text.count('@router.get("/contracts/compliance"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/navigation"') == 1
+
+    for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
+        assert forbidden not in lowered_services
+
+    for forbidden in (
+        "services.imperium.missions",
+        "services.imperium.vault",
+        "services.path",
+        "services.pulse",
+        "services.imperium.dashboard",
+        "services.imperium.daily_plan",
+        "app.routes",
+        "for route in",
+        "get_openapi",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+    ):
+        assert forbidden not in lowered_services
+
+    assert "runtime health check" in contracts_service_text.lower()
+    assert "runtime compliance audit" in contracts_docs.lower()
+
+    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    for text in (contracts_docs, schema_docs):
+        assert "frontend metadata layer" in text
+        assert "metadata only" in text
+        assert "not a health check" in text
+        assert "not openapi" in text
+        assert "not dynamic discovery" in text
+        assert "no business data read" in text
+        assert "no secrets/providers/infra metadata" in text
+
+
 def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
     schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")
