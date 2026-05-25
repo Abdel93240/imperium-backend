@@ -355,7 +355,8 @@ read model under:
 Purpose:
 - aggregate the current-user state already owned by stable V1 modules
 - expose a deterministic Imperium snapshot for Android/UI consumption
-- keep the dashboard as a view, not an AI brain or orchestration workflow
+- keep the dashboard as a snapshot read-only view, not the AI brain, not a
+  scoring/coaching/recommendation layer, and not an orchestration workflow
 
 Query params:
 - `date` optional `date`; default is backend current date by repo convention
@@ -363,38 +364,43 @@ Query params:
 
 Response sections:
 - root `date`, normalized `currency`, and `safe_explanation`
-- `mission.active_mission` from the current user's active mission read model, or `null`
-- `vault` global current-user ledger summary for the requested currency only
-- `path` today view for the current user and requested date
-- `pulse` today entry for the current user and requested date
+- `mission`: active mission section from the current user's active mission read model, or `null`
+- `vault`: current-user ledger summary for the requested currency only
+- `path`: today view for the current user and requested date
+- `pulse`: today entry for the current user and requested date
 
 Contract:
 - GET only
 - JWT-scoped via `CurrentUserDep`
 - no `Idempotency-Key` required
 - strict current-user scope for Mission, Vault, Path, and Pulse
-- read-only: no `db.add`, `flush`, `commit`, or cross-module write
+- snapshot read-only: no `db.add`, `db.flush`, `db.commit`, or rollback-driven mutation path
+- no write cross-module and no cross-module writes
 - deterministic: no hidden scoring, coaching, recommendation, or replanning layer
 - no user id is exposed in any dashboard response section
 
 Boundaries:
 - no real AI call
 - no n8n call or workflow trigger
+- no n8n AI Agent
+- no n8n DB write
 - no pgvector write
 - no embeddings
-- no memory commit
-- no calendar replanning
+- no automatic memory commit
+- no calendar or automatic replanning
 - no OCR
 - no automatic scoring
 - no automatic coaching
 - no automatic recommendations
-- no Path check-in creation
-- no Pulse entry creation
+- no automatic Path check-in creation
+- no automatic Pulse entry creation
+- no automatic creation of Path/Pulse rows
 - no Mission/Vault/Path/Pulse mutation
+- no cross-module write
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, OCR, scoring, coaching, recommendations, cross-module mutation. |
+| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
 
 ### The Vault
 

@@ -633,9 +633,17 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
     assert "path today" in lowered_docs
     assert "pulse today" in lowered_docs
     assert "no `idempotency-key` required" in lowered_docs
-    assert "no path check-in creation" in lowered_docs
-    assert "no pulse entry creation" in lowered_docs
+    assert "snapshot read-only" in lowered_docs
+    assert "not the ai brain" in lowered_docs
+    assert "no n8n ai agent" in lowered_docs
+    assert "no n8n db write" in lowered_docs
+    assert "no automatic memory commit" in lowered_docs
+    assert "no automatic path check-in creation" in lowered_docs
+    assert "no automatic pulse entry creation" in lowered_docs
+    assert "no automatic creation of path/pulse rows" in lowered_docs
     assert "no mission/vault/path/pulse mutation" in lowered_docs
+    assert "no cross-module write" in lowered_docs
+    assert "no cross-module writes" in lowered_docs
 
     assert "imperium_dashboard" in api_router_text
     assert api_router_text.index("imperium_dashboard.router") < api_router_text.index("imperium.router")
@@ -680,6 +688,7 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
         "calendar",
         "replanning",
         "ocr",
+        "scoring",
         "weighted_score",
         "coaching",
         "recommendation",
