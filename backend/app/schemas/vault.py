@@ -90,6 +90,7 @@ class ImperiumVaultTransactionCreate(BaseModel):
     amount_cents: int = Field(gt=0)
     currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
     occurred_at: datetime
+    timezone: str | None = Field(default=None, min_length=1, max_length=80)
     category: str | None = Field(default=None, max_length=80)
     source: str | None = Field(default=None, max_length=80)
     note: str | None = Field(default=None, max_length=500)
@@ -111,7 +112,7 @@ class ImperiumVaultTransactionCreate(BaseModel):
             raise ValueError("occurred_at must include timezone information.")
         return value
 
-    @field_validator("category", "source", "note", "external_ref")
+    @field_validator("timezone", "category", "source", "note", "external_ref")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -130,6 +131,8 @@ class ImperiumVaultTransactionRead(BaseModel):
     amount_cents: int
     currency: str
     occurred_at: datetime
+    local_date: date
+    timezone: str
     category: str | None
     source: str | None
     note: str | None

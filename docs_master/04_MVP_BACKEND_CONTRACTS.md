@@ -355,7 +355,7 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/vault/transactions/{transaction_id}/reverse` | Patch 9F append-only transaction correction endpoint; JWT scoped; requires `Idempotency-Key`; creates one opposite reversal transaction and never updates/deletes the original transaction | none in Patch 9F |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
-| GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by public month `YYYY-MM`; currency is uppercase 3 letters; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by persisted user-local month `YYYY-MM`; currency normalizes to uppercase 3 letters; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
 | PATCH | `/api/vault/transactions/{transaction_id}` | Legacy direct edit route; not part of Imperium Vault V1 and forbidden for the append-only ledger | forbidden in V1 |
@@ -377,6 +377,7 @@ calculate strategy or trigger downstream automation.
 - Rejects client-supplied `user_id`; the backend always uses the authenticated user.
 - Rejects `amount_cents <= 0`.
 - Accepts only `transaction_type` values `income` and `expense`.
+- Requires timezone-aware `occurred_at`; optional `timezone` can be supplied by the client. The backend stores a derived `local_date` for month-level financial reporting.
 - Creates one append-only row in `imperium_vault_transactions` and records the idempotency result.
 
 `GET /api/imperium/vault/transactions`:
@@ -384,6 +385,7 @@ calculate strategy or trigger downstream automation.
 - Does not require `Idempotency-Key`.
 - Returns only transactions owned by the current user.
 - Supports filters: `transaction_type`, `category`, `source`, `occurred_from`, and `occurred_to`.
+- `occurred_from` and `occurred_to` must include timezone information and filter by the absolute `occurred_at` instant.
 - Supports pagination with `limit` and `offset`.
 - Sorts deterministically by `occurred_at desc`, `created_at desc`, then `id desc`.
 - Is read-only: no `db.add`, `flush`, `commit`, event creation, or workflow trigger.
@@ -400,6 +402,7 @@ calculate strategy or trigger downstream automation.
 - Does not require `Idempotency-Key`.
 - Returns only the current user's ledger transactions.
 - Supports filters: `currency`, `occurred_from`, and `occurred_to`.
+- `occurred_from` and `occurred_to` must include timezone information and filter by the absolute `occurred_at` instant.
 - Computes `total_income_cents`, `total_expense_cents`, `net_cents`, `transaction_count`, `income_count`, and `expense_count` at request time.
 - Is read-only: no `db.add`, `flush`, `commit`, wallet persistence, balance persistence, AI, n8n, OCR, sadaqa, pgvector, memory, or calendar side effects.
 - Returns zeros for all totals and counts when there are no matching transactions.
@@ -429,9 +432,11 @@ Patch 9C scope:
 Patch 9D scope:
 - Adds a read-only monthly summary endpoint for current-user vault ledger facts.
 - The monthly summary is computed from database transactions at request time and is not persisted.
-- Transactions are grouped by month using `occurred_at` and the public `YYYY-MM` format.
-- `currency` uses an uppercase 3-letter code and defaults to `EUR`.
+- The endpoint is grouped by month for public reporting.
+- Transactions are grouped by the persisted user-local `local_date` month and the public `YYYY-MM` format, avoiding UTC month drift for end-of-month local transactions.
+- `currency` accepts a 3-letter code case-insensitively, normalizes to uppercase, and defaults to `EUR`.
 - `GET` supports `currency`, `occurred_from`, and `occurred_to`.
+- `occurred_from` and `occurred_to` must include timezone information and filter by the absolute `occurred_at` instant.
 - The response is deterministic and sorted by `month desc`.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the monthly summary read path.
 - No wallet balance is persisted and no ledger mutation occurs on this endpoint.
@@ -450,7 +455,8 @@ Patch 9E scope:
 - Returns `404` when the original transaction is missing or non-owned.
 - Returns `409` when the original is already reversed, when the target is itself a reversal, or when the idempotency key is reused with a different payload.
 - Same `Idempotency-Key` plus same payload returns the original reversal response.
-- Creates exactly one new row in `imperium_vault_transactions` with the opposite transaction type, same positive amount, same currency, same category, source `reversal`, backend `occurred_at`, null `external_ref`, `is_reversal = true`, `reversal_of_transaction_id = original.id`, and the trimmed `reversal_reason`.
+- Creates exactly one new row in `imperium_vault_transactions` with the opposite transaction type, same positive amount, same currency, same category, source `reversal`, backend `occurred_at`, backend-derived `local_date`, null `external_ref`, `is_reversal = true`, `reversal_of_transaction_id = original.id`, and the trimmed `reversal_reason`.
+- Reversals are dated at the moment of reversal. They do not rewrite the original transaction's local month.
 - This is an append-only correction endpoint: it reverses by appending an opposite ledger row.
 - The original transaction is never updated or deleted, even for corrections.
 - Patch 9F allows one and only one reversal per original transaction.

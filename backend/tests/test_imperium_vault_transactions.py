@@ -92,13 +92,16 @@ def _payload(**overrides) -> dict:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 123400),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", None),
@@ -144,6 +147,8 @@ def test_post_creates_income_transaction() -> None:
     transaction = next(item for item in db.added if isinstance(item, ImperiumVaultTransaction))
     assert transaction.user_id == current_user.id
     assert transaction.transaction_type == "income"
+    assert transaction.local_date.isoformat() == "2026-05-25"
+    assert transaction.timezone == "UTC"
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
     assert db.committed is True
 
@@ -171,6 +176,26 @@ def test_post_creates_expense_transaction() -> None:
     assert body["currency"] == "EUR"
     assert body["category"] == "fuel"
     assert body["note"] == "diesel"
+
+
+def test_post_persists_local_date_from_submitted_timezone_offset() -> None:
+    current_user = _user()
+    db = FakeDb()
+
+    response = _client(db, current_user).post(
+        "/imperium/vault/transactions",
+        headers={"Idempotency-Key": "vault-local-date-1"},
+        json=_payload(occurred_at="2026-01-31T23:30:00-05:00"),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["occurred_at"] == "2026-01-31T23:30:00-05:00"
+    assert body["local_date"] == "2026-01-31"
+    assert body["timezone"] == "UTC-05:00"
+    transaction = next(item for item in db.added if isinstance(item, ImperiumVaultTransaction))
+    assert transaction.local_date.isoformat() == "2026-01-31"
+    assert transaction.timezone == "UTC-05:00"
 
 
 def test_post_requires_idempotency_key() -> None:
@@ -223,6 +248,8 @@ def test_post_idempotent_same_key_and_payload_returns_same_response() -> None:
         "amount_cents": 123400,
         "currency": "EUR",
         "occurred_at": "2026-05-25T09:30:00Z",
+        "local_date": "2026-05-25",
+        "timezone": "UTC",
         "category": "vtc",
         "source": "manual",
         "note": "Monday revenue",
@@ -256,6 +283,8 @@ def test_post_same_key_with_different_payload_returns_conflict() -> None:
             "amount_cents": 123400,
             "currency": "EUR",
             "occurred_at": "2026-05-25T09:30:00Z",
+            "local_date": "2026-05-25",
+            "timezone": "UTC",
             "category": "vtc",
             "source": "manual",
             "note": "Monday revenue",
@@ -357,6 +386,14 @@ def test_get_transactions_respects_limit_offset_and_is_read_only() -> None:
     assert db.rolled_back is False
 
 
+def test_get_transactions_rejects_naive_occurred_from() -> None:
+    response = _client(FakeDb(scalars_results=[[]]), _user()).get(
+        "/imperium/vault/transactions?occurred_from=2026-01-01T00:00:00"
+    )
+
+    assert response.status_code == 422
+
+
 def test_imperium_vault_transaction_model_constraints_match_patch_9a() -> None:
     assert ImperiumVaultTransaction.__tablename__ == "imperium_vault_transactions"
 
@@ -380,4 +417,5 @@ def test_imperium_vault_transaction_model_constraints_match_patch_9a() -> None:
 
     index_names = {index.name for index in ImperiumVaultTransaction.__table__.indexes}
     assert "imperium_vault_transactions_user_occurred_at_idx" in index_names
+    assert "imperium_vault_transactions_user_local_date_idx" in index_names
     assert "imperium_vault_transactions_user_transaction_type_idx" in index_names

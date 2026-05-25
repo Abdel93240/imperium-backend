@@ -50,13 +50,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 1234),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", "ok"),
@@ -77,6 +80,8 @@ def test_get_transaction_detail_returns_current_user_transaction() -> None:
     body = response.json()
     assert body["transaction"]["id"] == str(own.id)
     assert body["transaction"]["amount_cents"] == own.amount_cents
+    assert body["transaction"]["local_date"] == own.local_date.isoformat()
+    assert body["transaction"]["timezone"] == "UTC"
     assert body["safe_explanation"] == "Vault transaction detail for current user."
     assert "user_id" not in body["transaction"]
 

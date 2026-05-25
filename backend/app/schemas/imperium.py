@@ -827,6 +827,8 @@ class ImperiumVaultTransactionDetailRead(BaseModel):
     amount_cents: int
     currency: str
     occurred_at: datetime
+    local_date: date
+    timezone: str
     category: str | None
     source: str | None
     note: str | None

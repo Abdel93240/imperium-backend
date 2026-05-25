@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -36,15 +37,7 @@ def _load_filtered_vault_transactions(
     if transaction_type is not None:
         query = query.where(ImperiumVaultTransaction.transaction_type == transaction_type)
 
-    transactions = [
-        transaction
-        for transaction in db.scalars(query)
-        if transaction.user_id == current_user.id
-        and transaction.currency == normalized_currency
-        and (occurred_from is None or transaction.occurred_at >= occurred_from)
-        and (occurred_to is None or transaction.occurred_at <= occurred_to)
-        and (transaction_type is None or transaction.transaction_type == transaction_type)
-    ]
+    transactions = list(db.scalars(query))
     return normalized_currency, transactions
 
 
@@ -104,7 +97,7 @@ def get_vault_monthly_summary(
 
     grouped_transactions: dict[str, list[ImperiumVaultTransaction]] = {}
     for transaction in transactions:
-        month = transaction.occurred_at.strftime("%Y-%m")
+        month = transaction.local_date.strftime("%Y-%m")
         grouped_transactions.setdefault(month, []).append(transaction)
 
     items: list[ImperiumVaultMonthlySummaryItem] = []
@@ -225,7 +218,7 @@ def get_vault_transaction_detail(
     db: Session,
     *,
     current_user: User,
-    transaction_id,
+    transaction_id: UUID,
 ) -> ImperiumVaultTransactionDetailResponse | None:
     transaction = db.scalar(
         select(ImperiumVaultTransaction).where(

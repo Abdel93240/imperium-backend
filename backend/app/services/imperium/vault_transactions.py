@@ -1,7 +1,8 @@
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -54,6 +55,8 @@ def create_vault_transaction(
         amount_cents=payload.amount_cents,
         currency=payload.currency,
         occurred_at=payload.occurred_at,
+        local_date=_payload_local_date(payload.occurred_at, payload.timezone),
+        timezone=_vault_timezone_label(payload.occurred_at, payload.timezone),
         category=payload.category,
         source=payload.source,
         note=payload.note,
@@ -119,12 +122,17 @@ def reverse_vault_transaction(
     if existing_reversal is not None:
         raise VaultTransactionReversalConflictError("Vault transaction already has a reversal.")
 
+    reversal_occurred_at = datetime.now(UTC)
+    reversal_timezone = _user_timezone_name(current_user)
+    reversal_local_date = _local_date_in_timezone(reversal_occurred_at, reversal_timezone)
     reversal = ImperiumVaultTransaction(
         user_id=current_user.id,
         transaction_type=_opposite_transaction_type(original.transaction_type),
         amount_cents=original.amount_cents,
         currency=original.currency,
-        occurred_at=datetime.now(UTC),
+        occurred_at=reversal_occurred_at,
+        local_date=reversal_local_date,
+        timezone=reversal_timezone,
         category=original.category,
         source="reversal",
         note=f"Reversal of transaction {original.id}",
@@ -257,6 +265,48 @@ def _opposite_transaction_type(transaction_type: str) -> str:
     if transaction_type == "income":
         return "expense"
     return "income"
+
+
+def _vault_timezone_label(occurred_at: datetime, payload_timezone: str | None) -> str:
+    if payload_timezone is not None:
+        return payload_timezone
+    name = occurred_at.tzname()
+    if name:
+        if len(name) == 6 and name[0] in {"+", "-"} and name[3] == ":":
+            return f"UTC{name}"
+        return name
+    offset = occurred_at.utcoffset()
+    if offset is None:
+        return "UTC"
+    total_seconds = int(offset.total_seconds())
+    sign = "+" if total_seconds >= 0 else "-"
+    total_seconds = abs(total_seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes = remainder // 60
+    return f"UTC{sign}{hours:02d}:{minutes:02d}"
+
+
+def _payload_local_date(occurred_at: datetime, payload_timezone: str | None) -> date:
+    if payload_timezone is None:
+        return occurred_at.date()
+    try:
+        return occurred_at.astimezone(ZoneInfo(payload_timezone)).date()
+    except ZoneInfoNotFoundError:
+        return occurred_at.date()
+
+
+def _user_timezone_name(current_user: User) -> str:
+    timezone = getattr(current_user, "timezone", None)
+    if isinstance(timezone, str) and timezone.strip():
+        return timezone.strip()
+    return "UTC"
+
+
+def _local_date_in_timezone(value: datetime, timezone_name: str) -> date:
+    try:
+        return value.astimezone(ZoneInfo(timezone_name)).date()
+    except ZoneInfoNotFoundError:
+        return value.astimezone(UTC).date()
 
 
 def _hash_request(action: str, payload: dict) -> str:

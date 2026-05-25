@@ -76,13 +76,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 123400),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", "original note"),
@@ -142,6 +145,8 @@ def test_reverse_income_creates_expense_same_amount_and_currency() -> None:
     assert reversal.source == "reversal"
     assert reversal.external_ref is None
     assert reversal.is_reversal is True
+    assert reversal.local_date == reversal.occurred_at.date()
+    assert reversal.timezone == "UTC"
     assert reversal.reversal_of_transaction_id == original.id
     assert reversal.reversal_reason == "duplicate revenue"
     assert body["transaction"]["transaction_type"] == "expense"
@@ -232,6 +237,8 @@ def test_reverse_idempotent_same_key_and_payload_returns_same_response() -> None
             "amount_cents": 100000,
             "currency": "EUR",
             "occurred_at": "2026-05-25T10:00:00Z",
+            "local_date": "2026-05-25",
+            "timezone": "UTC",
             "category": "vtc",
             "source": "reversal",
             "note": f"Reversal of transaction {original_id}",
@@ -287,6 +294,8 @@ def test_reverse_same_key_with_different_payload_returns_conflict() -> None:
                 "amount_cents": 100000,
                 "currency": "EUR",
                 "occurred_at": "2026-05-25T10:00:00Z",
+                "local_date": "2026-05-25",
+                "timezone": "UTC",
                 "category": "vtc",
                 "source": "reversal",
                 "note": f"Reversal of transaction {original_id}",
@@ -347,6 +356,8 @@ def test_reverse_original_transaction_is_not_modified() -> None:
         "amount_cents": original.amount_cents,
         "currency": original.currency,
         "occurred_at": original.occurred_at,
+        "local_date": original.local_date,
+        "timezone": original.timezone,
         "category": original.category,
         "source": original.source,
         "note": original.note,
@@ -369,6 +380,8 @@ def test_reverse_original_transaction_is_not_modified() -> None:
         "amount_cents": original.amount_cents,
         "currency": original.currency,
         "occurred_at": original.occurred_at,
+        "local_date": original.local_date,
+        "timezone": original.timezone,
         "category": original.category,
         "source": original.source,
         "note": original.note,

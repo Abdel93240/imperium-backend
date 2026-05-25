@@ -44,13 +44,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 123400),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", "original note"),
@@ -73,6 +76,8 @@ def test_transaction_put_patch_delete_are_not_implemented_and_do_not_mutate_the_
         "amount_cents": original.amount_cents,
         "currency": original.currency,
         "occurred_at": original.occurred_at,
+        "local_date": original.local_date,
+        "timezone": original.timezone,
         "category": original.category,
         "source": original.source,
         "note": original.note,
@@ -98,6 +103,8 @@ def test_transaction_put_patch_delete_are_not_implemented_and_do_not_mutate_the_
             "amount_cents": original.amount_cents,
             "currency": original.currency,
             "occurred_at": original.occurred_at,
+            "local_date": original.local_date,
+            "timezone": original.timezone,
             "category": original.category,
             "source": original.source,
             "note": original.note,

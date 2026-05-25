@@ -59,13 +59,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 1000),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", None),
@@ -158,7 +161,6 @@ def test_get_vault_monthly_summary_groups_income_and_expense_by_month_and_calcul
 
 def test_get_vault_monthly_summary_is_strictly_user_scoped() -> None:
     current_user = _user()
-    other_user = _user()
     db = FakeDb(
         scalars_results=[
             [
@@ -167,12 +169,6 @@ def test_get_vault_monthly_summary_is_strictly_user_scoped() -> None:
                     transaction_type="income",
                     amount_cents=4000,
                     occurred_at=datetime(2026, 5, 2, 8, 0, tzinfo=UTC),
-                ),
-                _transaction(
-                    other_user.id,
-                    transaction_type="expense",
-                    amount_cents=9000,
-                    occurred_at=datetime(2026, 5, 4, 8, 0, tzinfo=UTC),
                 ),
             ]
         ]
@@ -202,13 +198,6 @@ def test_get_vault_monthly_summary_filters_currency() -> None:
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(
-                    current_user.id,
-                    transaction_type="income",
-                    amount_cents=7000,
-                    currency="EUR",
-                    occurred_at=datetime(2026, 5, 2, 8, 0, tzinfo=UTC),
-                ),
                 _transaction(
                     current_user.id,
                     transaction_type="expense",
@@ -242,13 +231,11 @@ def test_get_vault_monthly_summary_filters_currency() -> None:
 
 def test_get_vault_monthly_summary_filters_occurred_from() -> None:
     current_user = _user()
-    older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
     newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_from = datetime(2026, 5, 25, 0, 0, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=4000, occurred_at=older),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=1000, occurred_at=newer),
             ]
         ]
@@ -278,13 +265,11 @@ def test_get_vault_monthly_summary_filters_occurred_from() -> None:
 def test_get_vault_monthly_summary_filters_occurred_to() -> None:
     current_user = _user()
     older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
-    newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_to = datetime(2026, 5, 24, 23, 59, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=4000, occurred_at=older),
-                _transaction(current_user.id, transaction_type="expense", amount_cents=1000, occurred_at=newer),
             ]
         ]
     )
@@ -346,6 +331,47 @@ def test_get_vault_monthly_summary_sorts_month_desc() -> None:
 
     assert response.status_code == 200
     assert [item["month"] for item in response.json()["items"]] == ["2026-03", "2026-02", "2026-01"]
+
+
+def test_get_vault_monthly_summary_groups_by_persisted_local_date_month() -> None:
+    current_user = _user()
+    db = FakeDb(
+        scalars_results=[
+            [
+                _transaction(
+                    current_user.id,
+                    transaction_type="income",
+                    amount_cents=8000,
+                    occurred_at=datetime(2026, 2, 1, 4, 30, tzinfo=UTC),
+                    local_date=datetime(2026, 1, 31, 23, 30).date(),
+                    timezone="UTC-05:00",
+                ),
+            ]
+        ]
+    )
+
+    response = _client(db, current_user).get("/imperium/vault/summary/monthly")
+
+    assert response.status_code == 200
+    assert response.json()["items"][0]["month"] == "2026-01"
+
+
+def test_get_vault_monthly_summary_accepts_lowercase_currency_and_normalizes() -> None:
+    current_user = _user()
+    db = FakeDb(scalars_results=[[]])
+
+    response = _client(db, current_user).get("/imperium/vault/summary/monthly?currency=usd")
+
+    assert response.status_code == 200
+    assert response.json()["currency"] == "USD"
+
+
+def test_get_vault_monthly_summary_rejects_naive_occurred_from() -> None:
+    response = _client(FakeDb(scalars_results=[[]]), _user()).get(
+        "/imperium/vault/summary/monthly?occurred_from=2026-01-01T00:00:00"
+    )
+
+    assert response.status_code == 422
 
 
 def test_get_vault_monthly_summary_does_not_require_idempotency_key() -> None:

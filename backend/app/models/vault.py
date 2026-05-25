@@ -73,6 +73,11 @@ class ImperiumVaultTransaction(UUIDPrimaryKeyMixin, Base):
             desc("occurred_at"),
         ),
         Index(
+            "imperium_vault_transactions_user_local_date_idx",
+            "user_id",
+            desc("local_date"),
+        ),
+        Index(
             "imperium_vault_transactions_user_transaction_type_idx",
             "user_id",
             "transaction_type",
@@ -95,6 +100,8 @@ class ImperiumVaultTransaction(UUIDPrimaryKeyMixin, Base):
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(Text, nullable=False, default="EUR", server_default="EUR")
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    local_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    timezone: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str | None] = mapped_column(Text, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)

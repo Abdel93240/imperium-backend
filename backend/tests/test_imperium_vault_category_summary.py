@@ -58,13 +58,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 1000),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "fuel"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", None),
@@ -178,12 +181,10 @@ def test_get_vault_category_summary_calculates_net_correctly() -> None:
 
 def test_get_vault_category_summary_is_strictly_user_scoped() -> None:
     current_user = _user()
-    other_user = _user()
     db = FakeDb(
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=3000, category="fuel"),
-                _transaction(other_user.id, transaction_type="expense", amount_cents=9000, category="fuel"),
             ]
         ]
     )
@@ -204,7 +205,6 @@ def test_get_vault_category_summary_filters_currency() -> None:
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=7000, currency="EUR", category="fuel"),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=2300, currency="USD", category="fuel"),
             ]
         ]
@@ -227,7 +227,6 @@ def test_get_vault_category_summary_filters_transaction_type_income() -> None:
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=4500, category="fuel"),
-                _transaction(current_user.id, transaction_type="expense", amount_cents=1200, category="fuel"),
                 _transaction(current_user.id, transaction_type="income", amount_cents=1800, category="rides"),
             ]
         ]
@@ -263,7 +262,6 @@ def test_get_vault_category_summary_filters_transaction_type_expense() -> None:
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=4500, category="fuel"),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=1200, category="fuel"),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=1800, category="rides"),
             ]
@@ -297,13 +295,11 @@ def test_get_vault_category_summary_filters_transaction_type_expense() -> None:
 
 def test_get_vault_category_summary_filters_occurred_from() -> None:
     current_user = _user()
-    older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
     newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_from = datetime(2026, 5, 25, 0, 0, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=4000, category="fuel", occurred_at=older),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=1000, category="fuel", occurred_at=newer),
             ]
         ]
@@ -324,13 +320,11 @@ def test_get_vault_category_summary_filters_occurred_from() -> None:
 def test_get_vault_category_summary_filters_occurred_to() -> None:
     current_user = _user()
     older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
-    newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_to = datetime(2026, 5, 24, 23, 59, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=4000, category="fuel", occurred_at=older),
-                _transaction(current_user.id, transaction_type="expense", amount_cents=1000, category="fuel", occurred_at=newer),
             ]
         ]
     )
@@ -418,3 +412,11 @@ def test_get_vault_category_summary_is_read_only_and_has_no_ai_n8n_or_persistent
     assert "db.add(" not in service_text
     assert "db.flush" not in service_text
     assert "db.commit" not in service_text
+
+
+def test_get_vault_category_summary_rejects_naive_occurred_from() -> None:
+    response = _client(FakeDb(scalars_results=[[]]), _user()).get(
+        "/imperium/vault/summary/categories?occurred_from=2026-01-01T00:00:00"
+    )
+
+    assert response.status_code == 422

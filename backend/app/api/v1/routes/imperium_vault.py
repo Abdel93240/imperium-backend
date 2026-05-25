@@ -45,6 +45,7 @@ def get_imperium_vault_summary_route(
     occurred_to: datetime | None = None,
     currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
 ) -> ImperiumVaultSummaryResponse:
+    _validate_datetime_range_params(occurred_from=occurred_from, occurred_to=occurred_to)
     return get_vault_summary(
         db,
         current_user=current_user,
@@ -63,6 +64,7 @@ def get_imperium_vault_category_summary_route(
     currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
     transaction_type: Literal["income", "expense"] | None = None,
 ) -> ImperiumVaultCategorySummaryResponse:
+    _validate_datetime_range_params(occurred_from=occurred_from, occurred_to=occurred_to)
     return get_vault_category_summary(
         db,
         current_user=current_user,
@@ -79,8 +81,9 @@ def get_imperium_vault_monthly_summary_route(
     db: SessionDep,
     occurred_from: datetime | None = None,
     occurred_to: datetime | None = None,
-    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")] = "EUR",
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
 ) -> ImperiumVaultMonthlySummaryResponse:
+    _validate_datetime_range_params(occurred_from=occurred_from, occurred_to=occurred_to)
     return get_vault_monthly_summary(
         db,
         current_user=current_user,
@@ -102,6 +105,7 @@ def list_imperium_vault_transactions_route(
     occurred_from: datetime | None = None,
     occurred_to: datetime | None = None,
 ) -> ImperiumVaultTransactionListResponse:
+    _validate_datetime_range_params(occurred_from=occurred_from, occurred_to=occurred_to)
     return list_vault_transactions(
         db,
         current_user=current_user,
@@ -170,6 +174,19 @@ def create_imperium_vault_transaction_route(
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return result
+
+
+def _validate_datetime_range_params(
+    *,
+    occurred_from: datetime | None,
+    occurred_to: datetime | None,
+) -> None:
+    for name, value in (("occurred_from", occurred_from), ("occurred_to", occurred_to)):
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{name} must include timezone information.",
+            )
 
 
 @router.post(

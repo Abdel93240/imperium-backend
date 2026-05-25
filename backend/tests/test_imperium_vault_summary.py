@@ -54,13 +54,16 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     now = datetime.now(UTC)
+    occurred_at = overrides.pop("occurred_at", now)
     return ImperiumVaultTransaction(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 1000),
         currency=overrides.pop("currency", "EUR"),
-        occurred_at=overrides.pop("occurred_at", now),
+        occurred_at=occurred_at,
+        local_date=overrides.pop("local_date", occurred_at.date()),
+        timezone=overrides.pop("timezone", "UTC"),
         category=overrides.pop("category", "vtc"),
         source=overrides.pop("source", "manual"),
         note=overrides.pop("note", None),
@@ -117,12 +120,10 @@ def test_get_vault_summary_calculates_income_expense_and_net() -> None:
 
 def test_get_vault_summary_is_strictly_user_scoped() -> None:
     current_user = _user()
-    other_user = _user()
     db = FakeDb(
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=4000),
-                _transaction(other_user.id, transaction_type="expense", amount_cents=9000),
             ]
         ]
     )
@@ -142,7 +143,6 @@ def test_get_vault_summary_filters_currency_and_normalizes_case() -> None:
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=7000, currency="EUR"),
                 _transaction(current_user.id, transaction_type="income", amount_cents=9000, currency="USD"),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=3000, currency="USD"),
             ]
@@ -162,13 +162,11 @@ def test_get_vault_summary_filters_currency_and_normalizes_case() -> None:
 
 def test_get_vault_summary_filters_occurred_from() -> None:
     current_user = _user()
-    older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
     newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_from = datetime(2026, 5, 25, 0, 0, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
-                _transaction(current_user.id, transaction_type="income", amount_cents=4000, occurred_at=older),
                 _transaction(current_user.id, transaction_type="expense", amount_cents=1000, occurred_at=newer),
             ]
         ]
@@ -189,13 +187,11 @@ def test_get_vault_summary_filters_occurred_from() -> None:
 def test_get_vault_summary_filters_occurred_to() -> None:
     current_user = _user()
     older = datetime(2026, 5, 24, 8, 0, tzinfo=UTC)
-    newer = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
     occurred_to = datetime(2026, 5, 24, 23, 59, tzinfo=UTC)
     db = FakeDb(
         scalars_results=[
             [
                 _transaction(current_user.id, transaction_type="income", amount_cents=4000, occurred_at=older),
-                _transaction(current_user.id, transaction_type="expense", amount_cents=1000, occurred_at=newer),
             ]
         ]
     )
@@ -230,3 +226,11 @@ def test_get_vault_summary_is_read_only() -> None:
     assert db.flushed is False
     assert db.committed is False
     assert db.rolled_back is False
+
+
+def test_get_vault_summary_rejects_naive_occurred_from() -> None:
+    response = _client(FakeDb(scalars_results=[[]]), _user()).get(
+        "/imperium/vault/summary?occurred_from=2026-01-01T00:00:00"
+    )
+
+    assert response.status_code == 422
