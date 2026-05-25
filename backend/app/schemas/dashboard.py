@@ -38,6 +38,20 @@ class ImperiumDashboardPulseSection(BaseModel):
     safe_explanation: str
 
 
+class ImperiumDashboardReadinessSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mission_available: bool
+    vault_available: bool
+    path_available: bool
+    pulse_available: bool
+    active_mission_present: bool
+    vault_transaction_count: int
+    path_today_count: int
+    pulse_entry_present: bool
+    safe_explanation: str = "Dashboard readiness snapshot computed from read-only module data."
+
+
 class ImperiumDashboardFoundationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -47,4 +61,5 @@ class ImperiumDashboardFoundationResponse(BaseModel):
     vault: ImperiumDashboardVaultSection
     path: ImperiumDashboardPathSection
     pulse: ImperiumDashboardPulseSection
+    readiness: ImperiumDashboardReadinessSection
     safe_explanation: str = "Imperium dashboard snapshot for current user."

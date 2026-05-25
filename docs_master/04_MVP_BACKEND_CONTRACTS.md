@@ -405,7 +405,46 @@ Boundaries:
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
+| GET | `/api/imperium/dashboard` | Read the current user's Imperium dashboard snapshot from stable V1 modules. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `currency`, `mission`, `vault`, `path`, `pulse`, `readiness`, `safe_explanation` | `200`, `409`, `422` | Allowed: read active mission, Vault summary, Path today, Pulse today, readiness snapshot. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
+
+#### Imperium Dashboard Foundation 12D - Readiness Snapshot
+
+The dashboard response includes a read-only `readiness` block computed from the same read-only module data already used by Mission, Vault, Path, and Pulse.
+
+Readiness is not a score.
+
+Readiness is not a recommendation.
+
+Readiness is not a health score.
+
+This block contains only booleans and counts:
+
+- `mission_available`
+- `vault_available`
+- `path_available`
+- `pulse_available`
+- `active_mission_present`
+- `vault_transaction_count`
+- `path_today_count`
+- `pulse_entry_present`
+
+The `safe_explanation` for this block is:
+
+```text
+Dashboard readiness snapshot computed from read-only module data.
+```
+
+Readiness has no side effects:
+
+- no write
+- no cross-module write
+- no Path creation
+- no Pulse creation
+- no AI
+- no n8n
+- no scoring
+- no coaching
+- no recommendation
 
 ### The Vault
 

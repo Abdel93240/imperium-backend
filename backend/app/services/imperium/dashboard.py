@@ -28,6 +28,7 @@ from app.schemas.dashboard import (
     ImperiumDashboardFoundationResponse,
     ImperiumDashboardMissionSection,
     ImperiumDashboardPathSection,
+    ImperiumDashboardReadinessSection,
     ImperiumDashboardPulseSection,
     ImperiumDashboardVaultSection,
 )
@@ -106,6 +107,16 @@ def get_imperium_dashboard_foundation(
             date=pulse_today.date,
             entry=pulse_today.entry,
             safe_explanation=pulse_today.safe_explanation,
+        ),
+        readiness=ImperiumDashboardReadinessSection(
+            mission_available=True,
+            vault_available=True,
+            path_available=True,
+            pulse_available=True,
+            active_mission_present=active_mission.mission is not None,
+            vault_transaction_count=vault_summary.transaction_count,
+            path_today_count=path_today.count,
+            pulse_entry_present=pulse_today.entry is not None,
         ),
     )
 

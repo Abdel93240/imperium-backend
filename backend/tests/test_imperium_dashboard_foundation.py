@@ -184,6 +184,17 @@ def test_dashboard_empty_returns_nulls_and_zero_sections() -> None:
     assert body["path"]["items"] == []
     assert body["path"]["count"] == 0
     assert body["pulse"]["entry"] is None
+    assert body["readiness"] == {
+        "mission_available": True,
+        "vault_available": True,
+        "path_available": True,
+        "pulse_available": True,
+        "active_mission_present": False,
+        "vault_transaction_count": 0,
+        "path_today_count": 0,
+        "pulse_entry_present": False,
+        "safe_explanation": "Dashboard readiness snapshot computed from read-only module data.",
+    }
     assert body["safe_explanation"] == "Imperium dashboard snapshot for current user."
     assert "current_mission" not in body
     assert "vault_week" not in body
@@ -201,6 +212,8 @@ def test_dashboard_returns_active_mission_for_current_user() -> None:
     assert body["mission"]["active_mission"]["id"] == str(mission.id)
     assert body["mission"]["active_mission"]["title"] == "Drive focused VTC block"
     assert "user_id" not in body["mission"]["active_mission"]
+    assert body["readiness"]["mission_available"] is True
+    assert body["readiness"]["active_mission_present"] is True
     assert "imperium_missions.user_id" in "\n".join(str(query) for query in db.queries)
 
 
@@ -215,12 +228,15 @@ def test_dashboard_returns_vault_summary_for_current_user_only() -> None:
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
     assert response.status_code == 200
-    body = response.json()["vault"]
-    assert body["total_income_cents"] == 9000
-    assert body["total_expense_cents"] == 2500
-    assert body["net_cents"] == 6500
-    assert body["transaction_count"] == 2
-    assert foreign.amount_cents != body["total_income_cents"]
+    body = response.json()
+    vault = body["vault"]
+    assert vault["total_income_cents"] == 9000
+    assert vault["total_expense_cents"] == 2500
+    assert vault["net_cents"] == 6500
+    assert vault["transaction_count"] == 2
+    assert body["readiness"]["vault_available"] is True
+    assert body["readiness"]["vault_transaction_count"] == 2
+    assert foreign.amount_cents != vault["total_income_cents"]
     assert "imperium_vault_transactions.user_id" in "\n".join(str(query) for query in db.queries)
 
 
@@ -235,11 +251,14 @@ def test_dashboard_returns_path_today_for_current_user_only() -> None:
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
     assert response.status_code == 200
-    body = response.json()["path"]
-    assert body["count"] == 1
-    assert body["items"][0]["habit"]["title"] == "Fajr on time"
-    assert body["items"][0]["check_in"]["status"] == "done"
-    assert foreign_habit.title != body["items"][0]["habit"]["title"]
+    body = response.json()
+    path = body["path"]
+    assert path["count"] == 1
+    assert path["items"][0]["habit"]["title"] == "Fajr on time"
+    assert path["items"][0]["check_in"]["status"] == "done"
+    assert body["readiness"]["path_available"] is True
+    assert body["readiness"]["path_today_count"] == 1
+    assert foreign_habit.title != path["items"][0]["habit"]["title"]
     query_text = "\n".join(str(query) for query in db.queries)
     assert "imperium_path_habits.user_id" in query_text
     assert "imperium_path_check_ins.user_id" in query_text
@@ -258,6 +277,8 @@ def test_dashboard_returns_pulse_today_for_current_user_only() -> None:
     body = response.json()["pulse"]
     assert body["entry"]["id"] == str(entry.id)
     assert body["entry"]["notes"] == "Own pulse"
+    assert response.json()["readiness"]["pulse_available"] is True
+    assert response.json()["readiness"]["pulse_entry_present"] is True
     assert body["entry"]["notes"] != foreign_entry.notes
     assert "imperium_pulse_entries.user_id" in "\n".join(str(query) for query in db.queries)
 

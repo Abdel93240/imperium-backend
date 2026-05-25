@@ -74,9 +74,33 @@ def test_dashboard_contract_shape_and_query_params() -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"date", "currency", "mission", "vault", "path", "pulse", "safe_explanation"}
+    assert set(body) == {
+        "date",
+        "currency",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+        "readiness",
+        "safe_explanation",
+    }
     assert body["currency"] == "EUR"
     assert body["mission"]["active_mission"] is None
+    assert set(body["readiness"]) == {
+        "mission_available",
+        "vault_available",
+        "path_available",
+        "pulse_available",
+        "active_mission_present",
+        "vault_transaction_count",
+        "path_today_count",
+        "pulse_entry_present",
+        "safe_explanation",
+    }
+    assert body["readiness"]["mission_available"] is True
+    assert body["readiness"]["vault_available"] is True
+    assert body["readiness"]["path_available"] is True
+    assert body["readiness"]["pulse_available"] is True
     assert body["safe_explanation"] == "Imperium dashboard snapshot for current user."
 
 
@@ -101,6 +125,23 @@ def test_dashboard_does_not_require_idempotency_key_and_stays_read_only() -> Non
     assert db.added == []
     assert db.flushed is False
     assert db.committed is False
+
+
+def test_dashboard_readiness_is_read_only_and_not_a_score() -> None:
+    db = FakeDb(scalar_results=[None], scalars_results=[[], [], []])
+    response = _client(db, _user()).get("/api/imperium/dashboard")
+
+    assert response.status_code == 200
+    readiness = response.json()["readiness"]
+    assert readiness["safe_explanation"] == "Dashboard readiness snapshot computed from read-only module data."
+    assert readiness["active_mission_present"] is False
+    assert readiness["vault_transaction_count"] == 0
+    assert readiness["path_today_count"] == 0
+    assert readiness["pulse_entry_present"] is False
+    assert "score" not in readiness
+    assert "recommendation" not in readiness
+    assert "health_score" not in readiness
+    assert "coach" not in readiness
 
 
 def test_dashboard_route_keeps_module_routes_available() -> None:

@@ -644,6 +644,10 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
     assert "no mission/vault/path/pulse mutation" in lowered_docs
     assert "no cross-module write" in lowered_docs
     assert "no cross-module writes" in lowered_docs
+    assert "readiness snapshot" in lowered_docs
+    assert "readiness is not a score" in lowered_docs
+    assert "readiness is not a recommendation" in lowered_docs
+    assert "readiness is not a health score" in lowered_docs
 
     assert "imperium_dashboard" in api_router_text
     assert api_router_text.index("imperium_dashboard.router") < api_router_text.index("imperium.router")
@@ -663,6 +667,9 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
     assert "occurred_from=None" in foundation_service
     assert "occurred_to=None" in foundation_service
     assert "active_mission" in dashboard_schema_text
+    assert "mission_available" in dashboard_schema_text
+    assert "vault_transaction_count" in dashboard_schema_text
+    assert "Dashboard readiness snapshot computed from read-only module data." in dashboard_schema_text
     assert "user_id" not in dashboard_schema_text
 
     for read_only_section in (dashboard_route_text, foundation_service):
@@ -688,7 +695,7 @@ def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_sa
         "calendar",
         "replanning",
         "ocr",
-        "scoring",
+        "health_score",
         "weighted_score",
         "coaching",
         "recommendation",
@@ -713,12 +720,16 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     assert "responses are public-safe for the current authenticated user only" in lowered_docs
     assert "no auto-creation of path rows" in lowered_docs
     assert "no auto-creation of pulse rows" in lowered_docs
+    assert "readiness is not a score" in lowered_docs
+    assert "readiness is not a recommendation" in lowered_docs
+    assert "readiness is not a health score" in lowered_docs
     assert "GET /api/imperium/dashboard" in contracts_text
     assert "currentuserdep" in lowered_docs
     assert "idempotency-key" in lowered_docs
     assert "query params:" in lowered_docs
     assert "date` optional `date`" in lowered_docs
     assert "currency` optional string" in lowered_docs
+    assert "readiness`" in lowered_docs
     assert "safe_explanation" in contracts_text
 
     for forbidden in (
@@ -741,7 +752,7 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
         "memory commit",
         "calendar",
         "ocr",
-        "scoring",
+        "health_score",
         "weighted_score",
         "coaching",
         "recommendation",
@@ -758,6 +769,7 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     assert "get_pulse_today_entry" in dashboard_service_text
     assert "get_dashboard_snapshot" in dashboard_service_text
     assert "return ImperiumDashboardFoundationResponse" in dashboard_service_text
+    assert "readiness=ImperiumDashboardReadinessSection" in dashboard_service_text
     assert "Query(min_length=3, max_length=3, pattern=r\"^[A-Za-z]{3}$\")" in dashboard_route_text
     assert "CurrentUserDep" in dashboard_route_text
     assert "Idempotency-Key" not in dashboard_route_text
