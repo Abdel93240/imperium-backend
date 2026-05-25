@@ -89,11 +89,18 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
         "mission",
         "path",
         "pulse",
+        "modules",
         "readiness",
         "summary",
         "meta",
         "safe_explanation",
     }
+    assert body["modules"] == [
+        {"name": "dashboard", "status": "included", "read_only": True},
+        {"name": "mission", "status": "included", "read_only": True},
+        {"name": "path", "status": "included", "read_only": True},
+        {"name": "pulse", "status": "included", "read_only": True},
+    ]
     assert body["meta"]["daily_plan_version"] == "v1"
     assert body["meta"]["read_only"] is True
     snapshot_generated_at = datetime.fromisoformat(body["meta"]["snapshot_generated_at"].replace("Z", "+00:00"))
@@ -118,6 +125,7 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
     assert "score" not in str(body).lower()
     assert "recommendation" not in str(body).lower()
     assert "health_score" not in str(body).lower()
+    assert "health_check" not in str(body).lower()
 
 
 def test_daily_plan_is_read_only_and_does_not_require_idempotency_key() -> None:

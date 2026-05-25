@@ -2173,6 +2173,12 @@ def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
     assert "get_dashboard_snapshot" not in lowered
     assert "dashboard_present" in lowered
     assert "mission_present" in lowered
+    assert "DailyPlanModuleSection" in schema_text
+    assert "modules: list[DailyPlanModuleSection]" in schema_text
+    assert 'name="dashboard", status="included", read_only=True' in service_text
+    assert 'name="mission", status="included", read_only=True' in service_text
+    assert 'name="path", status="included", read_only=True' in service_text
+    assert 'name="pulse", status="included", read_only=True' in service_text
     assert "read_only=True" in service_text
     assert "qwenclient" not in lowered
     assert "openai" not in lowered
@@ -2189,6 +2195,7 @@ def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
     assert "coaching" not in lowered
     assert "recommendation" not in lowered
     assert "health_score" not in lowered
+    assert "health_check" not in lowered
     assert "auto create" not in lowered
     assert "cross-module" not in lowered
 

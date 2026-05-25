@@ -52,12 +52,22 @@ Response contract:
 - `mission`
 - `path`
 - `pulse`
+- `modules`
 - `readiness`
 - `summary`
 - `meta`
 - `safe_explanation`
 
 Snapshot metadata:
+- `modules` is metadata only
+- `modules` is not a runtime availability check
+- `modules` is not a health check
+- `modules` is not a score
+- `modules` deterministic order is: `dashboard`, `mission`, `path`, `pulse`
+- each `modules[]` item has `name`, `status`, `read_only`
+- each `modules[].status` is always `included` in Patch 13D
+- each `modules[].read_only` is always `true`
+- `modules` must not expose internal identifiers
 - `readiness` is a readiness snapshot only block and must contain booleans and counts only
 - `readiness` is bool/count only
 - `readiness` is not a score, not a health score, not a recommendation, and not a coaching surface
@@ -572,7 +582,7 @@ Boundaries:
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
-| GET | `/api/imperium/daily-plan` | Read the current user's consolidated daily snapshot from stable V1 snapshots. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `dashboard`, `mission`, `path`, `pulse`, `summary`, `meta`, `safe_explanation` | `200`, `409`, `422` | Allowed: read dashboard foundation snapshot, active mission, Path today, Pulse today, derived summary, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
+| GET | `/api/imperium/daily-plan` | Read the current user's consolidated daily snapshot from stable V1 snapshots. | Not required | `CurrentUserDep` | snapshot read-only | `date`, `dashboard`, `mission`, `path`, `pulse`, `modules`, `summary`, `meta`, `safe_explanation` | `200`, `409`, `422` | Allowed: read dashboard foundation snapshot, active mission, Path today, Pulse today, daily-plan modules metadata list, derived summary, snapshot metadata. Forbidden: writes, AI, n8n, n8n AI Agent, n8n DB write, pgvector writes, embeddings, automatic memory commit, calendar/replanning, OCR, automatic scoring, automatic coaching, automatic recommendations, automatic Path/Pulse creation, cross-module writes. |
 
 ```text
 Dashboard readiness snapshot computed from read-only module data.

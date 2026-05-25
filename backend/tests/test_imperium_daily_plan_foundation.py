@@ -170,11 +170,18 @@ def test_daily_plan_contract_shape_and_query_params() -> None:
         "mission",
         "path",
         "pulse",
+        "modules",
         "readiness",
         "summary",
         "meta",
         "safe_explanation",
     }
+    assert body["modules"] == [
+        {"name": "dashboard", "status": "included", "read_only": True},
+        {"name": "mission", "status": "included", "read_only": True},
+        {"name": "path", "status": "included", "read_only": True},
+        {"name": "pulse", "status": "included", "read_only": True},
+    ]
     assert body["dashboard"]["meta"]["dashboard_version"] == "v1"
     assert body["dashboard"]["meta"]["read_only"] is True
     assert body["mission"]["mission"] is None

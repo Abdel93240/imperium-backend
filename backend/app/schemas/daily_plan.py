@@ -37,6 +37,14 @@ class DailyPlanMetaSection(BaseModel):
     safe_explanation: str = "Daily plan metadata snapshot."
 
 
+class DailyPlanModuleSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    status: str
+    read_only: bool
+
+
 class DailyPlanResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -45,6 +53,7 @@ class DailyPlanResponse(BaseModel):
     mission: ActiveMissionResponse
     path: PathTodayResponse
     pulse: PulseTodayResponse
+    modules: list[DailyPlanModuleSection]
     readiness: DailyPlanReadinessSection
     summary: DailyPlanSummarySection
     meta: DailyPlanMetaSection

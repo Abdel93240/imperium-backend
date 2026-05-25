@@ -6,6 +6,7 @@ from app.core.dates import get_default_local_date
 from app.models.auth import User
 from app.schemas.daily_plan import (
     DailyPlanMetaSection,
+    DailyPlanModuleSection,
     DailyPlanReadinessSection,
     DailyPlanResponse,
     DailyPlanSummarySection,
@@ -15,6 +16,13 @@ from app.services.imperium.dashboard import get_imperium_dashboard_foundation
 from app.services.imperium.missions import get_current_active_mission
 from app.services.path.habits import get_path_today_view
 from app.services.pulse.entries import get_pulse_today_entry
+
+DAILY_PLAN_MODULES: tuple[DailyPlanModuleSection, ...] = (
+    DailyPlanModuleSection(name="dashboard", status="included", read_only=True),
+    DailyPlanModuleSection(name="mission", status="included", read_only=True),
+    DailyPlanModuleSection(name="path", status="included", read_only=True),
+    DailyPlanModuleSection(name="pulse", status="included", read_only=True),
+)
 
 
 def get_daily_plan_snapshot(
@@ -53,6 +61,7 @@ def get_daily_plan_snapshot(
         ),
         path=path,
         pulse=pulse,
+        modules=list(DAILY_PLAN_MODULES),
         readiness=DailyPlanReadinessSection(
             dashboard_present=dashboard is not None,
             mission_present=mission.mission is not None,
