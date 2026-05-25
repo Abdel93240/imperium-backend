@@ -2679,3 +2679,43 @@ def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existi
     assert "no automatic check-in creation" in lowered_docs
     assert "no automatic replanning" in lowered_docs
     assert "no automatic scoring" in lowered_docs
+
+
+def test_home_bootstrap_service_has_no_db_write_or_business_service_dependency() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "home.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    lowered = service_text.lower()
+
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+
+    for forbidden in (
+        "services.imperium.missions",
+        "services.imperium.vault",
+        "services.path",
+        "services.pulse",
+        "services.imperium.dashboard",
+        "services.imperium.daily_plan",
+        "openai",
+        "anthropic",
+        "gemini",
+        "qwen",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+    ):
+        assert forbidden not in lowered
+
+
+def test_home_bootstrap_docs_define_metadata_only_and_status_available_not_health_check() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+
+    for text in (contracts_text, schema_text):
+        assert "/api/imperium/home/bootstrap" in text
+        assert "metadata only" in text
+        assert "status available" in text
+        assert "not a health check" in text

@@ -97,6 +97,53 @@ Europe/Paris convention:
 - this convention applies only to the snapshot date selection, not to UTC metadata timestamps
 - when `date` is omitted, selection follows Europe/Paris local date conventions
 
+
+
+### Imperium Home Bootstrap
+
+`GET /api/imperium/home/bootstrap`
+
+Purpose:
+- return minimal frontend bootstrap metadata for the current authenticated user
+- expose contract-level module availability only (not runtime checks)
+- avoid frontend coupling to multiple route contracts at startup
+
+Request semantics:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+
+Read-only semantics:
+- metadata only
+- no business data
+- no health check
+- `status = available` means contract availability only, not runtime health
+- no AI
+- no n8n
+- no OCR
+- no scoring
+- no coaching
+- no recommendation
+- no cross-module write
+- no auto-creation
+
+Response contract:
+- `backend_version`
+- `read_only`
+- `modules[]` in deterministic order: `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
+- `modules[].status` always `available` in Patch 14A
+- `modules[].primary_endpoint` is the public primary read route for each module
+- `safe_explanation`
+
+Security/safety:
+- do not expose `user_id`
+- do not expose infra/host/provider/secrets metadata
+
+Frontend bootstrap usage:
+- call this endpoint once at home startup to discover core module entrypoints
+- do not treat this response as a data snapshot or health probe
+
+
 ## V1 Implementation Stack
 
 Final implementation decisions:
@@ -1910,3 +1957,5 @@ TODO:
 - refresh token hashing algorithm
 - master access key / secret phrase rotation and recovery ceremony
 - webhook secret rotation policy
+
+- status available is contract metadata only and is not a health check

@@ -112,6 +112,18 @@ For MVP, prefer status transitions and audit/history over hard deletes.
 
 Events are the primary audit log.
 
+
+Home bootstrap contract note:
+- no business data
+- `GET /api/imperium/home/bootstrap` is metadata only and reads no business entities
+- it performs no writes and no auto-creation
+- it is JWT-scoped (`CurrentUserDep`) but does not expose `user_id`
+- it is not a health check
+- `status = available` indicates contract availability only
+- it does not call AI, n8n, OCR, scoring, coaching, or recommendation flows
+- it performs no cross-module write
+
+
 Read-only snapshot endpoints, including `GET /api/imperium/dashboard` and
 `GET /api/imperium/daily-plan`, must not write canonical rows and must remain
 derived from existing Mission, Vault, Path, Pulse, and snapshot read models
@@ -2468,3 +2480,15 @@ TODO:
 - exact pgvector embedding dimension/model
 - exact workflow run linkage to n8n execution IDs
 - exact backup and restore schema requirements
+
+- status available is contract metadata only and is not a health check
+
+Home bootstrap contract note:
+
+- no AI
+- no n8n
+- no OCR
+- no scoring
+- no coaching
+- no recommendation
+- no cross-module write
