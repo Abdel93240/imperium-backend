@@ -12,9 +12,10 @@ from app.models.auth import User
 from app.models.enums import IdempotencyStatus
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumPulseEntry
-from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead
+from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead, PulseTodayResponse
 
 SAFE_EXPLANATION = "Pulse entries for current user."
+TODAY_SAFE_EXPLANATION = "Pulse today entry for current user."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -122,6 +123,20 @@ def get_pulse_entry(
     if entry is None:
         raise PulseEntryNotFoundError("Pulse entry not found.")
     return PulseEntryRead.model_validate(entry)
+
+
+def get_pulse_today_entry(
+    db: Session,
+    *,
+    current_user: User,
+    local_date: date,
+) -> PulseTodayResponse:
+    entry = _get_existing_entry_for_date(db, current_user=current_user, entry_date=local_date)
+    return PulseTodayResponse(
+        date=local_date,
+        entry=PulseEntryRead.model_validate(entry) if entry is not None else None,
+        safe_explanation=TODAY_SAFE_EXPLANATION,
+    )
 
 
 def _get_existing_entry_for_date(

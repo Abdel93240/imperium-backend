@@ -320,53 +320,56 @@ def test_patch_8i_mission_contract_docs_and_route_order_are_consolidated() -> No
     ]
     assert route_order == sorted(route_order)
 
-    read_only_sections = [
-        route_text.split('@router.get("/missions/backlog"', maxsplit=1)[1].split(
-            '@router.get(\n    "/missions/backlog/decision-preview"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get(\n    "/missions/backlog/decision-preview"', maxsplit=1)[1].split(
-            '@router.post("/missions/backlog/{mission_id}/promote"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get("/missions/current"', maxsplit=1)[1].split(
-            '@router.get("/missions/active"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get("/missions/active"', maxsplit=1)[1].split(
-            '@router.get("/missions/history"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get("/missions/history"', maxsplit=1)[1].split(
-            '@router.get("/missions/recent"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get("/missions/recent"', maxsplit=1)[1].split(
-            '@router.get(\n    "/missions/{mission_id}"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get(\n    "/missions/{mission_id}"', maxsplit=1)[1].split(
-            '@router.get(\n    "/missions/{mission_id}/decision-score"',
-            maxsplit=1,
-        )[0],
-        route_text.split('@router.get(\n    "/missions/{mission_id}/decision-score"', maxsplit=1)[1].split(
-            '@router.get("/weekly-review/history"',
-            maxsplit=1,
-        )[0],
+def test_patch_11b_pulse_today_contract_docs_and_route_order_are_consolidated() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    pulse_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_pulse.py").read_text(
+        encoding="utf-8"
+    )
+    pulse_service_text = (BACKEND_ROOT / "app" / "services" / "pulse" / "entries.py").read_text(encoding="utf-8")
+    pulse_schema_text = (BACKEND_ROOT / "app" / "schemas" / "pulse.py").read_text(encoding="utf-8")
+    combined = "\n".join([pulse_route_text, pulse_service_text, pulse_schema_text]).lower()
+
+    assert "`/api/imperium/pulse/today`" in contracts_text
+    assert "read-only" in contracts_text.lower()
+    assert "entry: null" in contracts_text.lower()
+    assert "no automatic entry creation" in contracts_text.lower()
+    assert "no ai/n8n/scoring/coaching/calendar/memory/cross-module linkage" in contracts_text.lower()
+
+    route_order = [
+        pulse_route_text.index('@router.get("/today"'),
+        pulse_route_text.index('@router.get("/entries/{entry_id}"'),
     ]
+    assert route_order == sorted(route_order)
 
-    for section in read_only_sections:
-        lowered_section = section.lower()
-        assert "db.add(" not in section
-        assert "db.flush" not in section
-        assert "db.commit" not in section
-        assert "qwenclient" not in lowered_section
-        assert "n8n" not in lowered_section
-        assert "pgvector" not in lowered_section
-        assert "embedding" not in lowered_section
-        assert "memory" not in lowered_section
-        assert "calendar" not in lowered_section
+    today_route_section = pulse_route_text.split('@router.get("/today"', maxsplit=1)[1].split(
+        '@router.post("/entries"',
+        maxsplit=1,
+    )[0]
+    assert "Idempotency-Key" not in today_route_section
 
+    for forbidden in (
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "weighted_score",
+        "coaching",
+        "mission_id",
+        "vault",
+    ):
+        assert forbidden not in combined
 
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"

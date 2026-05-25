@@ -6,17 +6,31 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead
+from app.schemas.pulse import PulseEntryCreate, PulseEntryListResponse, PulseEntryRead, PulseTodayResponse
 from app.services.pulse.entries import (
     PulseEntryConflictError,
     PulseEntryNotFoundError,
     PulseIdempotencyConflictError,
     create_pulse_entry,
+    get_pulse_today_entry,
     get_pulse_entry,
     list_pulse_entries,
 )
 
 router = APIRouter()
+
+
+@router.get("/today", response_model=PulseTodayResponse)
+def get_pulse_today_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    query_date: date | None = Query(default=None, alias="date"),
+) -> PulseTodayResponse:
+    return get_pulse_today_entry(
+        db,
+        current_user=current_user,
+        local_date=query_date or date.today(),
+    )
 
 
 @router.post("/entries", response_model=PulseEntryRead, status_code=status.HTTP_201_CREATED)

@@ -551,6 +551,7 @@ Implemented endpoints:
 | POST | `/api/imperium/pulse/entries` | Create one current-user Pulse daily entry | Required `Idempotency-Key` |
 | GET | `/api/imperium/pulse/entries` | List current-user Pulse entries with optional `date_from`, `date_to`, `limit`, `offset` | Not required; read-only |
 | GET | `/api/imperium/pulse/entries/{entry_id}` | Read one current-user Pulse entry by id | Not required; read-only |
+| GET | `/api/imperium/pulse/today` | Read-only Pulse entry view for current user on backend current date or explicit `date` query param | Not required; read-only |
 
 Contracts:
 - all endpoints are JWT-scoped through `CurrentUserDep`
@@ -568,6 +569,24 @@ Contracts:
 - attempting the same `entry_date` with another idempotency key returns `409`
 - there is no update, merge, destructive edit, or automatic recalculation in Patch 11A
 
+#### Pulse Today Entry View 11B - read-only date lookup
+
+Patch 11B adds:
+- `GET /api/imperium/pulse/today`
+
+Contract:
+- read-only endpoint
+- JWT-scoped via `CurrentUserDep`
+- strict user scope: query uses `(user_id, entry_date)`
+- query param `date` is optional; default is backend current date by repo convention
+- response always includes:
+  - `date`
+  - `entry` object or `entry: null` when absent
+  - `safe_explanation = "Pulse today entry for current user."`
+- no `Idempotency-Key` required
+- no automatic entry creation
+- no entry mutation
+
 Audit readiness boundaries:
 - no AI
 - no n8n
@@ -575,10 +594,12 @@ Audit readiness boundaries:
 - no embeddings
 - no memory commit
 - no replanning
+- no automatic scoring
 - no automatic coaching
 - no health score
 - no automatic recommendations
 - no automatic synchronization with Mission, Vault, Path, calendar, or any other module
+- no AI/n8n/scoring/coaching/calendar/memory/cross-module linkage
 
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|

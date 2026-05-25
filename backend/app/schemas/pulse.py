@@ -69,3 +69,9 @@ class PulseEntryListResponse(BaseModel):
     limit: int
     offset: int
     safe_explanation: str = "Pulse entries for current user."
+
+
+class PulseTodayResponse(BaseModel):
+    date: date
+    entry: PulseEntryRead | None
+    safe_explanation: str = "Pulse today entry for current user."
