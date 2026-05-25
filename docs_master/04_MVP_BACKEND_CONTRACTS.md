@@ -352,6 +352,7 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/vault/transactions` | Patch 9A append-only income/expense ledger create; JWT scoped; requires `Idempotency-Key`; no AI/n8n/pgvector/memory/calendar side effect | none in Patch 9A |
 | GET | `/api/imperium/vault/transactions` | Patch 9A current-user ledger read with deterministic filters and sorting; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
 | PATCH | `/api/vault/transactions/{transaction_id}` | Edit transaction | `transaction.updated` |
@@ -405,6 +406,15 @@ Patch 9B scope:
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the summary read path.
 - `GET` supports `limit`, `offset`, `transaction_type`, `category`, `source`, `occurred_from`, and `occurred_to`, sorted by `occurred_at desc`, `created_at desc`, and `id`.
 - No balance, wallet automation, sadaqa, OCR ticket flow, AI analysis, n8n workflow, n8n AI Agent, n8n DB write, pgvector write, embedding, memory commit, automatic replanning, calendar replanning, financial scoring, or internal coefficient is part of this patch.
+
+Patch 9C scope:
+- Adds a read-only category summary endpoint for current-user vault ledger facts.
+- The category summary is computed from database transactions at request time and is not persisted.
+- Transactions are grouped by category; missing, null, or blank categories are returned as `uncategorized`.
+- `GET` supports `currency`, `transaction_type`, `occurred_from`, and `occurred_to`.
+- The response is deterministic and sorted by `transaction_count desc`, absolute net magnitude desc, then `category asc`.
+- No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the category summary read path.
+- No wallet balance is persisted and no ledger mutation occurs on this endpoint.
 
 ### Vector
 

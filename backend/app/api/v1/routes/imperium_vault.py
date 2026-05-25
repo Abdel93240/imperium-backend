@@ -5,7 +5,10 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.imperium import ImperiumVaultSummaryResponse
+from app.schemas.imperium import (
+    ImperiumVaultCategorySummaryResponse,
+    ImperiumVaultSummaryResponse,
+)
 from app.schemas.vault import (
     ImperiumVaultTransactionCreate,
     ImperiumVaultTransactionListResponse,
@@ -16,7 +19,10 @@ from app.services.imperium.vault_transactions import (
     create_vault_transaction,
     list_vault_transactions,
 )
-from app.services.imperium.vault import get_vault_summary
+from app.services.imperium.vault import (
+    get_vault_category_summary,
+    get_vault_summary,
+)
 
 router = APIRouter()
 
@@ -100,4 +106,23 @@ def get_imperium_vault_summary_route(
         currency=currency,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
+    )
+
+
+@router.get("/summary/categories", response_model=ImperiumVaultCategorySummaryResponse)
+def get_imperium_vault_category_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
+    transaction_type: Literal["income", "expense"] | None = None,
+) -> ImperiumVaultCategorySummaryResponse:
+    return get_vault_category_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        transaction_type=transaction_type,
     )
