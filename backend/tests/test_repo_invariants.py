@@ -790,6 +790,50 @@ def test_active_mission_read_has_no_ai_n8n_pgvector_embedding_or_writes() -> Non
     assert "ended_at" not in active_schema_section
 
 
+def test_mission_detail_read_has_no_ai_n8n_pgvector_embedding_or_writes() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    detail_service_section = service_text.split("def get_mission_detail", maxsplit=1)[1].split(
+        "def get_mission_decision_score",
+        maxsplit=1,
+    )[0]
+    detail_route_section = route_text.split("def mission_detail_route(", maxsplit=1)[1].split(
+        "def mission_decision_score_route",
+        maxsplit=1,
+    )[0]
+    detail_schema_section = schema_text.split("class MissionDetailRead", maxsplit=1)[1].split(
+        "class MissionDetailResponse",
+        maxsplit=1,
+    )[0]
+    detail_text = "\n".join([detail_service_section, detail_route_section, detail_schema_section]).lower()
+
+    assert "Idempotency-Key" not in detail_route_section
+    assert "QwenClient" not in detail_text
+    assert "providers" not in detail_text
+    assert "openai" not in detail_text
+    assert "anthropic" not in detail_text
+    assert "gemini" not in detail_text
+    assert "claude" not in detail_text
+    assert "n8n" not in detail_text
+    assert "pgvector" not in detail_text
+    assert "embedding" not in detail_text
+    assert "memory" not in detail_text
+    assert "calendar" not in detail_text
+    assert "db.add(" not in detail_service_section
+    assert "db.flush" not in detail_service_section
+    assert "db.commit" not in detail_service_section
+    assert "weighted_score" not in detail_schema_section
+    assert "domain_coefficient" not in detail_schema_section
+    assert "coefficient" not in detail_schema_section
+    assert "decision_score" not in detail_schema_section
+    assert "started_at" in detail_schema_section
+    assert "ended_at" in detail_schema_section
+
+
 def test_backlog_path_has_no_n8n_client_imports() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"

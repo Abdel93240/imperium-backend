@@ -29,6 +29,8 @@ from app.schemas.imperium import (
     MissionHistoryStatus,
     MissionCompletionResponse,
     MissionCompletionSummary,
+    MissionDetailRead,
+    MissionDetailResponse,
     MissionDecisionScoreRead,
     MissionDecisionScoreSummary,
     MissionResponse,
@@ -92,6 +94,7 @@ MISSION_COMPLETION_SAFE_EXPLANATION = "Mission completed using deterministic bac
 ACTIVE_MISSION_SAFE_EXPLANATION = "Current active mission for user."
 ACTIVE_MISSION_NONE_SAFE_EXPLANATION = "No active mission found for current user."
 MISSION_HISTORY_SAFE_EXPLANATION = "Mission history for current user."
+MISSION_DETAIL_SAFE_EXPLANATION = "Mission detail for current user."
 HISTORICAL_MISSION_STATUSES = {"completed", "failed", "abandoned"}
 
 
@@ -686,6 +689,25 @@ def get_mission_history(
         offset=offset,
         safe_explanation=MISSION_HISTORY_SAFE_EXPLANATION,
     )
+
+
+def get_mission_detail(
+    db: Session,
+    *,
+    current_user: User,
+    mission_id: UUID,
+) -> MissionDetailResponse:
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission is None:
+        raise MissionNotFoundError("Mission not found.")
+
+    mission_response = MissionDetailRead.model_validate(mission)
+    if mission.status == "backlog":
+        mission_response.started_at = None
+        mission_response.ended_at = None
+    elif mission.status == "active":
+        mission_response.ended_at = None
+    return MissionDetailResponse(mission=mission_response, safe_explanation=MISSION_DETAIL_SAFE_EXPLANATION)
 
 
 def get_mission_decision_score(

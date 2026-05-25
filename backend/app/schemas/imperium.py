@@ -394,6 +394,29 @@ class MissionHistoryResponse(BaseModel):
     safe_explanation: str
 
 
+class MissionDetailRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionDetailResponse(BaseModel):
+    mission: MissionDetailRead
+    safe_explanation: str
+
+
 class MissionDecisionScoreSummary(BaseModel):
     intrinsic_score: int
     priority_bucket: int

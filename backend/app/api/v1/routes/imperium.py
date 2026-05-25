@@ -37,6 +37,7 @@ from app.schemas.imperium import (
     ImperiumDashboardResponse,
     MissionDecisionScoreRead,
     MissionCompletionResponse,
+    MissionDetailResponse,
     MissionHistoryResponse,
     MissionHistoryStatus,
     MissionResponse,
@@ -150,6 +151,7 @@ from app.services.imperium.missions import (
     get_backlog_decision_preview,
     get_current_active_mission,
     get_current_mission,
+    get_mission_detail,
     get_mission_history,
     get_mission_decision_score,
     get_recent_missions,
@@ -1224,6 +1226,22 @@ def recent_missions_route(
 ) -> list[MissionResponse]:
     missions = get_recent_missions(db, current_user=current_user, limit=limit)
     return [MissionResponse.model_validate(mission) for mission in missions]
+
+
+@router.get(
+    "/missions/{mission_id}",
+    response_model=MissionDetailResponse,
+    response_model_exclude_none=True,
+)
+def mission_detail_route(
+    mission_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> MissionDetailResponse:
+    try:
+        return get_mission_detail(db, current_user=current_user, mission_id=mission_id)
+    except MissionNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/missions/{mission_id}/decision-score", response_model=MissionDecisionScoreRead)
