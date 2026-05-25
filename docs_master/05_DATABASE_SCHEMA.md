@@ -658,6 +658,16 @@ Columns:
 - `created_at` timestamptz not null
 - `updated_at` timestamptz not null
 
+Immutability contract:
+- The Vault ledger is append-only.
+- Transactions are immutable once inserted.
+- No PUT/PATCH/DELETE endpoint is allowed for `/api/imperium/vault/transactions`.
+- Corrections must be written by appending a reversal row through `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- The original transaction must never be updated or deleted.
+- The reversal transaction is a new row linked to the original transaction.
+- Patch 9F/9G allow one and only one reversal per original transaction.
+- `updated_at` remains a generic row timestamp, but V1 must not use it to represent direct transaction edits.
+
 Reversal fields:
 - `is_reversal` marks rows appended by the Patch 9F reverse endpoint.
 - `reversal_of_transaction_id` links a reversal row to the original transaction and is required only when `is_reversal = true`.
@@ -715,6 +725,16 @@ Patch 9F reversal rules:
 - no wallet/balance automation
 - no sadaqa creation
 - no receipt OCR
+- no persistent AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
+- no Mission-table coupling
+
+Patch 9G immutability rules:
+- The Vault ledger stays append-only after Patch 9F.
+- No direct `PUT`, `PATCH`, or `DELETE` transaction mutation endpoints are part of the Imperium Vault contract.
+- The only permitted correction path is `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- The original transaction must never be updated or deleted.
+- The reversal transaction is a new row linked to the original.
+- One reversal per original transaction remains the V1 rule.
 - no persistent AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
 - no Mission-table coupling
 

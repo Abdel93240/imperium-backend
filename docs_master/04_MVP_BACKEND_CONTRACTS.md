@@ -358,7 +358,7 @@ canonical for Imperium mission behavior.
 | GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by public month `YYYY-MM`; currency is uppercase 3 letters; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
-| PATCH | `/api/vault/transactions/{transaction_id}` | Edit transaction | `transaction.updated` |
+| PATCH | `/api/vault/transactions/{transaction_id}` | Legacy direct edit route; not part of Imperium Vault V1 and forbidden for the append-only ledger | forbidden in V1 |
 | POST | `/api/vault/upcoming-expenses` | Create upcoming expense | `upcoming.expense.created` |
 | PATCH | `/api/vault/upcoming-expenses/{expense_id}` | Edit upcoming expense | `upcoming.expense.updated` |
 | POST | `/api/vault/scan-ticket` | Receipt image OCR flow | `receipt.ocr.requested` |
@@ -460,6 +460,16 @@ Patch 9F scope:
 - Does not add persistent AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, memory, calendar, or financial decision side effects.
 - Does not trigger AI, n8n, OCR, sadaqa, wallet, or balance workflows.
 - Result is deterministic apart from backend timestamps and ids.
+
+Patch 9G scope:
+- Formalizes the Vault transaction immutability contract.
+- The Vault ledger is append-only and transactions are immutable after insert.
+- No PUT/PATCH/DELETE endpoints exist under `/api/imperium/vault/transactions`.
+- Corrections must use `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- The original transaction must never be updated or deleted.
+- The reversal transaction is a new transaction linked to the original.
+- Patch 9F/9G allow one and only one reversal per original transaction.
+- This patch does not add any AI, n8n, OCR, sadaqa, wallet, balance, pgvector, memory, or calendar side effects.
 
 ### Vector
 

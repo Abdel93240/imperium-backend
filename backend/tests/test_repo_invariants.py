@@ -1389,3 +1389,50 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     assert "sadaqa" not in lowered_code
     assert "wallet" not in lowered_code
     assert "balance" not in lowered_code
+
+
+def test_patch_9g_vault_transaction_immutability_contract_is_preserved() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    write_service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault_transactions.py"
+    read_service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    docs_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    schema_docs_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    write_service_text = write_service_path.read_text(encoding="utf-8")
+    read_service_text = read_service_path.read_text(encoding="utf-8")
+    docs_text = docs_path.read_text(encoding="utf-8")
+    schema_docs_text = schema_docs_path.read_text(encoding="utf-8")
+    lowered_docs = docs_text.lower()
+    lowered_schema_docs = schema_docs_text.lower()
+
+    assert '@router.put("/transactions"' not in route_text
+    assert '@router.patch("/transactions"' not in route_text
+    assert '@router.delete("/transactions"' not in route_text
+    assert "/transactions/{transaction_id}/reverse" in route_text
+
+    assert "def update_vault_transaction" not in write_service_text
+    assert "def delete_vault_transaction" not in write_service_text
+    assert "db.delete(" not in write_service_text
+    assert "session.delete(" not in write_service_text
+    assert "def update_vault_transaction" not in read_service_text
+    assert "def delete_vault_transaction" not in read_service_text
+
+    assert "patch 9g" in lowered_docs
+    assert "vault ledger is append-only" in lowered_docs
+    assert "transactions are immutable" in lowered_docs
+    assert "no put/patch/delete endpoints exist under `/api/imperium/vault/transactions`" in lowered_docs
+    assert "post /api/imperium/vault/transactions/{transaction_id}/reverse" in lowered_docs
+    assert "original transaction must never be updated or deleted" in lowered_docs
+    assert "reversal transaction is a new transaction linked to the original" in lowered_docs
+    assert "one reversal per original" in lowered_docs
+    assert "forbidden for the append-only ledger" in lowered_docs
+
+    assert "vault ledger is append-only" in lowered_schema_docs
+    assert "transactions are immutable" in lowered_schema_docs
+    assert "no put/patch/delete endpoint is allowed for `/api/imperium/vault/transactions`" in lowered_schema_docs
+    assert "corrections must be written by appending a reversal row through `post /api/imperium/vault/transactions/{transaction_id}/reverse`" in lowered_schema_docs
+    assert "the original transaction must never be updated or deleted" in lowered_schema_docs
+    assert "the reversal transaction is a new row linked to the original transaction" in lowered_schema_docs
+    assert "patch 9f/9g allow one and only one reversal per original transaction" in lowered_schema_docs
+    assert "`updated_at` remains a generic row timestamp" in lowered_schema_docs
+    assert "legacy direct edit route" in lowered_docs
