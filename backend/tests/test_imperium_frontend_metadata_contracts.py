@@ -59,6 +59,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
             "/api/imperium/contracts/index",
             "/api/imperium/contracts/compliance",
             "/api/imperium/frontend/navigation",
+            "/api/imperium/frontend/layout",
         )
     }
 
@@ -92,6 +93,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     contracts_index = client.get("/api/imperium/contracts/index").json()
     compliance = client.get("/api/imperium/contracts/compliance").json()
     navigation = client.get("/api/imperium/frontend/navigation").json()
+    layout = client.get("/api/imperium/frontend/layout").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -126,6 +128,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert all(endpoint["read_only"] is True or endpoint["read_only"] is False for group in contracts_index["groups"] for endpoint in group["endpoints"])
     assert all(check["status"] == "declared" for check in compliance["checks"])
     assert all(item["enabled"] is True for item in navigation["items"])
+    assert [region["key"] for region in layout["regions"]] == ["hero", "mission", "daily_plan", "path", "pulse", "vault"]
 
 
 def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_runtime_behavior() -> None:

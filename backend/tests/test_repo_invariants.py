@@ -2961,3 +2961,31 @@ def test_home_bootstrap_docs_define_metadata_only_and_status_available_not_healt
         assert "not a health check" in text
         assert "no business data read" in text
         assert "primary_endpoint" in text
+
+
+def test_frontend_layout_service_is_metadata_only_and_has_no_business_or_discovery_or_write_paths() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    service_text = service_path.read_text(encoding="utf-8")
+    service_lower = service_text.lower()
+    route_text = route_path.read_text(encoding="utf-8")
+
+    assert '@router.get("/frontend/layout"' in route_text
+    assert "CurrentUserDep" in route_text
+    assert "Idempotency-Key" not in route_text
+
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+
+    for forbidden in ("openapi", "scan", "dynamic discovery", "health", "n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "anthropic", "gemini", "claude"):
+        assert forbidden not in service_lower
+
+    for docs_text in (docs_contracts, docs_schema):
+        assert "/api/imperium/frontend/layout" in docs_text
+        assert "metadata only" in docs_text
+        assert "not a health check" in docs_text
+        assert "not a dynamic discovery" in docs_text
+        assert "not a dynamic theme" in docs_text

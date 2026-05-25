@@ -153,6 +153,7 @@ It contains four JWT-scoped, read-only, metadata-only contracts:
 - Contracts Index = index static of the main contracts
 - Contracts Compliance = declarative only, not a runtime audit
 - Frontend Navigation = static navigation configuration
+- Frontend Layout = static layout configuration
 
 Shared rules:
 - metadata only
@@ -171,12 +172,49 @@ Deterministic ordering rules:
 - Contracts Index groups order: `home`, `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
 - Contracts Compliance checks order: `metadata_only`, `not_openapi`, `not_health_check`, `no_business_data_read`, `no_dynamic_discovery`
 - Frontend Navigation items order: `home`, `dashboard`, `daily_plan`, `missions`, `vault`, `path`, `pulse`
+- Frontend Layout regions order: `hero`, `mission`, `daily_plan`, `path`, `pulse`, `vault`
 
 Contract notes:
 - `Home Bootstrap` is metadata only and not a runtime health check
 - `Contracts Index` is a static index of the main frontend-facing contracts
 - `Contracts Compliance` is declarative only and does not perform runtime audit
 - `Frontend Navigation` is static and deterministic, not a discovery mechanism
+- `Frontend Layout` is static and deterministic, not a dynamic theme and not a discovery mechanism
+
+### Imperium Frontend Layout Config V1
+
+`GET /api/imperium/frontend/layout`
+
+Purpose:
+- return frontend layout metadata only for Imperium V1 shell and regions
+- provide static deterministic V1 layout config
+- avoid dynamic theme behavior and dynamic discovery
+
+Rules:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- metadata only
+- no business data read
+- no writes
+- no auto-creation
+- not a dynamic theme
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module write
+- no user_id exposure
+- no secrets/providers/infra metadata
+
+Response contract:
+- `layout_version` is `v1`
+- `read_only` is always `true`
+- `shell` includes: `style`, `density`, `navigation_position`, `primary_surface`
+- deterministic `regions[]` ordered by `order`: `hero`, `mission`, `daily_plan`, `path`, `pulse`, `vault`
+- each `regions[]` element includes: `key`, `purpose`, `order`, `enabled`
+- `enabled` is always `true` in V1
+- `safe_explanation`
 
 ### Imperium Contracts Index V1
 
