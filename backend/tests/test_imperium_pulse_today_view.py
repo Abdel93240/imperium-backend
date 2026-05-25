@@ -72,15 +72,16 @@ def _entry(user_id, **overrides) -> ImperiumPulseEntry:
     )
 
 
-def test_pulse_today_returns_null_when_no_entry_exists() -> None:
+def test_pulse_today_default_date_uses_europe_paris_helper(monkeypatch) -> None:
     current_user = _user()
     db = FakeDb(scalar_results=[None])
+    monkeypatch.setattr(imperium_pulse, "get_default_local_date", lambda: date(2026, 5, 26))
 
     response = _client(db, current_user).get("/imperium/pulse/today")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["date"] == date.today().isoformat()
+    assert body["date"] == "2026-05-26"
     assert body["entry"] is None
     assert body["safe_explanation"] == "Pulse today entry for current user."
 

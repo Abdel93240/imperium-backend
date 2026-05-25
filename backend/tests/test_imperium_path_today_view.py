@@ -109,16 +109,17 @@ def _assert_check_in_body(body: dict, check_in: ImperiumPathCheckIn) -> None:
     assert "user_id" not in body
 
 
-def test_get_path_today_returns_pending_for_active_habits_without_check_ins() -> None:
+def test_get_path_today_default_date_uses_europe_paris_helper(monkeypatch) -> None:
     current_user = _user()
     habit = _habit(current_user.id)
     db = FakeDb(scalars_results=[[habit], []])
+    monkeypatch.setattr(imperium_path, "get_default_local_date", lambda: date(2026, 5, 26))
 
     response = _client(db, current_user).get("/imperium/path/today")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["date"] == date.today().isoformat()
+    assert body["date"] == "2026-05-26"
     assert body["count"] == 1
     assert body["safe_explanation"] == "Path today view for current user."
     assert body["items"][0]["status"] == "pending"

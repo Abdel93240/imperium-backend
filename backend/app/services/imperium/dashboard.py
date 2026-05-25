@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.dates import get_default_local_date
 from app.models.auth import User
 from app.models.imperium import (
     ImperiumDailyPlan,
@@ -59,7 +60,7 @@ def get_imperium_dashboard_foundation(
     currency: str = "EUR",
 ) -> ImperiumDashboardFoundationResponse:
     snapshot_generated_at = datetime.now(UTC)
-    snapshot_date = local_date or date.today()
+    snapshot_date = local_date or get_default_local_date()
     normalized_currency = currency.strip().upper()
 
     active_mission = get_current_active_mission(db, current_user=current_user)

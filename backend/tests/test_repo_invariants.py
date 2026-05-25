@@ -1943,42 +1943,27 @@ def test_patch_9k_alembic_head_includes_vault_local_date_timezone_migration() ->
     assert "op.create_index(" in migration_text
 
 
-def test_path_today_full_router_uses_canonical_path_route_before_legacy_item_route() -> None:
+def test_patch_12g_path_today_has_single_canonical_route() -> None:
     from fastapi import FastAPI
     from fastapi.routing import APIRoute
-    from starlette.routing import Match
 
     from app.api.v1.router import api_router
-    from app.api.v1.routes import imperium, imperium_path
+    from app.api.v1.routes import imperium_path
     from app.schemas.path import PathTodayResponse
 
     app = FastAPI()
     app.include_router(api_router, prefix="/api")
-    scope = {
-        "type": "http",
-        "method": "GET",
-        "path": "/api/imperium/path/today",
-        "root_path": "",
-        "headers": [],
-        "query_string": b"",
-    }
-    matching_routes = []
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
-        match, _ = route.matches(scope)
-        if match == Match.FULL:
-            matching_routes.append(route)
+    matching_routes = [
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path == "/api/imperium/path/today"
+        and "GET" in route.methods
+    ]
 
-    assert matching_routes
+    assert len(matching_routes) == 1
     assert matching_routes[0].endpoint is imperium_path.path_today_route
     assert matching_routes[0].response_model is PathTodayResponse
-
-    legacy_route_indexes = [
-        index for index, route in enumerate(matching_routes) if route.endpoint is imperium.path_today_route
-    ]
-    assert legacy_route_indexes
-    assert legacy_route_indexes[0] > 0
 
 
 def test_path_item_legacy_model_is_documented_as_deprecated_when_present() -> None:
@@ -1999,6 +1984,94 @@ def test_path_item_legacy_model_is_documented_as_deprecated_when_present() -> No
     assert "deprecated" in lowered_docs
     assert "must not mask" in lowered_docs
     assert "no automatic mission/vault linkage" in lowered_docs
+
+
+def test_patch_12g_default_today_uses_europe_paris_helper_for_dashboard_path_and_pulse() -> None:
+    helper_text = (BACKEND_ROOT / "app" / "core" / "dates.py").read_text(encoding="utf-8")
+    dashboard_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(encoding="utf-8")
+    path_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py").read_text(
+        encoding="utf-8"
+    )
+    pulse_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_pulse.py").read_text(
+        encoding="utf-8"
+    )
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+
+    assert 'DEFAULT_LOCAL_TIMEZONE = "Europe/Paris"' in helper_text
+    assert "datetime.now(ZoneInfo(DEFAULT_LOCAL_TIMEZONE)).date()" in helper_text
+
+    for text in (dashboard_text, path_route_text, pulse_route_text):
+        assert "get_default_local_date" in text
+        assert "date.today()" not in text
+
+    assert "default date convention is europe/paris" in contracts_text
+    assert "query `date` overrides the europe/paris default" in contracts_text
+
+
+def test_patch_12g_get_priorities_is_read_only_compatibility_projection() -> None:
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py").read_text(encoding="utf-8")
+    service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "decision_framework.py").read_text(
+        encoding="utf-8"
+    )
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    legacy_get_section = route_text.split('@router.get("/priorities"', maxsplit=1)[1].split(
+        '@router.post("/priorities"',
+        maxsplit=1,
+    )[0]
+    get_or_initialize_section = service_text.split("def get_or_initialize_user_priorities", maxsplit=1)[1].split(
+        "def get_user_priority_context",
+        maxsplit=1,
+    )[0]
+    canonical_read_section = service_text.split("def get_canonical_priority_order", maxsplit=1)[1].split(
+        "def _build_default_priorities",
+        maxsplit=1,
+    )[0]
+
+    assert "persist_defaults=True" not in legacy_get_section
+    assert "persist_defaults=True" not in get_or_initialize_section
+    assert "persist_defaults" not in canonical_read_section
+
+    for read_only_section in (legacy_get_section, get_or_initialize_section, canonical_read_section):
+        assert "db.add(" not in read_only_section
+        assert "db.add_all" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    assert "read-only compatibility projection" in contracts_text
+    assert "persistent initialization must use an explicit post" in contracts_text
+
+
+def test_patch_12g_dashboard_audit_notes_are_documented_and_no_forbidden_engines_added() -> None:
+    dashboard_route_text = (
+        BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_dashboard.py"
+    ).read_text(encoding="utf-8")
+    dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
+        encoding="utf-8"
+    )
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    lowered_code = "\n".join([dashboard_route_text, dashboard_service_text]).lower()
+
+    assert "three-letter currency codes are accepted and normalized uppercase" in contracts_text
+    assert "iso-4217 existence is not validated in v1" in contracts_text
+    assert "unknown or unused currency with no transaction returns zero totals" in contracts_text
+    assert "*_available means the section was wired and calculated successfully in the snapshot" in contracts_text
+    assert "not an external health check" in contracts_text
+    assert "not an availability score" in contracts_text
+
+    for forbidden in (
+        "qwenclient",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ocr",
+        "weighted_score",
+        "coaching",
+        "recommendation",
+    ):
+        assert forbidden not in lowered_code
 
 
 def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:

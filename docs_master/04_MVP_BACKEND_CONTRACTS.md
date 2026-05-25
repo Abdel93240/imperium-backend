@@ -340,10 +340,21 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/projects` | Create/update project | `project.changed` |
 | POST | `/api/imperium/projects/{project_id}/validate-completion` | Explicit project completion | `project.completion.validated` |
 | POST | `/api/imperium/routines` | Create/update routine | `routine.changed` |
+| GET | `/api/imperium/priorities` | Legacy read-only compatibility projection from Decision Framework priorities | none |
 | POST | `/api/imperium/priorities` | Legacy priority write disabled; use `/api/imperium/decision-framework/priorities` | none; returns `410 Gone` |
 | POST | `/api/imperium/weekly-review/start` | Start weekly review | `weekly.review.started` |
 | POST | `/api/imperium/weekly-review/{review_id}/answer` | Store review answer | `weekly.review.answered` |
 | POST | `/api/imperium/weekly-review/{review_id}/complete` | Complete after final validation | `weekly.review.completed` |
+
+#### Legacy Priorities Compatibility Projection
+
+`GET /api/imperium/priorities` is a read-only compatibility projection over
+Decision Framework priorities. If no active priority rows exist yet, it returns
+the deterministic V1 defaults as transient response data and does not persist
+them.
+
+Persistent initialization must use an explicit POST flow. Hidden writes from GET
+are forbidden: no `db.add`, no `flush`, and no `commit`.
 
 #### Imperium Dashboard Foundation 12B - consolidated read-only module snapshot
 
@@ -360,8 +371,13 @@ Purpose:
   scoring/coaching/recommendation layer, and not an orchestration workflow
 
 Query params:
-- `date` optional `date`; default is backend current date by repo convention
-- `currency` optional string; default `EUR`; must match `^[A-Za-z]{3}$`; response normalizes uppercase
+- `date` optional `date`; default date convention is Europe/Paris through the backend helper; query `date` overrides the Europe/Paris default
+- `currency` optional string; default `EUR`; must match `^[A-Za-z]{3}$`; three-letter currency codes are accepted and normalized uppercase
+
+Currency V1 notes:
+- ISO-4217 existence is not validated in V1.
+- Unknown or unused currency with no transaction returns zero totals.
+- This dashboard follows the Vault summary read contract; it observes ledger reality and does not create wallet or finance decisions.
 
 Response sections:
 - root `date`, normalized `currency`, and `safe_explanation`
@@ -416,6 +432,9 @@ Readiness is not a score.
 Readiness is not a recommendation.
 
 Readiness is not a health score.
+
+*_available means the section was wired and calculated successfully in the snapshot.
+It is not an external health check and not an availability score.
 
 This block contains only booleans and counts:
 
@@ -841,8 +860,9 @@ interpreted as implemented endpoints.
 Patch 10I routing decision:
 - The canonical Path V1 API module is `app/api/v1/routes/imperium_path.py`.
 - Canonical Path V1 endpoints live under `/api/imperium/path/...` and use the habit/check-in contracts below.
+- `imperium_path.py` is the canonical owner of `GET /api/imperium/path/today`.
 - Legacy Path item endpoints that still exist in `app/api/v1/routes/imperium.py` are deprecated for Path V1 and must not mask canonical Path V1 routes.
-- In particular, `GET /api/imperium/path/today` must resolve to the `imperium_path.py` handler returning `PathTodayResponse`, not the legacy list-shaped `ImperiumPathItem` response.
+- In particular, `GET /api/imperium/path/today` must resolve only to the `imperium_path.py` handler returning `PathTodayResponse`, not the legacy list-shaped `ImperiumPathItem` response.
 - If legacy Path item endpoints remain mounted for older Imperium workflows, they are compatibility surfaces only and must not introduce new Path V1 behavior.
 
 #### Path Foundation 10A - habits and check-ins
@@ -957,7 +977,7 @@ Implemented endpoint:
 | GET | `/api/imperium/path/today` | Read-only current-user Path day view with optional `date`, `domain`, and `frequency` filters | Not required; read-only |
 
 Contracts:
-- default `date` is the backend current date according to the repo convention
+- default `date` uses the backend Europe/Paris helper; query `date` overrides the Europe/Paris default
 - `domain` and `frequency` are optional filters
 - active habits only are returned
 - check-in lookup is done for the selected date only

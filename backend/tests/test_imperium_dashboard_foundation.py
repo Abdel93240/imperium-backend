@@ -10,6 +10,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
 from app.models.imperium import ImperiumMission, ImperiumPathCheckIn, ImperiumPathHabit, ImperiumPulseEntry
 from app.models.vault import ImperiumVaultTransaction
+from app.services.imperium import dashboard as dashboard_service
 
 
 class FakeDb:
@@ -308,6 +309,18 @@ def test_dashboard_date_query_param_is_propagated_to_path_and_pulse() -> None:
     assert body["path"]["items"][0]["check_in"]["check_date"] == "2026-05-24"
     assert body["pulse"]["date"] == "2026-05-24"
     assert body["pulse"]["entry"]["entry_date"] == "2026-05-24"
+
+
+def test_dashboard_default_date_uses_europe_paris_helper(monkeypatch) -> None:
+    monkeypatch.setattr(dashboard_service, "get_default_local_date", lambda: date(2026, 5, 26))
+
+    response = _client(_empty_dashboard_db(), _user()).get("/api/imperium/dashboard")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["date"] == "2026-05-26"
+    assert body["path"]["date"] == "2026-05-26"
+    assert body["pulse"]["date"] == "2026-05-26"
 
 
 def test_dashboard_currency_query_param_is_propagated_to_vault_and_normalized_uppercase() -> None:

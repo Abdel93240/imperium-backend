@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
+from app.core.dates import get_default_local_date
 from app.schemas.pulse import (
     PulseEntryCreate,
     PulseEntryListResponse,
@@ -36,7 +37,7 @@ def get_pulse_today_route(
     return get_pulse_today_entry(
         db,
         current_user=current_user,
-        local_date=query_date or date.today(),
+        local_date=query_date or get_default_local_date(),
     )
 
 

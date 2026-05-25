@@ -164,7 +164,6 @@ from app.services.imperium.path_items import (
     create_path_item,
     get_path_items_for_day,
     get_recent_path_items,
-    get_today_path_items,
     skip_path_item,
     start_path_item,
 )
@@ -690,16 +689,6 @@ def _transition_daily_plan_route(
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return result
-
-
-@router.get("/path/today", response_model=list[PathItemResponse])
-def path_today_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    timezone: str = "Europe/Paris",
-) -> list[PathItemResponse]:
-    items = get_today_path_items(db, current_user=current_user, timezone=timezone)
-    return [PathItemResponse.model_validate(item) for item in items]
 
 
 @router.get("/path/day", response_model=list[PathItemResponse])
@@ -1266,7 +1255,7 @@ def get_priorities_route(current_user: CurrentUserDep, db: SessionDep) -> Priori
     This route remains only as a compatibility projection for old clients.
     """
 
-    priorities = get_canonical_priority_order(db, current_user=current_user, persist_defaults=True)
+    priorities = get_canonical_priority_order(db, current_user=current_user)
     return PriorityRulesResponse(
         priorities=[
             PriorityRuleResponse(

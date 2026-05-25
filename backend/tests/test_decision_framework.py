@@ -87,7 +87,7 @@ def _priority(user_id, *, domain: str, position: int, active: bool = True) -> Im
     )
 
 
-def test_default_priorities_created_and_read_correctly() -> None:
+def test_default_priorities_returned_transient_without_persistence() -> None:
     db = FakeDb()
     current_user = _user()
 
@@ -97,8 +97,31 @@ def test_default_priorities_created_and_read_correctly() -> None:
     assert [item.domain for item in response.priorities] == ["religious", "business", "finance", "health"]
     assert [item.position for item in response.priorities] == [1, 2, 3, 4]
     assert all(item.is_active for item in response.priorities)
-    assert len([item for item in db.added if isinstance(item, ImperiumUserPriority)]) == 4
-    assert db.committed is True
+    assert all(item.id is not None for item in response.priorities)
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
+
+
+def test_legacy_priorities_get_route_returns_defaults_without_writing() -> None:
+    current_user = _user()
+    db = FakeDb()
+    app = FastAPI()
+    app.include_router(imperium.router, prefix="/imperium")
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    app.dependency_overrides[get_db] = lambda: db
+    client = TestClient(app)
+
+    response = client.get("/imperium/priorities")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "legacy_superseded"
+    assert body["legacy"] is True
+    assert [item["priority_key"] for item in body["priorities"]] == ["religious", "business", "finance", "health"]
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
 
 
 def test_existing_priorities_are_not_silently_overwritten() -> None:

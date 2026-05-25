@@ -6,6 +6,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
+from app.core.dates import get_default_local_date
 from app.schemas.path import (
     PathCheckInCreate,
     PathCheckInDetailResponse,
@@ -53,7 +54,7 @@ def path_today_route(
     return get_path_today_view(
         db,
         current_user=current_user,
-        local_date=query_date or date.today(),
+        local_date=query_date or get_default_local_date(),
         domain=domain.strip().lower() if domain else None,
         frequency=frequency.value if frequency else None,
     )

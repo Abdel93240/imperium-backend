@@ -8,7 +8,7 @@ from starlette.routing import Match
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
-from app.api.v1.routes import imperium_path
+from app.api.v1.routes import imperium, imperium_path
 from app.schemas.path import PathTodayResponse
 
 
@@ -73,7 +73,15 @@ def test_full_api_router_resolves_path_today_to_canonical_path_handler() -> None
     app = _app(db)
 
     route = _resolve_route(app, method="GET", path="/api/imperium/path/today")
+    matching_routes = [
+        candidate
+        for candidate in app.routes
+        if isinstance(candidate, APIRoute)
+        and candidate.path == "/api/imperium/path/today"
+        and "GET" in candidate.methods
+    ]
 
+    assert matching_routes == [route]
     assert route.endpoint is imperium_path.path_today_route
     assert route.response_model is PathTodayResponse
 
@@ -112,5 +120,19 @@ def test_full_api_router_resolves_static_and_parametric_path_routes_to_canonical
 
     for (method, path), endpoint in expected_routes.items():
         route = _resolve_route(app, method=method, path=path)
+
+        assert route.endpoint is endpoint
+
+
+def test_legacy_path_item_routes_except_today_remain_available() -> None:
+    app = _app()
+
+    expected_routes = {
+        ("GET", "/api/imperium/path/day?local_date=2026-05-25"): imperium.path_day_route,
+        ("GET", "/api/imperium/path/recent"): imperium.path_recent_route,
+    }
+
+    for (method, path), endpoint in expected_routes.items():
+        route = _resolve_route(app, method=method, path=path.split("?", maxsplit=1)[0])
 
         assert route.endpoint is endpoint

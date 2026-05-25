@@ -34,6 +34,11 @@ Path tracks religious obligations and surfaces them at the right time in the use
 
 The principle: **religious actions are sacred and personal**. The system never auto-marks them as done.
 
+Backend V1 routing note:
+- `app/api/v1/routes/imperium_path.py` is canonical for Path V1.
+- `GET /api/imperium/path/today` is owned by that module and returns `PathTodayResponse`.
+- Legacy `ImperiumPathItem` compatibility code is deprecated for Path V1 and must not define or mask `/path/today`.
+
 ---
 
 ## 3. The Five Path Domains

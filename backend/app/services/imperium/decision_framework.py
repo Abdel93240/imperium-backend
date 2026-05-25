@@ -2,6 +2,7 @@ import hashlib
 import json
 import unicodedata
 from datetime import UTC, date, datetime
+from uuid import NAMESPACE_URL, uuid5
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -153,7 +154,7 @@ def get_domain_coefficient(position: int) -> int:
 
 
 def get_or_initialize_user_priorities(db: Session, *, current_user: User) -> DecisionFrameworkPrioritiesResponse:
-    priorities = get_canonical_priority_order(db, current_user=current_user, persist_defaults=True)
+    priorities = get_canonical_priority_order(db, current_user=current_user)
     return _priorities_response(priorities, status="ok")
 
 
@@ -165,23 +166,16 @@ def get_canonical_priority_order(
     db: Session,
     *,
     current_user: User,
-    persist_defaults: bool = False,
 ) -> list[ImperiumUserPriority]:
     """Return the Decision Framework priority hierarchy in canonical order.
 
     `imperium_user_priorities` is the canonical read source. When no persisted
-    rows exist yet, callers can either receive the deterministic V1 default as a
-    transient context or persist that default for public read endpoints.
+    rows exist yet, callers receive the deterministic V1 default as transient
+    context. Persistent initialization must go through an explicit POST flow.
     """
 
     priorities = _get_active_user_priorities(db, current_user=current_user)
     if priorities:
-        return sorted(priorities, key=lambda item: item.position)
-    if persist_defaults:
-        priorities = _build_default_priorities(current_user=current_user)
-        db.add_all(priorities)
-        db.flush()
-        db.commit()
         return sorted(priorities, key=lambda item: item.position)
     return _build_default_priorities(current_user=current_user, transient=True)
 
@@ -194,7 +188,7 @@ def _build_default_priorities(
     now = datetime.now(UTC)
     return [
         ImperiumUserPriority(
-            id=None if transient else None,
+            id=_transient_priority_id(current_user=current_user, domain=domain) if transient else None,
             user_id=current_user.id,
             domain=domain,
             position=position,
@@ -205,6 +199,10 @@ def _build_default_priorities(
         )
         for position, domain in enumerate(DEFAULT_PRIORITY_ORDER, start=1)
     ]
+
+
+def _transient_priority_id(*, current_user: User, domain: str):
+    return uuid5(NAMESPACE_URL, f"imperium:user-priority:{current_user.id}:{domain}:v1-default")
 
 
 def replace_user_priorities(
