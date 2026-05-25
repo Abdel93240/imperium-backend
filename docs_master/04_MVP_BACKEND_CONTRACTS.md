@@ -116,6 +116,7 @@ Request semantics:
 Read-only semantics:
 - metadata only
 - no business data
+- no business data read
 - no health check
 - `status = available` means contract availability only, not runtime health
 - no AI
@@ -132,7 +133,7 @@ Response contract:
 - `read_only`
 - `modules[]` in deterministic order: `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
 - `modules[].status` always `available` in Patch 14A
-- `modules[].primary_endpoint` is the public primary read route for each module
+- `modules[].primary_endpoint` is metadata only and is the public primary read route for each module
 - `safe_explanation`
 
 Security/safety:

@@ -115,11 +115,14 @@ Events are the primary audit log.
 
 Home bootstrap contract note:
 - no business data
+- no business data read
 - `GET /api/imperium/home/bootstrap` is metadata only and reads no business entities
 - it performs no writes and no auto-creation
 - it is JWT-scoped (`CurrentUserDep`) but does not expose `user_id`
 - it is not a health check
 - `status = available` indicates contract availability only
+- `modules` order is deterministic: `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
+- `modules[].primary_endpoint` is metadata only and does not execute business reads
 - it does not call AI, n8n, OCR, scoring, coaching, or recommendation flows
 - it performs no cross-module write
 

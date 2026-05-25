@@ -2719,3 +2719,5 @@ def test_home_bootstrap_docs_define_metadata_only_and_status_available_not_healt
         assert "metadata only" in text
         assert "status available" in text
         assert "not a health check" in text
+        assert "no business data read" in text
+        assert "primary_endpoint" in text

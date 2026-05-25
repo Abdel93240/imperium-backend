@@ -80,6 +80,40 @@ def test_home_bootstrap_has_no_user_id_or_sensitive_infra_provider_metadata() ->
     assert "user_id" not in payload_text
     assert "provider" not in payload_text
     assert "host" not in payload_text
+    assert "secret" not in payload_text
+    assert "infra" not in payload_text
+    assert "database" not in payload_text
+    assert "postgres" not in payload_text
+    assert "pgvector" not in payload_text
+    assert "n8n" not in payload_text
+    assert "openai" not in payload_text
+    assert "anthropic" not in payload_text
+    assert "gemini" not in payload_text
+    assert "claude" not in payload_text
+
+
+def test_home_bootstrap_contains_no_business_payload_keys() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/home/bootstrap")
+    assert response.status_code == 200
+    payload_text = str(response.json()).lower()
+
+    for forbidden in (
+        "income",
+        "expense",
+        "transaction",
+        "balance",
+        "mission_title",
+        "mission_status",
+        "prayer",
+        "sadaqa",
+        "workout",
+        "calories",
+        "score",
+        "recommendation",
+        "coaching",
+        "health",
+    ):
+        assert forbidden not in payload_text
 
 
 def test_home_bootstrap_read_only_no_db_write() -> None:
