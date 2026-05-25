@@ -1688,3 +1688,76 @@ def test_path_today_view_10b_is_read_only_and_reports_pending_done_missed_only()
     assert "pending/done/missed" in lowered_docs
     assert "no ai/n8n/scoring/calendar" in lowered_docs
     assert "no automatic check-in creation" in lowered_docs
+
+
+def test_path_habit_detail_10d_is_read_only_user_scoped_and_no_ai_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "path.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+    detail_route = route_text.split('@router.get("/habits/{habit_id}"', maxsplit=1)[1].split(
+        '@router.post("/habits/{habit_id}/check-ins"',
+        maxsplit=1,
+    )[0]
+    detail_service = service_text.split("def get_path_habit_detail", maxsplit=1)[1].split(
+        "def create_path_check_in",
+        maxsplit=1,
+    )[0]
+    route_order = [
+        route_text.index('@router.get("/habits"'),
+        route_text.index('@router.get("/habits/{habit_id}"'),
+        route_text.index('@router.post("/habits/{habit_id}/check-ins"'),
+    ]
+
+    assert "response_model=PathHabitDetailResponse" in route_text
+    assert "current_user: CurrentUserDep" in detail_route
+    assert "Idempotency-Key" not in detail_route
+    assert "PathHabitNotFoundError" in detail_route
+    assert "Path habit not found." in detail_service
+    assert "_get_user_habit" in detail_service
+    assert "HABIT_DETAIL_SAFE_EXPLANATION" in detail_service
+    assert "PathHabitDetailResponse" in schema_text
+    assert route_order == sorted(route_order)
+
+    for read_only_section in (detail_route, detail_service):
+        assert "db.add(" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    for forbidden in (
+        "qwenclient",
+        "providers",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "automatic memory",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "discipline_score",
+        "weighted_score",
+        "scoring",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "get /api/imperium/path/habits/{habit_id}" in lowered_docs
+    assert "path habit detail 10d" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "404" in lowered_docs
+    assert "non-owned" in lowered_docs
+    assert "never creates a check-in" in lowered_docs

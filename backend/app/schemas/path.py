@@ -136,6 +136,11 @@ class PathHabitListResponse(BaseModel):
     safe_explanation: str
 
 
+class PathHabitDetailResponse(BaseModel):
+    habit: PathHabitRead
+    safe_explanation: str
+
+
 class PathCheckInListResponse(BaseModel):
     items: list[PathCheckInRead]
     count: int

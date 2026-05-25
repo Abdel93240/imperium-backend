@@ -17,6 +17,7 @@ from app.schemas.path import (
     PathCheckInListResponse,
     PathCheckInRead,
     PathHabitCreate,
+    PathHabitDetailResponse,
     PathHabitLifecycleResponse,
     PathHabitLifecycleSummary,
     PathHabitListResponse,
@@ -29,6 +30,7 @@ from app.schemas.path import (
 SAFE_EXPLANATION = "Path habits/check-ins for current user."
 TODAY_SAFE_EXPLANATION = "Path today view for current user."
 LIFECYCLE_SAFE_EXPLANATION = "Path habit lifecycle updated without deleting history."
+HABIT_DETAIL_SAFE_EXPLANATION = "Path habit detail for current user."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -115,6 +117,21 @@ def list_path_habits(
         limit=limit,
         offset=offset,
         safe_explanation=SAFE_EXPLANATION,
+    )
+
+
+def get_path_habit_detail(
+    db: Session,
+    *,
+    current_user: User,
+    habit_id: UUID,
+) -> PathHabitDetailResponse:
+    habit = _get_user_habit(db, current_user=current_user, habit_id=habit_id)
+    if habit is None:
+        raise PathHabitNotFoundError("Path habit not found.")
+    return PathHabitDetailResponse(
+        habit=PathHabitRead.model_validate(habit),
+        safe_explanation=HABIT_DETAIL_SAFE_EXPLANATION,
     )
 
 

@@ -563,6 +563,7 @@ Implemented endpoints:
 |---|---|---|---|
 | POST | `/api/imperium/path/habits` | Create a Path habit for the current user | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/habits` | List current-user habits, optionally filtered by `is_active` and `domain` | Not required; read-only |
+| GET | `/api/imperium/path/habits/{habit_id}` | Read one current-user Path habit detail by id | Not required; read-only |
 | GET | `/api/imperium/path/today` | Read-only Path day view for the current user, including active habits and same-day check-ins | Not required; read-only |
 | POST | `/api/imperium/path/habits/{habit_id}/check-ins` | Create one check-in for a current-user active habit | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/check-ins` | List current-user check-ins, optionally filtered by `habit_id`, `status`, `date_from`, `date_to` | Not required; read-only |
@@ -570,6 +571,7 @@ Implemented endpoints:
 Canonical route keys:
 - `POST /api/imperium/path/habits`
 - `GET /api/imperium/path/habits`
+- `GET /api/imperium/path/habits/{habit_id}`
 - `GET /api/imperium/path/today`
 - `POST /api/imperium/path/habits/{habit_id}/check-ins`
 - `GET /api/imperium/path/check-ins`
@@ -602,6 +604,32 @@ Contracts:
 - no automatic sadaqa calculation or Vault decision is triggered by these endpoints
 - no automatic check-in creation in `GET /api/imperium/path/today`
 - no AI/n8n/scoring/calendar in `GET /api/imperium/path/today`
+
+#### Path Habit Detail 10D - read-only habit detail by id
+
+Path Habit Detail 10D adds deterministic read access for one Path habit owned by the current user.
+
+Purpose:
+- read one habit detail by `habit_id` for the authenticated user
+- keep strict current-user ownership rules
+- preserve read-only behavior with no side effects
+
+Implemented endpoint:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| GET | `/api/imperium/path/habits/{habit_id}` | Read-only current-user Path habit detail by id | Not required; read-only |
+
+Contracts:
+- endpoint is JWT-scoped through `CurrentUserDep`
+- missing habit returns `404`
+- non-owned habit returns `404`
+- no `Idempotency-Key` required
+- endpoint is read-only: no `db.add`, `flush`, `commit`
+- endpoint never creates a check-in
+- endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar, or scoring
+- response is deterministic and uses safe public fields only
+- `safe_explanation` must be `Path habit detail for current user.`
 
 #### Path Today View 10B - read-only daily snapshot
 

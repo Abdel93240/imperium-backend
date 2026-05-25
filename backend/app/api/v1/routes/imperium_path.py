@@ -13,6 +13,7 @@ from app.schemas.path import (
     PathCheckInStatus,
     PathHabitFrequency,
     PathHabitCreate,
+    PathHabitDetailResponse,
     PathHabitLifecycleResponse,
     PathHabitListResponse,
     PathHabitRead,
@@ -26,6 +27,7 @@ from app.services.path.habits import (
     archive_path_habit,
     create_path_check_in,
     create_path_habit,
+    get_path_habit_detail,
     get_path_today_view,
     list_path_check_ins,
     list_path_habits,
@@ -83,6 +85,18 @@ def list_path_habits_route(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/habits/{habit_id}", response_model=PathHabitDetailResponse)
+def get_path_habit_detail_route(
+    habit_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> PathHabitDetailResponse:
+    try:
+        return get_path_habit_detail(db, current_user=current_user, habit_id=habit_id)
+    except PathHabitNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post("/habits/{habit_id}/check-ins", response_model=PathCheckInRead, status_code=status.HTTP_201_CREATED)
