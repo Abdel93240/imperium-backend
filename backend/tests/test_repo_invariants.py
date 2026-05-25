@@ -1514,6 +1514,64 @@ def test_patch_9k_alembic_head_includes_vault_local_date_timezone_migration() ->
     assert "op.create_index(" in migration_text
 
 
+def test_path_today_full_router_uses_canonical_path_route_before_legacy_item_route() -> None:
+    from fastapi import FastAPI
+    from fastapi.routing import APIRoute
+    from starlette.routing import Match
+
+    from app.api.v1.router import api_router
+    from app.api.v1.routes import imperium, imperium_path
+    from app.schemas.path import PathTodayResponse
+
+    app = FastAPI()
+    app.include_router(api_router, prefix="/api")
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/imperium/path/today",
+        "root_path": "",
+        "headers": [],
+        "query_string": b"",
+    }
+    matching_routes = []
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+        match, _ = route.matches(scope)
+        if match == Match.FULL:
+            matching_routes.append(route)
+
+    assert matching_routes
+    assert matching_routes[0].endpoint is imperium_path.path_today_route
+    assert matching_routes[0].response_model is PathTodayResponse
+
+    legacy_route_indexes = [
+        index for index, route in enumerate(matching_routes) if route.endpoint is imperium.path_today_route
+    ]
+    assert legacy_route_indexes
+    assert legacy_route_indexes[0] > 0
+
+
+def test_path_item_legacy_model_is_documented_as_deprecated_when_present() -> None:
+    model_text = (BACKEND_ROOT / "app" / "models" / "imperium.py").read_text(encoding="utf-8")
+    lowered_docs = "\n".join(
+        [
+            (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8"),
+            (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8"),
+        ]
+    ).lower()
+
+    if "class ImperiumPathItem" not in model_text:
+        return
+
+    assert "imperiumpathitem" in lowered_docs
+    assert "imperium_path_items" in lowered_docs
+    assert "legacy" in lowered_docs
+    assert "deprecated" in lowered_docs
+    assert "must not mask" in lowered_docs
+    assert "no automatic mission/vault linkage" in lowered_docs
+
+
 def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
     service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
@@ -1595,6 +1653,8 @@ def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflo
         "calendar replanning",
         "ocr",
         "mission/vault",
+        "mission",
+        "vault",
         "discipline_score",
         "weighted_score",
         "automatic scoring",
@@ -1680,8 +1740,10 @@ def test_path_today_view_10b_is_read_only_and_reports_pending_done_missed_only()
         "memory commit",
         "calendar",
         "replanning",
+        "ocr",
         "discipline_score",
         "weighted_score",
+        "mission",
         "mission_id",
         "vault",
     ):

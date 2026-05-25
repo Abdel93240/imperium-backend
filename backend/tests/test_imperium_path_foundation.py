@@ -544,14 +544,19 @@ def test_create_path_check_in_returns_404_for_non_owned_habit() -> None:
 def test_create_path_check_in_requires_reason_when_missed() -> None:
     current_user = _user()
     habit = _habit(current_user.id)
+    db = FakeDb(scalar_results=[None, habit])
 
-    response = _client(FakeDb(scalar_results=[None, habit]), current_user).post(
+    response = _client(db, current_user).post(
         f"/imperium/path/habits/{habit.id}/check-ins",
         headers={"Idempotency-Key": "path-check-in-missed"},
         json={"check_date": "2026-05-25", "status": "missed"},
     )
 
     assert response.status_code == 422
+    assert "reason is required when status is missed" in response.text
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
 
 
 def test_create_path_check_in_rejects_done_with_reason() -> None:
@@ -570,6 +575,38 @@ def test_create_path_check_in_rejects_done_with_reason() -> None:
     assert db.added == []
     assert db.flushed is False
     assert db.committed is False
+
+
+def test_create_path_check_in_rejects_invalid_reason_status_payloads_before_service() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id)
+    invalid_payloads = [
+        (
+            "path-check-in-invalid-done-reason",
+            {"check_date": "2026-05-25", "status": "done", "reason": "Traffic delay"},
+            "reason must be null when status is done",
+        ),
+        (
+            "path-check-in-invalid-missed-no-reason",
+            {"check_date": "2026-05-25", "status": "missed"},
+            "reason is required when status is missed",
+        ),
+    ]
+
+    for idempotency_key, payload, expected_error in invalid_payloads:
+        db = FakeDb(scalar_results=[None, habit])
+
+        response = _client(db, current_user).post(
+            f"/imperium/path/habits/{habit.id}/check-ins",
+            headers={"Idempotency-Key": idempotency_key},
+            json=payload,
+        )
+
+        assert response.status_code == 422
+        assert expected_error in response.text
+        assert db.added == []
+        assert db.flushed is False
+        assert db.committed is False
 
 
 def test_create_path_check_in_missed_with_reason_ok() -> None:
