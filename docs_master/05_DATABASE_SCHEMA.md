@@ -635,7 +635,7 @@ Audit/history:
 
 ## The Vault
 
-### `imperium_vault_transactions` - Patch 9A ledger foundation, Patch 9F reversals
+### `imperium_vault_transactions` - Patch 9A ledger foundation, Patch 9F reversals, Patch 9H audit readiness
 
 Purpose:
 - Stores a simple append-only Vault ledger for income and expense facts created through `/api/imperium/vault/transactions`.
@@ -709,6 +709,7 @@ API and ownership rules:
 - Reads are strictly current-user scoped and deterministic.
 - Reversals are append-only corrections: the original row is never updated or deleted.
 - A non-reversal original may have one and only one reversal in Patch 9F.
+- Public Vault read responses stay safe for audit review: they expose only the fields needed by the contract and do not persist AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, or memory state.
 
 Patch 9A exclusions:
 - no wallet/balance automation

@@ -383,7 +383,7 @@ def test_get_vault_monthly_summary_is_read_only_and_has_no_ai_n8n_or_persistent_
     schema_text = (BACKEND_ROOT / "app" / "schemas" / "imperium.py").read_text(encoding="utf-8")
     docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
     route_section = route_text.split('@router.get("/summary/monthly"', maxsplit=1)[1].split(
-        '@router.get("/summary/categories"',
+        '@router.get("/transactions"',
         maxsplit=1,
     )[0]
     schema_section = schema_text.split("class ImperiumVaultMonthlySummaryItem", maxsplit=1)[1].split(

@@ -37,6 +37,100 @@ from app.services.imperium.vault import (
 router = APIRouter()
 
 
+@router.get("/summary", response_model=ImperiumVaultSummaryResponse)
+def get_imperium_vault_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
+) -> ImperiumVaultSummaryResponse:
+    return get_vault_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+
+@router.get("/summary/categories", response_model=ImperiumVaultCategorySummaryResponse)
+def get_imperium_vault_category_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
+    transaction_type: Literal["income", "expense"] | None = None,
+) -> ImperiumVaultCategorySummaryResponse:
+    return get_vault_category_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+        transaction_type=transaction_type,
+    )
+
+
+@router.get("/summary/monthly", response_model=ImperiumVaultMonthlySummaryResponse)
+def get_imperium_vault_monthly_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")] = "EUR",
+) -> ImperiumVaultMonthlySummaryResponse:
+    return get_vault_monthly_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+
+@router.get("/transactions", response_model=ImperiumVaultTransactionListResponse)
+def list_imperium_vault_transactions_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    transaction_type: Literal["income", "expense"] | None = None,
+    category: Annotated[str | None, Query(max_length=80)] = None,
+    source: Annotated[str | None, Query(max_length=80)] = None,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+) -> ImperiumVaultTransactionListResponse:
+    return list_vault_transactions(
+        db,
+        current_user=current_user,
+        limit=limit,
+        offset=offset,
+        transaction_type=transaction_type,
+        category=category.strip() if category else None,
+        source=source.strip() if source else None,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+
+@router.get("/transactions/{transaction_id}", response_model=ImperiumVaultTransactionDetailResponse)
+def get_imperium_vault_transaction_detail_route(
+    transaction_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> ImperiumVaultTransactionDetailResponse:
+    result = get_vault_transaction_detail(
+        db,
+        current_user=current_user,
+        transaction_id=transaction_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vault transaction not found.")
+    return result
+
+
 @router.post(
     "/transactions",
     response_model=ImperiumVaultTransactionRead,
@@ -121,97 +215,3 @@ def reverse_imperium_vault_transaction_route(
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return result
-
-
-@router.get("/transactions", response_model=ImperiumVaultTransactionListResponse)
-def list_imperium_vault_transactions_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    transaction_type: Literal["income", "expense"] | None = None,
-    category: Annotated[str | None, Query(max_length=80)] = None,
-    source: Annotated[str | None, Query(max_length=80)] = None,
-    occurred_from: datetime | None = None,
-    occurred_to: datetime | None = None,
-) -> ImperiumVaultTransactionListResponse:
-    return list_vault_transactions(
-        db,
-        current_user=current_user,
-        limit=limit,
-        offset=offset,
-        transaction_type=transaction_type,
-        category=category.strip() if category else None,
-        source=source.strip() if source else None,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-    )
-
-
-@router.get("/transactions/{transaction_id}", response_model=ImperiumVaultTransactionDetailResponse)
-def get_imperium_vault_transaction_detail_route(
-    transaction_id: UUID,
-    current_user: CurrentUserDep,
-    db: SessionDep,
-) -> ImperiumVaultTransactionDetailResponse:
-    result = get_vault_transaction_detail(
-        db,
-        current_user=current_user,
-        transaction_id=transaction_id,
-    )
-    if result is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vault transaction not found.")
-    return result
-
-
-@router.get("/summary", response_model=ImperiumVaultSummaryResponse)
-def get_imperium_vault_summary_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    occurred_from: datetime | None = None,
-    occurred_to: datetime | None = None,
-    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
-) -> ImperiumVaultSummaryResponse:
-    return get_vault_summary(
-        db,
-        current_user=current_user,
-        currency=currency,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-    )
-
-
-@router.get("/summary/monthly", response_model=ImperiumVaultMonthlySummaryResponse)
-def get_imperium_vault_monthly_summary_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    occurred_from: datetime | None = None,
-    occurred_to: datetime | None = None,
-    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")] = "EUR",
-) -> ImperiumVaultMonthlySummaryResponse:
-    return get_vault_monthly_summary(
-        db,
-        current_user=current_user,
-        currency=currency,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-    )
-
-
-@router.get("/summary/categories", response_model=ImperiumVaultCategorySummaryResponse)
-def get_imperium_vault_category_summary_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    occurred_from: datetime | None = None,
-    occurred_to: datetime | None = None,
-    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
-    transaction_type: Literal["income", "expense"] | None = None,
-) -> ImperiumVaultCategorySummaryResponse:
-    return get_vault_category_summary(
-        db,
-        current_user=current_user,
-        currency=currency,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-        transaction_type=transaction_type,
-    )

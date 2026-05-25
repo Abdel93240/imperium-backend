@@ -471,6 +471,28 @@ Patch 9G scope:
 - Patch 9F/9G allow one and only one reversal per original transaction.
 - This patch does not add any AI, n8n, OCR, sadaqa, wallet, balance, pgvector, memory, or calendar side effects.
 
+#### Vault 9H Contract Consolidation
+
+Patch 9H does not add new behavior. It consolidates the Vault contract so audit review can verify the final surface in one place.
+
+| method | endpoint | scope | idempotency | mode | safe public response | principal errors | forbidden side effects |
+|---|---|---|---|---|---|---|---|
+| POST | `/api/imperium/vault/transactions` | `CurrentUserDep`, current-user scoped | Required | append-only write | `transaction`, `event_id`, `idempotency_key`, `status` | `400`, `409`, `422` | No AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| GET | `/api/imperium/vault/transactions` | `CurrentUserDep`, current-user scoped | Not required | read-only | `items`, `count`, `limit`, `offset`, `safe_explanation` | `200`, `422` | No `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| GET | `/api/imperium/vault/transactions/{transaction_id}` | `CurrentUserDep`, current-user scoped | Not required | read-only | `transaction`, `safe_explanation` | `200`, `404` | No `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| POST | `/api/imperium/vault/transactions/{transaction_id}/reverse` | `CurrentUserDep`, current-user scoped | Required | append-only correction write | `transaction`, `reversal_summary` | `201`, `400`, `404`, `409`, `422` | No update/delete of the original row; no AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| GET | `/api/imperium/vault/summary` | `CurrentUserDep`, current-user scoped | Not required | read-only | `currency`, totals, counts, `safe_explanation` | `200`, `422` | No `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| GET | `/api/imperium/vault/summary/categories` | `CurrentUserDep`, current-user scoped | Not required | read-only | `currency`, `items`, `count`, `safe_explanation` | `200`, `422` | No `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+| GET | `/api/imperium/vault/summary/monthly` | `CurrentUserDep`, current-user scoped | Not required | read-only | `currency`, `items`, `count`, `safe_explanation` | `200`, `422` | No `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, OCR, sadaqa, or wallet persistence. |
+
+Audit-ready invariants:
+- The Vault ledger is append-only.
+- Vault transactions are immutable after insert.
+- The only correction path is `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- No PUT/PATCH/DELETE endpoint exists under `/api/imperium/vault/transactions`.
+- All Vault endpoints are scoped through `CurrentUserDep`.
+- None of the Vault 9H routes persist AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, or memory state.
+
 ### Vector
 
 | method | endpoint | purpose | emitted event |

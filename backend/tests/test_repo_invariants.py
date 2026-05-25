@@ -824,7 +824,10 @@ def test_patch_9a_vault_ledger_routes_have_no_ai_n8n_or_memory_side_effects() ->
         "def _get_existing_idempotency",
         maxsplit=1,
     )[0]
-    get_route_section = route_text.split('@router.get("/transactions"', maxsplit=1)[1]
+    get_route_section = route_text.split('@router.get("/transactions"', maxsplit=1)[1].split(
+        '@router.get("/transactions/{transaction_id}"',
+        maxsplit=1,
+    )[0]
     combined = "\n".join([route_text, service_text, create_schema_section, migration_text])
     lowered = combined.lower()
 
@@ -867,7 +870,10 @@ def test_patch_9b_vault_summary_route_is_read_only_and_has_no_ai_n8n_or_persiste
     route_text = route_path.read_text(encoding="utf-8")
     service_text = service_path.read_text(encoding="utf-8")
     schema_text = schema_path.read_text(encoding="utf-8")
-    summary_route_section = route_text.split('@router.get("/summary"', maxsplit=1)[1]
+    summary_route_section = route_text.split('@router.get("/summary"', maxsplit=1)[1].split(
+        '@router.get("/summary/categories"',
+        maxsplit=1,
+    )[0]
     summary_schema_section = schema_text.split("class ImperiumVaultSummaryResponse", maxsplit=1)[1].split(
         "class MissionDecisionScoreRead",
         maxsplit=1,
@@ -909,7 +915,10 @@ def test_patch_9c_vault_category_summary_route_is_read_only_and_has_no_ai_n8n_or
     service_text = service_path.read_text(encoding="utf-8")
     schema_text = schema_path.read_text(encoding="utf-8")
     docs_text = docs_path.read_text(encoding="utf-8")
-    route_section = route_text.split('@router.get("/summary/categories"', maxsplit=1)[1]
+    route_section = route_text.split('@router.get("/summary/categories"', maxsplit=1)[1].split(
+        '@router.get("/summary/monthly"',
+        maxsplit=1,
+    )[0]
     schema_section = schema_text.split("class ImperiumVaultCategorySummaryItem", maxsplit=1)[1].split(
         "class MissionDecisionScoreRead",
         maxsplit=1,
@@ -960,7 +969,7 @@ def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_
     schema_text = schema_path.read_text(encoding="utf-8")
     docs_text = docs_path.read_text(encoding="utf-8")
     route_section = route_text.split('@router.get("/summary/monthly"', maxsplit=1)[1].split(
-        '@router.get("/summary/categories"',
+        '@router.get("/transactions"',
         maxsplit=1,
     )[0]
     schema_section = schema_text.split("class ImperiumVaultMonthlySummaryItem", maxsplit=1)[1].split(
@@ -1269,7 +1278,7 @@ def test_patch_9e_vault_transaction_detail_route_is_read_only_and_user_scoped() 
     schema_text = schema_path.read_text(encoding="utf-8")
     docs_text = docs_path.read_text(encoding="utf-8")
     route_section = route_text.split('@router.get("/transactions/{transaction_id}"', maxsplit=1)[1].split(
-        '@router.get("/summary"',
+        '@router.post(\n    "/transactions"',
         maxsplit=1,
     )[0]
     service_section = service_text.split("def get_vault_transaction_detail", maxsplit=1)[1].split(
@@ -1436,3 +1445,57 @@ def test_patch_9g_vault_transaction_immutability_contract_is_preserved() -> None
     assert "patch 9f/9g allow one and only one reversal per original transaction" in lowered_schema_docs
     assert "`updated_at` remains a generic row timestamp" in lowered_schema_docs
     assert "legacy direct edit route" in lowered_docs
+
+
+def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    schema_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    lowered_code = "\n".join([route_text, service_text]).lower()
+    lowered_docs = "\n".join([contracts_text, schema_text]).lower()
+
+    for endpoint in (
+        "/summary",
+        "/summary/categories",
+        "/summary/monthly",
+        "/transactions",
+        "/transactions/{transaction_id}",
+        "/transactions/{transaction_id}/reverse",
+    ):
+        assert endpoint in route_text
+
+    assert '@router.put("/transactions"' not in route_text
+    assert '@router.patch("/transactions"' not in route_text
+    assert '@router.delete("/transactions"' not in route_text
+
+    assert "Idempotency-Key" in route_text
+    assert "CurrentUserDep" in route_text
+    assert "append-only" in lowered_docs
+    assert "immutable once inserted" in lowered_docs
+    assert "the vault ledger is append-only" in lowered_docs
+    assert "transactions are immutable after insert" in lowered_docs
+    assert "all vault endpoints are scoped through `currentuserdep`" in lowered_docs
+
+    for forbidden in (
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "ai agent",
+        "aiagent",
+        "n8n_client",
+        "trigger_n8n",
+        "pgvector",
+        "embedding",
+        "memory commit",
+        "calendar replanning",
+        "ocr",
+        "sadaqa",
+        "wallet persistence",
+    ):
+        assert forbidden not in lowered_code
