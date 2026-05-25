@@ -762,6 +762,21 @@ class MissionDecisionScorePublicSummary(PublicDecisionScoreSummary):
     pass
 
 
+class ImperiumVaultSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str
+    occurred_from: datetime | None
+    occurred_to: datetime | None
+    total_income_cents: int
+    total_expense_cents: int
+    net_cents: int
+    transaction_count: int
+    income_count: int
+    expense_count: int
+    safe_explanation: str = "Vault summary computed from current user's ledger transactions."
+
+
 class MissionDecisionScoreRead(BaseModel):
     mission_id: UUID
     status: MissionStatus

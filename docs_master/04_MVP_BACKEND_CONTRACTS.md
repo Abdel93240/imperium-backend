@@ -351,6 +351,7 @@ canonical for Imperium mission behavior.
 |---|---|---|---|
 | POST | `/api/imperium/vault/transactions` | Patch 9A append-only income/expense ledger create; JWT scoped; requires `Idempotency-Key`; no AI/n8n/pgvector/memory/calendar side effect | none in Patch 9A |
 | GET | `/api/imperium/vault/transactions` | Patch 9A current-user ledger read with deterministic filters and sorting; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
 | PATCH | `/api/vault/transactions/{transaction_id}` | Edit transaction | `transaction.updated` |
@@ -383,11 +384,25 @@ calculate strategy or trigger downstream automation.
 - Sorts deterministically by `occurred_at desc`, `created_at desc`, then `id desc`.
 - Is read-only: no `db.add`, `flush`, `commit`, event creation, or workflow trigger.
 
+`GET /api/imperium/vault/summary`:
+- Requires authenticated current-user scope.
+- Does not require `Idempotency-Key`.
+- Returns only the current user's ledger transactions.
+- Supports filters: `currency`, `occurred_from`, and `occurred_to`.
+- Computes `total_income_cents`, `total_expense_cents`, `net_cents`, `transaction_count`, `income_count`, and `expense_count` at request time.
+- Is read-only: no `db.add`, `flush`, `commit`, wallet persistence, balance persistence, AI, n8n, OCR, sadaqa, pgvector, memory, or calendar side effects.
+- Returns zeros for all totals and counts when there are no matching transactions.
+
 Patch 9A scope:
 - Stores only `income` or `expense` rows in `imperium_vault_transactions`.
 - Amount is stored as positive integer `amount_cents`; currency defaults to uppercase `EUR`.
 - Public responses never accept or expose client-controlled `user_id`.
 - `POST` is idempotent by current user and `Idempotency-Key`: same key plus same payload returns the original public response; same key plus different payload returns conflict.
+
+Patch 9B scope:
+- Adds a read-only summary endpoint for current-user vault ledger facts.
+- The summary is computed from database transactions at request time and is not persisted.
+- No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the summary read path.
 - `GET` supports `limit`, `offset`, `transaction_type`, `category`, `source`, `occurred_from`, and `occurred_to`, sorted by `occurred_at desc`, `created_at desc`, and `id`.
 - No balance, wallet automation, sadaqa, OCR ticket flow, AI analysis, n8n workflow, n8n AI Agent, n8n DB write, pgvector write, embedding, memory commit, automatic replanning, calendar replanning, financial scoring, or internal coefficient is part of this patch.
 

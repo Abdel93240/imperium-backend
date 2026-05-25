@@ -860,6 +860,46 @@ def test_patch_9a_vault_ledger_routes_have_no_ai_n8n_or_memory_side_effects() ->
     assert "replanning" not in lowered
 
 
+def test_patch_9b_vault_summary_route_is_read_only_and_has_no_ai_n8n_or_persistent_wallet_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    summary_route_section = route_text.split('@router.get("/summary"', maxsplit=1)[1]
+    summary_schema_section = schema_text.split("class ImperiumVaultSummaryResponse", maxsplit=1)[1].split(
+        "class MissionDecisionScoreRead",
+        maxsplit=1,
+    )[0]
+    lowered = "\n".join([route_text, service_text, summary_schema_section]).lower()
+
+    assert "class ImperiumVaultSummaryResponse" in schema_text
+    assert "extra=\"forbid\"" in schema_text
+    assert "safe_explanation: str = \"Vault summary computed from current user's ledger transactions.\"" in schema_text
+    assert "get_vault_summary(" in service_text
+    assert "ImperiumVaultTransaction" in service_text
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+    assert "Idempotency-Key" not in summary_route_section
+    assert "current_user: CurrentUserDep" in summary_route_section
+    assert "currency" in summary_route_section
+    assert "occurred_from" in summary_route_section
+    assert "occurred_to" in summary_route_section
+    assert "QwenClient" not in lowered
+    assert "n8n_client" not in lowered
+    assert "trigger_n8n" not in lowered
+    assert "pgvector" not in lowered
+    assert "embedding" not in lowered
+    assert "memory" not in lowered
+    assert "calendar" not in lowered
+    assert "ocr" not in lowered
+    assert "sadaqa" not in lowered
+    assert "wallet" not in lowered
+    assert "balance" not in lowered
+
+
 def test_backlog_path_has_no_ai_provider_imports() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"

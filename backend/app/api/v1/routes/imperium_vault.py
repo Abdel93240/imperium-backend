@@ -5,6 +5,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, 
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
+from app.schemas.imperium import ImperiumVaultSummaryResponse
 from app.schemas.vault import (
     ImperiumVaultTransactionCreate,
     ImperiumVaultTransactionListResponse,
@@ -15,6 +16,7 @@ from app.services.imperium.vault_transactions import (
     create_vault_transaction,
     list_vault_transactions,
 )
+from app.services.imperium.vault import get_vault_summary
 
 router = APIRouter()
 
@@ -79,6 +81,23 @@ def list_imperium_vault_transactions_route(
         transaction_type=transaction_type,
         category=category.strip() if category else None,
         source=source.strip() if source else None,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+
+@router.get("/summary", response_model=ImperiumVaultSummaryResponse)
+def get_imperium_vault_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
+) -> ImperiumVaultSummaryResponse:
+    return get_vault_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
     )
