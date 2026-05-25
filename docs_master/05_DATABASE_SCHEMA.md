@@ -1573,6 +1573,8 @@ Audit/history:
 - no automatic mission/vault linkage
 - no automatic replanning
 - no automatic scoring
+- Path remains deterministic and read-only on GET endpoints
+- no automatic check-in creation
 
 ### `prayer_logs`
 

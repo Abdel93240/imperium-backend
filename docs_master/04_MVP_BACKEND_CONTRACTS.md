@@ -561,24 +561,33 @@ Implemented endpoints:
 
 | method | endpoint | purpose | idempotency |
 |---|---|---|---|
+| GET | `/api/imperium/path/today` | Read-only Path day view for the current user, including active habits and same-day check-ins | Not required; read-only |
+| GET | `/api/imperium/path/stats/summary` | Read-only Path stats summary for the current user | Not required; read-only |
 | POST | `/api/imperium/path/habits` | Create a Path habit for the current user | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/habits` | List current-user habits, optionally filtered by `is_active` and `domain` | Not required; read-only |
 | GET | `/api/imperium/path/habits/{habit_id}` | Read one current-user Path habit detail by id | Not required; read-only |
-| GET | `/api/imperium/path/today` | Read-only Path day view for the current user, including active habits and same-day check-ins | Not required; read-only |
+| POST | `/api/imperium/path/habits/{habit_id}/archive` | Archive one current-user habit without deleting history | Required `Idempotency-Key` |
+| POST | `/api/imperium/path/habits/{habit_id}/reactivate` | Reactivate one current-user habit without deleting history | Required `Idempotency-Key` |
 | POST | `/api/imperium/path/habits/{habit_id}/check-ins` | Create one check-in for a current-user active habit | Required `Idempotency-Key` |
 | GET | `/api/imperium/path/check-ins` | List current-user check-ins, optionally filtered by `habit_id`, `status`, `date_from`, `date_to` | Not required; read-only |
 | GET | `/api/imperium/path/check-ins/{check_in_id}` | Read one current-user Path check-in detail by id | Not required; read-only |
 
 Canonical route keys:
+- `GET /api/imperium/path/today`
+- `GET /api/imperium/path/stats/summary`
 - `POST /api/imperium/path/habits`
 - `GET /api/imperium/path/habits`
 - `GET /api/imperium/path/habits/{habit_id}`
-- `GET /api/imperium/path/today`
+- `POST /api/imperium/path/habits/{habit_id}/archive`
+- `POST /api/imperium/path/habits/{habit_id}/reactivate`
 - `POST /api/imperium/path/habits/{habit_id}/check-ins`
 - `GET /api/imperium/path/check-ins`
 - `GET /api/imperium/path/check-ins/{check_in_id}`
 
 Contracts:
+- all endpoints are JWT-scoped through `CurrentUserDep`
+- all GET endpoints are read-only and do not require `Idempotency-Key`
+- all POST endpoints require `Idempotency-Key`
 - habit create payload accepts `title`, `description`, `domain`, and `frequency`; client-provided `user_id` is forbidden
 - blank habit `title` is rejected
 - supported habit `frequency`: `daily`, `weekly`
@@ -589,14 +598,15 @@ Contracts:
 - `GET /api/imperium/path/today` is read-only, user-scoped, and returns active habits with same-day check-in status only
 - `GET /api/imperium/path/today` returns `pending` when no check-in exists, `done` when a `done` check-in exists, and `missed` when a `missed` check-in exists
 - `GET /api/imperium/path/today` never creates a check-in automatically
+- `GET /api/imperium/path/stats/summary` counts only existing `done` and `missed` check-ins
 - check-ins for non-owned habits return 404
 - check-ins for inactive habits return 409
 - duplicate `habit_id` plus `check_date` with another idempotency key returns 409
 - repeating the same `Idempotency-Key` with the same payload returns the original result
 - repeating the same `Idempotency-Key` with a different payload returns 409
 
-10A boundaries:
-- no AI/n8n/scoring/calendar in 10A
+Audit readiness boundaries:
+- no AI/n8n/scoring/calendar in Path
 - no pgvector write
 - no embeddings
 - no automatic memory commit
@@ -719,6 +729,7 @@ Contracts:
 - the endpoint is read-only: no `db.add`, `flush`, or `commit`
 - the endpoint never creates a check-in automatically
 - the endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar replanning, or scoring
+- the endpoint never links Mission or Vault automatically
 - `safe_explanation` must be `Path summary stats computed from current user's habits and check-ins.`
 
 10F boundaries:

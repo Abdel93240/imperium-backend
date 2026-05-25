@@ -1544,7 +1544,7 @@ def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflo
         maxsplit=1,
     )[0]
     habit_get_route = route_text.split('@router.get("/habits"', maxsplit=1)[1].split(
-        '@router.post("/habits/{habit_id}/check-ins"',
+        '@router.post("/habits/{habit_id}/archive"',
         maxsplit=1,
     )[0]
     check_ins_get_route = route_text.split('@router.get("/check-ins"', maxsplit=1)[1].split(
@@ -1592,8 +1592,12 @@ def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflo
         "memory commit",
         "calendar",
         "replanning",
+        "calendar replanning",
+        "ocr",
+        "mission/vault",
         "discipline_score",
         "weighted_score",
+        "automatic scoring",
     ):
         assert forbidden not in lowered_code
 
@@ -1610,6 +1614,7 @@ def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflo
     assert "no automatic mission/vault linkage" in lowered_docs
     assert "no automatic replanning" in lowered_docs
     assert "no automatic scoring" in lowered_docs
+    assert "no automatic check-in creation" in lowered_docs
 
 
 def test_path_today_view_10b_is_read_only_and_reports_pending_done_missed_only() -> None:
@@ -1622,7 +1627,7 @@ def test_path_today_view_10b_is_read_only_and_reports_pending_done_missed_only()
     schema_text = schema_path.read_text(encoding="utf-8")
     contracts_text = contracts_path.read_text(encoding="utf-8")
     today_route = route_text.split('@router.get("/today"', maxsplit=1)[1].split(
-        "def _require_idempotency_key",
+        '@router.get("/stats/summary"',
         maxsplit=1,
     )[0]
     today_service = service_text.split("def get_path_today_view", maxsplit=1)[1].split(
@@ -1702,7 +1707,7 @@ def test_path_habit_detail_10d_is_read_only_user_scoped_and_no_ai_side_effects()
     lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
     lowered_docs = contracts_text.lower()
     detail_route = route_text.split('@router.get("/habits/{habit_id}"', maxsplit=1)[1].split(
-        '@router.post("/habits/{habit_id}/check-ins"',
+        '@router.post("/habits/{habit_id}/archive"',
         maxsplit=1,
     )[0]
     detail_service = service_text.split("def get_path_habit_detail", maxsplit=1)[1].split(
@@ -1712,7 +1717,7 @@ def test_path_habit_detail_10d_is_read_only_user_scoped_and_no_ai_side_effects()
     route_order = [
         route_text.index('@router.get("/habits"'),
         route_text.index('@router.get("/habits/{habit_id}"'),
-        route_text.index('@router.post("/habits/{habit_id}/check-ins"'),
+        route_text.index('@router.post("/habits/{habit_id}/archive"'),
     ]
 
     assert "response_model=PathHabitDetailResponse" in route_text
@@ -1775,19 +1780,13 @@ def test_path_check_in_detail_10e_is_read_only_user_scoped_and_no_ai_side_effect
     lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
     lowered_docs = contracts_text.lower()
     detail_route = route_text.split('@router.get("/check-ins/{check_in_id}"', maxsplit=1)[1].split(
-        '@router.get("/today"',
+        "def _require_idempotency_key",
         maxsplit=1,
     )[0]
     detail_service = service_text.split("def get_path_check_in_detail", maxsplit=1)[1].split(
         "def get_path_today_view",
         maxsplit=1,
     )[0]
-    route_order = [
-        route_text.index('@router.get("/check-ins"'),
-        route_text.index('@router.get("/check-ins/{check_in_id}"'),
-        route_text.index('@router.get("/today"'),
-    ]
-
     assert "response_model=PathCheckInDetailResponse" in route_text
     assert "current_user: CurrentUserDep" in detail_route
     assert "Idempotency-Key" not in detail_route
@@ -1797,7 +1796,8 @@ def test_path_check_in_detail_10e_is_read_only_user_scoped_and_no_ai_side_effect
     assert "ImperiumPathCheckIn.user_id == current_user.id" in detail_service
     assert "CHECK_IN_DETAIL_SAFE_EXPLANATION" in detail_service
     assert "PathCheckInDetailResponse" in schema_text
-    assert route_order == sorted(route_order)
+    assert route_text.index('@router.get("/today"') < route_text.index('@router.get("/check-ins"')
+    assert route_text.index('@router.get("/check-ins"') < route_text.index('@router.get("/check-ins/{check_in_id}"')
 
     for read_only_section in (detail_route, detail_service):
         assert "db.add(" not in read_only_section
@@ -1849,7 +1849,7 @@ def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existi
     lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
     lowered_docs = contracts_text.lower()
     summary_route = route_text.split('@router.get("/stats/summary"', maxsplit=1)[1].split(
-        '@router.get("/today"',
+        '@router.post("/habits"',
         maxsplit=1,
     )[0]
     summary_service = service_text.split("def get_path_stats_summary", maxsplit=1)[1].split(
@@ -1857,7 +1857,7 @@ def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existi
         maxsplit=1,
     )[0]
 
-    assert route_text.index('@router.get("/stats/summary"') < route_text.index('@router.get("/today"')
+    assert route_text.index('@router.get("/today"') < route_text.index('@router.get("/stats/summary"')
     assert "response_model=PathStatsSummaryResponse" in route_text
     assert "current_user: CurrentUserDep" in summary_route
     assert "Idempotency-Key" not in summary_route
@@ -1906,9 +1906,13 @@ def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existi
         "memory commit",
         "calendar",
         "replanning",
+        "calendar replanning",
+        "ocr",
+        "mission/vault",
         "discipline_score",
         "weighted_score",
         "scoring",
+        "automatic scoring",
         "mission",
         "vault",
     ):
@@ -1923,5 +1927,7 @@ def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existi
     assert "no pgvector write" in lowered_docs
     assert "no embeddings" in lowered_docs
     assert "no automatic memory commit" in lowered_docs
+    assert "no automatic mission/vault linkage" in lowered_docs
+    assert "no automatic check-in creation" in lowered_docs
     assert "no automatic replanning" in lowered_docs
     assert "no automatic scoring" in lowered_docs

@@ -42,6 +42,47 @@ from app.services.path.habits import (
 router = APIRouter()
 
 
+@router.get("/today", response_model=PathTodayResponse)
+def path_today_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    query_date: date | None = Query(default=None, alias="date"),
+    domain: Annotated[str | None, Query(max_length=80)] = None,
+    frequency: PathHabitFrequency | None = None,
+) -> PathTodayResponse:
+    return get_path_today_view(
+        db,
+        current_user=current_user,
+        local_date=query_date or date.today(),
+        domain=domain.strip().lower() if domain else None,
+        frequency=frequency.value if frequency else None,
+    )
+
+
+@router.get("/stats/summary", response_model=PathStatsSummaryResponse)
+def get_path_stats_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    domain: Annotated[str | None, Query(max_length=80)] = None,
+    frequency: PathHabitFrequency | None = None,
+) -> PathStatsSummaryResponse:
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from must be before or equal to date_to.",
+        )
+    return get_path_stats_summary(
+        db,
+        current_user=current_user,
+        date_from=date_from,
+        date_to=date_to,
+        domain=domain.strip().lower() if domain else None,
+        frequency=frequency.value if frequency else None,
+    )
+
+
 @router.post("/habits", response_model=PathHabitRead, status_code=status.HTTP_201_CREATED)
 def create_path_habit_route(
     payload: PathHabitCreate,
@@ -102,45 +143,6 @@ def get_path_habit_detail_route(
         return get_path_habit_detail(db, current_user=current_user, habit_id=habit_id)
     except PathHabitNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-
-@router.post("/habits/{habit_id}/check-ins", response_model=PathCheckInRead, status_code=status.HTTP_201_CREATED)
-def create_path_check_in_route(
-    habit_id: UUID,
-    payload: PathCheckInCreate,
-    request: Request,
-    response: Response,
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> PathCheckInRead:
-    idempotency_key = _require_idempotency_key(idempotency_key)
-    try:
-        result, duplicate = create_path_check_in(
-            db,
-            current_user=current_user,
-            habit_id=habit_id,
-            payload=payload,
-            idempotency_key=idempotency_key,
-            request_method=request.method,
-            request_path=request.url.path,
-        )
-    except PathHabitNotFoundError as exc:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except (PathHabitInactiveError, PathCheckInConflictError, PathIdempotencyConflictError) as exc:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Path check-in conflicts with existing data.",
-        ) from exc
-
-    if duplicate:
-        response.status_code = status.HTTP_200_OK
-    return result
 
 
 @router.post("/habits/{habit_id}/archive", response_model=PathHabitLifecycleResponse)
@@ -205,6 +207,45 @@ def reactivate_path_habit_route(
     return result
 
 
+@router.post("/habits/{habit_id}/check-ins", response_model=PathCheckInRead, status_code=status.HTTP_201_CREATED)
+def create_path_check_in_route(
+    habit_id: UUID,
+    payload: PathCheckInCreate,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PathCheckInRead:
+    idempotency_key = _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = create_path_check_in(
+            db,
+            current_user=current_user,
+            habit_id=habit_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except PathHabitNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (PathHabitInactiveError, PathCheckInConflictError, PathIdempotencyConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Path check-in conflicts with existing data.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
 @router.get("/check-ins", response_model=PathCheckInListResponse)
 def list_path_check_ins_route(
     current_user: CurrentUserDep,
@@ -243,47 +284,6 @@ def get_path_check_in_detail_route(
         return get_path_check_in_detail(db, current_user=current_user, check_in_id=check_in_id)
     except PathCheckInNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-
-@router.get("/stats/summary", response_model=PathStatsSummaryResponse)
-def get_path_stats_summary_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    domain: Annotated[str | None, Query(max_length=80)] = None,
-    frequency: PathHabitFrequency | None = None,
-) -> PathStatsSummaryResponse:
-    if date_from is not None and date_to is not None and date_from > date_to:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="date_from must be before or equal to date_to.",
-        )
-    return get_path_stats_summary(
-        db,
-        current_user=current_user,
-        date_from=date_from,
-        date_to=date_to,
-        domain=domain.strip().lower() if domain else None,
-        frequency=frequency.value if frequency else None,
-    )
-
-
-@router.get("/today", response_model=PathTodayResponse)
-def path_today_route(
-    current_user: CurrentUserDep,
-    db: SessionDep,
-    query_date: date | None = Query(default=None, alias="date"),
-    domain: Annotated[str | None, Query(max_length=80)] = None,
-    frequency: PathHabitFrequency | None = None,
-) -> PathTodayResponse:
-    return get_path_today_view(
-        db,
-        current_user=current_user,
-        local_date=query_date or date.today(),
-        domain=domain.strip().lower() if domain else None,
-        frequency=frequency.value if frequency else None,
-    )
 
 
 def _require_idempotency_key(idempotency_key: str | None) -> str:
