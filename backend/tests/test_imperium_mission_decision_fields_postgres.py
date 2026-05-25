@@ -1,11 +1,10 @@
 """PostgreSQL checks for Patch 7F-1 mission decision fields.
 
-These tests require a migrated PostgreSQL database and skip automatically when
-IMPERIUM_TEST_DATABASE_URL is not set.
+These tests require a migrated PostgreSQL database. They skip locally when
+IMPERIUM_TEST_DATABASE_URL is not set and fail in CI if the variable is missing.
 """
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -13,12 +12,9 @@ import pytest
 
 pytest.importorskip("psycopg")
 
-_TEST_DB_URL = os.environ.get("IMPERIUM_TEST_DATABASE_URL")
-if not _TEST_DB_URL:
-    pytest.skip(
-        "IMPERIUM_TEST_DATABASE_URL not set; skipping mission decision field DB tests.",
-        allow_module_level=True,
-    )
+from _postgres import require_test_database_url  # noqa: E402
+
+_TEST_DB_URL = require_test_database_url("mission decision field DB tests")
 
 pytestmark = pytest.mark.postgres
 
@@ -117,6 +113,22 @@ def test_imperium_missions_status_accepts_backlog(engine) -> None:
         stored_status = conn.scalar(text("SELECT status FROM imperium_missions WHERE id = :id"), {"id": mission_id})
 
     assert stored_status == "backlog"
+
+
+def test_imperium_missions_status_accepts_abandoned(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        mission_id = _insert_mission(
+            conn,
+            user_id=user_id,
+            status="abandoned",
+            domain="business",
+            priority_level=4,
+            mission_type_category="cat_e",
+        )
+        stored_status = conn.scalar(text("SELECT status FROM imperium_missions WHERE id = :id"), {"id": mission_id})
+
+    assert stored_status == "abandoned"
 
 
 def test_imperium_mission_scores_unique_user_mission_source(engine) -> None:

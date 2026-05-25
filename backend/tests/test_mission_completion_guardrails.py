@@ -97,6 +97,40 @@ def _post_complete(client: TestClient, mission_id, *, key: str, payload: dict):
     )
 
 
+def _post_fail(client: TestClient, mission_id, *, key: str | None, payload: dict):
+    headers = {"Idempotency-Key": key} if key is not None else {}
+    return client.post(
+        f"/imperium/missions/{mission_id}/fail",
+        headers=headers,
+        json=payload,
+    )
+
+
+def _post_start(client: TestClient, *, key: str, payload: dict):
+    return client.post(
+        "/imperium/missions/start",
+        headers={"Idempotency-Key": key},
+        json=payload,
+    )
+
+
+def test_start_route_returns_409_when_active_mission_exists() -> None:
+    current_user = _user()
+    active = _mission(current_user.id, title="Existing active mission")
+    db = FakeDb(scalar_results=[None, active])
+
+    response = _post_start(
+        _client(db, current_user),
+        key="start-active-conflict",
+        payload={"title": "Second active mission"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "An active mission already exists for this user."
+    assert db.rolled_back is True
+    assert db.added == []
+
+
 def test_complete_active_mission_with_completed_outcome_sets_safe_summary() -> None:
     current_user = _user()
     started_at = datetime(2026, 5, 25, 8, 0, tzinfo=UTC)
@@ -415,3 +449,82 @@ def test_complete_guardrails_have_no_ai_n8n_pgvector_embedding_memory_or_calenda
     assert "domain_coefficient" not in complete_schema_section
     assert "weighted_score" not in complete_schema_section
     assert "final_weighted_score" not in complete_schema_section
+
+
+def test_fail_active_mission_stores_reason_signals_and_event() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id)
+    db = FakeDb(scalar_results=[None, mission])
+
+    response = _post_fail(
+        _client(db, current_user),
+        mission.id,
+        key="fail-active",
+        payload={
+            "failure_reason": "fatigue was too high",
+            "user_reported_signals": {"fatigue_level": 9},
+            "ai_usable_reason": False,
+        },
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["mission"]["id"] == str(mission.id)
+    assert body["mission"]["status"] == "failed"
+    assert body["mission"]["failure_reason"] == "fatigue was too high"
+    assert body["mission"]["user_reported_signals"] == {"fatigue_level": 9}
+    assert body["mission"]["ai_usable_reason"] is False
+    assert body["status"] == "failed"
+    assert mission.status == "failed"
+    assert mission.failure_reason == "fatigue was too high"
+    assert mission.user_reported_signals == {"fatigue_level": 9}
+    assert mission.ai_usable_reason is False
+    assert any(isinstance(item, Event) and item.event_type == "mission.failed" for item in db.added)
+    assert any(isinstance(item, IdempotencyKey) for item in db.added)
+    assert db.committed is True
+
+
+def test_fail_requires_idempotency_key() -> None:
+    response = _post_fail(
+        _client(FakeDb(), _user()),
+        uuid4(),
+        key=None,
+        payload={"failure_reason": "blocked"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Missing Idempotency-Key header."
+
+
+def test_fail_missing_or_non_owned_mission_returns_404() -> None:
+    current_user = _user()
+    db = FakeDb(scalar_results=[None, None])
+
+    response = _post_fail(
+        _client(db, current_user),
+        uuid4(),
+        key="fail-not-found",
+        payload={"failure_reason": "blocked"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Mission not found."
+    assert db.rolled_back is True
+
+
+def test_fail_non_active_mission_returns_409() -> None:
+    current_user = _user()
+    mission = _mission(current_user.id, status="completed")
+    db = FakeDb(scalar_results=[None, mission])
+
+    response = _post_fail(
+        _client(db, current_user),
+        mission.id,
+        key="fail-completed",
+        payload={"failure_reason": "blocked"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Mission is not active."
+    assert db.added == []
+    assert db.rolled_back is True

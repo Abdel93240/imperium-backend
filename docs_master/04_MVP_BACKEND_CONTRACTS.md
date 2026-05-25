@@ -270,13 +270,17 @@ No AI. No n8n. No pgvector writes. No embeddings. No memory commit. No calendar 
 
 | method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
 |---|---|---|---|---|---|---|---|---|
+| POST | `/api/imperium/missions/start` | Create the single active mission directly from user input. | Required | `CurrentUserDep` | write | `mission`, `event_id`, `idempotency_key`, `status`, `score_created`, safe `decision_score` summary | `400`, `409`, `422` | Allowed: create active mission, event, idempotency record, stored decision-score summary. Forbidden: creating a second active mission, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | POST | `/api/imperium/missions/backlog` | Create a backlog mission from user input. | Required | `CurrentUserDep` | write | `mission`, `event_id`, `idempotency_key`, `status`, `score_created`, safe `decision_score` summary | `400`, `409`, `422` | Allowed: create mission, event, idempotency record, stored decision-score summary. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/backlog` | List the current user's backlog missions. | Not required | `CurrentUserDep` | read-only | `items`, `count`, `ordering` | `200`, `401`, `422` | Allowed: read stored backlog rows only. Forbidden: writes of any kind, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/backlog/decision-preview` | Return a deterministic backend preview of the recommended backlog mission. | Not required | `CurrentUserDep` | read-only | `recommended_mission_id`, `candidate_count`, `candidates`, `safe_explanation` | `200`, `401`, `422` | Allowed: read stored backlog rows and stored score rows only. Forbidden: AI calls, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | POST | `/api/imperium/missions/backlog/{mission_id}/promote` | Promote one backlog mission to the single active mission. | Required | `CurrentUserDep` | write | `mission`, `promotion_summary`, `event_id`, `idempotency_key`, `status`, safe `decision_score` summary | `400`, `404`, `409`, `422` | Allowed: update mission state, create event, persist idempotency record. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/current` | Read the current active mission directly. | Not required | `CurrentUserDep` | read-only | mission safe public fields | `200`, `404` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/active` | Read the single active mission for the current user. | Not required | `CurrentUserDep` | read-only | `mission`, `safe_explanation` | `200`, `404`, `409` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
-| POST | `/api/imperium/missions/{mission_id}/complete` | Complete the active mission or mark it failed/abandoned. | Required | `CurrentUserDep` | write | `mission`, `completion_summary` | `400`, `404`, `409`, `422` | Allowed: update mission state, create event, persist idempotency record. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| POST | `/api/imperium/missions/{mission_id}/complete` | Complete the active mission or mark it failed/abandoned. | Required | `CurrentUserDep` | write | `mission`, `completion_summary` | `400`, `404`, `409`, `422` | Allowed: update mission state, create `mission.completed`, `mission.failed`, or `mission.abandoned` event, persist idempotency record. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| POST | `/api/imperium/missions/{mission_id}/fail` | Mark the active mission failed with user-reported reason/signals. | Required | `CurrentUserDep` | write | `mission`, `event_id`, `idempotency_key`, `status` | `400`, `404`, `409`, `422` | Allowed: update mission state, create `mission.failed` event, persist idempotency record. Forbidden: AI judgement, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/history` | Read historical missions for the current user. | Not required | `CurrentUserDep` | read-only | `items`, `count`, `limit`, `offset`, `safe_explanation` | `200`, `401`, `422` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/recent` | Read recent missions for the current user. | Not required | `CurrentUserDep` | read-only | list of mission safe public fields | `200`, `401`, `422` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/{mission_id}` | Read one mission detail record. | Not required | `CurrentUserDep` | read-only | `mission`, `safe_explanation` | `200`, `404` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 | GET | `/api/imperium/missions/{mission_id}/decision-score` | Read the safe public decision-score view for one mission. | Not required | `CurrentUserDep` | read-only | `mission_id`, `status`, `priority_level`, `priority_bucket`, `score_summary`, `safe_explanation` | `200`, `404` | Allowed: read only, deterministic summary from stored data. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
 
@@ -306,6 +310,9 @@ Refresh token hashing algorithm and master key rotation ceremony: TODO.
 
 ## Main API Endpoints
 
+This table is a high-level index only. The mission contract table above is
+canonical for Imperium mission behavior.
+
 ### Core
 
 | method | endpoint | purpose | emitted event |
@@ -323,14 +330,17 @@ Refresh token hashing algorithm and master key rotation ceremony: TODO.
 | GET | `/api/imperium/dashboard` | Current mission, day session, advice, weekly review status | `imperium.dashboard.requested` |
 | POST | `/api/imperium/day-session/start` | Start day session | `day.started` |
 | POST | `/api/imperium/day-session/end` | End active day session | `day.finished` |
-| POST | `/api/imperium/missions/{mission_id}/done` | Mark current mission done | `mission.completed` |
-| POST | `/api/imperium/missions/{mission_id}/not-done` | Mark mission not done with reason | `mission.failed` |
+| POST | `/api/imperium/missions/start` | Start direct active mission | `mission.started` |
+| GET | `/api/imperium/missions/current` | Read current active mission | none |
+| GET | `/api/imperium/missions/recent` | Read recent missions | none |
+| POST | `/api/imperium/missions/{mission_id}/complete` | Complete mission or mark failed/abandoned | `mission.completed`, `mission.failed`, or `mission.abandoned` |
+| POST | `/api/imperium/missions/{mission_id}/fail` | Mark mission failed with reason/signals | `mission.failed` |
 | GET | `/api/imperium/missions/{mission_id}/decision-score` | Read safe deterministic mission decision summary; no AI, no n8n, no writes | none |
 | POST | `/api/imperium/replan` | Explicit replanning request | `replan.requested` |
 | POST | `/api/imperium/projects` | Create/update project | `project.changed` |
 | POST | `/api/imperium/projects/{project_id}/validate-completion` | Explicit project completion | `project.completion.validated` |
 | POST | `/api/imperium/routines` | Create/update routine | `routine.changed` |
-| POST | `/api/imperium/priorities` | Update ordered priorities | `priorities.changed` |
+| POST | `/api/imperium/priorities` | Legacy priority write disabled; use `/api/imperium/decision-framework/priorities` | none; returns `410 Gone` |
 | POST | `/api/imperium/weekly-review/start` | Start weekly review | `weekly.review.started` |
 | POST | `/api/imperium/weekly-review/{review_id}/answer` | Store review answer | `weekly.review.answered` |
 | POST | `/api/imperium/weekly-review/{review_id}/complete` | Complete after final validation | `weekly.review.completed` |

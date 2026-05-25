@@ -1,9 +1,9 @@
 """Append-only trigger verification tests for events and auth_events.
 
 These tests require a real PostgreSQL database with the migrations applied
-(append-only triggers are installed by migrations 0002 and 0003). They are
-skipped automatically when IMPERIUM_TEST_DATABASE_URL is not set, so the
-default fast unit-test suite continues to pass on machines without Postgres.
+(append-only triggers are installed by migrations 0002 and 0003). They skip
+locally when IMPERIUM_TEST_DATABASE_URL is not set and fail in CI if the
+variable is missing.
 
 Run locally:
 
@@ -12,7 +12,6 @@ Run locally:
 """
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -20,12 +19,9 @@ import pytest
 
 pytest.importorskip("psycopg")
 
-_TEST_DB_URL = os.environ.get("IMPERIUM_TEST_DATABASE_URL")
-if not _TEST_DB_URL:
-    pytest.skip(
-        "IMPERIUM_TEST_DATABASE_URL not set; skipping append-only trigger tests.",
-        allow_module_level=True,
-    )
+from _postgres import require_test_database_url  # noqa: E402
+
+_TEST_DB_URL = require_test_database_url("append-only trigger tests")
 
 pytestmark = pytest.mark.postgres
 

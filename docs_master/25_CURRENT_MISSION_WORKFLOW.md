@@ -29,7 +29,7 @@ Important columns:
 - `title`: mission title
 - `category`: optional mission category
 - `priority_level`: optional user/app-provided priority marker
-- `status`: `active`, `completed`, `failed`, or `cancelled`
+- `status`: `backlog`, `active`, `completed`, `failed`, `abandoned`, or `cancelled`
 - `planned_start_at`: optional planned start timestamp
 - `planned_end_at`: optional planned end timestamp
 - `started_at`: actual backend-confirmed start timestamp
@@ -84,16 +84,17 @@ Payload:
 
 ```json
 {
-  "completion_note": "Finished cleanly."
+  "outcome": "completed"
 }
 ```
 
 Behavior:
 
 - Requires the mission to exist and be `active`.
-- Sets status to `completed`.
-- Stores optional `completion_note`.
-- Appends `mission.completed`.
+- Sets status to `completed`, `failed`, or `abandoned` from the validated `outcome`.
+- Requires `reason` when the outcome is `failed` or `abandoned`.
+- Stores the reason as `failure_reason` for failed or abandoned outcomes.
+- Appends `mission.completed`, `mission.failed`, or `mission.abandoned`.
 - Returns `404` if mission is missing.
 - Returns `409` if mission is not active.
 
@@ -148,6 +149,7 @@ The backend appends canonical events only:
 - `mission.started`
 - `mission.completed`
 - `mission.failed`
+- `mission.abandoned`
 
 Events are append-only. Mission rows may change status from `active` to a terminal state, but event rows must not be updated.
 

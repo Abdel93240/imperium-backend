@@ -250,22 +250,33 @@ def test_wr_mission_history_read_has_no_ai_or_write_paths() -> None:
 
 def test_patch_8i_mission_contract_docs_and_route_order_are_consolidated() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    current_workflow_text = (DOCS_ROOT / "25_CURRENT_MISSION_WORKFLOW.md").read_text(encoding="utf-8")
     decision_framework_text = (DOCS_ROOT / "52_AI_DECISION_FRAMEWORK.md").read_text(encoding="utf-8")
     ai_tasks_text = (DOCS_ROOT / "31_AI_TASKS_AND_RESULTS_CONTRACT.md").read_text(encoding="utf-8")
     smoke_text = (DOCS_ROOT / "18_N8N_SMOKE_TEST.md").read_text(encoding="utf-8")
     route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py").read_text(encoding="utf-8")
 
     for endpoint in (
+        "/api/imperium/missions/start",
         "/api/imperium/missions/backlog",
         "/api/imperium/missions/backlog/decision-preview",
         "/api/imperium/missions/backlog/{mission_id}/promote",
+        "/api/imperium/missions/current",
         "/api/imperium/missions/active",
         "/api/imperium/missions/{mission_id}/complete",
+        "/api/imperium/missions/{mission_id}/fail",
         "/api/imperium/missions/history",
+        "/api/imperium/missions/recent",
         "/api/imperium/missions/{mission_id}",
         "/api/imperium/missions/{mission_id}/decision-score",
     ):
         assert f"`{endpoint}`" in contracts_text
+
+    assert "/api/imperium/missions/{mission_id}/done" not in contracts_text
+    assert "/api/imperium/missions/{mission_id}/not-done" not in contracts_text
+    assert "`mission.abandoned`" in contracts_text
+    assert "`backlog`, `active`, `completed`, `failed`, `abandoned`, or `cancelled`" in current_workflow_text
+    assert "`mission.abandoned`" in current_workflow_text
 
     assert "| POST |" in contracts_text
     assert "| GET |" in contracts_text
