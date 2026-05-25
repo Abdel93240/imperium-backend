@@ -24,6 +24,9 @@ from app.schemas.imperium import (
     BacklogMissionRead,
     CompleteMissionRequest,
     FailMissionRequest,
+    MissionHistoryRead,
+    MissionHistoryResponse,
+    MissionHistoryStatus,
     MissionCompletionResponse,
     MissionCompletionSummary,
     MissionDecisionScoreRead,
@@ -88,6 +91,8 @@ MISSION_COMPLETION_GUARDRAILS_CHECKED = [
 MISSION_COMPLETION_SAFE_EXPLANATION = "Mission completed using deterministic backend guardrails only."
 ACTIVE_MISSION_SAFE_EXPLANATION = "Current active mission for user."
 ACTIVE_MISSION_NONE_SAFE_EXPLANATION = "No active mission found for current user."
+MISSION_HISTORY_SAFE_EXPLANATION = "Mission history for current user."
+HISTORICAL_MISSION_STATUSES = {"completed", "failed", "abandoned"}
 
 
 def start_mission(
@@ -611,6 +616,75 @@ def get_recent_missions(db: Session, *, current_user: User, limit: int) -> list[
             .order_by(ImperiumMission.started_at.desc())
             .limit(limit)
         )
+    )
+
+
+def get_mission_history(
+    db: Session,
+    *,
+    current_user: User,
+    limit: int = 20,
+    offset: int = 0,
+    status: MissionHistoryStatus | str | None = None,
+    domain: str | None = None,
+    priority_level: int | None = None,
+    started_after: datetime | None = None,
+    ended_before: datetime | None = None,
+) -> MissionHistoryResponse:
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    query = (
+        select(ImperiumMission)
+        .where(
+            ImperiumMission.user_id == current_user.id,
+            ImperiumMission.status.in_(HISTORICAL_MISSION_STATUSES),
+        )
+        .order_by(
+            ImperiumMission.ended_at.desc().nullslast(),
+            ImperiumMission.created_at.desc(),
+            ImperiumMission.id.asc(),
+        )
+    )
+    missions = [
+        mission
+        for mission in db.scalars(query)
+        if mission.user_id == current_user.id and mission.status in HISTORICAL_MISSION_STATUSES
+    ]
+    normalized_status = status.value if isinstance(status, MissionHistoryStatus) else status
+    if normalized_status is not None:
+        missions = [mission for mission in missions if mission.status == normalized_status]
+    if domain is not None:
+        missions = [mission for mission in missions if mission.domain == domain]
+    if priority_level is not None:
+        missions = [mission for mission in missions if mission.priority_level == priority_level]
+    if started_after is not None:
+        missions = [mission for mission in missions if mission.started_at > started_after]
+    if ended_before is not None:
+        missions = [
+            mission
+            for mission in missions
+            if mission.ended_at is not None and mission.ended_at < ended_before
+        ]
+
+    missions = sorted(missions, key=lambda mission: str(mission.id))
+    missions = sorted(
+        missions,
+        key=lambda mission: mission.created_at or datetime.min.replace(tzinfo=UTC),
+        reverse=True,
+    )
+    missions = sorted(
+        missions,
+        key=lambda mission: mission.ended_at or datetime.min.replace(tzinfo=UTC),
+        reverse=True,
+    )
+
+    page = missions[offset : offset + limit]
+    return MissionHistoryResponse(
+        items=[MissionHistoryRead.model_validate(mission) for mission in page],
+        count=len(page),
+        limit=limit,
+        offset=offset,
+        safe_explanation=MISSION_HISTORY_SAFE_EXPLANATION,
     )
 
 

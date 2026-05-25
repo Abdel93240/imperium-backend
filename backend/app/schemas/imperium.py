@@ -81,6 +81,12 @@ class MissionStatus(StrEnum):
     cancelled = "cancelled"
 
 
+class MissionHistoryStatus(StrEnum):
+    completed = "completed"
+    failed = "failed"
+    abandoned = "abandoned"
+
+
 SUPPORTED_DECISION_DOMAINS = {"religious", "business", "finance", "health"}
 SUPPORTED_MISSION_TYPE_CATEGORIES = {
     "cat_a",
@@ -360,6 +366,32 @@ class MissionCompletionSummary(BaseModel):
 class MissionCompletionResponse(BaseModel):
     mission: MissionCompletionRead
     completion_summary: MissionCompletionSummary
+
+
+class MissionHistoryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime
+    ended_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MissionHistoryResponse(BaseModel):
+    items: list[MissionHistoryRead]
+    count: int
+    limit: int
+    offset: int
+    safe_explanation: str
 
 
 class MissionDecisionScoreSummary(BaseModel):

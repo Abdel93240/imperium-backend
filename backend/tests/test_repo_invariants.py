@@ -216,6 +216,37 @@ def test_wr_memory_commit_readiness_has_no_storage_or_vector_write_path() -> Non
     assert "commit-ready" in route_text
 
 
+def test_wr_mission_history_read_has_no_ai_or_write_paths() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    route_text = route_path.read_text(encoding="utf-8")
+    history_section = service_text.split("def get_mission_history", maxsplit=1)[1].split(
+        "def get_mission_decision_score",
+        maxsplit=1,
+    )[0]
+    route_section = route_text.split('@router.get("/missions/history"', maxsplit=1)[1].split(
+        '@router.get("/missions/recent"',
+        maxsplit=1,
+    )[0]
+
+    assert "db.add(" not in history_section
+    assert "db.flush" not in history_section
+    assert "db.commit" not in history_section
+    assert "pgvector" not in history_section.lower()
+    assert "embedding" not in history_section.lower()
+    assert "memory" not in history_section.lower()
+    assert "calendar" not in history_section.lower()
+    assert "n8n" not in history_section.lower()
+    assert "ai agent" not in history_section.lower()
+    assert "openai" not in history_section.lower()
+    assert "anthropic" not in history_section.lower()
+    assert "gemini" not in history_section.lower()
+    assert "weighted_score" not in history_section
+    assert "coefficient" not in history_section
+    assert "Idempotency-Key" not in route_section
+
+
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"

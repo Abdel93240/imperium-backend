@@ -37,6 +37,8 @@ from app.schemas.imperium import (
     ImperiumDashboardResponse,
     MissionDecisionScoreRead,
     MissionCompletionResponse,
+    MissionHistoryResponse,
+    MissionHistoryStatus,
     MissionResponse,
     MissionWriteResponse,
     PathItemResponse,
@@ -148,6 +150,7 @@ from app.services.imperium.missions import (
     get_backlog_decision_preview,
     get_current_active_mission,
     get_current_mission,
+    get_mission_history,
     get_mission_decision_score,
     get_recent_missions,
     list_backlog_missions,
@@ -1186,6 +1189,31 @@ def active_mission_route(current_user: CurrentUserDep, db: SessionDep) -> Active
             status_code=status.HTTP_409_CONFLICT,
             detail="Multiple active missions found for current user.",
         ) from exc
+
+
+@router.get("/missions/history", response_model=MissionHistoryResponse)
+def mission_history_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    status_filter: Annotated[MissionHistoryStatus | None, Query(alias="status")] = None,
+    domain: Annotated[str | None, Query()] = None,
+    priority_level: Annotated[int | None, Query(ge=1, le=10)] = None,
+    started_after: Annotated[datetime | None, Query()] = None,
+    ended_before: Annotated[datetime | None, Query()] = None,
+) -> MissionHistoryResponse:
+    return get_mission_history(
+        db,
+        current_user=current_user,
+        limit=limit,
+        offset=offset,
+        status=status_filter,
+        domain=domain,
+        priority_level=priority_level,
+        started_after=started_after,
+        ended_before=ended_before,
+    )
 
 
 @router.get("/missions/recent", response_model=list[MissionResponse])
