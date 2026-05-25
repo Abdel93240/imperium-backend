@@ -193,6 +193,53 @@ def test_create_pulse_entry_replays_same_key_and_payload() -> None:
     assert db.committed is False
 
 
+def test_create_pulse_entry_replays_decimal_equivalent_payload() -> None:
+    current_user = _user()
+    created_at = datetime.now(UTC)
+    original_payload = PulseEntryCreate.model_validate(_valid_payload(sleep_hours=7.5, weight_kg=92.4))
+    response_body = {
+        "id": str(uuid4()),
+        "entry_date": "2026-05-25",
+        "sleep_hours": "7.50",
+        "energy_level": 8,
+        "fatigue_level": 3,
+        "weight_kg": "92.40",
+        "workout_done": True,
+        "workout_type": "street_workout",
+        "notes": "Good baseline day",
+        "created_at": created_at.isoformat(),
+        "updated_at": created_at.isoformat(),
+    }
+    db = FakeDb(
+        scalar_results=[
+            IdempotencyKey(
+                id=uuid4(),
+                user_id=current_user.id,
+                idempotency_key="pulse-decimal-replay",
+                request_method="POST",
+                request_path="/imperium/pulse/entries",
+                request_hash=_hash_request("pulse.entry.created", original_payload.model_dump(mode="json")),
+                status="completed",
+                response_status_code=201,
+                response_body=response_body,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        ]
+    )
+
+    response = _client(db, current_user).post(
+        "/imperium/pulse/entries",
+        headers={"Idempotency-Key": "pulse-decimal-replay"},
+        json=_valid_payload(sleep_hours="7.50", weight_kg="92.40"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == response_body["id"]
+    assert not any(isinstance(item, ImperiumPulseEntry) for item in db.added)
+    assert db.committed is False
+
+
 def test_create_pulse_entry_same_key_different_payload_returns_409() -> None:
     current_user = _user()
     created_at = datetime.now(UTC)

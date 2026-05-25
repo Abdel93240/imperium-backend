@@ -1,6 +1,7 @@
 import hashlib
 import json
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import TypeVar
 from uuid import UUID
 
@@ -23,6 +24,7 @@ from app.schemas.pulse import (
 SAFE_EXPLANATION = "Pulse entries for current user."
 TODAY_SAFE_EXPLANATION = "Pulse today entry for current user."
 STATS_SUMMARY_SAFE_EXPLANATION = "Pulse summary statistics for current user."
+_DECIMAL_HASH_KEYS = frozenset({"sleep_hours", "weight_kg"})
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -250,12 +252,37 @@ def _store_idempotency(
 
 
 def _hash_request(action: str, payload: dict) -> str:
+    normalized_payload = _normalize_for_hash(payload)
     canonical = json.dumps(
-        {"action": action, "payload": payload},
+        {"action": action, "payload": normalized_payload},
         sort_keys=True,
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _normalize_for_hash(value: object, *, key: str | None = None) -> object:
+    if isinstance(value, dict):
+        return {
+            str(item_key): _normalize_for_hash(item_value, key=str(item_key))
+            for item_key, item_value in value.items()
+        }
+    if isinstance(value, list):
+        return [_normalize_for_hash(item) for item in value]
+    if isinstance(value, Decimal):
+        return _normalize_decimal(value)
+    if key in _DECIMAL_HASH_KEYS and isinstance(value, str):
+        try:
+            return _normalize_decimal(Decimal(value))
+        except InvalidOperation:
+            return value
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _normalize_decimal(value: Decimal) -> str:
+    return format(value.normalize(), "f")
 
 
 def _average_or_none(values: list[float]) -> float | None:

@@ -546,6 +546,9 @@ Purpose:
 
 Implemented endpoints:
 
+Pulse V1 11A->11D active backend surface is only the five `/api/imperium/pulse/...`
+endpoints below. No `/api/pulse/...` route is implemented by Pulse V1 11A->11D.
+
 | method | endpoint | purpose | idempotency |
 |---|---|---|---|
 | POST | `/api/imperium/pulse/entries` | Create one current-user Pulse daily entry | Required `Idempotency-Key` |
@@ -567,6 +570,8 @@ Contracts:
 - one entry per `(user_id, entry_date)`
 - repeating the same `Idempotency-Key` with the same payload returns the original result
 - repeating the same `Idempotency-Key` with a different payload returns `409`
+- idempotence is guaranteed for sequential replay of the same key and same normalized payload
+- strictly concurrent replays of the same key/payload may return `409` in V1 if PostgreSQL uniqueness constraints win the race before the completed idempotency row is readable
 - attempting the same `entry_date` with another idempotency key returns `409`
 - there is no update, merge, destructive edit, or automatic recalculation in Patch 11A
 
@@ -671,6 +676,7 @@ Pulse 11D audit invariants:
 - no automatic scoring
 - no automatic coaching
 - no automatic recommendations
+- no automatic scoring/coaching/recommendations
 - no automatic Mission/Vault/Path linkage
 - no AI
 - no n8n
@@ -681,16 +687,22 @@ Pulse 11D audit invariants:
 - `POST /api/imperium/pulse/entries` remains append-only and idempotent by `Idempotency-Key`
 - `GET` routes remain user-scoped through `CurrentUserDep` and read-only
 
-| method | endpoint | purpose | emitted event |
-|---|---|---|---|
-| GET | `/api/pulse/dashboard` | Biological profile, health score, workout/nutrition summary | `pulse.dashboard.requested` |
-| POST | `/api/pulse/biological-profile/correction` | User correction to biological truth | `biological.profile.corrected` |
-| POST | `/api/pulse/workout/generate` | Generate today's workout | `workout.generate.requested` |
-| POST | `/api/pulse/workout/adapt` | Adapt workout to reality | `workout.adaptation.requested` |
-| POST | `/api/pulse/stock-items` | Create/update stock item | `stock.item.changed` |
-| POST | `/api/pulse/grocery-list/generate` | Generate grocery list | `grocery.list.generated` |
-| POST | `/api/pulse/batch-cooking/validate` | Validate cooked quantities | `batch.cooking.validated` |
-| POST | `/api/pulse/wearable/sync` | Store wearable data if available | `wearable.data.synced` |
+#### Future Pulse surfaces - FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D
+
+The items below are retained as future product ideas only. They are not active
+backend contracts, are outside Pulse V1 11A->11D scope, and must not be
+interpreted as implemented endpoints.
+
+| status | method | endpoint | future purpose | future event |
+|---|---|---|---|---|
+| FUTURE / NOT IMPLEMENTED | GET | `/api/pulse/dashboard` | Biological profile, health score, workout/nutrition summary | `pulse.dashboard.requested` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/biological-profile/correction` | User correction to biological truth | `biological.profile.corrected` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/workout/generate` | Generate today's workout | `workout.generate.requested` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/workout/adapt` | Adapt workout to reality | `workout.adaptation.requested` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/stock-items` | Create/update stock item | `stock.item.changed` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/grocery-list/generate` | Generate grocery list | `grocery.list.generated` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/batch-cooking/validate` | Validate cooked quantities | `batch.cooking.validated` |
+| FUTURE / NOT IMPLEMENTED | POST | `/api/pulse/wearable/sync` | Store wearable data if available | `wearable.data.synced` |
 
 ### The Path
 
@@ -1074,6 +1086,9 @@ Vector:
 | `vector.low.fuel.triggered` | User pressed low fuel |
 
 Pulse:
+
+These event types are FUTURE / NOT IMPLEMENTED for Pulse V1 11A->11D unless a
+later patch explicitly promotes one into the active backend contract.
 
 | event_type | purpose |
 |---|---|
@@ -1497,13 +1512,14 @@ Expected MVP tables or equivalent:
 - `vector_business_rules`
 - `map_eta_observations`
 - `scheduled_rides`
-- `pulse_biological_profiles`
-- `pulse_health_scores`
-- `pulse_workouts`
-- `pulse_stock_items`
-- `pulse_grocery_lists`
-- `pulse_batch_cooking_sessions`
-- `wearable_data_points`
+- `imperium_pulse_entries`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_biological_profiles`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_health_scores`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_workouts`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_stock_items`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_grocery_lists`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_batch_cooking_sessions`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `wearable_data_points`
 - `path_prayer_days`
 - `path_ghusl_events`
 - `path_fasting_days`
@@ -1528,7 +1544,7 @@ Expected memory objects:
 - Vector session learning summaries
 - bad recommendation explanations
 - financial behavior summaries
-- Pulse biological pattern summaries
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: Pulse biological pattern summaries
 - The Path routine consistency summaries
 - model output summaries approved for memory
 

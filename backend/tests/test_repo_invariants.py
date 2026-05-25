@@ -548,6 +548,64 @@ def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() 
         assert forbidden not in lowered_route_and_service
 
 
+def test_patch_11f_pulse_docs_mark_future_surfaces_outside_v1_contract() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")
+    lowered_docs = "\n".join([contracts_text, schema_text]).lower()
+
+    active_contract = contracts_text.split("#### Pulse Foundation 11A", maxsplit=1)[1].split(
+        "#### Future Pulse surfaces - FUTURE / NOT IMPLEMENTED",
+        maxsplit=1,
+    )[0]
+    future_contract = contracts_text.split(
+        "#### Future Pulse surfaces - FUTURE / NOT IMPLEMENTED",
+        maxsplit=1,
+    )[1].split("### The Path", maxsplit=1)[0]
+    active_schema = schema_text.split("### Pulse Foundation 11A", maxsplit=1)[1].split(
+        "### FUTURE / NOT IMPLEMENTED",
+        maxsplit=1,
+    )[0]
+
+    implemented_endpoints = (
+        "POST | `/api/imperium/pulse/entries`",
+        "GET | `/api/imperium/pulse/entries`",
+        "GET | `/api/imperium/pulse/entries/{entry_id}`",
+        "GET | `/api/imperium/pulse/today`",
+        "GET | `/api/imperium/pulse/stats/summary`",
+    )
+    for endpoint in implemented_endpoints:
+        assert endpoint in contracts_text
+
+    future_endpoints = (
+        "/api/pulse/dashboard",
+        "/api/pulse/workout/generate",
+        "/api/pulse/workout/adapt",
+        "/api/pulse/wearable/sync",
+    )
+    for endpoint in future_endpoints:
+        assert endpoint not in active_contract
+        future_lines = [line for line in future_contract.splitlines() if endpoint in line]
+        assert future_lines
+        assert all("FUTURE / NOT IMPLEMENTED" in line for line in future_lines)
+
+    future_tables = (
+        "pulse_biological_profiles",
+        "pulse_health_scores",
+        "pulse_workouts",
+        "pulse_recommendations",
+    )
+    for table in future_tables:
+        assert table not in active_schema
+        assert f"future / not implemented in pulse v1 11a->11d: `{table}`" in lowered_docs
+
+    assert "pulse v1 11a->11d active backend surface is only" in lowered_docs
+    assert "pulse v1 11a->11d implemented schema surface is only `imperium_pulse_entries`" in lowered_docs
+    assert "health score table" in lowered_docs
+    assert "workout generation" in lowered_docs
+    assert "wearable sync tables" in lowered_docs
+    assert "no automatic scoring/coaching/recommendations" in lowered_docs
+
+
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"

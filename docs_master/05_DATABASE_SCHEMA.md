@@ -583,6 +583,11 @@ Audit/history:
 
 ### `recommendations`
 
+Implementation status:
+- FUTURE / NOT IMPLEMENTED for Pulse V1 11A->11D.
+- Pulse V1 11A->11D does not write, read, or expose recommendations from this table.
+- This section must not be interpreted as a Pulse recommendations contract.
+
 Purpose:
 - Stores backend/AI recommendations for apps, especially Imperium, Vector, Vault, Pulse, and The Path.
 
@@ -1217,6 +1222,18 @@ Audit/history:
 ## Pulse
 
 Pulse MVP stays simple.
+Pulse V1 11A->11D implemented schema surface is only `imperium_pulse_entries`.
+No `pulse_biological_profiles`, `pulse_health_scores`, `pulse_workouts`,
+`pulse_recommendations`, wearable table, health score table, workout generation
+table, coaching table, or recommendations table is implemented in Pulse V1
+11A->11D.
+
+Future-only Pulse schema names:
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_biological_profiles`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_health_scores`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_workouts`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: `pulse_recommendations`
+- FUTURE / NOT IMPLEMENTED in Pulse V1 11A->11D: wearable sync tables
 
 ### Pulse Foundation 11A - `imperium_pulse_entries`
 
@@ -1274,9 +1291,14 @@ Audit/history:
 - Patch 11A has no update, merge, destructive edit, automatic recalculation, health score, automatic coaching, or automatic recommendations
 - Patch 11A has no automatic synchronization with Mission, Vault, Path, calendar, memory, pgvector, embedding, or n8n modules
 - Patch 11D keeps the same table and does not add automatic entry creation, automatic scoring, automatic coaching, automatic recommendations, or automatic Mission/Vault/Path linkage
+- Patch 11D has no automatic scoring/coaching/recommendations
 - Patch 11D remains append-only on POST and read-only on GET
 
-### `body_profile_snapshots`
+### FUTURE / NOT IMPLEMENTED - `body_profile_snapshots`
+
+This section is a future product idea only. It is outside Pulse V1 11A->11D and
+must not be interpreted as an implemented backend table or current schema
+contract.
 
 Purpose:
 - Stores user body profile snapshots over time.
@@ -1325,7 +1347,11 @@ Soft delete:
 Audit/history:
 - table is snapshot history
 
-### `meals`
+### FUTURE / NOT IMPLEMENTED - `meals`
+
+This section is a future product idea only. It is outside Pulse V1 11A->11D and
+must not be interpreted as an implemented backend table or current schema
+contract.
 
 Purpose:
 - Simple meal tracking.
@@ -1369,7 +1395,11 @@ Soft delete:
 Audit/history:
 - event-backed
 
-### `workouts`
+### FUTURE / NOT IMPLEMENTED - `workouts`
+
+This section is a future product idea only. It is outside Pulse V1 11A->11D and
+must not be interpreted as an implemented backend table, `pulse_workouts` table,
+workout generation contract, or current schema contract.
 
 Purpose:
 - Stores planned and completed workouts.
@@ -1417,7 +1447,11 @@ Soft delete:
 Audit/history:
 - changes are event-backed
 
-### `food_stock_items`
+### FUTURE / NOT IMPLEMENTED - `food_stock_items`
+
+This section is a future product idea only. It is outside Pulse V1 11A->11D and
+must not be interpreted as an implemented backend table or current schema
+contract.
 
 Purpose:
 - Tracks simple food stock and expiration.
@@ -1468,7 +1502,11 @@ Soft delete:
 Audit/history:
 - stock changes should emit events
 
-### `pulse_recommendations`
+### FUTURE / NOT IMPLEMENTED - `pulse_recommendations`
+
+This section is a future product idea only. It is outside Pulse V1 11A->11D and
+must not be interpreted as an implemented backend table, recommendations
+contract, coaching contract, health score contract, or current schema contract.
 
 Purpose:
 - Stores Pulse workout, nutrition, stock, and health recommendations.
