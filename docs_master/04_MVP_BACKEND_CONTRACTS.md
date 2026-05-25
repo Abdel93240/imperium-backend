@@ -548,6 +548,13 @@ No endpoint may auto-click, auto-accept, auto-refuse, or automate Bolt.
 
 ### The Path
 
+Patch 10I routing decision:
+- The canonical Path V1 API module is `app/api/v1/routes/imperium_path.py`.
+- Canonical Path V1 endpoints live under `/api/imperium/path/...` and use the habit/check-in contracts below.
+- Legacy Path item endpoints that still exist in `app/api/v1/routes/imperium.py` are deprecated for Path V1 and must not mask canonical Path V1 routes.
+- In particular, `GET /api/imperium/path/today` must resolve to the `imperium_path.py` handler returning `PathTodayResponse`, not the legacy list-shaped `ImperiumPathItem` response.
+- If legacy Path item endpoints remain mounted for older Imperium workflows, they are compatibility surfaces only and must not introduce new Path V1 behavior.
+
 #### Path Foundation 10A - habits and check-ins
 
 Path Foundation 10A adds the first backend-owned habit/check-in surface for The Path.

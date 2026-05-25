@@ -1465,6 +1465,8 @@ Important:
 - Never infer sadaqa completion without explicit user action.
 - Path Foundation 10A is limited to habits and check-ins.
 - 10A has no AI/n8n/scoring/calendar in 10A, no pgvector write, no embeddings, no automatic memory commit, no automatic replanning, no automatic scoring, and no automatic mission/vault linkage.
+- Patch 10I confirms the canonical Path V1 data model is `imperium_path_habits` plus `imperium_path_check_ins`.
+- Existing `ImperiumPathItem` / `imperium_path_items` records are legacy/deprecated compatibility data for older Imperium path-item workflows. They must not mask, redefine, or receive new Path V1 behavior under `/api/imperium/path/...`.
 
 ### Path Foundation 10A - `imperium_path_habits`
 

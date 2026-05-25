@@ -554,6 +554,24 @@ def test_create_path_check_in_requires_reason_when_missed() -> None:
     assert response.status_code == 422
 
 
+def test_create_path_check_in_rejects_done_with_reason() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id)
+    db = FakeDb(scalar_results=[None, habit])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/check-ins",
+        headers={"Idempotency-Key": "path-check-in-done-with-reason"},
+        json={"check_date": "2026-05-25", "status": "done", "reason": "No issue"},
+    )
+
+    assert response.status_code == 422
+    assert "reason must be null when status is done" in response.text
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
+
+
 def test_create_path_check_in_missed_with_reason_ok() -> None:
     current_user = _user()
     habit = _habit(current_user.id)
