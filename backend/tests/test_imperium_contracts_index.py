@@ -215,3 +215,23 @@ def test_contracts_index_read_only_no_db_write_and_no_sensitive_metadata() -> No
     assert "infra" not in payload_text
     assert "health check runtime" not in payload_text
     assert "internal" not in payload_text
+
+
+def test_contracts_index_get_and_post_idempotency_flags_are_consistent() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/contracts/index")
+    assert response.status_code == 200
+    for group in response.json()["groups"]:
+        for endpoint in group["endpoints"]:
+            if endpoint["method"] == "POST":
+                assert endpoint["idempotency_key_required"] is True
+            if endpoint["method"] == "GET":
+                assert endpoint["idempotency_key_required"] is False
+
+
+def test_contracts_index_excludes_openapi_health_and_internal_admin_paths() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/contracts/index")
+    assert response.status_code == 200
+    all_paths = [e["path"] for g in response.json()["groups"] for e in g["endpoints"]]
+    forbidden_substrings = ("/openapi", "/docs", "/redoc", "/health", "/internal", "/admin")
+    for path in all_paths:
+        assert not any(token in path for token in forbidden_substrings)

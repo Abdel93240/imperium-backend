@@ -144,6 +144,32 @@ Frontend bootstrap usage:
 - call this endpoint once at home startup to discover core module entrypoints
 - do not treat this response as a data snapshot or health probe
 
+### Imperium Contracts Index V1
+
+`GET /api/imperium/contracts/index`
+
+Purpose:
+- return metadata only for frontend contract navigation
+- provide a static deterministic V1 index of selected public Imperium module endpoints
+- help frontend map major routes without runtime discovery
+
+Non-goals:
+- not a full OpenAPI document
+- not a health check
+- not a dynamic runtime discovery mechanism
+- no FastAPI route scanning
+
+Rules:
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- `contract_version` is `v1`
+- `read_only` is always `true`
+- deterministic groups order: `home`, `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
+- metadata only: no business data read, no writes, no auto-creation
+- no exposure of `user_id`, secrets, provider metadata, or infra metadata
+- must not expose internal/admin/sensitive routes
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+
 
 ## V1 Implementation Stack
 
