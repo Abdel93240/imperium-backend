@@ -355,7 +355,7 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/vault/transactions/{transaction_id}/reverse` | Patch 9F append-only transaction correction endpoint; JWT scoped; requires `Idempotency-Key`; creates one opposite reversal transaction and never updates/deletes the original transaction | none in Patch 9F |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
-| GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by persisted user-local month `YYYY-MM`; currency normalizes to uppercase 3 letters; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/summary/monthly` | Patch 9D/9J current-user monthly summary computed on the fly from current transactions; read-only; grouped by UTC `occurred_at` month `YYYY-MM`; currency accepts three ASCII letters and normalizes uppercase; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
 | PATCH | `/api/vault/transactions/{transaction_id}` | Legacy direct edit route; not part of Imperium Vault V1 and forbidden for the append-only ledger | forbidden in V1 |
@@ -377,7 +377,7 @@ calculate strategy or trigger downstream automation.
 - Rejects client-supplied `user_id`; the backend always uses the authenticated user.
 - Rejects `amount_cents <= 0`.
 - Accepts only `transaction_type` values `income` and `expense`.
-- Requires timezone-aware `occurred_at`; optional `timezone` can be supplied by the client. The backend stores a derived `local_date` for month-level financial reporting.
+- Requires timezone-aware `occurred_at`; optional `timezone` can be supplied by the client. Patch 9J makes `occurred_at` the only authoritative Vault V1 reporting time source.
 - Creates one append-only row in `imperium_vault_transactions` and records the idempotency result.
 
 `GET /api/imperium/vault/transactions`:
@@ -402,7 +402,8 @@ calculate strategy or trigger downstream automation.
 - Does not require `Idempotency-Key`.
 - Returns only the current user's ledger transactions.
 - Supports filters: `currency`, `occurred_from`, and `occurred_to`.
-- `occurred_from` and `occurred_to` must include timezone information and filter by the absolute `occurred_at` instant.
+- `currency` accepts exactly three ASCII letters (`^[A-Za-z]{3}$`) and normalizes to uppercase.
+- `occurred_from` and `occurred_to` must include timezone information. They are interpreted as UTC-normalized absolute bounds on `occurred_at`; no local timezone conversion is applied.
 - Computes `total_income_cents`, `total_expense_cents`, `net_cents`, `transaction_count`, `income_count`, and `expense_count` at request time.
 - Is read-only: no `db.add`, `flush`, `commit`, wallet persistence, balance persistence, AI, n8n, OCR, sadaqa, pgvector, memory, or calendar side effects.
 - Returns zeros for all totals and counts when there are no matching transactions.
@@ -425,6 +426,8 @@ Patch 9C scope:
 - The category summary is computed from database transactions at request time and is not persisted.
 - Transactions are grouped by category; missing, null, or blank categories are returned as `uncategorized`.
 - `GET` supports `currency`, `transaction_type`, `occurred_from`, and `occurred_to`.
+- `currency` accepts exactly three ASCII letters (`^[A-Za-z]{3}$`) and normalizes to uppercase.
+- `occurred_from` and `occurred_to` must include timezone information. They are interpreted as UTC-normalized absolute bounds on `occurred_at`; no local timezone conversion is applied.
 - The response is deterministic and sorted by `transaction_count desc`, absolute net magnitude desc, then `category asc`.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the category summary read path.
 - No wallet balance is persisted and no ledger mutation occurs on this endpoint.
@@ -433,10 +436,10 @@ Patch 9D scope:
 - Adds a read-only monthly summary endpoint for current-user vault ledger facts.
 - The monthly summary is computed from database transactions at request time and is not persisted.
 - The endpoint is grouped by month for public reporting.
-- Transactions are grouped by the persisted user-local `local_date` month and the public `YYYY-MM` format, avoiding UTC month drift for end-of-month local transactions.
-- `currency` accepts a 3-letter code case-insensitively, normalizes to uppercase, and defaults to `EUR`.
+- Patch 9J revises the month rule: transactions are grouped by UTC `occurred_at` month and the public `YYYY-MM` format.
+- `currency` accepts exactly three ASCII letters (`^[A-Za-z]{3}$`) case-insensitively, normalizes to uppercase, and defaults to `EUR`.
 - `GET` supports `currency`, `occurred_from`, and `occurred_to`.
-- `occurred_from` and `occurred_to` must include timezone information and filter by the absolute `occurred_at` instant.
+- `occurred_from` and `occurred_to` must include timezone information. They are interpreted as UTC-normalized absolute bounds on `occurred_at`; no local timezone conversion is applied.
 - The response is deterministic and sorted by `month desc`.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the monthly summary read path.
 - No wallet balance is persisted and no ledger mutation occurs on this endpoint.
@@ -455,8 +458,8 @@ Patch 9E scope:
 - Returns `404` when the original transaction is missing or non-owned.
 - Returns `409` when the original is already reversed, when the target is itself a reversal, or when the idempotency key is reused with a different payload.
 - Same `Idempotency-Key` plus same payload returns the original reversal response.
-- Creates exactly one new row in `imperium_vault_transactions` with the opposite transaction type, same positive amount, same currency, same category, source `reversal`, backend `occurred_at`, backend-derived `local_date`, null `external_ref`, `is_reversal = true`, `reversal_of_transaction_id = original.id`, and the trimmed `reversal_reason`.
-- Reversals are dated at the moment of reversal. They do not rewrite the original transaction's local month.
+- Creates exactly one new row in `imperium_vault_transactions` with the opposite transaction type, same positive amount, same currency, same category, source `reversal`, backend `occurred_at`, backend-derived compatibility date fields, null `external_ref`, `is_reversal = true`, `reversal_of_transaction_id = original.id`, and the trimmed `reversal_reason`.
+- Reversals are dated at the backend moment of the counter-entry. They do not rewrite the original transaction's period. A January transaction reversed in March produces a March counter-entry in Vault V1 append-only accounting.
 - This is an append-only correction endpoint: it reverses by appending an opposite ledger row.
 - The original transaction is never updated or deleted, even for corrections.
 - Patch 9F allows one and only one reversal per original transaction.
@@ -498,6 +501,19 @@ Audit-ready invariants:
 - No PUT/PATCH/DELETE endpoint exists under `/api/imperium/vault/transactions`.
 - All Vault endpoints are scoped through `CurrentUserDep`.
 - None of the Vault 9H routes persist AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, or memory state.
+
+#### Vault 9J UTC Temporal Semantics
+
+Patch 9J fixes the audit 9I temporal ambiguity without adding endpoints, migrations, or local-time reporting.
+
+- Vault V1 uses UTC temporal semantics.
+- `occurred_at` is the only authoritative temporal source for Vault V1 summaries and filters.
+- `GET /api/imperium/vault/summary/monthly` groups by the UTC month of `occurred_at` and returns `YYYY-MM`.
+- `occurred_from` and `occurred_to` are timezone-aware UTC-normalized bounds on `occurred_at`.
+- Transactions near a user's local monthly boundary can fall into the adjacent UTC month.
+- Patch 9J does not introduce `local_date` or timezone-based reporting semantics. Existing compatibility columns must not drive Vault V1 summaries.
+- Any future local-month or timezone-aware financial reporting must be a dedicated patch with its own migration and contract update.
+- Summary endpoints share the same currency contract: exactly three ASCII letters are accepted, invalid values such as `US1` or `EURO` return `422`, and accepted values are normalized uppercase.
 
 ### Vector
 

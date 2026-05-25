@@ -333,7 +333,7 @@ def test_get_vault_monthly_summary_sorts_month_desc() -> None:
     assert [item["month"] for item in response.json()["items"]] == ["2026-03", "2026-02", "2026-01"]
 
 
-def test_get_vault_monthly_summary_groups_by_persisted_local_date_month() -> None:
+def test_get_vault_monthly_summary_groups_by_occurred_at_utc_month() -> None:
     current_user = _user()
     db = FakeDb(
         scalars_results=[
@@ -353,7 +353,7 @@ def test_get_vault_monthly_summary_groups_by_persisted_local_date_month() -> Non
     response = _client(db, current_user).get("/imperium/vault/summary/monthly")
 
     assert response.status_code == 200
-    assert response.json()["items"][0]["month"] == "2026-01"
+    assert response.json()["items"][0]["month"] == "2026-02"
 
 
 def test_get_vault_monthly_summary_accepts_lowercase_currency_and_normalizes() -> None:

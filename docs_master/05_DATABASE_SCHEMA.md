@@ -675,6 +675,15 @@ Reversal fields:
 - `reversal_of_transaction_id` links a reversal row to the original transaction and is required only when `is_reversal = true`.
 - `reversal_reason` stores the trimmed user-provided correction reason; it is nullable on normal rows and max 500 characters on reversal writes.
 
+Temporal semantics:
+- Patch 9J makes `occurred_at` the only authoritative temporal source for Vault V1 summaries and filters.
+- `occurred_at` is stored and interpreted as UTC for Vault V1.
+- `GET /api/imperium/vault/summary/monthly` groups by the UTC month of `occurred_at` and returns `YYYY-MM`.
+- `occurred_from` and `occurred_to` are timezone-aware UTC-normalized bounds on `occurred_at`.
+- Transactions near a user's local monthly boundary can fall into the adjacent UTC month.
+- `local_date` and `timezone` remain compatibility columns from earlier patches, but Patch 9J does not use them for Vault V1 summary semantics.
+- Any future local-month or timezone-aware financial reporting requires a separate patch and migration.
+
 Required fields:
 - `id`
 - `user_id`
@@ -715,7 +724,7 @@ API and ownership rules:
 - Reversals are append-only corrections: the original row is never updated or deleted.
 - A non-reversal original may have one and only one reversal in Patch 9F.
 - Public Vault read responses stay safe for audit review: they expose only the fields needed by the contract and do not persist AI, n8n, OCR, sadaqa, wallet, balance, pgvector, embedding, or memory state.
-- Monthly Vault summaries group by the persisted `local_date` month (`YYYY-MM`), not by the UTC month of `occurred_at`, so a user-local end-of-month transaction stays in the user's local month.
+- Monthly Vault summaries group by the UTC `occurred_at` month (`YYYY-MM`) in Patch 9J.
 
 Patch 9A exclusions:
 - no wallet/balance automation
@@ -727,7 +736,7 @@ Patch 9F reversal rules:
 - income reverses to expense with the same amount and currency.
 - expense reverses to income with the same amount and currency.
 - Reversal rows use `source = 'reversal'`, `external_ref = null`, and store the trimmed user reason.
-- Reversal rows use backend `occurred_at`; their `local_date` is derived from the authenticated user's timezone at reversal time. They correct the ledger on the date the reversal is made, not by rewriting the original transaction's local date.
+- Reversal rows use backend `occurred_at`; compatibility date fields are derived at reversal time. They correct the ledger at the backend moment of the counter-entry, not by rewriting the original transaction's period. A January transaction reversed in March produces a March counter-entry in Vault V1 append-only accounting.
 - Reversal rows cannot themselves be reversed in V1.
 - The reverse endpoint never updates or deletes the original transaction; correction is represented only by the appended reversal row.
 - no wallet/balance automation

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -97,7 +97,7 @@ def get_vault_monthly_summary(
 
     grouped_transactions: dict[str, list[ImperiumVaultTransaction]] = {}
     for transaction in transactions:
-        month = transaction.local_date.strftime("%Y-%m")
+        month = transaction.occurred_at.astimezone(UTC).strftime("%Y-%m")
         grouped_transactions.setdefault(month, []).append(transaction)
 
     items: list[ImperiumVaultMonthlySummaryItem] = []
