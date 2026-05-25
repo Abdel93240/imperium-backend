@@ -134,6 +134,33 @@ def test_dashboard_uses_decision_framework_priorities() -> None:
     assert all(priority.importance_score is None for priority in snapshot.priorities)
 
 
+def test_dashboard_snapshot_exposes_readiness_as_a_read_only_snapshot_field() -> None:
+    current_user = _user()
+    priorities = _canonical_priorities(current_user.id)
+    db = QueueFakeDb(
+        scalar_results=[None, None, None, None],
+        scalars_results=[[], priorities, [], []],
+    )
+
+    snapshot = get_dashboard_snapshot(db, current_user=current_user)
+
+    assert snapshot.readiness.safe_explanation == "Dashboard readiness snapshot computed from read-only module data."
+    assert snapshot.readiness.mission_available is True
+    assert snapshot.readiness.vault_available is True
+    assert snapshot.readiness.path_available is True
+    assert snapshot.readiness.system_status_available is True
+    assert snapshot.readiness.current_mission_present is False
+    assert snapshot.readiness.recent_missions_count == 0
+    assert snapshot.readiness.priorities_count == 4
+    assert snapshot.readiness.latest_day_review_present is False
+    assert snapshot.readiness.vault_transaction_count == 0
+    assert snapshot.readiness.path_today_count == 0
+    assert snapshot.readiness.daily_plan_present is False
+    assert snapshot.readiness.weekly_review_banner_present is False
+    assert db.added == []
+    assert db.committed is False
+
+
 def test_daily_plan_uses_decision_framework_priorities() -> None:
     current_user = _user()
     priorities = _canonical_priorities(current_user.id)

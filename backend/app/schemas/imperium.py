@@ -1068,6 +1068,24 @@ class DashboardSystemStatus(BaseModel):
     generated_at: datetime
 
 
+class ImperiumDashboardReadinessSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mission_available: bool
+    vault_available: bool
+    path_available: bool
+    system_status_available: bool
+    current_mission_present: bool
+    recent_missions_count: int
+    priorities_count: int
+    latest_day_review_present: bool
+    vault_transaction_count: int
+    path_today_count: int
+    daily_plan_present: bool
+    weekly_review_banner_present: bool
+    safe_explanation: str = "Dashboard readiness snapshot computed from read-only module data."
+
+
 class DashboardWeeklyReviewBanner(BaseModel):
     week_start: date
     ready: bool
@@ -1085,6 +1103,7 @@ class ImperiumDashboardResponse(BaseModel):
     path_today: list[PathItemResponse]
     path_counts_today: dict[str, int]
     daily_plan_today: DailyPlanResponse | None
+    readiness: ImperiumDashboardReadinessSection
     weekly_review_banner: DashboardWeeklyReviewBanner | None = None
     system_status: DashboardSystemStatus
 

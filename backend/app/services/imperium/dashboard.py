@@ -22,13 +22,14 @@ from app.schemas.imperium import (
     DashboardVaultWeek,
     DailyPlanResponse,
     ImperiumDashboardResponse,
+    ImperiumDashboardReadinessSection,
     PathItemResponse,
 )
 from app.schemas.dashboard import (
     ImperiumDashboardFoundationResponse,
     ImperiumDashboardMissionSection,
     ImperiumDashboardPathSection,
-    ImperiumDashboardReadinessSection,
+    ImperiumDashboardReadinessSection as FoundationDashboardReadinessSection,
     ImperiumDashboardPulseSection,
     ImperiumDashboardVaultSection,
 )
@@ -108,7 +109,7 @@ def get_imperium_dashboard_foundation(
             entry=pulse_today.entry,
             safe_explanation=pulse_today.safe_explanation,
         ),
-        readiness=ImperiumDashboardReadinessSection(
+        readiness=FoundationDashboardReadinessSection(
             mission_available=True,
             vault_available=True,
             path_available=True,
@@ -191,6 +192,20 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
         path_today=[PathItemResponse.model_validate(item) for item in path_today],
         path_counts_today=_path_counts(path_today),
         daily_plan_today=DailyPlanResponse.model_validate(daily_plan_today) if daily_plan_today else None,
+        readiness=ImperiumDashboardReadinessSection(
+            mission_available=True,
+            vault_available=True,
+            path_available=True,
+            system_status_available=True,
+            current_mission_present=current_mission is not None,
+            recent_missions_count=len(recent_missions),
+            priorities_count=len(priorities),
+            latest_day_review_present=latest_day_review is not None,
+            vault_transaction_count=len(vault_transactions),
+            path_today_count=len(path_today),
+            daily_plan_present=daily_plan_today is not None,
+            weekly_review_banner_present=weekly_review_banner is not None,
+        ),
         weekly_review_banner=weekly_review_banner,
         system_status=DashboardSystemStatus(
             api_status="ok",

@@ -712,6 +712,8 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
         encoding="utf-8"
     )
+    snapshot_schema_text = (BACKEND_ROOT / "app" / "schemas" / "imperium.py").read_text(encoding="utf-8")
+    snapshot_service = dashboard_service_text.split("def get_dashboard_snapshot", maxsplit=1)[1]
     lowered_service = dashboard_service_text.lower()
     lowered_docs = contracts_text.lower() + "\n" + schema_text.lower()
 
@@ -731,6 +733,8 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     assert "currency` optional string" in lowered_docs
     assert "readiness`" in lowered_docs
     assert "safe_explanation" in contracts_text
+    assert "readiness: ImperiumDashboardReadinessSection" in snapshot_schema_text
+    assert "Dashboard readiness snapshot computed from read-only module data." in snapshot_schema_text
 
     for forbidden in (
         "db.add(",
@@ -770,6 +774,7 @@ def test_patch_12b_imperium_dashboard_contracts_and_invariants_are_consolidated(
     assert "get_dashboard_snapshot" in dashboard_service_text
     assert "return ImperiumDashboardFoundationResponse" in dashboard_service_text
     assert "readiness=ImperiumDashboardReadinessSection" in dashboard_service_text
+    assert "readiness=ImperiumDashboardReadinessSection" in snapshot_service
     assert "Query(min_length=3, max_length=3, pattern=r\"^[A-Za-z]{3}$\")" in dashboard_route_text
     assert "CurrentUserDep" in dashboard_route_text
     assert "Idempotency-Key" not in dashboard_route_text
