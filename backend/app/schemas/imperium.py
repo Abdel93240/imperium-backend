@@ -819,6 +819,28 @@ class ImperiumVaultCategorySummaryResponse(BaseModel):
     safe_explanation: str = "Vault category summary computed from current user's ledger transactions."
 
 
+class ImperiumVaultTransactionDetailRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: UUID
+    transaction_type: Literal["income", "expense"]
+    amount_cents: int
+    currency: str
+    occurred_at: datetime
+    category: str | None
+    source: str | None
+    note: str | None
+    external_ref: str | None
+    created_at: datetime
+
+
+class ImperiumVaultTransactionDetailResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transaction: ImperiumVaultTransactionDetailRead
+    safe_explanation: str = "Vault transaction detail for current user."
+
+
 class MissionDecisionScoreRead(BaseModel):
     mission_id: UUID
     status: MissionStatus

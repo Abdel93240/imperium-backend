@@ -1258,3 +1258,46 @@ def test_backlog_promotion_guardrails_have_no_external_or_memory_side_effects() 
     assert "final_weighted_score" not in promote_schema_section
     assert "ended_at" not in promote_schema_section
     assert "guardrails_checked" in promote_schema_section
+
+def test_patch_9e_vault_transaction_detail_route_is_read_only_and_user_scoped() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    docs_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    docs_text = docs_path.read_text(encoding="utf-8")
+    route_section = route_text.split('@router.get("/transactions/{transaction_id}"', maxsplit=1)[1].split(
+        '@router.get("/summary"',
+        maxsplit=1,
+    )[0]
+    service_section = service_text.split("def get_vault_transaction_detail", maxsplit=1)[1].split(
+        "def get_vault_summary",
+        maxsplit=1,
+    )[0]
+    lowered_code = "\n".join([route_section, service_section]).lower()
+    lowered_docs = docs_text.lower()
+
+    assert "class ImperiumVaultTransactionDetailResponse" in schema_text
+    assert "safe_explanation: str = \"Vault transaction detail for current user.\"" in schema_text
+    assert "CurrentUserDep" in route_section
+    assert "Idempotency-Key" not in route_section
+    assert "HTTP_404_NOT_FOUND" in route_section
+    assert "ImperiumVaultTransaction.user_id == current_user.id" in service_section
+    assert "db.add(" not in service_section
+    assert "db.flush" not in service_section
+    assert "db.commit" not in service_section
+    assert "db.rollback" not in service_section
+    assert "/api/imperium/vault/transactions/{transaction_id}" in docs_text
+    assert "non-owned => 404" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "qwenclient" not in lowered_code
+    assert "n8n_client" not in lowered_code
+    assert "trigger_n8n" not in lowered_code
+    assert "pgvector" not in lowered_code
+    assert "embedding" not in lowered_code
+    assert "memory" not in lowered_code
+    assert "calendar" not in lowered_code
+    assert "ocr" not in lowered_code
+    assert "sadaqa" not in lowered_code

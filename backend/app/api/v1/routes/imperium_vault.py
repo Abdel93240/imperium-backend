@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy.exc import IntegrityError
@@ -9,6 +10,7 @@ from app.schemas.imperium import (
     ImperiumVaultCategorySummaryResponse,
     ImperiumVaultMonthlySummaryResponse,
     ImperiumVaultSummaryResponse,
+    ImperiumVaultTransactionDetailResponse,
 )
 from app.schemas.vault import (
     ImperiumVaultTransactionCreate,
@@ -22,6 +24,7 @@ from app.services.imperium.vault_transactions import (
 )
 from app.services.imperium.vault import (
     get_vault_category_summary,
+    get_vault_transaction_detail,
     get_vault_monthly_summary,
     get_vault_summary,
 )
@@ -92,6 +95,22 @@ def list_imperium_vault_transactions_route(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
     )
+
+
+@router.get("/transactions/{transaction_id}", response_model=ImperiumVaultTransactionDetailResponse)
+def get_imperium_vault_transaction_detail_route(
+    transaction_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> ImperiumVaultTransactionDetailResponse:
+    result = get_vault_transaction_detail(
+        db,
+        current_user=current_user,
+        transaction_id=transaction_id,
+    )
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vault transaction not found.")
+    return result
 
 
 @router.get("/summary", response_model=ImperiumVaultSummaryResponse)

@@ -8,6 +8,7 @@ from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import (
     ImperiumVaultCategorySummaryItem,
     ImperiumVaultCategorySummaryResponse,
+    ImperiumVaultTransactionDetailResponse,
     ImperiumVaultMonthlySummaryItem,
     ImperiumVaultMonthlySummaryResponse,
     ImperiumVaultSummaryResponse,
@@ -218,3 +219,20 @@ def _normalize_vault_category(category: str | None) -> str:
     if not stripped:
         return "uncategorized"
     return stripped
+
+
+def get_vault_transaction_detail(
+    db: Session,
+    *,
+    current_user: User,
+    transaction_id,
+) -> ImperiumVaultTransactionDetailResponse | None:
+    transaction = db.scalar(
+        select(ImperiumVaultTransaction).where(
+            ImperiumVaultTransaction.id == transaction_id,
+            ImperiumVaultTransaction.user_id == current_user.id,
+        )
+    )
+    if transaction is None:
+        return None
+    return ImperiumVaultTransactionDetailResponse(transaction=transaction)

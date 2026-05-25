@@ -351,6 +351,7 @@ canonical for Imperium mission behavior.
 |---|---|---|---|
 | POST | `/api/imperium/vault/transactions` | Patch 9A append-only income/expense ledger create; JWT scoped; requires `Idempotency-Key`; no AI/n8n/pgvector/memory/calendar side effect | none in Patch 9A |
 | GET | `/api/imperium/vault/transactions` | Patch 9A current-user ledger read with deterministic filters and sorting; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/transactions/{transaction_id}` | Patch 9E current-user Vault transaction detail read; read-only; returns `404` when missing or non-owned; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by public month `YYYY-MM`; currency is uppercase 3 letters; no `Idempotency-Key` required | none |
@@ -385,6 +386,13 @@ calculate strategy or trigger downstream automation.
 - Supports pagination with `limit` and `offset`.
 - Sorts deterministically by `occurred_at desc`, `created_at desc`, then `id desc`.
 - Is read-only: no `db.add`, `flush`, `commit`, event creation, or workflow trigger.
+
+`GET /api/imperium/vault/transactions/{transaction_id}`:
+- Requires authenticated current-user scope.
+- Does not require `Idempotency-Key`.
+- Returns only one transaction owned by the current user.
+- Returns `404` when transaction is missing or non-owned => 404.
+- Is read-only: no `db.add`, `flush`, `commit`, wallet persistence, balance persistence, AI, n8n, OCR, sadaqa, pgvector, memory, or calendar side effects.
 
 `GET /api/imperium/vault/summary`:
 - Requires authenticated current-user scope.
@@ -426,6 +434,12 @@ Patch 9D scope:
 - The response is deterministic and sorted by `month desc`.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the monthly summary read path.
 - No wallet balance is persisted and no ledger mutation occurs on this endpoint.
+
+Patch 9E scope:
+- Adds a read-only Vault transaction detail endpoint for one transaction id.
+- Enforces current-user scope in the query; non-owned records are not disclosed and return `404`.
+- Deterministic output with safe public fields only.
+- No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the detail read path.
 
 ### Vector
 
