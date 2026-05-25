@@ -122,6 +122,16 @@ The daily-plan snapshot is a read-only consolidation layer:
 - it does not create Path or Pulse records
 - it does not mutate Mission, Vault, Path, or Pulse state
 - it is built from existing read models and current-user scoped reads only
+- it uses the Europe/Paris local date convention for its default `date`
+- it accepts an optional `date` query parameter for snapshot selection
+- it does not use AI, n8n, OCR, scoring, coaching, recommendations, or orchestration
+- it does not perform cross-module writes
+- it does not rely on any legacy dashboard aggregator
+- `summary` and `meta` are metadata-only sections
+- `meta.snapshot_generated_at` is UTC timezone-aware
+- `meta.daily_plan_version` is `v1`
+- `meta.read_only` is `true`
+- the response remains a snapshot contract, not a persisted database entity
 
 For mutable domain records, use:
 - `created_at`

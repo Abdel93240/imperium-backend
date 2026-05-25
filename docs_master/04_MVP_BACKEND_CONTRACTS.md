@@ -20,6 +20,59 @@ The contracts preserve the product rules:
 
 ## API Conventions
 
+### Imperium Daily Plan V1
+
+`GET /api/imperium/daily-plan`
+
+Purpose:
+- return a read-only daily plan snapshot for the current user
+- consolidate existing read models without creating new rows
+- expose the daily state for Imperium, Mission, Path, and Pulse in one response
+
+Request semantics:
+- optional query param: `date=YYYY-MM-DD`
+- when `date` is omitted, the backend uses the Europe/Paris local date convention via `get_default_local_date()`
+- this endpoint is snapshot-oriented and does not require `Idempotency-Key`
+
+Read-only semantics:
+- no AI
+- no n8n
+- no OCR
+- no scoring
+- no coaching
+- no recommendation
+- no orchestration
+- no automatic creation
+- no cross-module write
+- no legacy dashboard aggregator
+
+Response contract:
+- `date`
+- `dashboard`
+- `mission`
+- `path`
+- `pulse`
+- `summary`
+- `meta`
+- `safe_explanation`
+
+Snapshot metadata:
+- `summary` is metadata only and must contain booleans and counts only
+- `meta.snapshot_generated_at` is timezone-aware UTC
+- `meta.daily_plan_version` is `v1`
+- `meta.read_only` is `true`
+- `meta` is metadata only and must not carry business actions
+
+Response shape rules:
+- `dashboard` remains independently available as a separate snapshot contract
+- the daily plan aggregates existing snapshot reads only
+- no canonical row is created by the daily plan route
+- no Mission, Vault, Path, or Pulse write is allowed from this contract
+
+Europe/Paris convention:
+- daily plan default date follows the Europe/Paris local date helper
+- this convention applies only to the snapshot date selection, not to UTC metadata timestamps
+
 ## V1 Implementation Stack
 
 Final implementation decisions:

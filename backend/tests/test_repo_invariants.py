@@ -2136,6 +2136,45 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
         assert forbidden not in lowered_code
 
 
+def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_daily_plan.py").read_text(
+        encoding="utf-8"
+    )
+    service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "daily_plan.py").read_text(encoding="utf-8")
+    schema_text = (BACKEND_ROOT / "app" / "schemas" / "daily_plan.py").read_text(encoding="utf-8")
+    router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
+    lowered = "\n".join([route_text, service_text, schema_text]).lower()
+
+    assert router_text.index("imperium_daily_plan.router") < router_text.index("imperium.router")
+    assert '@router.get("/daily-plan"' in route_text
+    assert "date: date | None = Query(default=None, alias=\"date\")" in route_text
+    assert "get_default_local_date" in service_text
+    assert "datetime.now(UTC)" in service_text
+    assert 'daily_plan_version="v1"' in service_text
+    assert "read_only=True" in service_text
+    assert "db.add(" not in lowered
+    assert "db.flush" not in lowered
+    assert "db.commit" not in lowered
+    assert "legacy dashboard aggregator" not in lowered
+    assert "get_dashboard_snapshot" not in lowered
+    assert "qwenclient" not in lowered
+    assert "openai" not in lowered
+    assert "anthropic" not in lowered
+    assert "gemini" not in lowered
+    assert "claude" not in lowered
+    assert "n8n_client" not in lowered
+    assert "trigger_n8n" not in lowered
+    assert "ocr" not in lowered
+    assert "pgvector" not in lowered
+    assert "embedding" not in lowered
+    assert "memory" not in lowered
+    assert "scoring" not in lowered
+    assert "coaching" not in lowered
+    assert "recommendation" not in lowered
+    assert "auto create" not in lowered
+    assert "cross-module" not in lowered
+
+
 def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
     service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
