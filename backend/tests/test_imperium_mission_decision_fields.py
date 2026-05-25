@@ -350,6 +350,7 @@ def test_mission_score_response_does_not_expose_coefficient_or_weighted_score() 
     serialized = response.model_dump_json()
     assert "decision_score" in serialized
     assert "priority_bucket" in serialized
+    assert "intrinsic_score" not in serialized
     assert "domain_coefficient" not in serialized
     assert "weighted_score" not in serialized
     assert "final_weighted_score" not in serialized
@@ -386,7 +387,6 @@ def test_idempotent_start_mission_does_not_duplicate_mission_score() -> None:
         "status": "started",
         "score_created": True,
         "decision_score": {
-            "intrinsic_score": 10,
             "priority_bucket": 4,
             "score_status": "partial",
             "missing_fields": ["deadline_at", "impact", "dependency", "recurrence"],

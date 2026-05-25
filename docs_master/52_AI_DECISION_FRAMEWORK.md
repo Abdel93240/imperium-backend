@@ -257,6 +257,26 @@ EXAMPLE 5 — Buy shoes (Finances):
    shows the breakdown: A=20, B=15, C=15, D=0, E=5, total=55,
    coef Religieux ×10 = 550.
 
+### 5.3 Mission decision-preview and decision-score
+
+The mission `decision-preview` and `decision-score` routes are deterministic
+backend-only reads.
+
+- They use only fields already stored in PostgreSQL.
+- They do not call AI.
+- They do not call n8n.
+- They do not write pgvector embeddings.
+- They do not commit memory.
+- They do not trigger calendar replanning.
+- They do not expose `weighted_score`.
+- They do not expose `domain_coefficient`.
+- They do not expose the internal scoring formula.
+- They expose a public `label` and optional `reason_codes` only.
+- `reason_codes` are public-safe labels only.
+- They are not a formula dump.
+- Promotion remains a backend guardrail driven by the user flow, not an
+  automatic AI decision.
+
 ✅ ADJUSTABLE
    Tuning is done by adjusting the criteria thresholds, not 
    by changing prompts.

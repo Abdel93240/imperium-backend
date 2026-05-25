@@ -418,7 +418,9 @@ class MissionDetailResponse(BaseModel):
 
 
 class MissionDecisionScoreSummary(BaseModel):
-    intrinsic_score: int
+    # Internal score value retained for backend bookkeeping, but excluded from
+    # public JSON serialization.
+    intrinsic_score: int | None = Field(default=None, exclude=True)
     priority_bucket: int
     score_status: str
     missing_fields: list[str]

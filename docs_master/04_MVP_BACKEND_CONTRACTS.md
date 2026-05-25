@@ -258,6 +258,37 @@ Access tokens:
 - TTL: 15 minutes
 - sent with API requests
 
+## Mission API Contract Consolidation
+
+The mission module is user-scoped through `CurrentUserDep` on every route.
+Read-only mission routes do not require `Idempotency-Key`.
+Write mission routes require `Idempotency-Key`.
+
+Patch 8A through 8H mission routes must not call AI, n8n, pgvector, embeddings,
+memory commit, or calendar replanning.
+No AI. No n8n. No pgvector writes. No embeddings. No memory commit. No calendar replanning.
+
+| method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
+|---|---|---|---|---|---|---|---|---|
+| POST | `/api/imperium/missions/backlog` | Create a backlog mission from user input. | Required | `CurrentUserDep` | write | `mission`, `event_id`, `idempotency_key`, `status`, `score_created`, safe `decision_score` summary | `400`, `409`, `422` | Allowed: create mission, event, idempotency record, stored decision-score summary. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/backlog` | List the current user's backlog missions. | Not required | `CurrentUserDep` | read-only | `items`, `count`, `ordering` | `200`, `401`, `422` | Allowed: read stored backlog rows only. Forbidden: writes of any kind, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/backlog/decision-preview` | Return a deterministic backend preview of the recommended backlog mission. | Not required | `CurrentUserDep` | read-only | `recommended_mission_id`, `candidate_count`, `candidates`, `safe_explanation` | `200`, `401`, `422` | Allowed: read stored backlog rows and stored score rows only. Forbidden: AI calls, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| POST | `/api/imperium/missions/backlog/{mission_id}/promote` | Promote one backlog mission to the single active mission. | Required | `CurrentUserDep` | write | `mission`, `promotion_summary`, `event_id`, `idempotency_key`, `status`, safe `decision_score` summary | `400`, `404`, `409`, `422` | Allowed: update mission state, create event, persist idempotency record. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/active` | Read the single active mission for the current user. | Not required | `CurrentUserDep` | read-only | `mission`, `safe_explanation` | `200`, `404`, `409` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| POST | `/api/imperium/missions/{mission_id}/complete` | Complete the active mission or mark it failed/abandoned. | Required | `CurrentUserDep` | write | `mission`, `completion_summary` | `400`, `404`, `409`, `422` | Allowed: update mission state, create event, persist idempotency record. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/history` | Read historical missions for the current user. | Not required | `CurrentUserDep` | read-only | `items`, `count`, `limit`, `offset`, `safe_explanation` | `200`, `401`, `422` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/{mission_id}` | Read one mission detail record. | Not required | `CurrentUserDep` | read-only | `mission`, `safe_explanation` | `200`, `404` | Allowed: read only. Forbidden: writes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+| GET | `/api/imperium/missions/{mission_id}/decision-score` | Read the safe public decision-score view for one mission. | Not required | `CurrentUserDep` | read-only | `mission_id`, `status`, `priority_level`, `priority_bucket`, `score_summary`, `safe_explanation` | `200`, `404` | Allowed: read only, deterministic summary from stored data. Forbidden: AI, n8n, pgvector, embeddings, memory commit, calendar replanning. |
+
+Public mission score summaries must stay safe:
+
+- they do not expose `weighted_score`
+- they do not expose `domain_coefficient`
+- they do not expose the internal formula
+- they do not expose client-supplied score fields
+- they do not use AI as a hidden scorer
+- they do not use n8n as a hidden scorer
+
 Refresh tokens:
 - TTL: 30 days
 - device-bound

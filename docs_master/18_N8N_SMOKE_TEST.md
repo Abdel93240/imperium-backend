@@ -43,6 +43,12 @@ Expected boundary:
 - no recurrence, auto-replan, AI scheduling, mobile sync, notifications,
   pgvector write, or embeddings are triggered.
 
+## Patch 8I - Mission Boundary Clarification
+
+The routes mission in Patch 8A->8H must not trigger n8n.
+n8n remains out of path for the mission routes.
+n8n smoke tests must not depend on the mission routes.
+
 ## Patch 2F - WR Qwen Dry-Run Workflow Smoke Test
 
 Workflow file:

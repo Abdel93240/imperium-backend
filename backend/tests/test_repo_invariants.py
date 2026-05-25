@@ -4,6 +4,7 @@ from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
+DOCS_ROOT = REPO_ROOT / "docs_master"
 INTERNAL_SECRET_HEADER = "X-Internal" + "-Secret"
 N8N_DB_NAME = "n8n" + "_db"
 
@@ -245,6 +246,115 @@ def test_wr_mission_history_read_has_no_ai_or_write_paths() -> None:
     assert "weighted_score" not in history_section
     assert "coefficient" not in history_section
     assert "Idempotency-Key" not in route_section
+
+
+def test_patch_8i_mission_contract_docs_and_route_order_are_consolidated() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    decision_framework_text = (DOCS_ROOT / "52_AI_DECISION_FRAMEWORK.md").read_text(encoding="utf-8")
+    ai_tasks_text = (DOCS_ROOT / "31_AI_TASKS_AND_RESULTS_CONTRACT.md").read_text(encoding="utf-8")
+    smoke_text = (DOCS_ROOT / "18_N8N_SMOKE_TEST.md").read_text(encoding="utf-8")
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py").read_text(encoding="utf-8")
+
+    for endpoint in (
+        "/api/imperium/missions/backlog",
+        "/api/imperium/missions/backlog/decision-preview",
+        "/api/imperium/missions/backlog/{mission_id}/promote",
+        "/api/imperium/missions/active",
+        "/api/imperium/missions/{mission_id}/complete",
+        "/api/imperium/missions/history",
+        "/api/imperium/missions/{mission_id}",
+        "/api/imperium/missions/{mission_id}/decision-score",
+    ):
+        assert f"`{endpoint}`" in contracts_text
+
+    assert "| POST |" in contracts_text
+    assert "| GET |" in contracts_text
+
+    assert "CurrentUserDep" in contracts_text
+    assert "Idempotency-Key" in contracts_text
+    assert "no ai" in contracts_text.lower()
+    assert "no n8n" in contracts_text.lower()
+    assert "pgvector" in contracts_text.lower()
+    assert "embedding" in contracts_text.lower()
+    assert "memory" in contracts_text.lower()
+    assert "calendar" in contracts_text.lower()
+
+    lowered_decision_framework = " ".join(decision_framework_text.lower().split())
+    assert "deterministic backend-only reads" in lowered_decision_framework
+    assert "decision-preview" in lowered_decision_framework
+    assert "decision-score" in lowered_decision_framework
+    assert "do not expose `weighted_score`" in lowered_decision_framework
+    assert "do not expose `domain_coefficient`" in lowered_decision_framework
+    assert "reason_codes" in lowered_decision_framework
+    assert "label" in lowered_decision_framework
+
+    lowered_ai_tasks = ai_tasks_text.lower()
+    assert "mission module 8a->8h does not create an ai task" in lowered_ai_tasks
+    assert "ai_tasks" in lowered_ai_tasks
+    assert "ai_results" in lowered_ai_tasks
+    assert "n8n receives nothing" in lowered_ai_tasks
+
+    lowered_smoke = smoke_text.lower()
+    assert "routes mission" in lowered_smoke
+    assert "must not trigger n8n" in lowered_smoke
+    assert "n8n smoke tests must not depend on the mission routes" in lowered_smoke
+
+    route_order = [
+        route_text.index('@router.get("/missions/current"'),
+        route_text.index('@router.get("/missions/active"'),
+        route_text.index('@router.get("/missions/history"'),
+        route_text.index('@router.get("/missions/recent"'),
+        route_text.index('@router.get(\n    "/missions/{mission_id}"'),
+        route_text.index('@router.get(\n    "/missions/{mission_id}/decision-score"'),
+    ]
+    assert route_order == sorted(route_order)
+
+    read_only_sections = [
+        route_text.split('@router.get("/missions/backlog"', maxsplit=1)[1].split(
+            '@router.get(\n    "/missions/backlog/decision-preview"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get(\n    "/missions/backlog/decision-preview"', maxsplit=1)[1].split(
+            '@router.post("/missions/backlog/{mission_id}/promote"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get("/missions/current"', maxsplit=1)[1].split(
+            '@router.get("/missions/active"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get("/missions/active"', maxsplit=1)[1].split(
+            '@router.get("/missions/history"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get("/missions/history"', maxsplit=1)[1].split(
+            '@router.get("/missions/recent"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get("/missions/recent"', maxsplit=1)[1].split(
+            '@router.get(\n    "/missions/{mission_id}"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get(\n    "/missions/{mission_id}"', maxsplit=1)[1].split(
+            '@router.get(\n    "/missions/{mission_id}/decision-score"',
+            maxsplit=1,
+        )[0],
+        route_text.split('@router.get(\n    "/missions/{mission_id}/decision-score"', maxsplit=1)[1].split(
+            '@router.get("/weekly-review/history"',
+            maxsplit=1,
+        )[0],
+    ]
+
+    for section in read_only_sections:
+        lowered_section = section.lower()
+        assert "db.add(" not in section
+        assert "db.flush" not in section
+        assert "db.commit" not in section
+        assert "qwenclient" not in lowered_section
+        assert "n8n" not in lowered_section
+        assert "pgvector" not in lowered_section
+        assert "embedding" not in lowered_section
+        assert "memory" not in lowered_section
+        assert "calendar" not in lowered_section
 
 
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:

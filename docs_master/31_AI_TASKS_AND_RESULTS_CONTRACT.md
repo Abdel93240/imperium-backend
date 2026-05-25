@@ -102,6 +102,18 @@ n8n role: future orchestration only. n8n must call backend APIs and must not wri
 
 ---
 
+## Patch 8I - Mission Module Boundary
+
+Mission module 8A->8H does not create an AI task.
+
+- No backlog mission route writes to `ai_tasks` or `ai_results`.
+- No active mission route writes to `ai_tasks` or `ai_results`.
+- No mission history, detail, or decision-score route writes to `ai_tasks` or `ai_results`.
+- n8n receives nothing from these mission routes.
+- Future AI mission analysis must use a separate contract, not this one.
+
+---
+
 ## Patch 2B - WR Conversation Integration
 
 Patch 2B adds the backend-owned Weekly Review conversation layer.

@@ -426,7 +426,13 @@ def test_backlog_decision_preview_does_not_expose_internal_coefficients() -> Non
 
     assert response.status_code == 200
     body_text = response.text
-    for forbidden in ("domain_coefficient", "weighted_score", "final_weighted_score", "position_to_coefficient"):
+    for forbidden in (
+        "domain_coefficient",
+        "weighted_score",
+        "final_weighted_score",
+        "position_to_coefficient",
+        "intrinsic_score",
+    ):
         assert forbidden not in body_text
 
 
@@ -714,7 +720,6 @@ def test_backlog_idempotent_create_replay_does_not_duplicate_score() -> None:
             "created_at": now,
             "updated_at": now,
             "decision_score": {
-                "intrinsic_score": 30,
                 "priority_bucket": 5,
                 "score_status": "partial",
                 "missing_fields": ["deadline_at"],
