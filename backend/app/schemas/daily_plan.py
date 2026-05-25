@@ -17,6 +17,17 @@ class DailyPlanSummarySection(BaseModel):
     safe_explanation: str = "Daily plan summary computed from existing read-only snapshots."
 
 
+class DailyPlanReadinessSection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dashboard_present: bool
+    mission_present: bool
+    path_items_count: int
+    pulse_entry_present: bool
+    read_only: bool
+    safe_explanation: str = "Daily plan readiness snapshot computed from existing read-only data."
+
+
 class DailyPlanMetaSection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -34,7 +45,7 @@ class DailyPlanResponse(BaseModel):
     mission: ActiveMissionResponse
     path: PathTodayResponse
     pulse: PulseTodayResponse
+    readiness: DailyPlanReadinessSection
     summary: DailyPlanSummarySection
     meta: DailyPlanMetaSection
     safe_explanation: str = "Imperium daily plan snapshot for current user."
-

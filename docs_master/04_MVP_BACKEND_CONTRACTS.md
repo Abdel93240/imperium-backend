@@ -52,11 +52,17 @@ Response contract:
 - `mission`
 - `path`
 - `pulse`
+- `readiness`
 - `summary`
 - `meta`
 - `safe_explanation`
 
 Snapshot metadata:
+- `readiness` is a readiness snapshot only block and must contain booleans and counts only
+- `readiness` is bool/count only
+- `readiness` is not a score, not a health score, not a recommendation, and not a coaching surface
+- `readiness.read_only` is always `true`
+- `readiness.safe_explanation` must explain that it is computed from existing read-only data
 - `summary` is metadata only and must contain booleans and counts only
 - `meta.snapshot_generated_at` is timezone-aware UTC
 - `meta.daily_plan_version` is `v1`

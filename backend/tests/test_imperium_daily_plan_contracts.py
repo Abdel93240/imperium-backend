@@ -89,6 +89,7 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
         "mission",
         "path",
         "pulse",
+        "readiness",
         "summary",
         "meta",
         "safe_explanation",
@@ -100,6 +101,14 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
     assert snapshot_generated_at.utcoffset() is not None and snapshot_generated_at.utcoffset().total_seconds() == 0
     assert body["dashboard"]["meta"]["read_only"] is True
     assert body["dashboard"]["meta"]["dashboard_version"] == "v1"
+    assert body["readiness"] == {
+        "dashboard_present": True,
+        "mission_present": False,
+        "path_items_count": 0,
+        "pulse_entry_present": False,
+        "read_only": True,
+        "safe_explanation": "Daily plan readiness snapshot computed from existing read-only data.",
+    }
     assert body["summary"] == {
         "has_active_mission": False,
         "path_items_count": 0,
@@ -108,6 +117,7 @@ def test_daily_plan_contract_shape_and_metadata_semantics() -> None:
     }
     assert "score" not in str(body).lower()
     assert "recommendation" not in str(body).lower()
+    assert "health_score" not in str(body).lower()
 
 
 def test_daily_plan_is_read_only_and_does_not_require_idempotency_key() -> None:
@@ -118,6 +128,27 @@ def test_daily_plan_is_read_only_and_does_not_require_idempotency_key() -> None:
     assert db.added == []
     assert db.flushed is False
     assert db.committed is False
+
+
+def test_daily_plan_readiness_is_bool_count_only_and_snapshot_coherent() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/daily-plan")
+
+    assert response.status_code == 200
+    readiness = response.json()["readiness"]
+    assert readiness == {
+        "dashboard_present": True,
+        "mission_present": False,
+        "path_items_count": 0,
+        "pulse_entry_present": False,
+        "read_only": True,
+        "safe_explanation": "Daily plan readiness snapshot computed from existing read-only data.",
+    }
+    for key, value in readiness.items():
+        if key in {"dashboard_present", "mission_present", "pulse_entry_present", "read_only"}:
+            assert isinstance(value, bool)
+        elif key == "path_items_count":
+            assert isinstance(value, int)
+            assert value >= 0
 
 
 def test_daily_plan_docs_explicitly_document_contract_rules() -> None:
@@ -131,6 +162,9 @@ def test_daily_plan_docs_explicitly_document_contract_rules() -> None:
         assert "meta.daily_plan_version" in text
         assert "meta.read_only" in text
         assert "snapshot_generated_at" in text
+        assert "readiness snapshot" in text
+        assert "not a score" in text
+        assert "not a recommendation" in text
         assert "ai" in text
         assert "n8n" in text
         assert "ocr" in text

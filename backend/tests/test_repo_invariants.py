@@ -2093,10 +2093,16 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
     assert "get_pulse_today_entry" in service_text
     assert "get_dashboard_snapshot" not in service_text
     assert "DailyPlanSummarySection" in schema_text
+    assert "DailyPlanReadinessSection" in schema_text
     assert "DailyPlanMetaSection" in schema_text
     assert "read_only: bool" in schema_text
     assert "daily_plan_version: str" in schema_text
     assert "snapshot_generated_at: datetime" in schema_text
+    assert "dashboard_present: bool" in schema_text
+    assert "mission_present: bool" in schema_text
+    assert "path_items_count: int" in schema_text
+    assert "pulse_entry_present: bool" in schema_text
+    assert "readiness: DailyPlanReadinessSection" in schema_text
     assert 'api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])' in router_text
     assert router_text.index("imperium_daily_plan.router") < router_text.index("imperium.router")
 
@@ -2104,8 +2110,15 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
     assert "daily plan snapshot" in contracts_text
     assert "read-only consolidation layer" in contracts_text
     assert "no legacy dashboard aggregator" in contracts_text
+    assert "readiness snapshot only" in contracts_text
+    assert "bool/count only" in contracts_text
+    assert "not a score" in contracts_text
+    assert "not a recommendation" in contracts_text
+    assert "read-only semantics" in contracts_text
     assert "/api/imperium/daily-plan" in schema_docs_text
     assert "does not persist a new plan row" in schema_docs_text
+    assert "summary and meta are metadata-only sections" in schema_docs_text
+    assert "readiness" in schema_docs_text
 
     for forbidden in (
         "qwenclient",
@@ -2128,6 +2141,7 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
         "coaching",
         "recommendation",
         "health_score",
+        "coach",
         "db.add(",
         "db.flush",
         "db.commit",
@@ -2157,6 +2171,9 @@ def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
     assert "db.commit" not in lowered
     assert "legacy dashboard aggregator" not in lowered
     assert "get_dashboard_snapshot" not in lowered
+    assert "dashboard_present" in lowered
+    assert "mission_present" in lowered
+    assert "read_only=True" in service_text
     assert "qwenclient" not in lowered
     assert "openai" not in lowered
     assert "anthropic" not in lowered
@@ -2171,6 +2188,7 @@ def test_patch_13b_daily_plan_contract_is_explicit_and_write_free() -> None:
     assert "scoring" not in lowered
     assert "coaching" not in lowered
     assert "recommendation" not in lowered
+    assert "health_score" not in lowered
     assert "auto create" not in lowered
     assert "cross-module" not in lowered
 

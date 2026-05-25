@@ -170,6 +170,7 @@ def test_daily_plan_contract_shape_and_query_params() -> None:
         "mission",
         "path",
         "pulse",
+        "readiness",
         "summary",
         "meta",
         "safe_explanation",
@@ -179,6 +180,14 @@ def test_daily_plan_contract_shape_and_query_params() -> None:
     assert body["mission"]["mission"] is None
     assert body["path"]["count"] == 0
     assert body["pulse"]["entry"] is None
+    assert body["readiness"] == {
+        "dashboard_present": True,
+        "mission_present": False,
+        "path_items_count": 0,
+        "pulse_entry_present": False,
+        "read_only": True,
+        "safe_explanation": "Daily plan readiness snapshot computed from existing read-only data.",
+    }
     assert body["summary"] == {
         "has_active_mission": False,
         "path_items_count": 0,
@@ -236,6 +245,14 @@ def test_daily_plan_propagates_active_mission_path_and_pulse_today() -> None:
     assert body["path"]["count"] == 1
     assert body["pulse"]["entry"]["id"] == str(entry.id)
     assert body["pulse"]["entry"]["notes"] == "Good baseline day"
+    assert body["readiness"] == {
+        "dashboard_present": True,
+        "mission_present": True,
+        "path_items_count": 1,
+        "pulse_entry_present": True,
+        "read_only": True,
+        "safe_explanation": "Daily plan readiness snapshot computed from existing read-only data.",
+    }
     assert body["summary"] == {
         "has_active_mission": True,
         "path_items_count": 1,

@@ -127,6 +127,11 @@ The daily-plan snapshot is a read-only consolidation layer:
 - it does not use AI, n8n, OCR, scoring, coaching, recommendations, or orchestration
 - it does not perform cross-module writes
 - it does not rely on any legacy dashboard aggregator
+- `readiness` is a readiness snapshot only block in the response and contains booleans and counts only
+- `readiness` is bool/count only
+- summary and meta are metadata-only sections
+- `readiness` is not a score, not a health score, not a recommendation, and not a coaching surface
+- `readiness.read_only` is always `true`
 - `summary` and `meta` are metadata-only sections
 - `meta.snapshot_generated_at` is UTC timezone-aware
 - `meta.daily_plan_version` is `v1`
