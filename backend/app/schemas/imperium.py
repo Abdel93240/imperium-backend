@@ -309,6 +309,28 @@ class MissionResponse(BaseModel):
     idempotency_key: str | None = None
 
 
+class ActiveMissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: str
+    title: str
+    category: str | None
+    domain: str | None
+    priority_level: int | None
+    mission_type_category: str | None
+    planned_start_at: datetime | None
+    planned_end_at: datetime | None
+    started_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class ActiveMissionResponse(BaseModel):
+    mission: ActiveMissionRead | None
+    safe_explanation: str
+
+
 class MissionCompletionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

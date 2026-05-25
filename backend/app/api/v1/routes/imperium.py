@@ -11,6 +11,7 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    ActiveMissionResponse,
     BacklogDecisionPreviewResponse,
     BacklogMissionCreateRequest,
     BacklogMissionCreateResponse,
@@ -140,10 +141,12 @@ from app.services.imperium.missions import (
     MissionNotFoundError,
     MissionScoreNotFoundError,
     MissionStateConflictError,
+    MultipleActiveMissionsError,
     complete_mission,
     create_backlog_mission,
     fail_mission,
     get_backlog_decision_preview,
+    get_current_active_mission,
     get_current_mission,
     get_mission_decision_score,
     get_recent_missions,
@@ -1172,6 +1175,17 @@ def current_mission_route(current_user: CurrentUserDep, db: SessionDep) -> Missi
     if mission is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active mission found.")
     return MissionResponse.model_validate(mission)
+
+
+@router.get("/missions/active", response_model=ActiveMissionResponse)
+def active_mission_route(current_user: CurrentUserDep, db: SessionDep) -> ActiveMissionResponse:
+    try:
+        return get_current_active_mission(db, current_user=current_user)
+    except MultipleActiveMissionsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Multiple active missions found for current user.",
+        ) from exc
 
 
 @router.get("/missions/recent", response_model=list[MissionResponse])

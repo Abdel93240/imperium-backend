@@ -718,10 +718,45 @@ def test_backlog_decision_preview_has_no_ai_n8n_pgvector_embedding_or_writes() -
     assert "mission.status =" not in preview_service_section
     assert "started_at" not in preview_schema_section
     assert "ended_at" not in preview_schema_section
-    assert "domain_coefficient" not in preview_text
-    assert "weighted_score" not in preview_text
-    assert "final_weighted_score" not in preview_text
-    assert "position_to_coefficient" not in preview_text
+
+
+def test_active_mission_read_has_no_ai_n8n_pgvector_embedding_or_writes() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    route_text = route_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    active_route_section = route_text.split('@router.get("/missions/active"', maxsplit=1)[1].split(
+        '@router.get("/missions/recent"',
+        maxsplit=1,
+    )[0]
+    active_schema_section = schema_text.split("class ActiveMissionRead", maxsplit=1)[1].split(
+        "class MissionCompletionRead",
+        maxsplit=1,
+    )[0]
+    combined = "\n".join([active_route_section, active_schema_section]).lower()
+
+    assert "Idempotency-Key" not in active_route_section
+    assert "QwenClient" not in active_route_section
+    assert "providers" not in active_route_section
+    assert "openai" not in combined
+    assert "anthropic" not in combined
+    assert "gemini" not in combined
+    assert "claude" not in combined
+    assert "n8n" not in combined
+    assert "pgvector" not in combined
+    assert "embedding" not in combined
+    assert "ai agent" not in combined
+    assert "aiagent" not in combined
+    assert "memory commit" not in combined
+    assert "replanning" not in combined
+    assert "calendar" not in combined
+    assert "db.add" not in active_route_section
+    assert "db.flush" not in active_route_section
+    assert "db.commit" not in active_route_section
+    assert "weighted_score" not in active_schema_section
+    assert "domain_coefficient" not in active_schema_section
+    assert "coefficient" not in active_schema_section
+    assert "ended_at" not in active_schema_section
 
 
 def test_backlog_path_has_no_n8n_client_imports() -> None:

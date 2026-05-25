@@ -12,6 +12,8 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import (
+    ActiveMissionRead,
+    ActiveMissionResponse,
     BacklogDecisionCandidate,
     BacklogDecisionPreviewResponse,
     BacklogDecisionScoreSummary,
@@ -57,6 +59,10 @@ class MissionStateConflictError(ValueError):
     pass
 
 
+class MultipleActiveMissionsError(ValueError):
+    pass
+
+
 class MissionScoreNotFoundError(ValueError):
     pass
 
@@ -80,6 +86,8 @@ MISSION_COMPLETION_GUARDRAILS_CHECKED = [
     "IDEMPOTENCY_KEY_ACCEPTED",
 ]
 MISSION_COMPLETION_SAFE_EXPLANATION = "Mission completed using deterministic backend guardrails only."
+ACTIVE_MISSION_SAFE_EXPLANATION = "Current active mission for user."
+ACTIVE_MISSION_NONE_SAFE_EXPLANATION = "No active mission found for current user."
 
 
 def start_mission(
@@ -571,6 +579,28 @@ def fail_mission(
 
 def get_current_mission(db: Session, *, current_user: User) -> ImperiumMission | None:
     return _get_active_mission(db, current_user=current_user)
+
+
+def get_current_active_mission(db: Session, *, current_user: User) -> ActiveMissionResponse:
+    missions = list(
+        db.scalars(
+            select(ImperiumMission)
+            .where(
+                ImperiumMission.user_id == current_user.id,
+                ImperiumMission.status == "active",
+            )
+            .order_by(ImperiumMission.started_at.asc(), ImperiumMission.id.asc())
+            .limit(2)
+        )
+    )
+    if not missions:
+        return ActiveMissionResponse(mission=None, safe_explanation=ACTIVE_MISSION_NONE_SAFE_EXPLANATION)
+    if len(missions) > 1:
+        raise MultipleActiveMissionsError("Multiple active missions found for current user.")
+    return ActiveMissionResponse(
+        mission=ActiveMissionRead.model_validate(missions[0]),
+        safe_explanation=ACTIVE_MISSION_SAFE_EXPLANATION,
+    )
 
 
 def get_recent_missions(db: Session, *, current_user: User, limit: int) -> list[ImperiumMission]:
