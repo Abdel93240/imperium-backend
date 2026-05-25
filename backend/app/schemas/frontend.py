@@ -47,3 +47,50 @@ class ImperiumFrontendLayoutResponse(BaseModel):
     shell: ImperiumFrontendLayoutShell
     regions: list[ImperiumFrontendLayoutRegion]
     safe_explanation: str
+
+
+class ImperiumFrontendThemeSurface(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    purpose: str
+    token: str
+
+
+class ImperiumFrontendThemeScaleItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    value: int
+
+
+class ImperiumFrontendThemeTypographyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    purpose: str
+
+
+class ImperiumFrontendThemePalette(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    background: str
+    surface: str
+    primary: str
+    secondary: str
+    danger: str
+    muted: str
+
+
+class ImperiumFrontendThemeTokensResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    theme_version: str
+    read_only: bool
+    style_name: str
+    palette: ImperiumFrontendThemePalette
+    surfaces: list[ImperiumFrontendThemeSurface]
+    spacing_scale: list[ImperiumFrontendThemeScaleItem]
+    radius_scale: list[ImperiumFrontendThemeScaleItem]
+    typography_scale: list[ImperiumFrontendThemeTypographyItem]
+    safe_explanation: str

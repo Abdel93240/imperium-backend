@@ -2561,3 +2561,18 @@ Frontend layout contract note:
 - no AI, n8n, OCR, scoring, coaching, or recommendation flows
 - no user_id exposure
 - no secrets/providers/infra metadata
+
+Frontend theme tokens contract note:
+- `GET /api/imperium/frontend/theme-tokens` is metadata only
+- static deterministic V1 contract
+- not a dynamic theme
+- not a user preference
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no business data read
+- no writes
+- no AI, n8n, OCR, scoring, coaching, or recommendation flows
+- no user_id exposure
+- no secrets/providers/infra metadata
+- no asset URL/font file exposure

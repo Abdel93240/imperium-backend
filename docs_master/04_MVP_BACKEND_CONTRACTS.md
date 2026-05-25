@@ -154,6 +154,7 @@ It contains four JWT-scoped, read-only, metadata-only contracts:
 - Contracts Compliance = declarative only, not a runtime audit
 - Frontend Navigation = static navigation configuration
 - Frontend Layout = static layout configuration
+- Frontend Theme Tokens = static semantic theme token metadata
 
 Shared rules:
 - metadata only
@@ -173,6 +174,11 @@ Deterministic ordering rules:
 - Contracts Compliance checks order: `metadata_only`, `not_openapi`, `not_health_check`, `no_business_data_read`, `no_dynamic_discovery`
 - Frontend Navigation items order: `home`, `dashboard`, `daily_plan`, `missions`, `vault`, `path`, `pulse`
 - Frontend Layout regions order: `hero`, `mission`, `daily_plan`, `path`, `pulse`, `vault`
+- Frontend Theme Tokens order:
+  surfaces = `base`, `card`, `elevated`
+  spacing_scale = `xs`, `sm`, `md`, `lg`, `xl`
+  radius_scale = `sm`, `md`, `lg`, `xl`
+  typography_scale = `caption`, `body`, `title`, `hero`
 
 Contract notes:
 - `Home Bootstrap` is metadata only and not a runtime health check
@@ -180,6 +186,36 @@ Contract notes:
 - `Contracts Compliance` is declarative only and does not perform runtime audit
 - `Frontend Navigation` is static and deterministic, not a discovery mechanism
 - `Frontend Layout` is static and deterministic, not a dynamic theme and not a discovery mechanism
+- `Frontend Theme Tokens` is static and deterministic, metadata only, not a dynamic theme, and not a user preference
+
+### Imperium Frontend Theme Tokens Config V1
+
+`GET /api/imperium/frontend/theme-tokens`
+
+Purpose:
+- return frontend theme token metadata only for Imperium V1
+- provide static deterministic V1 semantic tokens
+- avoid runtime discovery, dynamic theme logic, and user preference reads
+
+Rules:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- metadata only
+- no business data read
+- no writes
+- no auto-creation
+- not a dynamic theme
+- not a user preference
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module write
+- no user_id exposure
+- no secrets/providers/infra metadata
+- no asset URL/font file exposure
+- no raw hex color exposure in V1 (semantic token names only)
 
 ### Imperium Frontend Layout Config V1
 

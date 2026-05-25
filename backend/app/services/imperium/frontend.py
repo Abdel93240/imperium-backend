@@ -4,6 +4,11 @@ from app.schemas.frontend import (
     ImperiumFrontendLayoutShell,
     ImperiumFrontendNavigationItem,
     ImperiumFrontendNavigationResponse,
+    ImperiumFrontendThemePalette,
+    ImperiumFrontendThemeScaleItem,
+    ImperiumFrontendThemeSurface,
+    ImperiumFrontendThemeTokensResponse,
+    ImperiumFrontendThemeTypographyItem,
 )
 
 IMPERIUM_FRONTEND_NAVIGATION_ITEMS: tuple[ImperiumFrontendNavigationItem, ...] = (
@@ -129,4 +134,54 @@ def get_imperium_frontend_layout_metadata() -> ImperiumFrontendLayoutResponse:
         },
         regions=list(IMPERIUM_FRONTEND_LAYOUT_REGIONS),
         safe_explanation="Frontend layout metadata for Imperium V1.",
+    )
+
+
+IMPERIUM_FRONTEND_THEME_SURFACES: tuple[ImperiumFrontendThemeSurface, ...] = (
+    ImperiumFrontendThemeSurface(key="base", purpose="Main application background.", token="surface.base"),
+    ImperiumFrontendThemeSurface(key="card", purpose="Primary content card surface.", token="surface.card"),
+    ImperiumFrontendThemeSurface(key="elevated", purpose="Elevated premium panel surface.", token="surface.elevated"),
+)
+
+IMPERIUM_FRONTEND_THEME_SPACING: tuple[ImperiumFrontendThemeScaleItem, ...] = (
+    ImperiumFrontendThemeScaleItem(key="xs", value=4),
+    ImperiumFrontendThemeScaleItem(key="sm", value=8),
+    ImperiumFrontendThemeScaleItem(key="md", value=12),
+    ImperiumFrontendThemeScaleItem(key="lg", value=16),
+    ImperiumFrontendThemeScaleItem(key="xl", value=24),
+)
+
+IMPERIUM_FRONTEND_THEME_RADIUS: tuple[ImperiumFrontendThemeScaleItem, ...] = (
+    ImperiumFrontendThemeScaleItem(key="sm", value=8),
+    ImperiumFrontendThemeScaleItem(key="md", value=14),
+    ImperiumFrontendThemeScaleItem(key="lg", value=20),
+    ImperiumFrontendThemeScaleItem(key="xl", value=28),
+)
+
+IMPERIUM_FRONTEND_THEME_TYPOGRAPHY: tuple[ImperiumFrontendThemeTypographyItem, ...] = (
+    ImperiumFrontendThemeTypographyItem(key="caption", purpose="Compact metadata labels."),
+    ImperiumFrontendThemeTypographyItem(key="body", purpose="Default readable body text."),
+    ImperiumFrontendThemeTypographyItem(key="title", purpose="Section titles."),
+    ImperiumFrontendThemeTypographyItem(key="hero", purpose="Primary dashboard focus text."),
+)
+
+
+def get_imperium_frontend_theme_tokens_metadata() -> ImperiumFrontendThemeTokensResponse:
+    return ImperiumFrontendThemeTokensResponse(
+        theme_version="v1",
+        read_only=True,
+        style_name="imperium_luxury",
+        palette=ImperiumFrontendThemePalette(
+            background="matte_black",
+            surface="deep_blue_black",
+            primary="champagne_gold",
+            secondary="premium_green",
+            danger="controlled_red",
+            muted="warm_gray",
+        ),
+        surfaces=list(IMPERIUM_FRONTEND_THEME_SURFACES),
+        spacing_scale=list(IMPERIUM_FRONTEND_THEME_SPACING),
+        radius_scale=list(IMPERIUM_FRONTEND_THEME_RADIUS),
+        typography_scale=list(IMPERIUM_FRONTEND_THEME_TYPOGRAPHY),
+        safe_explanation="Frontend theme token metadata for Imperium V1.",
     )

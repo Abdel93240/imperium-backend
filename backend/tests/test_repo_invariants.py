@@ -662,6 +662,7 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert contracts_route_text.count('@router.get("/contracts/index"') == 1
     assert contracts_route_text.count('@router.get("/contracts/compliance"') == 1
     assert frontend_route_text.count('@router.get("/frontend/navigation"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/theme-tokens"') == 1
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
         assert forbidden not in lowered_services
@@ -2989,3 +2990,59 @@ def test_frontend_layout_service_is_metadata_only_and_has_no_business_or_discove
         assert "not a health check" in docs_text
         assert "not a dynamic discovery" in docs_text
         assert "not a dynamic theme" in docs_text
+
+
+def test_frontend_theme_tokens_service_is_metadata_only_and_has_no_business_or_discovery_or_write_paths() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    service_text = service_path.read_text(encoding="utf-8")
+    service_lower = service_text.lower()
+    route_text = route_path.read_text(encoding="utf-8")
+
+    assert '@router.get("/frontend/theme-tokens"' in route_text
+    assert "CurrentUserDep" in route_text
+    assert "Idempotency-Key" not in route_text
+
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+    assert "select(" not in service_text
+
+    for forbidden in (
+        "services.imperium.missions",
+        "services.imperium.vault",
+        "services.path",
+        "services.pulse",
+        "services.imperium.dashboard",
+        "services.imperium.daily_plan",
+        "services.imperium.home",
+        "services.imperium.contracts",
+        "openapi",
+        "scan",
+        "dynamic discovery",
+        "health",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+    ):
+        assert forbidden not in service_lower
+
+    assert "http://" not in service_lower
+    assert "https://" not in service_lower
+    assert "#" not in service_text
+
+    for docs_text in (docs_contracts, docs_schema):
+        assert "/api/imperium/frontend/theme-tokens" in docs_text
+        assert "metadata only" in docs_text
+        assert "not a dynamic theme" in docs_text
+        assert "not a user preference" in docs_text
+        assert "not a health check" in docs_text
+        assert "not a dynamic discovery" in docs_text
