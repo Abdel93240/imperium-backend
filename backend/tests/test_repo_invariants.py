@@ -996,6 +996,8 @@ def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_
     assert "count" in schema_section
     assert "items" in schema_section
     assert "yyyy-mm" in lowered_docs
+    assert "utc `occurred_at` month and the public `yyyy-mm` format" in lowered_docs
+    assert "groups by the utc month of `occurred_at` and returns `yyyy-mm`" in lowered_docs
     assert "patch 9d" in lowered_docs
     assert "read-only" in lowered_docs
     assert "grouped by month" in lowered_docs
@@ -1366,6 +1368,9 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     assert "currency=original.currency" in service_section
     assert "source=\"reversal\"" in service_section
     assert "external_ref=None" in service_section
+    assert "reversal_occurred_at = datetime.now(UTC)" in service_section
+    assert "occurred_at=reversal_occurred_at" in service_section
+    assert "occurred_at=original.occurred_at" not in service_section
     assert "is_reversal=True" in service_section
     assert "reversal_of_transaction_id=original.id" in service_section
     assert "db.add(reversal)" in service_section
@@ -1379,6 +1384,8 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     assert "the original transaction is never updated or deleted" in lowered_docs
     assert "one and only one reversal per original transaction" in lowered_docs
     assert "does not add persistent ai, n8n, ocr, sadaqa, wallet" in lowered_docs
+    assert "reversals are dated at the backend moment of the counter-entry" in lowered_docs
+    assert "they do not rewrite the original transaction's period" in lowered_docs
     assert "reversal fields:" in lowered_schema_docs
     assert "`is_reversal` marks rows appended" in lowered_schema_docs
     assert "`reversal_of_transaction_id` links a reversal row" in lowered_schema_docs
@@ -1386,6 +1393,8 @@ def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_determinis
     assert "one and only one reversal in patch 9f" in lowered_schema_docs
     assert "never updates or deletes the original transaction" in lowered_schema_docs
     assert "no persistent ai, n8n, ocr, sadaqa, wallet" in lowered_schema_docs
+    assert "reversal rows use backend `occurred_at`" in lowered_schema_docs
+    assert "correct the ledger at the backend moment of the counter-entry" in lowered_schema_docs
 
     assert "qwenclient" not in lowered_code
     assert "n8n_client" not in lowered_code
@@ -1450,13 +1459,21 @@ def test_patch_9g_vault_transaction_immutability_contract_is_preserved() -> None
 def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    transaction_service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault_transactions.py"
+    create_schema_path = BACKEND_ROOT / "app" / "schemas" / "vault.py"
     contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
     schema_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
     route_text = route_path.read_text(encoding="utf-8")
     service_text = service_path.read_text(encoding="utf-8")
+    transaction_service_text = transaction_service_path.read_text(encoding="utf-8")
+    create_schema_text = create_schema_path.read_text(encoding="utf-8")
     contracts_text = contracts_path.read_text(encoding="utf-8")
     schema_text = schema_path.read_text(encoding="utf-8")
-    lowered_code = "\n".join([route_text, service_text]).lower()
+    create_schema_section = create_schema_text.split("class ImperiumVaultTransactionCreate", maxsplit=1)[1].split(
+        "class ImperiumVaultTransactionRead",
+        maxsplit=1,
+    )[0]
+    lowered_code = "\n".join([route_text, service_text, transaction_service_text, create_schema_section]).lower()
     lowered_docs = "\n".join([contracts_text, schema_text]).lower()
 
     for endpoint in (
@@ -1480,6 +1497,20 @@ def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> 
     assert "the vault ledger is append-only" in lowered_docs
     assert "transactions are immutable after insert" in lowered_docs
     assert "all vault endpoints are scoped through `currentuserdep`" in lowered_docs
+    assert "vault v1 uses utc temporal semantics" in lowered_docs
+    assert "`occurred_at` is the only authoritative temporal source for vault v1 summaries and filters" in lowered_docs
+    assert "`occurred_at` is stored and interpreted as utc for vault v1" in lowered_docs
+    assert "summary endpoints share the same currency contract" in lowered_docs
+    assert "exactly three ascii letters are accepted" in lowered_docs
+    assert "accepted values are normalized uppercase" in lowered_docs
+    assert 'pattern=r"^[A-Za-z]{3}$"' in route_text
+    assert route_text.count('pattern=r"^[A-Za-z]{3}$"') == 3
+    assert 'pattern=r"^[A-Z]{3}$"' in create_schema_section
+    assert "def normalize_currency" in create_schema_section
+    assert "return value.strip().upper()" in create_schema_section
+    assert "normalized_currency = currency.strip().upper()" in service_text
+    assert "currency=original.currency" in transaction_service_text
+    assert "none of the vault 9h routes persist ai, n8n, ocr, sadaqa, wallet, balance" in lowered_docs
 
     for forbidden in (
         "openai",
@@ -1496,6 +1527,8 @@ def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> 
         "calendar replanning",
         "ocr",
         "sadaqa",
+        "wallet",
+        "balance",
         "wallet persistence",
     ):
         assert forbidden not in lowered_code
