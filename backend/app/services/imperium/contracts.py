@@ -1,6 +1,7 @@
 from app.schemas.contracts import (
     ContractIndexEndpoint,
     ContractIndexGroup,
+    ImperiumContractsComplianceResponse,
     ImperiumContractsIndexResponse,
 )
 
@@ -154,4 +155,19 @@ def get_imperium_contracts_index_metadata() -> ImperiumContractsIndexResponse:
         read_only=True,
         groups=list(CONTRACT_INDEX_GROUPS),
         safe_explanation="Frontend API contract index metadata.",
+    )
+
+
+def get_imperium_contracts_compliance_metadata() -> ImperiumContractsComplianceResponse:
+    return ImperiumContractsComplianceResponse(
+        contract_version="v1",
+        read_only=True,
+        metadata_only=True,
+        no_db_migration=True,
+        no_business_data_read=True,
+        not_health_check=True,
+        not_dynamic_discovery=True,
+        no_ai_n8n_ocr_scoring_coaching_recommendations=True,
+        no_cross_module_writes=True,
+        safe_explanation="Static compliance metadata for Imperium contract surfaces.",
     )
