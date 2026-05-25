@@ -688,6 +688,48 @@ Contracts:
 - response is deterministic and uses safe public fields only
 - `safe_explanation` must be `Path check-in detail for current user.`
 
+#### Path Stats Summary 10F - deterministic aggregated summary
+
+Path Stats Summary 10F adds a read-only deterministic summary for the current user's Path habits and existing check-ins.
+
+Purpose:
+- report simple Path stats for the current user
+- support optional filtering by date range, domain, and frequency
+- count only existing `done` and `missed` check-ins
+- exclude implicit `pending` items from the completion rate
+
+Implemented endpoint:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| GET | `/api/imperium/path/stats/summary` | Read-only current-user Path stats summary with optional `date_from`, `date_to`, `domain`, and `frequency` filters | Not required; read-only |
+
+Contracts:
+- endpoint is JWT-scoped through `CurrentUserDep`
+- endpoint is user-scoped and never exposes another user's habits or check-ins
+- `total_active_habits` counts only active habits and applies `domain` and `frequency` filters when present
+- `done_count` and `missed_count` count only existing check-ins with status `done` or `missed`
+- `check_in_count = done_count + missed_count`
+- `completion_rate_percent = 0` when `check_in_count = 0`
+- otherwise `completion_rate_percent = round(done_count / check_in_count * 100, 2)`
+- `date_from` and `date_to` only filter check-ins, not active habit counting
+- `domain` and `frequency` are applied to both the active-habit aggregate and the check-in aggregate
+- check-ins linked to inactive habits remain countable when the `domain` and `frequency` filters match
+- no `Idempotency-Key` is required
+- the endpoint is read-only: no `db.add`, `flush`, or `commit`
+- the endpoint never creates a check-in automatically
+- the endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar replanning, or scoring
+- `safe_explanation` must be `Path summary stats computed from current user's habits and check-ins.`
+
+10F boundaries:
+- no AI/n8n/scoring/calendar in 10F
+- no pgvector write
+- no embeddings
+- no automatic memory commit
+- no automatic replanning
+- no automatic scoring
+- pending implicits are excluded in 10F
+
 #### Path Habit Lifecycle 10C - archive and reactivate
 
 Path Habit Lifecycle 10C adds safe lifecycle control for Path habits without destroying history.

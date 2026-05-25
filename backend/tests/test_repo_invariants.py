@@ -1835,3 +1835,93 @@ def test_path_check_in_detail_10e_is_read_only_user_scoped_and_no_ai_side_effect
     assert "404" in lowered_docs
     assert "non-owned" in lowered_docs
     assert "never modifies any habit or check-in" in lowered_docs
+
+
+def test_path_stats_summary_10f_is_read_only_user_scoped_and_reports_only_existing_check_ins() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "path.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
+    lowered_docs = contracts_text.lower()
+    summary_route = route_text.split('@router.get("/stats/summary"', maxsplit=1)[1].split(
+        '@router.get("/today"',
+        maxsplit=1,
+    )[0]
+    summary_service = service_text.split("def get_path_stats_summary", maxsplit=1)[1].split(
+        "def get_path_today_view",
+        maxsplit=1,
+    )[0]
+
+    assert route_text.index('@router.get("/stats/summary"') < route_text.index('@router.get("/today"')
+    assert "response_model=PathStatsSummaryResponse" in route_text
+    assert "current_user: CurrentUserDep" in summary_route
+    assert "Idempotency-Key" not in summary_route
+    assert "PathStatsSummaryResponse" in schema_text
+    assert "date_from" in schema_text
+    assert "date_to" in schema_text
+    assert "domain" in schema_text
+    assert "frequency" in schema_text
+    assert "completion_rate_percent" in schema_text
+    assert "safe_explanation" in schema_text
+    assert "Path summary stats computed from current user's habits and check-ins." in service_text
+    assert "path summary stats computed from current user's habits and check-ins." in lowered_docs
+    assert "pending" not in summary_route
+    assert "pending" not in summary_service
+    assert "db.add(" not in summary_route
+    assert "db.flush" not in summary_route
+    assert "db.commit" not in summary_route
+    assert "db.add(" not in summary_service
+    assert "db.flush" not in summary_service
+    assert "db.commit" not in summary_service
+    assert "ImperiumPathHabit.user_id == current_user.id" in summary_service
+    assert "ImperiumPathHabit.is_active.is_(True)" in summary_service
+    assert "ImperiumPathCheckIn.user_id == current_user.id" in summary_service
+    assert "ImperiumPathCheckIn.habit_id == ImperiumPathHabit.id" in summary_service
+    assert "ImperiumPathCheckIn.check_date >= date_from" in summary_service
+    assert "ImperiumPathCheckIn.check_date <= date_to" in summary_service
+    assert "check_in.status == \"done\"" in summary_service
+    assert "check_in.status == \"missed\"" in summary_service
+
+    for forbidden in (
+        "qwenclient",
+        "providers",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "automatic memory",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "discipline_score",
+        "weighted_score",
+        "scoring",
+        "mission",
+        "vault",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "/api/imperium/path/stats/summary" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "deterministic" in lowered_docs
+    assert "completion rate" in lowered_docs
+    assert "pending implicits are excluded" in lowered_docs
+    assert "no ai/n8n/scoring/calendar" in lowered_docs
+    assert "no pgvector write" in lowered_docs
+    assert "no embeddings" in lowered_docs
+    assert "no automatic memory commit" in lowered_docs
+    assert "no automatic replanning" in lowered_docs
+    assert "no automatic scoring" in lowered_docs

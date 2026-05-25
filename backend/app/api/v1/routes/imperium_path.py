@@ -18,6 +18,7 @@ from app.schemas.path import (
     PathHabitLifecycleResponse,
     PathHabitListResponse,
     PathHabitRead,
+    PathStatsSummaryResponse,
     PathTodayResponse,
 )
 from app.services.path.habits import (
@@ -31,6 +32,7 @@ from app.services.path.habits import (
     create_path_habit,
     get_path_habit_detail,
     get_path_check_in_detail,
+    get_path_stats_summary,
     get_path_today_view,
     list_path_check_ins,
     list_path_habits,
@@ -241,6 +243,30 @@ def get_path_check_in_detail_route(
         return get_path_check_in_detail(db, current_user=current_user, check_in_id=check_in_id)
     except PathCheckInNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/stats/summary", response_model=PathStatsSummaryResponse)
+def get_path_stats_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    domain: Annotated[str | None, Query(max_length=80)] = None,
+    frequency: PathHabitFrequency | None = None,
+) -> PathStatsSummaryResponse:
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="date_from must be before or equal to date_to.",
+        )
+    return get_path_stats_summary(
+        db,
+        current_user=current_user,
+        date_from=date_from,
+        date_to=date_to,
+        domain=domain.strip().lower() if domain else None,
+        frequency=frequency.value if frequency else None,
+    )
 
 
 @router.get("/today", response_model=PathTodayResponse)

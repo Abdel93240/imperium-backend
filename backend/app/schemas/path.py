@@ -155,6 +155,21 @@ class PathCheckInDetailResponse(BaseModel):
     safe_explanation: str
 
 
+class PathStatsSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    date_from: date | None
+    date_to: date | None
+    domain: str | None
+    frequency: str | None
+    total_active_habits: int
+    done_count: int
+    missed_count: int
+    check_in_count: int
+    completion_rate_percent: float
+    safe_explanation: str
+
+
 class PathTodayItemRead(BaseModel):
     habit: PathHabitRead
     check_in: PathCheckInRead | None

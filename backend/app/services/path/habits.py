@@ -23,6 +23,7 @@ from app.schemas.path import (
     PathHabitLifecycleSummary,
     PathHabitListResponse,
     PathHabitRead,
+    PathStatsSummaryResponse,
     PathTodayItemRead,
     PathTodayResponse,
     PathTodayStatus,
@@ -33,6 +34,7 @@ TODAY_SAFE_EXPLANATION = "Path today view for current user."
 LIFECYCLE_SAFE_EXPLANATION = "Path habit lifecycle updated without deleting history."
 HABIT_DETAIL_SAFE_EXPLANATION = "Path habit detail for current user."
 CHECK_IN_DETAIL_SAFE_EXPLANATION = "Path check-in detail for current user."
+STATS_SUMMARY_SAFE_EXPLANATION = "Path summary stats computed from current user's habits and check-ins."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -252,6 +254,70 @@ def get_path_check_in_detail(
     return PathCheckInDetailResponse(
         check_in=PathCheckInRead.model_validate(check_in),
         safe_explanation=CHECK_IN_DETAIL_SAFE_EXPLANATION,
+    )
+
+
+def get_path_stats_summary(
+    db: Session,
+    *,
+    current_user: User,
+    date_from: date | None,
+    date_to: date | None,
+    domain: str | None,
+    frequency: str | None,
+) -> PathStatsSummaryResponse:
+    habit_query = select(ImperiumPathHabit).where(
+        ImperiumPathHabit.user_id == current_user.id,
+        ImperiumPathHabit.is_active.is_(True),
+    )
+    if domain is not None:
+        habit_query = habit_query.where(ImperiumPathHabit.domain == domain)
+    if frequency is not None:
+        habit_query = habit_query.where(ImperiumPathHabit.frequency == frequency)
+    habit_query = habit_query.order_by(
+        ImperiumPathHabit.created_at.asc(),
+        ImperiumPathHabit.id.asc(),
+    )
+    active_habits = list(db.scalars(habit_query))
+
+    check_in_query = select(ImperiumPathCheckIn).join(
+        ImperiumPathHabit,
+        ImperiumPathCheckIn.habit_id == ImperiumPathHabit.id,
+    ).where(
+        ImperiumPathCheckIn.user_id == current_user.id,
+        ImperiumPathHabit.user_id == current_user.id,
+    )
+    if date_from is not None:
+        check_in_query = check_in_query.where(ImperiumPathCheckIn.check_date >= date_from)
+    if date_to is not None:
+        check_in_query = check_in_query.where(ImperiumPathCheckIn.check_date <= date_to)
+    if domain is not None:
+        check_in_query = check_in_query.where(ImperiumPathHabit.domain == domain)
+    if frequency is not None:
+        check_in_query = check_in_query.where(ImperiumPathHabit.frequency == frequency)
+    check_in_query = check_in_query.order_by(
+        ImperiumPathCheckIn.check_date.asc(),
+        ImperiumPathCheckIn.created_at.asc(),
+        ImperiumPathCheckIn.id.asc(),
+    )
+    check_ins = list(db.scalars(check_in_query))
+
+    done_count = sum(1 for check_in in check_ins if check_in.status == "done")
+    missed_count = sum(1 for check_in in check_ins if check_in.status == "missed")
+    check_in_count = done_count + missed_count
+    completion_rate_percent = round((done_count / check_in_count) * 100, 2) if check_in_count else 0.0
+
+    return PathStatsSummaryResponse(
+        date_from=date_from,
+        date_to=date_to,
+        domain=domain,
+        frequency=frequency,
+        total_active_habits=len(active_habits),
+        done_count=done_count,
+        missed_count=missed_count,
+        check_in_count=check_in_count,
+        completion_rate_percent=completion_rate_percent,
+        safe_explanation=STATS_SUMMARY_SAFE_EXPLANATION,
     )
 
 
