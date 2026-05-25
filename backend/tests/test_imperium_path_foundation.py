@@ -144,6 +144,41 @@ def test_create_path_habit_requires_idempotency_key() -> None:
     assert response.json()["detail"] == "Missing Idempotency-Key header."
 
 
+def test_create_path_habit_rejects_empty_title() -> None:
+    db = FakeDb()
+
+    response = _client(db, _user()).post(
+        "/imperium/path/habits",
+        headers={"Idempotency-Key": "path-habit-empty-title"},
+        json={"title": "   ", "domain": "worship", "frequency": "daily"},
+    )
+
+    assert response.status_code == 422
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
+
+
+def test_create_path_habit_rejects_client_user_id() -> None:
+    db = FakeDb()
+
+    response = _client(db, _user()).post(
+        "/imperium/path/habits",
+        headers={"Idempotency-Key": "path-habit-client-user-id"},
+        json={
+            "user_id": str(uuid4()),
+            "title": "Fajr on time",
+            "domain": "worship",
+            "frequency": "daily",
+        },
+    )
+
+    assert response.status_code == 422
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
+
+
 def test_create_path_habit_replays_same_idempotency_key() -> None:
     current_user = _user()
     created_at = datetime.now(UTC)
@@ -187,6 +222,40 @@ def test_create_path_habit_replays_same_idempotency_key() -> None:
     assert not any(isinstance(item, ImperiumPathHabit) for item in db.added)
 
 
+def test_create_path_habit_conflicts_when_same_key_has_different_payload() -> None:
+    current_user = _user()
+    created_at = datetime.now(UTC)
+    original_payload = PathHabitCreate(title="Fajr on time", domain="worship", frequency="daily")
+    db = FakeDb(
+        scalar_results=[
+            IdempotencyKey(
+                id=uuid4(),
+                user_id=current_user.id,
+                idempotency_key="path-habit-conflict",
+                request_method="POST",
+                request_path="/imperium/path/habits",
+                request_hash=_hash_request("path.habit.created", original_payload.model_dump(mode="json")),
+                status="completed",
+                response_status_code=201,
+                response_body={"id": str(uuid4())},
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        ]
+    )
+
+    response = _client(db, current_user).post(
+        "/imperium/path/habits",
+        headers={"Idempotency-Key": "path-habit-conflict"},
+        json={"title": "Isha on time", "domain": "worship", "frequency": "daily"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Idempotency key already used with different payload."
+    assert not any(isinstance(item, ImperiumPathHabit) for item in db.added)
+    assert db.rolled_back is True
+
+
 def test_list_path_habits_user_scoped_and_no_idempotency_required() -> None:
     current_user = _user()
     habit = _habit(current_user.id)
@@ -203,6 +272,9 @@ def test_list_path_habits_user_scoped_and_no_idempotency_required() -> None:
     assert "imperium_path_habits.user_id" in query_text
     assert "imperium_path_habits.is_active" in query_text
     assert "imperium_path_habits.domain" in query_text
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False
 
 
 def test_create_path_check_in_ok() -> None:
@@ -245,6 +317,23 @@ def test_create_path_check_in_rejects_inactive_habit() -> None:
     assert not any(isinstance(item, ImperiumPathCheckIn) for item in db.added)
 
 
+def test_create_path_check_in_returns_404_for_non_owned_habit() -> None:
+    current_user = _user()
+    habit_id = uuid4()
+    db = FakeDb(scalar_results=[None, None])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit_id}/check-ins",
+        headers={"Idempotency-Key": "path-check-in-non-owned"},
+        json={"check_date": "2026-05-25", "status": "done"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Path habit not found."
+    assert not any(isinstance(item, ImperiumPathCheckIn) for item in db.added)
+    assert db.rolled_back is True
+
+
 def test_create_path_check_in_requires_reason_when_missed() -> None:
     current_user = _user()
     habit = _habit(current_user.id)
@@ -256,6 +345,26 @@ def test_create_path_check_in_requires_reason_when_missed() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_create_path_check_in_missed_with_reason_ok() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id)
+    db = FakeDb(scalar_results=[None, habit, None])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/check-ins",
+        headers={"Idempotency-Key": "path-check-in-missed-with-reason"},
+        json={"check_date": "2026-05-25", "status": "missed", "reason": "Driving shift overran"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "missed"
+    assert body["reason"] == "Driving shift overran"
+    check_in = next(item for item in db.added if isinstance(item, ImperiumPathCheckIn))
+    assert check_in.user_id == current_user.id
+    assert check_in.habit_id == habit.id
 
 
 def test_create_path_check_in_conflicts_when_date_already_checked_with_other_key() -> None:
@@ -272,6 +381,100 @@ def test_create_path_check_in_conflicts_when_date_already_checked_with_other_key
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Path check-in already exists for this habit and date."
+
+
+def test_create_path_check_in_replays_same_idempotency_key() -> None:
+    current_user = _user()
+    habit_id = uuid4()
+    created_at = datetime.now(UTC)
+    response_body = {
+        "id": str(uuid4()),
+        "habit_id": str(habit_id),
+        "check_date": "2026-05-25",
+        "status": "done",
+        "reason": None,
+        "note": "Completed after prayer",
+        "created_at": created_at.isoformat(),
+    }
+    db = FakeDb(
+        scalar_results=[
+            IdempotencyKey(
+                id=uuid4(),
+                user_id=current_user.id,
+                idempotency_key="path-check-in-replay",
+                request_method="POST",
+                request_path=f"/imperium/path/habits/{habit_id}/check-ins",
+                request_hash=_hash_request(
+                    "path.check_in.created",
+                    {
+                        "habit_id": str(habit_id),
+                        "check_date": "2026-05-25",
+                        "status": "done",
+                        "reason": None,
+                        "note": "Completed after prayer",
+                    },
+                ),
+                status="completed",
+                response_status_code=201,
+                response_body=response_body,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        ]
+    )
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit_id}/check-ins",
+        headers={"Idempotency-Key": "path-check-in-replay"},
+        json={"check_date": "2026-05-25", "status": "done", "note": "Completed after prayer"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == response_body["id"]
+    assert not any(isinstance(item, ImperiumPathCheckIn) for item in db.added)
+
+
+def test_create_path_check_in_conflicts_when_same_key_has_different_payload() -> None:
+    current_user = _user()
+    habit_id = uuid4()
+    created_at = datetime.now(UTC)
+    db = FakeDb(
+        scalar_results=[
+            IdempotencyKey(
+                id=uuid4(),
+                user_id=current_user.id,
+                idempotency_key="path-check-in-conflict",
+                request_method="POST",
+                request_path=f"/imperium/path/habits/{habit_id}/check-ins",
+                request_hash=_hash_request(
+                    "path.check_in.created",
+                    {
+                        "habit_id": str(habit_id),
+                        "check_date": "2026-05-25",
+                        "status": "done",
+                        "reason": None,
+                        "note": None,
+                    },
+                ),
+                status="completed",
+                response_status_code=201,
+                response_body={"id": str(uuid4())},
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        ]
+    )
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit_id}/check-ins",
+        headers={"Idempotency-Key": "path-check-in-conflict"},
+        json={"check_date": "2026-05-25", "status": "missed", "reason": "Driving shift overran"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Idempotency key already used with different payload."
+    assert not any(isinstance(item, ImperiumPathCheckIn) for item in db.added)
+    assert db.rolled_back is True
 
 
 def test_list_path_check_ins_user_scoped_and_no_idempotency_required() -> None:
@@ -294,3 +497,6 @@ def test_list_path_check_ins_user_scoped_and_no_idempotency_required() -> None:
     assert "imperium_path_check_ins.habit_id" in query_text
     assert "imperium_path_check_ins.status" in query_text
     assert "imperium_path_check_ins.check_date" in query_text
+    assert db.added == []
+    assert db.flushed is False
+    assert db.committed is False

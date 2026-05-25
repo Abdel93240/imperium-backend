@@ -1512,3 +1512,101 @@ def test_patch_9k_alembic_head_includes_vault_local_date_timezone_migration() ->
     assert "op.add_column(\"imperium_vault_transactions\", sa.Column(\"local_date\", sa.Date(), nullable=True))" in migration_text
     assert "op.add_column(\"imperium_vault_transactions\", sa.Column(\"timezone\", sa.Text(), nullable=True))" in migration_text
     assert "op.create_index(" in migration_text
+
+
+def test_path_foundation_10a_is_scoped_read_only_on_get_and_has_no_ai_or_workflow_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_path.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "path" / "habits.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "path.py"
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260525_0027_imperium_path_habits_check_ins.py"
+    contracts_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    schema_docs_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+    contracts_text = contracts_path.read_text(encoding="utf-8")
+    schema_docs_text = schema_docs_path.read_text(encoding="utf-8")
+    habit_create_schema = schema_text.split("class PathHabitCreate", maxsplit=1)[1].split(
+        "class PathCheckInCreate",
+        maxsplit=1,
+    )[0]
+    check_in_create_schema = schema_text.split("class PathCheckInCreate", maxsplit=1)[1].split(
+        "class PathHabitRead",
+        maxsplit=1,
+    )[0]
+    list_habits_service = service_text.split("def list_path_habits", maxsplit=1)[1].split(
+        "def create_path_check_in",
+        maxsplit=1,
+    )[0]
+    list_check_ins_service = service_text.split("def list_path_check_ins", maxsplit=1)[1].split(
+        "def _get_user_habit",
+        maxsplit=1,
+    )[0]
+    habit_get_route = route_text.split('@router.get("/habits"', maxsplit=1)[1].split(
+        '@router.post("/habits/{habit_id}/check-ins"',
+        maxsplit=1,
+    )[0]
+    check_ins_get_route = route_text.split('@router.get("/check-ins"', maxsplit=1)[1].split(
+        "def _require_idempotency_key",
+        maxsplit=1,
+    )[0]
+    combined_code = "\n".join([route_text, service_text, schema_text, migration_text])
+    lowered_code = combined_code.lower()
+    lowered_docs = "\n".join([contracts_text, schema_docs_text]).lower()
+
+    assert 'revision: str = "20260525_0027"' in migration_text
+    assert 'down_revision: str | None = "20260525_0026"' in migration_text
+    assert "imperium_path_habits" in migration_text
+    assert "imperium_path_check_ins" in migration_text
+    assert "imperium_path_check_ins_user_habit_date_unique" in migration_text
+    assert "extra=\"forbid\"" in habit_create_schema
+    assert "extra=\"forbid\"" in check_in_create_schema
+    assert "user_id" not in habit_create_schema
+    assert "user_id" not in check_in_create_schema
+    assert "Idempotency-Key" in route_text
+    assert "Idempotency-Key" not in habit_get_route
+    assert "Idempotency-Key" not in check_ins_get_route
+
+    for read_only_section in (list_habits_service, list_check_ins_service, habit_get_route, check_ins_get_route):
+        assert "db.add(" not in read_only_section
+        assert "db.flush" not in read_only_section
+        assert "db.commit" not in read_only_section
+
+    for forbidden in (
+        "qwenclient",
+        "providers",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n_client",
+        "trigger_n8n",
+        "ai agent",
+        "aiagent",
+        "n8n-nodes-langchain.agent",
+        "pgvector",
+        "embedding",
+        "ai_memories",
+        "automatic memory",
+        "memory commit",
+        "calendar",
+        "replanning",
+        "discipline_score",
+        "weighted_score",
+    ):
+        assert forbidden not in lowered_code
+
+    assert "path foundation 10a" in lowered_docs
+    assert "`post /api/imperium/path/habits`" in lowered_docs
+    assert "`get /api/imperium/path/habits`" in lowered_docs
+    assert "`post /api/imperium/path/habits/{habit_id}/check-ins`" in lowered_docs
+    assert "`get /api/imperium/path/check-ins`" in lowered_docs
+    assert "missed requires reason" in lowered_docs
+    assert "no ai/n8n/scoring/calendar in 10a" in lowered_docs
+    assert "no pgvector write" in lowered_docs
+    assert "no embeddings" in lowered_docs
+    assert "no automatic memory commit" in lowered_docs
+    assert "no automatic mission/vault linkage" in lowered_docs
+    assert "no automatic replanning" in lowered_docs
+    assert "no automatic scoring" in lowered_docs

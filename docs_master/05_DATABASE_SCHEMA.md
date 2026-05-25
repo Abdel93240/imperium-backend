@@ -1463,6 +1463,116 @@ Important:
 - Never infer Quran completion without explicit user action.
 - Never infer adhkar completion without explicit user action.
 - Never infer sadaqa completion without explicit user action.
+- Path Foundation 10A is limited to habits and check-ins.
+- 10A has no AI/n8n/scoring/calendar in 10A, no pgvector write, no embeddings, no automatic memory commit, no automatic replanning, no automatic scoring, and no automatic mission/vault linkage.
+
+### Path Foundation 10A - `imperium_path_habits`
+
+Purpose:
+- Stores current-user Path habits for explicit worship, health, family, work, discipline, or custom routines.
+- The table is a simple tracking foundation; it does not create missions, Vault rows, memories, calendar events, scoring rows, or workflow triggers.
+
+Columns:
+- `id` uuid primary key
+- `user_id` foreign key to `users.id`
+- `title` varchar(120) not null
+- `description` varchar(500) nullable
+- `domain` varchar(80) nullable
+- `frequency` varchar(20) not null
+- `is_active` boolean not null default true
+- `created_at` timestamptz not null
+- `updated_at` timestamptz not null
+
+Required fields:
+- `id`
+- `user_id`
+- `title`
+- `frequency`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+Foreign keys:
+- `user_id -> users.id`
+
+Indexes:
+- index on `(user_id, is_active, created_at)`
+- index on `(user_id, domain)`
+
+Check constraints:
+- `frequency IN ('daily', 'weekly')`
+
+API validation:
+- client-provided `user_id` is forbidden
+- blank `title` is rejected
+- supported API domains are `worship`, `health`, `discipline`, `family`, `work`, `custom`
+
+Soft delete:
+- no hard delete in 10A; deactivate with `is_active = false`
+
+Audit/history:
+- idempotent creates are stored through the backend idempotency table
+- no AI/n8n/scoring/calendar in 10A
+
+### Path Foundation 10A - `imperium_path_check_ins`
+
+Purpose:
+- Stores one explicit check-in per current-user habit and date.
+- Records only the user's stated status; missed requires reason.
+- The table does not trigger automatic mission creation, Vault linkage, sadaqa calculation, memory commit, embeddings, pgvector writes, calendar replanning, or discipline scoring.
+
+Columns:
+- `id` uuid primary key
+- `user_id` foreign key to `users.id`
+- `habit_id` foreign key to `imperium_path_habits.id`
+- `check_date` date not null
+- `status` varchar(20) not null
+- `reason` varchar(500) nullable
+- `note` varchar(500) nullable
+- `created_at` timestamptz not null
+- `updated_at` timestamptz not null
+
+Required fields:
+- `id`
+- `user_id`
+- `habit_id`
+- `check_date`
+- `status`
+- `created_at`
+- `updated_at`
+
+Foreign keys:
+- `user_id -> users.id`
+- `habit_id -> imperium_path_habits.id`
+
+Indexes:
+- index on `(user_id, check_date desc)`
+- index on `(user_id, habit_id, check_date)`
+
+Unique constraints:
+- unique `(user_id, habit_id, check_date)`
+
+Check constraints:
+- `status IN ('done', 'missed')`
+
+API validation:
+- client-provided `user_id` is forbidden
+- check-ins are user-scoped through the owned habit
+- non-owned habits return 404
+- inactive habits return 409
+- duplicate `habit_id` and `check_date` with another idempotency key returns 409
+- missed requires reason
+- `done` must not include `reason`; use `note`
+
+Soft delete:
+- no hard delete in 10A
+
+Audit/history:
+- idempotent creates are stored through the backend idempotency table
+- no automatic memory commit
+- no automatic mission/vault linkage
+- no automatic replanning
+- no automatic scoring
 
 ### `prayer_logs`
 

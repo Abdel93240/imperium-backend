@@ -548,6 +548,54 @@ No endpoint may auto-click, auto-accept, auto-refuse, or automate Bolt.
 
 ### The Path
 
+#### Path Foundation 10A - habits and check-ins
+
+Path Foundation 10A adds the first backend-owned habit/check-in surface for The Path.
+
+Purpose:
+- record practical worship/discipline habits owned by the authenticated user
+- record explicit daily/weekly check-ins for those habits
+- keep the apps as interfaces: they collect and display, while the backend enforces ownership and idempotency
+
+Implemented endpoints:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| POST | `/api/imperium/path/habits` | Create a Path habit for the current user | Required `Idempotency-Key` |
+| GET | `/api/imperium/path/habits` | List current-user habits, optionally filtered by `is_active` and `domain` | Not required; read-only |
+| POST | `/api/imperium/path/habits/{habit_id}/check-ins` | Create one check-in for a current-user active habit | Required `Idempotency-Key` |
+| GET | `/api/imperium/path/check-ins` | List current-user check-ins, optionally filtered by `habit_id`, `status`, `date_from`, `date_to` | Not required; read-only |
+
+Canonical route keys:
+- `POST /api/imperium/path/habits`
+- `GET /api/imperium/path/habits`
+- `POST /api/imperium/path/habits/{habit_id}/check-ins`
+- `GET /api/imperium/path/check-ins`
+
+Contracts:
+- habit create payload accepts `title`, `description`, `domain`, and `frequency`; client-provided `user_id` is forbidden
+- blank habit `title` is rejected
+- supported habit `frequency`: `daily`, `weekly`
+- supported check-in `status`: `done`, `missed`
+- missed requires reason
+- `done` check-ins must not send `reason`; use `note` for comments
+- habit and check-in reads never expose another user's records
+- check-ins for non-owned habits return 404
+- check-ins for inactive habits return 409
+- duplicate `habit_id` plus `check_date` with another idempotency key returns 409
+- repeating the same `Idempotency-Key` with the same payload returns the original result
+- repeating the same `Idempotency-Key` with a different payload returns 409
+
+10A boundaries:
+- no AI/n8n/scoring/calendar in 10A
+- no pgvector write
+- no embeddings
+- no automatic memory commit
+- no automatic replanning
+- no automatic scoring
+- no automatic mission/vault linkage
+- no automatic sadaqa calculation or Vault decision is triggered by these endpoints
+
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
 | GET | `/api/path/prayers/today` | Prayer times and next prayer | `path.prayers.requested` |
