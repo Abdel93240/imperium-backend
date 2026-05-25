@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Numeric, Text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, Text, desc
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -37,6 +37,49 @@ class VaultTransaction(UUIDPrimaryKeyMixin, Base):
     currency: Mapped[str] = mapped_column(Text, nullable=False, default="EUR", server_default="EUR")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_app: Mapped[str] = mapped_column(Text, nullable=False, default="vault", server_default="vault")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ImperiumVaultTransaction(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_vault_transactions"
+    __table_args__ = (
+        CheckConstraint(
+            "transaction_type IN ('income', 'expense')",
+            name="imperium_vault_transactions_transaction_type_check",
+        ),
+        CheckConstraint("amount_cents > 0", name="imperium_vault_transactions_amount_positive"),
+        CheckConstraint("length(currency) = 3", name="imperium_vault_transactions_currency_length_check"),
+        Index(
+            "imperium_vault_transactions_user_occurred_at_idx",
+            "user_id",
+            desc("occurred_at"),
+        ),
+        Index(
+            "imperium_vault_transactions_user_transaction_type_idx",
+            "user_id",
+            "transaction_type",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    transaction_type: Mapped[str] = mapped_column(Text, nullable=False)
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="EUR", server_default="EUR")
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

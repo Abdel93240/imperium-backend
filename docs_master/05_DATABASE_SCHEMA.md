@@ -635,6 +635,61 @@ Audit/history:
 
 ## The Vault
 
+### `imperium_vault_transactions` - Patch 9A ledger foundation
+
+Purpose:
+- Stores a simple append-only Vault ledger for income and expense facts created through `/api/imperium/vault/transactions`.
+- This table is the Patch 9A foundation only; it does not create wallets, balances, sadaqa records, OCR results, AI scores, memory, embeddings, or calendar replanning.
+
+Columns:
+- `id` uuid primary key
+- `user_id` foreign key to `users.id`
+- `transaction_type` text not null
+- `amount_cents` integer not null
+- `currency` text not null default `EUR`
+- `occurred_at` timestamptz not null
+- `category` text nullable
+- `source` text nullable
+- `note` text nullable
+- `external_ref` text nullable
+- `created_at` timestamptz not null
+- `updated_at` timestamptz not null
+
+Required fields:
+- `id`
+- `user_id`
+- `transaction_type`
+- `amount_cents`
+- `currency`
+- `occurred_at`
+- `created_at`
+- `updated_at`
+
+Foreign keys:
+- `user_id -> users.id`
+
+Indexes:
+- index on `(user_id, occurred_at desc)`
+- index on `(user_id, transaction_type)`
+
+Check constraints:
+- `transaction_type IN ('income', 'expense')`
+- `amount_cents > 0`
+- `length(currency) = 3`
+
+API and ownership rules:
+- Routes are JWT scoped with `CurrentUserDep`; clients cannot provide `user_id`.
+- `POST` requires `Idempotency-Key` and stores the public response in `idempotency_keys`.
+- `GET` does not require `Idempotency-Key`.
+- Reads are strictly current-user scoped and deterministic.
+
+Patch 9A exclusions:
+- no wallet/balance automation
+- no sadaqa creation
+- no receipt OCR
+- no AI, n8n, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
+- no Mission-table coupling
+
 ### `wallets`
 
 Purpose:

@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -80,3 +81,65 @@ class VaultWeeklySummaryResponse(BaseModel):
     net_total: Decimal
     by_wallet: dict[str, dict[str, Decimal]]
     by_category: dict[str, dict[str, Decimal]]
+
+
+class ImperiumVaultTransactionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transaction_type: Literal["income", "expense"]
+    amount_cents: int = Field(gt=0)
+    currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
+    occurred_at: datetime
+    category: str | None = Field(default=None, max_length=80)
+    source: str | None = Field(default=None, max_length=80)
+    note: str | None = Field(default=None, max_length=500)
+    external_ref: str | None = Field(default=None, max_length=120)
+
+    @field_validator("currency", mode="before")
+    @classmethod
+    def normalize_currency(cls, value: object) -> str:
+        if value is None:
+            return "EUR"
+        if not isinstance(value, str):
+            raise ValueError("currency must be a string.")
+        return value.strip().upper()
+
+    @field_validator("occurred_at")
+    @classmethod
+    def require_timezone_aware_occurred_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("occurred_at must include timezone information.")
+        return value
+
+    @field_validator("category", "source", "note", "external_ref")
+    @classmethod
+    def strip_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return stripped
+
+
+class ImperiumVaultTransactionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    transaction_type: Literal["income", "expense"]
+    amount_cents: int
+    currency: str
+    occurred_at: datetime
+    category: str | None
+    source: str | None
+    note: str | None
+    external_ref: str | None
+    created_at: datetime
+
+
+class ImperiumVaultTransactionListResponse(BaseModel):
+    items: list[ImperiumVaultTransactionRead]
+    count: int
+    limit: int
+    offset: int
+    safe_explanation: str = "Vault transactions for current user."
