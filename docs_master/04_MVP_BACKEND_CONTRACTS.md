@@ -353,6 +353,7 @@ canonical for Imperium mission behavior.
 | GET | `/api/imperium/vault/transactions` | Patch 9A current-user ledger read with deterministic filters and sorting; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
+| GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by public month `YYYY-MM`; currency is uppercase 3 letters; no `Idempotency-Key` required | none |
 | GET | `/api/vault/dashboard` | Wallets, pressure, objectives, upcoming expenses | `vault.dashboard.requested` |
 | POST | `/api/vault/transactions` | Create gain or expense | `transaction.created` |
 | PATCH | `/api/vault/transactions/{transaction_id}` | Edit transaction | `transaction.updated` |
@@ -414,6 +415,16 @@ Patch 9C scope:
 - `GET` supports `currency`, `transaction_type`, `occurred_from`, and `occurred_to`.
 - The response is deterministic and sorted by `transaction_count desc`, absolute net magnitude desc, then `category asc`.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the category summary read path.
+- No wallet balance is persisted and no ledger mutation occurs on this endpoint.
+
+Patch 9D scope:
+- Adds a read-only monthly summary endpoint for current-user vault ledger facts.
+- The monthly summary is computed from database transactions at request time and is not persisted.
+- Transactions are grouped by month using `occurred_at` and the public `YYYY-MM` format.
+- `currency` uses an uppercase 3-letter code and defaults to `EUR`.
+- `GET` supports `currency`, `occurred_from`, and `occurred_to`.
+- The response is deterministic and sorted by `month desc`.
+- No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the monthly summary read path.
 - No wallet balance is persisted and no ledger mutation occurs on this endpoint.
 
 ### Vector

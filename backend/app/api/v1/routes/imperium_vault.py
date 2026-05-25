@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.imperium import (
     ImperiumVaultCategorySummaryResponse,
+    ImperiumVaultMonthlySummaryResponse,
     ImperiumVaultSummaryResponse,
 )
 from app.schemas.vault import (
@@ -21,6 +22,7 @@ from app.services.imperium.vault_transactions import (
 )
 from app.services.imperium.vault import (
     get_vault_category_summary,
+    get_vault_monthly_summary,
     get_vault_summary,
 )
 
@@ -101,6 +103,23 @@ def get_imperium_vault_summary_route(
     currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")] = "EUR",
 ) -> ImperiumVaultSummaryResponse:
     return get_vault_summary(
+        db,
+        current_user=current_user,
+        currency=currency,
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+
+@router.get("/summary/monthly", response_model=ImperiumVaultMonthlySummaryResponse)
+def get_imperium_vault_monthly_summary_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    occurred_from: datetime | None = None,
+    occurred_to: datetime | None = None,
+    currency: Annotated[str, Query(min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")] = "EUR",
+) -> ImperiumVaultMonthlySummaryResponse:
+    return get_vault_monthly_summary(
         db,
         current_user=current_user,
         currency=currency,

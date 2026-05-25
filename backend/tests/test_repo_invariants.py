@@ -950,6 +950,60 @@ def test_patch_9c_vault_category_summary_route_is_read_only_and_has_no_ai_n8n_or
     assert "no ai/n8n/ocr/sadaqa/wallet/balance workflows" in lowered_docs
 
 
+def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_persistent_wallet_side_effects() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "imperium.py"
+    docs_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    docs_text = docs_path.read_text(encoding="utf-8")
+    route_section = route_text.split('@router.get("/summary/monthly"', maxsplit=1)[1].split(
+        '@router.get("/summary/categories"',
+        maxsplit=1,
+    )[0]
+    schema_section = schema_text.split("class ImperiumVaultMonthlySummaryItem", maxsplit=1)[1].split(
+        "class ImperiumVaultCategorySummaryItem",
+        maxsplit=1,
+    )[0]
+    lowered_code = "\n".join([route_text, service_text, schema_section]).lower()
+    lowered_docs = docs_text.lower()
+
+    assert "class ImperiumVaultMonthlySummaryItem" in schema_text
+    assert "class ImperiumVaultMonthlySummaryResponse" in schema_text
+    assert "safe_explanation: str = \"Vault monthly summary computed from current user's ledger transactions.\"" in schema_text
+    assert "get_vault_monthly_summary(" in service_text
+    assert "ImperiumVaultTransaction" in service_text
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+    assert "Idempotency-Key" not in route_section
+    assert "current_user: CurrentUserDep" in route_section
+    assert "currency" in route_section
+    assert "occurred_from" in route_section
+    assert "occurred_to" in route_section
+    assert "month" in schema_section
+    assert "count" in schema_section
+    assert "items" in schema_section
+    assert "yyyy-mm" in lowered_docs
+    assert "patch 9d" in lowered_docs
+    assert "read-only" in lowered_docs
+    assert "grouped by month" in lowered_docs
+    assert "no ai/n8n/ocr/sadaqa/wallet/balance workflows" in lowered_docs
+    assert "QwenClient" not in lowered_code
+    assert "n8n_client" not in lowered_code
+    assert "trigger_n8n" not in lowered_code
+    assert "pgvector" not in lowered_code
+    assert "embedding" not in lowered_code
+    assert "memory" not in lowered_code
+    assert "calendar" not in lowered_code
+    assert "ocr" not in lowered_code
+    assert "sadaqa" not in lowered_code
+    assert "wallet" not in lowered_code
+    assert "balance" not in lowered_code
+
+
 def test_backlog_path_has_no_ai_provider_imports() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "missions.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"

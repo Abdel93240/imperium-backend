@@ -777,6 +777,27 @@ class ImperiumVaultSummaryResponse(BaseModel):
     safe_explanation: str = "Vault summary computed from current user's ledger transactions."
 
 
+class ImperiumVaultMonthlySummaryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month: str = Field(pattern=r"^\d{4}-\d{2}$")
+    total_income_cents: int
+    total_expense_cents: int
+    net_cents: int
+    transaction_count: int
+    income_count: int
+    expense_count: int
+
+
+class ImperiumVaultMonthlySummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str
+    items: list[ImperiumVaultMonthlySummaryItem]
+    count: int
+    safe_explanation: str = "Vault monthly summary computed from current user's ledger transactions."
+
+
 class ImperiumVaultCategorySummaryItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
