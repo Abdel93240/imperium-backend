@@ -17,6 +17,8 @@ from app.schemas.path import (
     PathCheckInListResponse,
     PathCheckInRead,
     PathHabitCreate,
+    PathHabitLifecycleResponse,
+    PathHabitLifecycleSummary,
     PathHabitListResponse,
     PathHabitRead,
     PathTodayItemRead,
@@ -26,6 +28,7 @@ from app.schemas.path import (
 
 SAFE_EXPLANATION = "Path habits/check-ins for current user."
 TODAY_SAFE_EXPLANATION = "Path today view for current user."
+LIFECYCLE_SAFE_EXPLANATION = "Path habit lifecycle updated without deleting history."
 
 ResponseT = TypeVar("ResponseT", bound=BaseModel)
 
@@ -360,3 +363,99 @@ def _hash_request(action: str, payload: dict) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def archive_path_habit(
+    db: Session,
+    *,
+    current_user: User,
+    habit_id: UUID,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[PathHabitLifecycleResponse, bool]:
+    return _transition_path_habit_lifecycle(
+        db,
+        current_user=current_user,
+        habit_id=habit_id,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_action="path.habit.archived",
+        desired_is_active=False,
+        status_if_changed="archived",
+        status_if_unchanged="already_archived",
+    )
+
+
+def reactivate_path_habit(
+    db: Session,
+    *,
+    current_user: User,
+    habit_id: UUID,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[PathHabitLifecycleResponse, bool]:
+    return _transition_path_habit_lifecycle(
+        db,
+        current_user=current_user,
+        habit_id=habit_id,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_action="path.habit.reactivated",
+        desired_is_active=True,
+        status_if_changed="reactivated",
+        status_if_unchanged="already_active",
+    )
+
+
+def _transition_path_habit_lifecycle(
+    db: Session,
+    *,
+    current_user: User,
+    habit_id: UUID,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+    request_action: str,
+    desired_is_active: bool,
+    status_if_changed: str,
+    status_if_unchanged: str,
+) -> tuple[PathHabitLifecycleResponse, bool]:
+    request_hash = _hash_request(request_action, {"habit_id": str(habit_id)})
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        return _handle_existing_idempotency(existing_key, request_hash, PathHabitLifecycleResponse), True
+
+    habit = _get_user_habit(db, current_user=current_user, habit_id=habit_id)
+    if habit is None:
+        raise PathHabitNotFoundError("Path habit not found.")
+
+    changed = habit.is_active != desired_is_active
+    if changed:
+        habit.is_active = desired_is_active
+
+    db.flush()
+
+    response = PathHabitLifecycleResponse(
+        habit=PathHabitRead.model_validate(habit),
+        lifecycle_summary=PathHabitLifecycleSummary(
+            status=status_if_changed if changed else status_if_unchanged,
+            guardrails_checked=["OWNERSHIP_CONFIRMED", "IDEMPOTENCY_KEY_ACCEPTED"],
+            safe_explanation=LIFECYCLE_SAFE_EXPLANATION,
+        ),
+    )
+    _store_idempotency(
+        db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_hash=request_hash,
+        response_status_code=200,
+        response=response,
+    )
+    db.commit()
+    return response, False

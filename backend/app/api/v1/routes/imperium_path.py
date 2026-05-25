@@ -13,6 +13,7 @@ from app.schemas.path import (
     PathCheckInStatus,
     PathHabitFrequency,
     PathHabitCreate,
+    PathHabitLifecycleResponse,
     PathHabitListResponse,
     PathHabitRead,
     PathTodayResponse,
@@ -22,11 +23,13 @@ from app.services.path.habits import (
     PathHabitInactiveError,
     PathHabitNotFoundError,
     PathIdempotencyConflictError,
+    archive_path_habit,
     create_path_check_in,
     create_path_habit,
     get_path_today_view,
     list_path_check_ins,
     list_path_habits,
+    reactivate_path_habit,
 )
 
 router = APIRouter()
@@ -115,6 +118,68 @@ def create_path_check_in_route(
             status_code=status.HTTP_409_CONFLICT,
             detail="Path check-in conflicts with existing data.",
         ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post("/habits/{habit_id}/archive", response_model=PathHabitLifecycleResponse)
+def archive_path_habit_route(
+    habit_id: UUID,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PathHabitLifecycleResponse:
+    idempotency_key = _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = archive_path_habit(
+            db,
+            current_user=current_user,
+            habit_id=habit_id,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except PathIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except PathHabitNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post("/habits/{habit_id}/reactivate", response_model=PathHabitLifecycleResponse)
+def reactivate_path_habit_route(
+    habit_id: UUID,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PathHabitLifecycleResponse:
+    idempotency_key = _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = reactivate_path_habit(
+            db,
+            current_user=current_user,
+            habit_id=habit_id,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except PathIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except PathHabitNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     if duplicate:
         response.status_code = status.HTTP_200_OK

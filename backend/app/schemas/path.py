@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
@@ -98,6 +99,21 @@ class PathHabitRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+PathHabitLifecycleStatus = Literal["archived", "reactivated", "already_archived", "already_active"]
+PathHabitLifecycleGuardrail = Literal["OWNERSHIP_CONFIRMED", "IDEMPOTENCY_KEY_ACCEPTED"]
+
+
+class PathHabitLifecycleSummary(BaseModel):
+    status: PathHabitLifecycleStatus
+    guardrails_checked: list[PathHabitLifecycleGuardrail]
+    safe_explanation: str
+
+
+class PathHabitLifecycleResponse(BaseModel):
+    habit: PathHabitRead
+    lifecycle_summary: PathHabitLifecycleSummary
 
 
 class PathCheckInRead(BaseModel):

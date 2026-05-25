@@ -222,6 +222,213 @@ def test_create_path_habit_replays_same_idempotency_key() -> None:
     assert not any(isinstance(item, ImperiumPathHabit) for item in db.added)
 
 
+def test_archive_path_habit_active_ok_and_keeps_check_ins() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id, is_active=True)
+    check_in = _check_in(current_user.id, habit.id)
+    db = FakeDb(scalar_results=[None, habit, check_in], scalars_results=[[check_in]])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["habit"]["id"] == str(habit.id)
+    assert body["habit"]["is_active"] is False
+    assert body["lifecycle_summary"]["status"] == "archived"
+    assert body["lifecycle_summary"]["guardrails_checked"] == [
+        "OWNERSHIP_CONFIRMED",
+        "IDEMPOTENCY_KEY_ACCEPTED",
+    ]
+    assert body["lifecycle_summary"]["safe_explanation"] == "Path habit lifecycle updated without deleting history."
+    assert habit.is_active is False
+    assert any(isinstance(item, IdempotencyKey) for item in db.added)
+    assert not any(isinstance(item, ImperiumPathCheckIn) for item in db.added)
+    assert db.scalar_results == [check_in]
+    assert db.scalars_results == [[check_in]]
+    assert db.committed is True
+
+
+def test_archive_path_habit_already_inactive_safe() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id, is_active=False)
+    db = FakeDb(scalar_results=[None, habit])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-already-inactive"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["habit"]["is_active"] is False
+    assert body["lifecycle_summary"]["status"] == "already_archived"
+    assert habit.is_active is False
+    assert db.committed is True
+
+
+def test_reactivate_path_habit_inactive_ok() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id, is_active=False)
+    db = FakeDb(scalar_results=[None, habit])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/reactivate",
+        headers={"Idempotency-Key": "path-habit-reactivate-1"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["habit"]["is_active"] is True
+    assert body["lifecycle_summary"]["status"] == "reactivated"
+    assert habit.is_active is True
+    assert db.committed is True
+
+
+def test_reactivate_path_habit_already_active_safe() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id, is_active=True)
+    db = FakeDb(scalar_results=[None, habit])
+
+    response = _client(db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/reactivate",
+        headers={"Idempotency-Key": "path-habit-reactivate-already-active"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["habit"]["is_active"] is True
+    assert body["lifecycle_summary"]["status"] == "already_active"
+    assert habit.is_active is True
+
+
+def test_path_habit_lifecycle_requires_idempotency_key() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id)
+
+    for path in (f"/imperium/path/habits/{habit.id}/archive", f"/imperium/path/habits/{habit.id}/reactivate"):
+        response = _client(FakeDb(), current_user).post(path)
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Missing Idempotency-Key header."
+
+
+def test_path_habit_lifecycle_returns_404_for_missing_or_non_owned_habit() -> None:
+    current_user = _user()
+    missing_habit_id = uuid4()
+    foreign_habit_id = uuid4()
+
+    missing_response = _client(FakeDb(scalar_results=[None, None]), current_user).post(
+        f"/imperium/path/habits/{missing_habit_id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-missing"},
+    )
+    foreign_response = _client(FakeDb(scalar_results=[None, None]), current_user).post(
+        f"/imperium/path/habits/{foreign_habit_id}/reactivate",
+        headers={"Idempotency-Key": "path-habit-reactivate-foreign"},
+    )
+
+    assert missing_response.status_code == 404
+    assert missing_response.json()["detail"] == "Path habit not found."
+    assert foreign_response.status_code == 404
+    assert foreign_response.json()["detail"] == "Path habit not found."
+
+
+def test_path_habit_archive_replays_same_idempotency_key_and_conflicts_on_different_payload() -> None:
+    current_user = _user()
+    archived_habit = _habit(current_user.id, is_active=False)
+    other_habit = _habit(current_user.id, is_active=True)
+    created_at = datetime.now(UTC)
+    archive_request_hash = _hash_request("path.habit.archived", {"habit_id": str(archived_habit.id)})
+    archived_response_body = {
+        "habit": {
+            "id": str(archived_habit.id),
+            "title": archived_habit.title,
+            "description": archived_habit.description,
+            "domain": archived_habit.domain,
+            "frequency": archived_habit.frequency,
+            "is_active": False,
+            "created_at": archived_habit.created_at.isoformat().replace("+00:00", "Z"),
+            "updated_at": archived_habit.updated_at.isoformat().replace("+00:00", "Z"),
+        },
+        "lifecycle_summary": {
+            "status": "archived",
+            "guardrails_checked": ["OWNERSHIP_CONFIRMED", "IDEMPOTENCY_KEY_ACCEPTED"],
+            "safe_explanation": "Path habit lifecycle updated without deleting history.",
+        },
+    }
+    existing_key = IdempotencyKey(
+        id=uuid4(),
+        user_id=current_user.id,
+        idempotency_key="path-habit-archive-replay",
+        request_method="POST",
+        request_path=f"/imperium/path/habits/{archived_habit.id}/archive",
+        request_hash=archive_request_hash,
+        status="completed",
+        response_status_code=200,
+        response_body=archived_response_body,
+        created_at=created_at,
+        updated_at=created_at,
+    )
+
+    replay_db = FakeDb(scalar_results=[existing_key, archived_habit], scalars_results=[[other_habit]])
+    replay_response = _client(replay_db, current_user).post(
+        f"/imperium/path/habits/{archived_habit.id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-replay"},
+    )
+
+    assert replay_response.status_code == 200
+    assert replay_response.json() == archived_response_body
+    assert replay_db.scalar_results == [archived_habit]
+    assert replay_db.scalars_results == [[other_habit]]
+    assert replay_db.added == []
+    assert replay_db.committed is False
+
+    conflict_db = FakeDb(scalar_results=[existing_key, other_habit], scalars_results=[[archived_habit]])
+    conflict_response = _client(conflict_db, current_user).post(
+        f"/imperium/path/habits/{other_habit.id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-replay"},
+    )
+
+    assert conflict_response.status_code == 409
+    assert conflict_response.json()["detail"] == "Idempotency key already used with different payload."
+    assert conflict_db.scalar_results == [other_habit]
+    assert conflict_db.scalars_results == [[archived_habit]]
+    assert conflict_db.added == []
+    assert conflict_db.rolled_back is True
+
+
+def test_archive_then_reactivate_updates_today_view_visibility() -> None:
+    current_user = _user()
+    habit = _habit(current_user.id, is_active=True)
+
+    archive_db = FakeDb(scalar_results=[None, habit])
+    archive_response = _client(archive_db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/archive",
+        headers={"Idempotency-Key": "path-habit-archive-today"},
+    )
+    assert archive_response.status_code == 200
+    assert habit.is_active is False
+
+    today_after_archive = _client(FakeDb(scalars_results=[[]]), current_user).get("/imperium/path/today")
+    assert today_after_archive.status_code == 200
+    assert today_after_archive.json()["count"] == 0
+
+    reactivate_db = FakeDb(scalar_results=[None, habit])
+    reactivate_response = _client(reactivate_db, current_user).post(
+        f"/imperium/path/habits/{habit.id}/reactivate",
+        headers={"Idempotency-Key": "path-habit-reactivate-today"},
+    )
+    assert reactivate_response.status_code == 200
+    assert habit.is_active is True
+
+    today_after_reactivate = _client(FakeDb(scalars_results=[[habit], []]), current_user).get("/imperium/path/today")
+    assert today_after_reactivate.status_code == 200
+    assert today_after_reactivate.json()["count"] == 1
+    assert today_after_reactivate.json()["items"][0]["habit"]["id"] == str(habit.id)
+
+
 def test_create_path_habit_conflicts_when_same_key_has_different_payload() -> None:
     current_user = _user()
     created_at = datetime.now(UTC)

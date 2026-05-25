@@ -631,6 +631,79 @@ Contracts:
 - the endpoint never invokes AI, n8n, pgvector, embeddings, memory commit, calendar replanning, or scoring
 - the endpoint is user-scoped and never exposes another user's habit/check-in data
 
+#### Path Habit Lifecycle 10C - archive and reactivate
+
+Path Habit Lifecycle 10C adds safe lifecycle control for Path habits without destroying history.
+
+Purpose:
+- archive a habit by turning it inactive without deleting the habit row
+- reactivate a habit by turning it active again without recreating history
+- preserve all existing check-ins and historical data
+- keep the endpoint deterministic and replay-safe with idempotency
+
+Implemented endpoints:
+
+| method | endpoint | purpose | idempotency |
+|---|---|---|---|
+| POST | `/api/imperium/path/habits/{habit_id}/archive` | Archive the current user's habit without deleting history | Required `Idempotency-Key` |
+| POST | `/api/imperium/path/habits/{habit_id}/reactivate` | Reactivate the current user's habit without deleting history | Required `Idempotency-Key` |
+
+Contracts:
+- both endpoints are JWT-scoped through `CurrentUserDep`
+- habit not found or not owned returns 404
+- archive sets `is_active=false` when the habit is active
+- archive is replay-safe when the habit is already inactive and returns `already_archived`
+- reactivate sets `is_active=true` when the habit is inactive
+- reactivate is replay-safe when the habit is already active and returns `already_active`
+- same idempotency key with same payload returns the original result
+- same idempotency key with a different payload returns 409
+- check-ins are never deleted
+- the habit row is never deleted
+- the endpoints never call AI, n8n, pgvector, embeddings, memory commit, calendar, or scoring
+- the response includes a public habit plus a lifecycle summary with guardrails
+- `safe_explanation` must be `Path habit lifecycle updated without deleting history.`
+
+Lifecycle response shape:
+
+```json
+{
+  "habit": {
+    "id": "uuid",
+    "title": "Fajr on time",
+    "description": "Pray before sunrise",
+    "domain": "worship",
+    "frequency": "daily",
+    "is_active": false,
+    "created_at": "2026-05-25T08:00:00Z",
+    "updated_at": "2026-05-25T08:00:00Z"
+  },
+  "lifecycle_summary": {
+    "status": "archived",
+    "guardrails_checked": [
+      "OWNERSHIP_CONFIRMED",
+      "IDEMPOTENCY_KEY_ACCEPTED"
+    ],
+    "safe_explanation": "Path habit lifecycle updated without deleting history."
+  }
+}
+```
+
+Lifecycle status values:
+- `archived`
+- `reactivated`
+- `already_archived`
+- `already_active`
+
+10C boundaries:
+- no deletion of habits
+- no deletion of check-ins
+- no AI/n8n/scoring/calendar
+- no pgvector write
+- no embeddings
+- no automatic memory commit
+- no vault logic
+- no mission replanning
+
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
 | GET | `/api/path/prayers/today` | Prayer times and next prayer | `path.prayers.requested` |
