@@ -653,6 +653,34 @@ Contracts:
 - no automatic recommendations
 - no automatic Mission/Vault/Path linkage
 
+#### Pulse Contract Consolidation 11D - audit readiness
+
+Patch 11D does not add behavior. It consolidates the final Pulse contract so audit review can verify the stable surface in one place.
+
+| method | endpoint | objective | Idempotency-Key | access scope | mode | public safe fields | main errors | allowed / forbidden side effects |
+|---|---|---|---|---|---|---|---|---|
+| POST | `/api/imperium/pulse/entries` | Create one current-user Pulse daily entry. | Required | `CurrentUserDep` | append-only write | `id`, `entry_date`, `sleep_hours`, `energy_level`, `fatigue_level`, `weight_kg`, `workout_done`, `workout_type`, `notes`, `created_at`, `updated_at` | `201`, `400`, `409`, `422` | Allowed: append one row, persist idempotency record, return original response on replay with same key/payload. Forbidden: updates, deletes, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, scoring, coaching, recommendations, Mission/Vault/Path linkage. |
+| GET | `/api/imperium/pulse/entries` | List current-user Pulse entries with optional `date_from`, `date_to`, `limit`, `offset`. | Not required | `CurrentUserDep` | read-only | `items`, `count`, `limit`, `offset`, `safe_explanation` | `200`, `422` | Allowed: read only. Forbidden: `db.add`, `flush`, `commit`, auto-creation, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, scoring, coaching, recommendations, Mission/Vault/Path linkage. |
+| GET | `/api/imperium/pulse/entries/{entry_id}` | Read one current-user Pulse entry by id. | Not required | `CurrentUserDep` | read-only | `id`, `entry_date`, safe entry fields, `created_at`, `updated_at` | `200`, `404` | Allowed: read only. Forbidden: `db.add`, `flush`, `commit`, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, scoring, coaching, recommendations, Mission/Vault/Path linkage. |
+| GET | `/api/imperium/pulse/today` | Read-only Pulse entry view for current user on backend current date or explicit `date` query param. | Not required | `CurrentUserDep` | read-only | `date`, `entry`, `safe_explanation` | `200` | Allowed: read only. Forbidden: automatic entry creation, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, scoring, coaching, recommendations, Mission/Vault/Path linkage. |
+| GET | `/api/imperium/pulse/stats/summary` | Read-only deterministic Pulse summary stats for current user with optional `date_from`, `date_to`. | Not required | `CurrentUserDep` | read-only | `entry_count`, averages, `latest_weight_kg`, `workout_count`, `safe_explanation` | `200`, `422` | Allowed: read only. Forbidden: automatic scoring, automatic coaching, automatic recommendations, AI, n8n, pgvector, embeddings, memory commit, calendar replanning, Mission/Vault/Path linkage. |
+
+Pulse 11D audit invariants:
+
+- no automatic entry creation
+- no automatic scoring
+- no automatic coaching
+- no automatic recommendations
+- no automatic Mission/Vault/Path linkage
+- no AI
+- no n8n
+- no pgvector writes
+- no embeddings
+- no memory commit
+- no calendar replanning
+- `POST /api/imperium/pulse/entries` remains append-only and idempotent by `Idempotency-Key`
+- `GET` routes remain user-scoped through `CurrentUserDep` and read-only
+
 | method | endpoint | purpose | emitted event |
 |---|---|---|---|
 | GET | `/api/pulse/dashboard` | Biological profile, health score, workout/nutrition summary | `pulse.dashboard.requested` |

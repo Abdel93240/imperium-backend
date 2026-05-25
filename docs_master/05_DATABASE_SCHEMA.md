@@ -1273,6 +1273,8 @@ Audit/history:
 - idempotent creates are stored through the backend idempotency table
 - Patch 11A has no update, merge, destructive edit, automatic recalculation, health score, automatic coaching, or automatic recommendations
 - Patch 11A has no automatic synchronization with Mission, Vault, Path, calendar, memory, pgvector, embedding, or n8n modules
+- Patch 11D keeps the same table and does not add automatic entry creation, automatic scoring, automatic coaching, automatic recommendations, or automatic Mission/Vault/Path linkage
+- Patch 11D remains append-only on POST and read-only on GET
 
 ### `body_profile_snapshots`
 

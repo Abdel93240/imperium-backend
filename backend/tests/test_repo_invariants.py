@@ -463,6 +463,91 @@ def test_patch_11c_pulse_stats_summary_is_read_only_deterministic_and_no_cross_m
     assert "no automatic scoring" in lowered_docs
 
 
+def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() -> None:
+    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
+    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")
+    route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_pulse.py").read_text(
+        encoding="utf-8"
+    )
+    service_text = (BACKEND_ROOT / "app" / "services" / "pulse" / "entries.py").read_text(encoding="utf-8")
+    lowered_route_and_service = "\n".join([route_text, service_text]).lower()
+    lowered_docs = "\n".join([contracts_text, schema_text]).lower()
+
+    for endpoint in (
+        "/api/imperium/pulse/entries",
+        "/api/imperium/pulse/entries/{entry_id}",
+        "/api/imperium/pulse/today",
+        "/api/imperium/pulse/stats/summary",
+    ):
+        assert endpoint in contracts_text
+
+    assert "| POST | `/api/imperium/pulse/entries`" in contracts_text
+    assert "| GET | `/api/imperium/pulse/entries`" in contracts_text
+    assert "| GET | `/api/imperium/pulse/entries/{entry_id}`" in contracts_text
+    assert "| GET | `/api/imperium/pulse/today`" in contracts_text
+    assert "| GET | `/api/imperium/pulse/stats/summary`" in contracts_text
+    assert "CurrentUserDep" in contracts_text
+    assert "Idempotency-Key" in contracts_text
+    assert "no automatic entry creation" in lowered_docs
+    assert "no automatic scoring" in lowered_docs
+    assert "no automatic coaching" in lowered_docs
+    assert "no automatic recommendations" in lowered_docs
+    assert "no automatic mission/vault/path linkage" in lowered_docs
+    assert "no ai" in lowered_docs
+    assert "no n8n" in lowered_docs
+    assert "pgvector" in lowered_docs
+    assert "embedding" in lowered_docs
+    assert "memory" in lowered_docs
+    assert "calendar" in lowered_docs
+
+    route_order = [
+        route_text.index('@router.get("/today"'),
+        route_text.index('@router.get("/stats/summary"'),
+        route_text.index('@router.post("/entries"'),
+        route_text.index('@router.get("/entries"'),
+        route_text.index('@router.get("/entries/{entry_id}"'),
+    ]
+    assert route_order == sorted(route_order)
+
+    post_route_section = route_text.split('@router.post("/entries"', maxsplit=1)[1].split(
+        '@router.get("/entries"',
+        maxsplit=1,
+    )[0]
+    get_section = route_text.split('@router.get("/entries"', maxsplit=1)[1]
+    assert "Idempotency-Key" in post_route_section
+    assert "CurrentUserDep" in post_route_section
+    assert "db.add(" in lowered_route_and_service
+    assert "db.flush" in lowered_route_and_service
+    assert "db.commit" in lowered_route_and_service
+    assert "db.add(" not in get_section
+    assert "db.flush" not in get_section
+    assert "db.commit" not in get_section
+
+    for forbidden in (
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "qwenclient",
+        "n8n",
+        "trigger_n8n",
+        "n8n agent",
+        "ai agent",
+        "aiagent",
+        "pgvector",
+        "embedding",
+        "memory commit",
+        "calendar replanning",
+        "scoring",
+        "coaching",
+        "recommendations",
+        "mission_id",
+        "vault",
+        "path linkage",
+    ):
+        assert forbidden not in lowered_route_and_service
+
+
 def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260501_0015_memory_candidate_decisions.py"
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
