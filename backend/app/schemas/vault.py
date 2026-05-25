@@ -134,7 +134,15 @@ class ImperiumVaultTransactionRead(BaseModel):
     source: str | None
     note: str | None
     external_ref: str | None
+    is_reversal: bool = False
+    reversal_of_transaction_id: UUID | None = None
+    reversal_reason: str | None = None
     created_at: datetime
+
+    @field_validator("is_reversal", mode="before")
+    @classmethod
+    def default_is_reversal(cls, value: bool | None) -> bool:
+        return False if value is None else value
 
 
 class ImperiumVaultTransactionListResponse(BaseModel):
@@ -143,3 +151,29 @@ class ImperiumVaultTransactionListResponse(BaseModel):
     limit: int
     offset: int
     safe_explanation: str = "Vault transactions for current user."
+
+
+class ImperiumVaultTransactionReverseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("reason cannot be empty.")
+        return stripped
+
+
+class ImperiumVaultTransactionReversalSummary(BaseModel):
+    status: Literal["reversed"]
+    original_transaction_id: UUID
+    guardrails_checked: list[str]
+    safe_explanation: str = "Transaction reversed by appending an opposite ledger transaction."
+
+
+class ImperiumVaultTransactionReverseResponse(BaseModel):
+    transaction: ImperiumVaultTransactionRead
+    reversal_summary: ImperiumVaultTransactionReversalSummary

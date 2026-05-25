@@ -635,7 +635,7 @@ Audit/history:
 
 ## The Vault
 
-### `imperium_vault_transactions` - Patch 9A ledger foundation
+### `imperium_vault_transactions` - Patch 9A ledger foundation, Patch 9F reversals
 
 Purpose:
 - Stores a simple append-only Vault ledger for income and expense facts created through `/api/imperium/vault/transactions`.
@@ -652,6 +652,9 @@ Columns:
 - `source` text nullable
 - `note` text nullable
 - `external_ref` text nullable
+- `reversal_of_transaction_id` uuid nullable
+- `reversal_reason` text nullable max 500
+- `is_reversal` boolean not null default false
 - `created_at` timestamptz not null
 - `updated_at` timestamptz not null
 
@@ -662,28 +665,47 @@ Required fields:
 - `amount_cents`
 - `currency`
 - `occurred_at`
+- `is_reversal`
 - `created_at`
 - `updated_at`
 
 Foreign keys:
 - `user_id -> users.id`
+- `reversal_of_transaction_id -> imperium_vault_transactions.id`
 
 Indexes:
 - index on `(user_id, occurred_at desc)`
 - index on `(user_id, transaction_type)`
+- index on `(user_id, reversal_of_transaction_id)`
+- unique partial index on `(reversal_of_transaction_id)` where `is_reversal = true`
 
 Check constraints:
 - `transaction_type IN ('income', 'expense')`
 - `amount_cents > 0`
 - `length(currency) = 3`
+- `is_reversal = true` requires `reversal_of_transaction_id IS NOT NULL`
+- `is_reversal = false` requires `reversal_of_transaction_id IS NULL`
 
 API and ownership rules:
 - Routes are JWT scoped with `CurrentUserDep`; clients cannot provide `user_id`.
 - `POST` requires `Idempotency-Key` and stores the public response in `idempotency_keys`.
+- `POST /api/imperium/vault/transactions/{transaction_id}/reverse` requires `Idempotency-Key`.
 - `GET` does not require `Idempotency-Key`.
 - Reads are strictly current-user scoped and deterministic.
+- Reversals are append-only corrections: the original row is never updated or deleted.
+- A non-reversal original may have at most one reversal in Patch 9F.
 
 Patch 9A exclusions:
+- no wallet/balance automation
+- no sadaqa creation
+- no receipt OCR
+- no AI, n8n, pgvector, embedding, memory commit, calendar replanning, financial scoring, or exposed internal coefficient
+
+Patch 9F reversal rules:
+- income reverses to expense with the same amount and currency.
+- expense reverses to income with the same amount and currency.
+- Reversal rows use `source = 'reversal'`, `external_ref = null`, and store the trimmed user reason.
+- Reversal rows cannot themselves be reversed in V1.
 - no wallet/balance automation
 - no sadaqa creation
 - no receipt OCR

@@ -352,6 +352,7 @@ canonical for Imperium mission behavior.
 | POST | `/api/imperium/vault/transactions` | Patch 9A append-only income/expense ledger create; JWT scoped; requires `Idempotency-Key`; no AI/n8n/pgvector/memory/calendar side effect | none in Patch 9A |
 | GET | `/api/imperium/vault/transactions` | Patch 9A current-user ledger read with deterministic filters and sorting; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/transactions/{transaction_id}` | Patch 9E current-user Vault transaction detail read; read-only; returns `404` when missing or non-owned; no `Idempotency-Key` required | none |
+| POST | `/api/imperium/vault/transactions/{transaction_id}/reverse` | Patch 9F append-only transaction correction; JWT scoped; requires `Idempotency-Key`; creates one opposite reversal transaction and never modifies or deletes the original | none in Patch 9F |
 | GET | `/api/imperium/vault/summary` | Patch 9B current-user ledger summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/categories` | Patch 9C current-user category summary computed on the fly from current transactions; read-only; no `Idempotency-Key` required | none |
 | GET | `/api/imperium/vault/summary/monthly` | Patch 9D current-user monthly summary computed on the fly from current transactions; read-only; grouped by public month `YYYY-MM`; currency is uppercase 3 letters; no `Idempotency-Key` required | none |
@@ -440,6 +441,22 @@ Patch 9E scope:
 - Enforces current-user scope in the query; non-owned records are not disclosed and return `404`.
 - Deterministic output with safe public fields only.
 - No AI/n8n/OCR/sadaqa/wallet/balance workflows are triggered by the detail read path.
+
+`POST /api/imperium/vault/transactions/{transaction_id}/reverse`:
+- Requires authenticated current-user scope.
+- Requires `Idempotency-Key`.
+- Accepts only `{ "reason": "..." }`; `reason` is trimmed, required, non-empty, and max 500 characters.
+- Rejects unknown fields and never accepts client-supplied amount, type, currency, or user id.
+- Returns `404` when the original transaction is missing or non-owned.
+- Returns `409` when the original is already reversed, when the target is itself a reversal, or when the idempotency key is reused with a different payload.
+- Same `Idempotency-Key` plus same payload returns the original reversal response.
+- Creates exactly one new row in `imperium_vault_transactions` with the opposite transaction type, same positive amount, same currency, same category, source `reversal`, backend `occurred_at`, null `external_ref`, `is_reversal = true`, `reversal_of_transaction_id = original.id`, and the trimmed `reversal_reason`.
+- Never updates or deletes the original transaction.
+
+Patch 9F scope:
+- Adds the append-only correction / reversal foundation for Vault transactions.
+- Does not add AI, n8n, OCR, sadaqa, pgvector, embedding, memory, calendar, wallet, balance, or persistent financial decision side effects.
+- Result is deterministic apart from backend timestamps and ids.
 
 ### Vector
 

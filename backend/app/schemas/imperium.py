@@ -831,7 +831,15 @@ class ImperiumVaultTransactionDetailRead(BaseModel):
     source: str | None
     note: str | None
     external_ref: str | None
+    is_reversal: bool = False
+    reversal_of_transaction_id: UUID | None = None
+    reversal_reason: str | None = None
     created_at: datetime
+
+    @field_validator("is_reversal", mode="before")
+    @classmethod
+    def default_is_reversal(cls, value: bool | None) -> bool:
+        return False if value is None else value
 
 
 class ImperiumVaultTransactionDetailResponse(BaseModel):

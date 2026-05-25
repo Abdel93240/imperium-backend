@@ -1301,3 +1301,78 @@ def test_patch_9e_vault_transaction_detail_route_is_read_only_and_user_scoped() 
     assert "calendar" not in lowered_code
     assert "ocr" not in lowered_code
     assert "sadaqa" not in lowered_code
+
+
+def test_patch_9f_vault_reversal_route_is_append_only_user_scoped_and_deterministic() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_vault.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "vault_transactions.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "vault.py"
+    model_path = BACKEND_ROOT / "app" / "models" / "vault.py"
+    migration_path = (
+        BACKEND_ROOT / "alembic" / "versions" / "20260525_0025_imperium_vault_transaction_reversals.py"
+    )
+    docs_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    model_text = model_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+    docs_text = docs_path.read_text(encoding="utf-8")
+    route_section = route_text.split('@router.post(\n    "/transactions/{transaction_id}/reverse"', maxsplit=1)[
+        1
+    ].split('@router.get("/transactions"', maxsplit=1)[0]
+    service_section = service_text.split("def reverse_vault_transaction", maxsplit=1)[1].split(
+        "def list_vault_transactions",
+        maxsplit=1,
+    )[0]
+    reverse_schema_section = schema_text.split("class ImperiumVaultTransactionReverseRequest", maxsplit=1)[1].split(
+        "class ImperiumVaultTransactionReversalSummary",
+        maxsplit=1,
+    )[0]
+    model_section = model_text.split("class ImperiumVaultTransaction", maxsplit=1)[1]
+    combined_code = "\n".join([route_section, service_section, reverse_schema_section, model_section])
+    lowered_code = combined_code.lower()
+    lowered_docs = docs_text.lower()
+
+    assert 'revision: str = "20260525_0025"' in migration_text
+    assert 'down_revision: str | None = "20260525_0024"' in migration_text
+    assert "/api/imperium/vault/transactions/{transaction_id}/reverse" in docs_text
+    assert "Patch 9F" in docs_text
+    assert "CurrentUserDep" in route_section
+    assert "Idempotency-Key" in route_section
+    assert "VaultTransactionNotFoundError" in route_section
+    assert "HTTP_404_NOT_FOUND" in route_section
+    assert "HTTP_409_CONFLICT" in route_section
+    assert "extra=\"forbid\"" in reverse_schema_section
+    assert "amount_cents" not in reverse_schema_section
+    assert "transaction_type" not in reverse_schema_section
+    assert "currency" not in reverse_schema_section
+    assert "user_id" not in reverse_schema_section
+    assert "ImperiumVaultTransaction.user_id == current_user.id" in service_section
+    assert "transaction_type=_opposite_transaction_type(original.transaction_type)" in service_section
+    assert "amount_cents=original.amount_cents" in service_section
+    assert "currency=original.currency" in service_section
+    assert "source=\"reversal\"" in service_section
+    assert "external_ref=None" in service_section
+    assert "is_reversal=True" in service_section
+    assert "reversal_of_transaction_id=original.id" in service_section
+    assert "db.add(reversal)" in service_section
+    assert "db.delete" not in service_section
+    assert "op.drop_table" not in migration_text
+    assert "reversal_of_transaction_id" in migration_text
+    assert "reversal_reason" in migration_text
+    assert "is_reversal" in migration_text
+    assert "postgresql_where=sa.text(\"is_reversal = true\")" in migration_text
+    assert "never modifies or deletes the original" in lowered_docs
+
+    assert "qwenclient" not in lowered_code
+    assert "n8n_client" not in lowered_code
+    assert "trigger_n8n" not in lowered_code
+    assert "pgvector" not in lowered_code
+    assert "embedding" not in lowered_code
+    assert "ai_memories" not in combined_code
+    assert "calendar" not in lowered_code
+    assert "ocr" not in lowered_code
+    assert "sadaqa" not in lowered_code
+    assert "wallet" not in lowered_code
+    assert "balance" not in lowered_code

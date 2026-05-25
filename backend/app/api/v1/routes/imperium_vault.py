@@ -16,11 +16,16 @@ from app.schemas.vault import (
     ImperiumVaultTransactionCreate,
     ImperiumVaultTransactionListResponse,
     ImperiumVaultTransactionRead,
+    ImperiumVaultTransactionReverseRequest,
+    ImperiumVaultTransactionReverseResponse,
 )
 from app.services.imperium.vault_transactions import (
     VaultTransactionIdempotencyConflictError,
+    VaultTransactionNotFoundError,
+    VaultTransactionReversalConflictError,
     create_vault_transaction,
     list_vault_transactions,
+    reverse_vault_transaction,
 )
 from app.services.imperium.vault import (
     get_vault_category_summary,
@@ -35,6 +40,7 @@ router = APIRouter()
 @router.post(
     "/transactions",
     response_model=ImperiumVaultTransactionRead,
+    response_model_exclude_defaults=True,
     status_code=status.HTTP_201_CREATED,
 )
 def create_imperium_vault_transaction_route(
@@ -65,6 +71,51 @@ def create_imperium_vault_transaction_route(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Vault transaction conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post(
+    "/transactions/{transaction_id}/reverse",
+    response_model=ImperiumVaultTransactionReverseResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def reverse_imperium_vault_transaction_route(
+    transaction_id: UUID,
+    payload: ImperiumVaultTransactionReverseRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> ImperiumVaultTransactionReverseResponse:
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+
+    try:
+        result, duplicate = reverse_vault_transaction(
+            db,
+            current_user=current_user,
+            transaction_id=transaction_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except VaultTransactionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (VaultTransactionIdempotencyConflictError, VaultTransactionReversalConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Vault transaction reversal conflicts with an existing record.",
         ) from exc
 
     if duplicate:
