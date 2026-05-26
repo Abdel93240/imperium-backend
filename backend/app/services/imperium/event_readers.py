@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.models.imperium import ImperiumEvent
 
+DEFAULT_EVENT_READER_LIMIT = 50
+MAX_EVENT_READER_LIMIT = 100
+
 
 def list_events_for_user(
     db: Session,
@@ -15,9 +18,14 @@ def list_events_for_user(
     source_module: str | None = None,
     occurred_from: datetime | None = None,
     occurred_to: datetime | None = None,
-    limit: int = 50,
+    limit: int = DEFAULT_EVENT_READER_LIMIT,
     offset: int = 0,
 ) -> list[ImperiumEvent]:
+    limit = _validate_limit(limit)
+    offset = _validate_offset(offset)
+    if user_id is None:
+        raise ValueError("user_id is required to read Imperium events.")
+
     query = select(ImperiumEvent).where(ImperiumEvent.user_id == user_id)
 
     if event_type is not None:
@@ -36,3 +44,21 @@ def list_events_for_user(
     ).limit(limit).offset(offset)
 
     return list(db.scalars(query))
+
+
+def _validate_limit(limit: int) -> int:
+    if isinstance(limit, bool) or not isinstance(limit, int):
+        raise ValueError("limit must be an integer.")
+    if limit < 1:
+        raise ValueError("limit must be greater than or equal to 1.")
+    if limit > MAX_EVENT_READER_LIMIT:
+        raise ValueError(f"limit must be less than or equal to {MAX_EVENT_READER_LIMIT}.")
+    return limit
+
+
+def _validate_offset(offset: int) -> int:
+    if isinstance(offset, bool) or not isinstance(offset, int):
+        raise ValueError("offset must be an integer.")
+    if offset < 0:
+        raise ValueError("offset must be greater than or equal to 0.")
+    return offset
