@@ -648,6 +648,10 @@ append-only
 user-scoped
 Idempotency-Key required on POST
 read-only GETs
+DB constraints aligned with Pydantic
+event_type snake_case strict
+schema_version = v1
+payload_json null or JSON object only
 strict CurrentUserDep
 no user_id exposed
 no projections

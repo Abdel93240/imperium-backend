@@ -1730,8 +1730,58 @@ def test_patch_23c_imperium_events_contract_consolidation_remains_stable() -> No
     assert "strict currentuserdep" in docs05_text.lower()
     assert "no user_id exposed" in docs04_text.lower()
     assert "no user_id exposed" in docs05_text.lower()
-    for forbidden in ("qwen", "n8n", "ocr", "pgvector", "memory commit", "scoring", "coaching", "recommendations", "projection write", "cross-module writes"):
+    for forbidden in (
+        "qwen",
+        "n8n",
+        "ocr",
+        "pgvector",
+        "memory commit",
+        "scoring",
+        "coaching",
+        "recommendations",
+        "projection write",
+        "cross-module writes",
+    ):
         assert forbidden not in service_text.lower()
+
+
+def test_patch_23d_imperium_events_db_constraints_hardening_remains_stable() -> None:
+    model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260526_0031_imperium_events_constraints_hardening.py"
+    postgres_test_path = BACKEND_ROOT / "tests" / "test_imperium_events_db_constraints_postgres.py"
+    docs04_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    docs05_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    model_text = model_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+    postgres_test_text = postgres_test_path.read_text(encoding="utf-8")
+    docs04_text = docs04_path.read_text(encoding="utf-8")
+    docs05_text = docs05_path.read_text(encoding="utf-8")
+
+    assert 'revision: str = "20260526_0031"' in migration_text
+    assert 'down_revision: str | None = "20260526_0030"' in migration_text
+    for text in (model_text, migration_text):
+        assert "imperium_events_event_type_format_check" in text
+        assert "event_type ~ '^[a-z][a-z0-9_]*$'" in text
+        assert "imperium_events_schema_version_v1_check" in text
+        assert "schema_version = 'v1'" in text
+        assert "imperium_events_payload_json_object_check" in text
+        assert "payload_json IS NULL OR jsonb_typeof(payload_json) = 'object'" in text
+
+    assert "MissionStarted" in postgres_test_text
+    assert "mission-started" in postgres_test_text
+    assert 'schema_version="v2"' in postgres_test_text
+    assert 'payload_json=["not", "object"]' in postgres_test_text
+    assert "DB constraints aligned with Pydantic" in docs04_text
+    assert "event_type snake_case strict" in docs04_text
+    assert "schema_version = v1" in docs04_text
+    assert "payload_json null or JSON object only" in docs04_text
+    assert "DB constraints aligned with Pydantic" in docs05_text
+    assert "event_type snake_case strict" in docs05_text
+    assert "schema_version = v1" in docs05_text
+    assert "payload_json null or JSON object only" in docs05_text
+    assert "index user/occurred_at desc" in docs05_text.lower()
+    assert "index user/source_module/occurred_at desc" in docs05_text.lower()
+    assert "index user/event_type/occurred_at desc" in docs05_text.lower()
 
 
 def test_alembic_heads_are_unique() -> None:

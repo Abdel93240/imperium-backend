@@ -405,13 +405,20 @@ columns:
 constraints:
 append-only trigger guards
 event_type non-empty
+event_type snake_case strict
 source_module non-empty
 schema_version non-empty
+schema_version = v1
+payload_json null or JSON object only
+DB constraints aligned with Pydantic
 source_module allowed values
 unique idempotency_key per user when present
 index user/occurred_at
+index user/occurred_at desc
 index user/source_module/occurred_at
+index user/source_module/occurred_at desc
 index user/event_type/occurred_at
+index user/event_type/occurred_at desc
 source_module check constraint
 intended future use:
 Vault snapshots

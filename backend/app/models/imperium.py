@@ -65,8 +65,14 @@ class ImperiumEvent(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_events"
     __table_args__ = (
         CheckConstraint("length(btrim(event_type)) > 0", name="imperium_events_event_type_non_empty"),
+        CheckConstraint("event_type ~ '^[a-z][a-z0-9_]*$'", name="imperium_events_event_type_format_check"),
         CheckConstraint("length(btrim(source_module)) > 0", name="imperium_events_source_module_non_empty"),
         CheckConstraint("length(btrim(schema_version)) > 0", name="imperium_events_schema_version_non_empty"),
+        CheckConstraint("schema_version = 'v1'", name="imperium_events_schema_version_v1_check"),
+        CheckConstraint(
+            "payload_json IS NULL OR jsonb_typeof(payload_json) = 'object'",
+            name="imperium_events_payload_json_object_check",
+        ),
         CheckConstraint(
             "source_module IN ('mission', 'vault', 'path', 'pulse', 'vector', "
             "'dashboard', 'daily_plan', 'system', 'manual')",

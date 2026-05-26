@@ -6,6 +6,7 @@ IMPERIUM_TEST_DATABASE_URL is not set and fail in CI if the variable is missing.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -48,17 +49,19 @@ def _insert_imperium_event(
     event_type: str = "mission_started",
     source_module: str = "mission",
     schema_version: str = "v1",
+    payload_json: dict | list | None = None,
     idempotency_key: str | None = "event-idem-1",
 ) -> str:
     event_id = str(uuid4())
     occurred_at = datetime(2026, 5, 26, 8, 45, tzinfo=UTC)
+    payload_json_param = None if payload_json is None else json.dumps(payload_json)
     conn.execute(
         text(
             "INSERT INTO imperium_events "
             "(id, user_id, event_type, source_module, occurred_at, payload_json, "
             "schema_version, idempotency_key, created_at, updated_at) "
-            "VALUES (:id, :user_id, :event_type, :source_module, :occurred_at, '{}'::jsonb, "
-            ":schema_version, :idempotency_key, now(), now())"
+            "VALUES (:id, :user_id, :event_type, :source_module, :occurred_at, "
+            "CAST(:payload_json AS jsonb), :schema_version, :idempotency_key, now(), now())"
         ),
         {
             "id": event_id,
@@ -66,6 +69,7 @@ def _insert_imperium_event(
             "event_type": event_type,
             "source_module": source_module,
             "occurred_at": occurred_at,
+            "payload_json": payload_json_param,
             "schema_version": schema_version,
             "idempotency_key": idempotency_key,
         },
@@ -85,6 +89,16 @@ def test_imperium_events_reject_blank_event_type(engine) -> None:
         with engine.begin() as conn:
             user_id = _make_user(conn)
             _insert_imperium_event(conn, user_id=user_id, event_type="   ")
+
+    _expect_constraint_failure(excinfo.value)
+
+
+@pytest.mark.parametrize("event_type", ["MissionStarted", "mission-started"])
+def test_imperium_events_reject_non_snake_case_event_type(engine, event_type: str) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            user_id = _make_user(conn)
+            _insert_imperium_event(conn, user_id=user_id, event_type=event_type)
 
     _expect_constraint_failure(excinfo.value)
 
@@ -114,6 +128,44 @@ def test_imperium_events_reject_blank_schema_version(engine) -> None:
             _insert_imperium_event(conn, user_id=user_id, schema_version="   ")
 
     _expect_constraint_failure(excinfo.value)
+
+
+def test_imperium_events_reject_schema_version_other_than_v1(engine) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            user_id = _make_user(conn)
+            _insert_imperium_event(conn, user_id=user_id, schema_version="v2")
+
+    _expect_constraint_failure(excinfo.value)
+
+
+def test_imperium_events_reject_payload_json_array(engine) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            user_id = _make_user(conn)
+            _insert_imperium_event(conn, user_id=user_id, payload_json=["not", "object"])
+
+    _expect_constraint_failure(excinfo.value)
+
+
+def test_imperium_events_accept_payload_json_null(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        event_id = _insert_imperium_event(conn, user_id=user_id, payload_json=None)
+
+    assert event_id
+
+
+def test_imperium_events_accept_payload_json_object(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        event_id = _insert_imperium_event(
+            conn,
+            user_id=user_id,
+            payload_json={"mission_id": str(uuid4()), "note": "created"},
+        )
+
+    assert event_id
 
 
 def test_imperium_events_reject_duplicate_idempotency_key_for_same_user(engine) -> None:
