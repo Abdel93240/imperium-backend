@@ -31,6 +31,7 @@ does not include user_id
 `/api/imperium/frontend/empty-states`
 `/api/imperium/frontend/actions`
 `/api/imperium/frontend/app-manifest`
+`/api/imperium/frontend/module-cards`
 
 contracts index
 metadata only

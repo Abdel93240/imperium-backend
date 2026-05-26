@@ -3,6 +3,7 @@
 route owner canonique
 imperium_contracts.py
 imperium_frontend.py
+imperium_home.py (`/api/imperium/home/bootstrap`)
 
 ## Frontend Metadata Layer v5
 
