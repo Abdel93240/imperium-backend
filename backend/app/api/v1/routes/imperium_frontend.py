@@ -6,6 +6,7 @@ from app.schemas.frontend import (
     ImperiumFrontendActionsResponse,
     ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutResponse,
+    ImperiumFrontendModuleCardsResponse,
     ImperiumFrontendNavigationResponse,
     ImperiumFrontendThemeTokensResponse,
 )
@@ -14,6 +15,7 @@ from app.services.imperium.frontend import (
     get_imperium_frontend_actions_metadata,
     get_imperium_frontend_empty_states_metadata,
     get_imperium_frontend_layout_metadata,
+    get_imperium_frontend_module_cards_metadata,
     get_imperium_frontend_navigation_metadata,
     get_imperium_frontend_theme_tokens_metadata,
 )
@@ -37,6 +39,12 @@ def imperium_frontend_navigation_route(current_user: CurrentUserDep) -> Imperium
 def imperium_frontend_layout_route(current_user: CurrentUserDep) -> ImperiumFrontendLayoutResponse:
     _ = current_user
     return get_imperium_frontend_layout_metadata()
+
+
+@router.get("/frontend/module-cards", response_model=ImperiumFrontendModuleCardsResponse)
+def imperium_frontend_module_cards_route(current_user: CurrentUserDep) -> ImperiumFrontendModuleCardsResponse:
+    _ = current_user
+    return get_imperium_frontend_module_cards_metadata()
 
 
 @router.get("/frontend/theme-tokens", response_model=ImperiumFrontendThemeTokensResponse)

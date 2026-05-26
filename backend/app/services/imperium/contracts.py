@@ -192,6 +192,13 @@ CONTRACT_INDEX_GROUPS: tuple[ContractIndexGroup, ...] = (
                 read_only=True,
                 idempotency_key_required=False,
             ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/module-cards",
+                purpose="Frontend module cards metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
         ],
     ),
 )

@@ -8,6 +8,8 @@ from app.schemas.frontend import (
     ImperiumFrontendLayoutRegion,
     ImperiumFrontendLayoutResponse,
     ImperiumFrontendLayoutShell,
+    ImperiumFrontendModuleCardItem,
+    ImperiumFrontendModuleCardsResponse,
     ImperiumFrontendNavigationItem,
     ImperiumFrontendNavigationResponse,
     ImperiumFrontendThemePalette,
@@ -304,6 +306,7 @@ IMPERIUM_FRONTEND_APP_MANIFEST_ENDPOINTS: tuple[str, ...] = (
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
+    "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/app-manifest",
 )
 
@@ -330,4 +333,71 @@ def get_imperium_frontend_actions_metadata() -> ImperiumFrontendActionsResponse:
         read_only=True,
         items=list(IMPERIUM_FRONTEND_ACTION_ITEMS),
         safe_explanation="Frontend action registry metadata for Imperium V1.",
+    )
+
+
+IMPERIUM_FRONTEND_MODULE_CARD_ITEMS: tuple[ImperiumFrontendModuleCardItem, ...] = (
+    ImperiumFrontendModuleCardItem(
+        key="dashboard",
+        title="Dashboard",
+        subtitle="Your command snapshot.",
+        route="/dashboard",
+        primary_endpoint="/api/imperium/dashboard",
+        order=10,
+        enabled=True,
+    ),
+    ImperiumFrontendModuleCardItem(
+        key="daily_plan",
+        title="Daily Plan",
+        subtitle="Your day at a glance.",
+        route="/daily-plan",
+        primary_endpoint="/api/imperium/daily-plan",
+        order=20,
+        enabled=True,
+    ),
+    ImperiumFrontendModuleCardItem(
+        key="mission",
+        title="Missions",
+        subtitle="Focus and execution.",
+        route="/missions",
+        primary_endpoint="/api/imperium/missions/active",
+        order=30,
+        enabled=True,
+    ),
+    ImperiumFrontendModuleCardItem(
+        key="vault",
+        title="Vault",
+        subtitle="Money and ledger.",
+        route="/vault",
+        primary_endpoint="/api/imperium/vault/summary",
+        order=40,
+        enabled=True,
+    ),
+    ImperiumFrontendModuleCardItem(
+        key="path",
+        title="The Path",
+        subtitle="Habits and discipline.",
+        route="/path",
+        primary_endpoint="/api/imperium/path/today",
+        order=50,
+        enabled=True,
+    ),
+    ImperiumFrontendModuleCardItem(
+        key="pulse",
+        title="Pulse",
+        subtitle="Body and energy.",
+        route="/pulse",
+        primary_endpoint="/api/imperium/pulse/today",
+        order=60,
+        enabled=True,
+    ),
+)
+
+
+def get_imperium_frontend_module_cards_metadata() -> ImperiumFrontendModuleCardsResponse:
+    return ImperiumFrontendModuleCardsResponse(
+        module_cards_version="v1",
+        read_only=True,
+        items=list(IMPERIUM_FRONTEND_MODULE_CARD_ITEMS),
+        safe_explanation="Frontend module card metadata for Imperium V1.",
     )

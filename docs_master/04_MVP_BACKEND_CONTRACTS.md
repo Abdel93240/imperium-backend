@@ -4,10 +4,10 @@ route owner canonique
 imperium_contracts.py
 imperium_frontend.py
 
-## Frontend Metadata Layer v4
+## Frontend Metadata Layer v5
 
 This layer is metadata only.
-Frontend Metadata Layer v4 is considered stable and locked.
+Frontend Metadata Layer v5 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 This layer is static and deterministic in V1.
 It is not a full OpenAPI document.
@@ -141,7 +141,7 @@ not openapi
 not a health check
 no business data read
 no secrets/providers/infra metadata
-lists exactly the 9 frontend metadata endpoints
+lists exactly the 10 frontend metadata endpoints
 contains no user_id
 contains no provider metadata
 contains no infra metadata
@@ -479,3 +479,15 @@ no automatic path check-in creation
 no automatic pulse entry creation
 no auto-creation of path rows
 no auto-creation of pulse rows
+
+### Module Cards
+
+`/api/imperium/frontend/module-cards`
+metadata only
+static deterministic v1
+not a health check
+not runtime availability
+not personalization
+not feature flag
+no business data read
+no secrets/providers/infra metadata

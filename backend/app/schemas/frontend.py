@@ -154,3 +154,24 @@ class ImperiumFrontendAppManifestResponse(BaseModel):
     application: ImperiumFrontendApplicationMetadata
     frontend_metadata_endpoints: list[str]
     safe_explanation: str
+
+
+class ImperiumFrontendModuleCardItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    title: str
+    subtitle: str
+    route: str
+    primary_endpoint: str
+    order: int
+    enabled: bool
+
+
+class ImperiumFrontendModuleCardsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    module_cards_version: str
+    read_only: bool
+    items: list[ImperiumFrontendModuleCardItem]
+    safe_explanation: str

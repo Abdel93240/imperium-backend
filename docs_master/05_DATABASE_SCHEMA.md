@@ -1,6 +1,6 @@
 # Database Schema Notes
 
-frontend metadata layer v4
+frontend metadata layer v5
 metadata only
 declarative metadata only
 not openapi
@@ -249,3 +249,15 @@ iso-4217 existence is not validated in v1
 three-letter currency codes are accepted and normalized uppercase
 path item legacy model
 deprecated
+
+## Frontend Module Cards Metadata
+
+`/api/imperium/frontend/module-cards`
+metadata only
+static deterministic v1
+not a health check
+not runtime availability
+not personalization
+not feature flag
+no business data read
+no secrets/providers/infra metadata

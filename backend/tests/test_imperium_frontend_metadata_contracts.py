@@ -19,6 +19,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
     "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/module-cards",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -319,7 +320,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/actions",
         "/api/imperium/frontend/app-manifest",
     )
-    assert "frontend metadata layer v4" in contracts_docs
+    assert "frontend metadata layer v5" in contracts_docs
     assert "stable and locked" in contracts_docs
     assert "metadata only" in contracts_docs
     assert "explicitly documented" in contracts_docs
@@ -330,11 +331,11 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "no action triggered" in contracts_docs
     assert "jwt-scoped" in contracts_docs
     assert "idempotency-key not required" in contracts_docs
-    assert "lists exactly the 9 frontend metadata endpoints" in contracts_docs
+    assert "lists exactly the 10 frontend metadata endpoints" in contracts_docs
     for path in expected_paths:
         assert path in contracts_docs
 
-    assert "frontend metadata layer v4" in schema_docs
+    assert "frontend metadata layer v5" in schema_docs
     assert "metadata only" in schema_docs
     assert "no business data read" in schema_docs
     assert "not a health check" in schema_docs
