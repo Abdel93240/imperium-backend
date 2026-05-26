@@ -405,6 +405,10 @@ future / not implemented in pulse v1 11a->11d: `pulse_biological_profiles`
 future / not implemented in pulse v1 11a->11d: `pulse_health_scores`
 future / not implemented in pulse v1 11a->11d: `pulse_workouts`
 future / not implemented in pulse v1 11a->11d: `pulse_recommendations`
+health score table future / not implemented
+workout generation future / not implemented
+wearable sync tables future / not implemented
+no automatic scoring/coaching/recommendations
 no automatic pulse entry creation
 no automatic coaching
 no automatic recommendations
