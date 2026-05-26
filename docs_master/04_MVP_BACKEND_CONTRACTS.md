@@ -684,3 +684,61 @@ Path consistency
 Pulse tracking
 Vector analytics
 Weekly Review
+
+## Internal Imperium Events Reader 24D
+
+Internal backend contract only.
+This is not a public API contract.
+No endpoint is introduced by this reader.
+No projection layer is introduced by this reader.
+No database write is allowed through this reader.
+No cross-module write is allowed through this reader.
+No Vault, Vector, Pulse, Path, n8n, Qwen, OCR, AI scoring, coaching, or recommendation integration is part of this contract.
+
+Primary function:
+`read_imperium_events(db, EventReadFilters(...)) -> EventReadPage`
+
+Compatibility function:
+`list_events_for_user(...)`
+delegates to the modern `read_imperium_events` contract and returns only `EventReadPage.items`.
+
+Scope:
+`user_id` is mandatory.
+Every read must be scoped by `imperium_events.user_id`.
+The reader must never return another user's events.
+
+Available filters:
+`event_type`
+`source_module`
+`occurred_from`
+`occurred_to`
+`limit`
+`offset`
+
+Bounds:
+`limit` default is 50.
+`limit` maximum is 100.
+`offset` must be greater than or equal to 0.
+
+Deterministic order:
+`occurred_at DESC`
+`created_at DESC`
+`id DESC`
+
+Pagination:
+The internal query reads `limit + 1` rows.
+The returned page contains at most `limit` items.
+`has_more` is true when the extra row exists.
+`next_offset` is `offset + limit` when `has_more` is true.
+`next_offset` is null when the page is final.
+
+Runtime constraints:
+read-only
+internal backend use only
+no endpoint
+no projection
+no migration
+no model change
+no write DB
+no public route exposure
+no module orchestration side effects

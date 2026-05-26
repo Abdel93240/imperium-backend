@@ -38,6 +38,7 @@ class EventReadPage:
 
 
 def read_imperium_events(db: Session, filters: EventReadFilters) -> EventReadPage:
+    """Read user-scoped Imperium events for internal backend callers only."""
     query = _build_event_read_query(filters)
     rows = list(db.scalars(query.limit(filters.limit + 1).offset(filters.offset)))
     items = rows[: filters.limit]
