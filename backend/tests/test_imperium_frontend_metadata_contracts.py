@@ -2,10 +2,23 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
+
+
+FRONTEND_METADATA_ENDPOINTS = {
+    "/api/imperium/home/bootstrap",
+    "/api/imperium/contracts/index",
+    "/api/imperium/contracts/compliance",
+    "/api/imperium/frontend/navigation",
+    "/api/imperium/frontend/layout",
+    "/api/imperium/frontend/theme-tokens",
+    "/api/imperium/frontend/empty-states",
+    "/api/imperium/frontend/actions",
+}
 
 
 class FakeDb:
@@ -25,11 +38,15 @@ class FakeDb:
 
 
 def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
+    return TestClient(_app(db, current_user))
+
+
+def _app(db: FakeDb, current_user: SimpleNamespace) -> FastAPI:
     app = FastAPI()
     app.include_router(api_router, prefix="/api")
     app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app)
+    return app
 
 
 def _user() -> SimpleNamespace:
@@ -38,20 +55,27 @@ def _user() -> SimpleNamespace:
 
 def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_scoped() -> None:
     client = _client(FakeDb(), _user())
-    for path in (
-        "/api/imperium/home/bootstrap",
-        "/api/imperium/contracts/index",
-        "/api/imperium/contracts/compliance",
-        "/api/imperium/frontend/navigation",
-        "/api/imperium/frontend/layout",
-        "/api/imperium/frontend/theme-tokens",
-        "/api/imperium/frontend/empty-states",
-        "/api/imperium/frontend/actions",
-    ):
+    for path in FRONTEND_METADATA_ENDPOINTS:
         response = client.get(path)
         assert response.status_code == 200
 
     assert client.get("/api/imperium/frontend/static-copy").status_code == 404
+
+
+def test_frontend_metadata_surface_snapshot_is_exact_and_get_only() -> None:
+    app = _app(FakeDb(), _user())
+    metadata_routes = [
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path in FRONTEND_METADATA_ENDPOINTS
+    ]
+
+    assert {route.path for route in metadata_routes} == FRONTEND_METADATA_ENDPOINTS
+    assert len(metadata_routes) == len(FRONTEND_METADATA_ENDPOINTS)
+    assert all(route.methods == {"GET"} for route in metadata_routes)
+    assert "/api/imperium/frontend/static-copy" not in {
+        route.path for route in app.routes if isinstance(route, APIRoute)
+    }
 
 
 def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_write_db() -> None:
@@ -60,16 +84,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
 
     responses = {
         path: client.get(path)
-        for path in (
-            "/api/imperium/home/bootstrap",
-            "/api/imperium/contracts/index",
-            "/api/imperium/contracts/compliance",
-            "/api/imperium/frontend/navigation",
-            "/api/imperium/frontend/layout",
-            "/api/imperium/frontend/theme-tokens",
-            "/api/imperium/frontend/empty-states",
-            "/api/imperium/frontend/actions",
-        )
+        for path in FRONTEND_METADATA_ENDPOINTS
     }
 
     assert all(response.status_code == 200 for response in responses.values())
@@ -115,6 +130,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "path",
         "pulse",
     ]
+    assert home["backend_version"] == "v1"
     assert [group["name"] for group in contracts_index["groups"]] == [
         "home",
         "dashboard",
@@ -125,7 +141,9 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "pulse",
         "frontend",
     ]
+    assert contracts_index["contract_version"] == "v1"
     assert [check["status"] for check in compliance["checks"]] == ["declared"] * 5
+    assert compliance["contract_version"] == "v1"
     assert [item["key"] for item in navigation["items"]] == [
         "home",
         "dashboard",
@@ -135,6 +153,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "path",
         "pulse",
     ]
+    assert navigation["navigation_version"] == "v1"
     assert [group["name"] for group in contracts_index["groups"] if group["name"] == "frontend"] == ["frontend"]
     assert [check["key"] for check in compliance["checks"]] == [
         "metadata_only",
@@ -169,17 +188,21 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     )
     assert all(check["status"] == "declared" for check in compliance["checks"])
     assert all(item["enabled"] is True for item in navigation["items"])
+    assert layout["layout_version"] == "v1"
     assert [region["key"] for region in layout["regions"]] == ["hero", "mission", "daily_plan", "path", "pulse", "vault"]
+    assert theme_tokens["theme_version"] == "v1"
     assert [surface["key"] for surface in theme_tokens["surfaces"]] == ["base", "card", "elevated"]
     assert [item["key"] for item in theme_tokens["spacing_scale"]] == ["xs", "sm", "md", "lg", "xl"]
     assert [item["key"] for item in theme_tokens["radius_scale"]] == ["sm", "md", "lg", "xl"]
     assert [item["key"] for item in theme_tokens["typography_scale"]] == ["caption", "body", "title", "hero"]
+    assert empty_states["empty_states_version"] == "v1"
     assert [item["key"] for item in empty_states["items"]] == [
         "no_active_mission",
         "no_vault_transactions",
         "no_path_habits",
         "no_pulse_entry",
     ]
+    assert actions["actions_version"] == "v1"
     assert [item["key"] for item in actions["items"]] == [
         "open_missions",
         "open_vault",
@@ -261,15 +284,28 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
     )
-    for text in (contracts_docs, schema_docs):
-        assert "frontend metadata layer v3" in text
-        assert "metadata only" in text
-        assert "no business data read" in text
-        assert "not a health check" in text
-        assert "not openapi" in text
-        assert "not dynamic discovery" in text
-        assert "no action triggered" in text
-        assert "jwt-scoped" in text
-        assert "idempotency-key not required" in text
-        for path in expected_paths:
-            assert path in text
+    assert "frontend metadata layer v3" in contracts_docs
+    assert "stable and locked" in contracts_docs
+    assert "metadata only" in contracts_docs
+    assert "explicitly documented" in contracts_docs
+    assert "no business data read" in contracts_docs
+    assert "not a health check" in contracts_docs
+    assert "not openapi" in contracts_docs
+    assert "not dynamic discovery" in contracts_docs
+    assert "no action triggered" in contracts_docs
+    assert "jwt-scoped" in contracts_docs
+    assert "idempotency-key not required" in contracts_docs
+    for path in expected_paths:
+        assert path in contracts_docs
+
+    assert "frontend metadata layer v3" in schema_docs
+    assert "metadata only" in schema_docs
+    assert "no business data read" in schema_docs
+    assert "not a health check" in schema_docs
+    assert "not openapi" in schema_docs
+    assert "not dynamic discovery" in schema_docs
+    assert "no action triggered" in schema_docs
+    assert "jwt-scoped" in schema_docs
+    assert "idempotency-key not required" in schema_docs
+    for path in expected_paths:
+        assert path in schema_docs

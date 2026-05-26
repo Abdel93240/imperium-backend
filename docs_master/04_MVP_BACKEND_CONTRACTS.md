@@ -7,6 +7,8 @@ imperium_frontend.py
 ## Frontend Metadata Layer v3
 
 This layer is metadata only.
+Frontend Metadata Layer v3 is considered stable and locked.
+Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 It is not a full OpenAPI document.
 It is not a health check.
 It is not health check.

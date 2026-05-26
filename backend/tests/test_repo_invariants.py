@@ -1,12 +1,54 @@
 import json
 from pathlib import Path
 
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
+from fastapi.testclient import TestClient
+
+from app.api.deps import get_current_user, get_db
+from app.api.v1.router import api_router
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 DOCS_ROOT = REPO_ROOT / "docs_master"
 INTERNAL_SECRET_HEADER = "X-Internal" + "-Secret"
 N8N_DB_NAME = "n8n" + "_db"
+FRONTEND_METADATA_ENDPOINTS = (
+    "/api/imperium/home/bootstrap",
+    "/api/imperium/contracts/index",
+    "/api/imperium/contracts/compliance",
+    "/api/imperium/frontend/navigation",
+    "/api/imperium/frontend/layout",
+    "/api/imperium/frontend/theme-tokens",
+    "/api/imperium/frontend/empty-states",
+    "/api/imperium/frontend/actions",
+)
+FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
+
+
+class _FrontendMetadataDb:
+    def __init__(self) -> None:
+        self.added = []
+        self.flushed = False
+        self.committed = False
+
+    def add(self, obj) -> None:
+        self.added.append(obj)
+
+    def flush(self) -> None:
+        self.flushed = True
+
+    def commit(self) -> None:
+        self.committed = True
+
+
+def _frontend_metadata_app() -> FastAPI:
+    app = FastAPI()
+    app.include_router(api_router, prefix="/api")
+    app.dependency_overrides[get_current_user] = lambda: object()
+    app.dependency_overrides[get_db] = lambda: _FrontendMetadataDb()
+    return app
 
 
 def _python_files_under(*relative_roots: str) -> list[Path]:
@@ -3264,3 +3306,170 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
         assert "not runtime audit" in docs_text
         assert "no action triggered" in docs_text
         assert "no cross-module write" in docs_text
+
+
+def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_static() -> None:
+    app = _frontend_metadata_app()
+    client = TestClient(app)
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    metadata_routes = [
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path in FRONTEND_METADATA_ENDPOINT_SET
+    ]
+    responses = {path: client.get(path) for path in FRONTEND_METADATA_ENDPOINTS}
+
+    assert {route.path for route in metadata_routes} == FRONTEND_METADATA_ENDPOINT_SET
+    assert len(metadata_routes) == len(FRONTEND_METADATA_ENDPOINTS)
+    assert all(route.methods == {"GET"} for route in metadata_routes)
+    assert "/api/imperium/frontend/static-copy" not in {route.path for route in app.routes if isinstance(route, APIRoute)}
+    assert all(response.status_code == 200 for response in responses.values())
+
+    home = responses["/api/imperium/home/bootstrap"].json()
+    contracts_index = responses["/api/imperium/contracts/index"].json()
+    compliance = responses["/api/imperium/contracts/compliance"].json()
+    navigation = responses["/api/imperium/frontend/navigation"].json()
+    layout = responses["/api/imperium/frontend/layout"].json()
+    theme_tokens = responses["/api/imperium/frontend/theme-tokens"].json()
+    empty_states = responses["/api/imperium/frontend/empty-states"].json()
+    actions = responses["/api/imperium/frontend/actions"].json()
+
+    assert home["backend_version"] == "v1"
+    assert contracts_index["contract_version"] == "v1"
+    assert compliance["contract_version"] == "v1"
+    assert navigation["navigation_version"] == "v1"
+    assert layout["layout_version"] == "v1"
+    assert theme_tokens["theme_version"] == "v1"
+    assert empty_states["empty_states_version"] == "v1"
+    assert actions["actions_version"] == "v1"
+
+    assert [module["name"] for module in home["modules"]] == [
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+    ]
+    assert [module["status"] for module in home["modules"]] == ["available"] * 6
+    assert [module["primary_endpoint"] for module in home["modules"]] == [
+        "/api/imperium/dashboard",
+        "/api/imperium/daily-plan",
+        "/api/imperium/missions/active",
+        "/api/imperium/vault/summary",
+        "/api/imperium/path/today",
+        "/api/imperium/pulse/today",
+    ]
+
+    assert [group["name"] for group in contracts_index["groups"]] == [
+        "home",
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+        "frontend",
+    ]
+    assert [check["key"] for check in compliance["checks"]] == [
+        "metadata_only",
+        "not_openapi",
+        "not_health_check",
+        "no_business_data_read",
+        "no_dynamic_discovery",
+    ]
+    assert [item["key"] for item in navigation["items"]] == [
+        "home",
+        "dashboard",
+        "daily_plan",
+        "missions",
+        "vault",
+        "path",
+        "pulse",
+    ]
+    assert [region["key"] for region in layout["regions"]] == [
+        "hero",
+        "mission",
+        "daily_plan",
+        "path",
+        "pulse",
+        "vault",
+    ]
+    assert [surface["key"] for surface in theme_tokens["surfaces"]] == [
+        "base",
+        "card",
+        "elevated",
+    ]
+    assert [item["key"] for item in theme_tokens["spacing_scale"]] == [
+        "xs",
+        "sm",
+        "md",
+        "lg",
+        "xl",
+    ]
+    assert [item["key"] for item in theme_tokens["radius_scale"]] == [
+        "sm",
+        "md",
+        "lg",
+        "xl",
+    ]
+    assert [item["key"] for item in theme_tokens["typography_scale"]] == [
+        "caption",
+        "body",
+        "title",
+        "hero",
+    ]
+    assert [item["key"] for item in empty_states["items"]] == [
+        "no_active_mission",
+        "no_vault_transactions",
+        "no_path_habits",
+        "no_pulse_entry",
+    ]
+    assert [item["key"] for item in actions["items"]] == [
+        "open_missions",
+        "open_vault",
+        "open_path",
+        "open_pulse",
+        "open_daily_plan",
+        "open_dashboard",
+    ]
+    assert all(
+        endpoint["method"] == "GET"
+        for group in contracts_index["groups"]
+        for endpoint in group["endpoints"]
+        if endpoint["path"] in FRONTEND_METADATA_ENDPOINT_SET
+    )
+    assert all(endpoint["read_only"] is True for group in contracts_index["groups"] for endpoint in group["endpoints"] if endpoint["path"] in FRONTEND_METADATA_ENDPOINT_SET)
+    assert all(endpoint["idempotency_key_required"] is False for group in contracts_index["groups"] for endpoint in group["endpoints"] if endpoint["path"] in FRONTEND_METADATA_ENDPOINT_SET)
+    assert all(item["enabled"] is True for item in navigation["items"])
+    assert all(item["action_type"] == "navigate" for item in actions["items"])
+    assert all(item["requires_confirmation"] is False for item in actions["items"])
+
+    forbidden_payload_terms = (
+        "business data",
+        "telemetry",
+        "analytics",
+        "dynamic theme",
+        "user preference",
+        "generated ui",
+        "openapi",
+        "runtime audit",
+        "feature flag",
+        "permissions",
+        "coaching",
+        "recommendation",
+        "ai decision",
+        "n8n",
+        "ocr",
+        "scoring",
+    )
+    for path, payload in responses.items():
+        payload_text = str(payload.json()).lower()
+        for forbidden in forbidden_payload_terms:
+            if path == "/api/imperium/contracts/compliance" and forbidden in {"business data", "openapi"}:
+                continue
+            assert forbidden not in payload_text
+
+    assert "frontend metadata layer v3 is considered stable and locked." in docs_contracts
+    assert "any future frontend metadata surface must be explicitly documented" in docs_contracts
+    assert "metadata-only" in docs_contracts
