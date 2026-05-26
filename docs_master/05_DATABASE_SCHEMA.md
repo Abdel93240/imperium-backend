@@ -125,22 +125,32 @@ no business data read
 no secrets/providers/infra metadata
 
 frontend design handoff metadata
+Claude Code Design handoff only
 metadata only
+handoff metadata contract
 static deterministic v1
 frontend metadata layer version v6
 read only
 GET only
 JWT-scoped
 Idempotency-Key not required
+prepared for Claude Code Design
 prepares Claude Code Design handoff
 declares design direction metadata
 declares supported modules
-declares existing frontend metadata endpoints
+declares exact frontend metadata endpoints
 declares expected asset groups
-declares design rules
+declares exact design rules
+design handoff metadata only
+no UI rendering
+no asset upload
+no upload
+no CDN
+no runtime discovery
 does not generate UI
 does not generate images
 does not generate React
+no generated frontend code
 does not perform layout runtime
 does not perform dynamic rendering
 does not perform filesystem scan
@@ -159,10 +169,14 @@ no base64
 no font file
 no code frontend
 no React/HTML/CSS
+no screenshots/blobs
 no screenshots
 no blobs
 no Figma
 no asset pipeline
+final assets provided later
+final assets can be provided later
+placeholders allowed
 
 static deterministic v1
 not a dynamic theme

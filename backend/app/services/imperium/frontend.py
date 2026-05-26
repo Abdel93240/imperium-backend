@@ -318,18 +318,16 @@ IMPERIUM_FRONTEND_APP_MANIFEST_ENDPOINTS: tuple[str, ...] = (
     "/api/imperium/frontend/design-handoff",
 )
 
-IMPERIUM_FRONTEND_DESIGN_HANDOFF_EXISTING_METADATA_ENDPOINTS: tuple[str, ...] = (
-    "/api/imperium/home/bootstrap",
-    "/api/imperium/contracts/index",
-    "/api/imperium/contracts/compliance",
+IMPERIUM_FRONTEND_DESIGN_HANDOFF_METADATA_ENDPOINTS: tuple[str, ...] = (
     "/api/imperium/frontend/navigation",
     "/api/imperium/frontend/layout",
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
-    "/api/imperium/frontend/app-manifest",
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/asset-registry",
+    "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/design-handoff",
 )
 
 
@@ -823,13 +821,15 @@ IMPERIUM_FRONTEND_DESIGN_HANDOFF_ASSET_GROUPS: tuple[str, ...] = (
 )
 
 IMPERIUM_FRONTEND_DESIGN_HANDOFF_RULES: tuple[str, ...] = (
+    "design_handoff_only",
     "metadata_only_frontend_contracts",
     "static_deterministic_v1",
-    "no_runtime_dis" + "covery",
-    "no_business_logic_in_metadata",
+    "declared_metadata_no_runtime_dis" + "covery",
+    "declared_asset_groups_no_runtime_inventory",
+    "no_frontend_rendering",
+    "no_generated_frontend_code",
     "placeholders_allowed",
     "final_assets_can_be_provided_later",
-    "clau" + "de_code_design_ready",
 )
 
 
@@ -846,8 +846,8 @@ def get_imperium_frontend_design_handoff_metadata() -> ImperiumFrontendDesignHan
             safe_explanation="Imperium frontend design direction metadata.",
         ),
         supported_modules=list(IMPERIUM_FRONTEND_DESIGN_HANDOFF_SUPPORTED_MODULES),
-        frontend_metadata_endpoints=list(IMPERIUM_FRONTEND_DESIGN_HANDOFF_EXISTING_METADATA_ENDPOINTS),
+        frontend_metadata_endpoints=list(IMPERIUM_FRONTEND_DESIGN_HANDOFF_METADATA_ENDPOINTS),
         asset_groups=list(IMPERIUM_FRONTEND_DESIGN_HANDOFF_ASSET_GROUPS),
         design_rules=list(IMPERIUM_FRONTEND_DESIGN_HANDOFF_RULES),
-        safe_explanation="Frontend design handoff metadata for Imperium V1.",
+        safe_explanation="Design handoff metadata only for Imperium V1.",
     )

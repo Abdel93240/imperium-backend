@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -15,18 +16,43 @@ DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 DESIGN_HANDOFF_PATH = "/api/imperium/frontend/design-handoff"
 
-EXPECTED_EXISTING_FRONTEND_METADATA_ENDPOINTS = [
-    "/api/imperium/home/bootstrap",
-    "/api/imperium/contracts/index",
-    "/api/imperium/contracts/compliance",
+EXPECTED_FRONTEND_METADATA_ENDPOINTS = [
     "/api/imperium/frontend/navigation",
     "/api/imperium/frontend/layout",
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
-    "/api/imperium/frontend/app-manifest",
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/asset-registry",
+    "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/design-handoff",
+]
+
+EXPECTED_ASSET_GROUPS = [
+    "core",
+    "navigation",
+    "dashboard",
+    "modules",
+    "vault",
+    "path",
+    "pulse",
+    "vector",
+    "weekly_review",
+    "states",
+    "backgrounds",
+    "overlays",
+]
+
+EXPECTED_DESIGN_RULES = [
+    "design_handoff_only",
+    "metadata_only_frontend_contracts",
+    "static_deterministic_v1",
+    "declared_metadata_no_runtime_discovery",
+    "declared_asset_groups_no_runtime_inventory",
+    "no_frontend_rendering",
+    "no_generated_frontend_code",
+    "placeholders_allowed",
+    "final_assets_can_be_provided_later",
 ]
 
 
@@ -110,31 +136,10 @@ def test_frontend_design_handoff_complete_shape_and_deterministic_order() -> Non
             "vector",
             "weekly_review",
         ],
-        "frontend_metadata_endpoints": EXPECTED_EXISTING_FRONTEND_METADATA_ENDPOINTS,
-        "asset_groups": [
-            "core",
-            "navigation",
-            "dashboard",
-            "modules",
-            "vault",
-            "path",
-            "pulse",
-            "vector",
-            "weekly_review",
-            "states",
-            "backgrounds",
-            "overlays",
-        ],
-        "design_rules": [
-            "metadata_only_frontend_contracts",
-            "static_deterministic_v1",
-            "no_runtime_discovery",
-            "no_business_logic_in_metadata",
-            "placeholders_allowed",
-            "final_assets_can_be_provided_later",
-            "claude_code_design_ready",
-        ],
-        "safe_explanation": "Frontend design handoff metadata for Imperium V1.",
+        "frontend_metadata_endpoints": EXPECTED_FRONTEND_METADATA_ENDPOINTS,
+        "asset_groups": EXPECTED_ASSET_GROUPS,
+        "design_rules": EXPECTED_DESIGN_RULES,
+        "safe_explanation": "Design handoff metadata only for Imperium V1.",
     }
 
 
@@ -157,22 +162,65 @@ def test_frontend_design_handoff_metadata_only_no_business_or_runtime_payload() 
         "cdn",
         "base64",
         "font file",
+        "font_file",
         "react",
         "html",
         "css",
         "screenshot",
         "blob",
+        "image",
         "figma",
+        "claude",
         "upload",
         "filesystem scan",
+        "filesystem_scan",
         "asset existence check",
+        "asset_existence_check",
         "openapi scan",
+        "openapi_scan",
         "runtime audit",
+        "runtime_audit",
         "business data",
+        "business_data",
         "dynamic rendering",
+        "dynamic_rendering",
         "layout runtime",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "cross-module write",
+        "cross_module_write",
     ):
         assert forbidden not in payload_text
+    assert re.search(r"\bai\b", payload_text) is None
+
+
+def test_frontend_design_handoff_exact_fields_contain_no_remote_or_embedded_assets() -> None:
+    response = _client(FakeDb(), _user()).get(DESIGN_HANDOFF_PATH)
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["frontend_metadata_endpoints"] == EXPECTED_FRONTEND_METADATA_ENDPOINTS
+    assert all(endpoint.startswith("/api/imperium/frontend/") for endpoint in body["frontend_metadata_endpoints"])
+    assert body["asset_groups"] == EXPECTED_ASSET_GROUPS
+    assert body["design_rules"] == EXPECTED_DESIGN_RULES
+
+    payload_text = str(body).lower()
+    assert "http://" not in payload_text
+    assert "https://" not in payload_text
+    assert "data:" not in payload_text
+    assert ";base64," not in payload_text
+    assert ".ttf" not in payload_text
+    assert ".otf" not in payload_text
+    assert ".woff" not in payload_text
+    assert ".woff2" not in payload_text
+    assert "<html" not in payload_text
+    assert "<script" not in payload_text
+    assert "function " not in payload_text
+    assert "const " not in payload_text
+    assert "export default" not in payload_text
 
 
 def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> None:
@@ -202,3 +250,10 @@ def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> No
         assert "no remote url" in text
         assert "no base64" in text
         assert "no code frontend" in text
+        assert "claude code design handoff only" in text
+        assert "no ui rendering" in text
+        assert "no asset upload" in text
+        assert "no runtime discovery" in text
+        assert "no generated frontend code" in text
+        assert "no screenshots/blobs" in text
+        assert "final assets provided later" in text
