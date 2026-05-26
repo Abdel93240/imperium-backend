@@ -757,6 +757,46 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
         assert "no secrets/providers/infra metadata" in text
 
 
+def test_patch_22d_design_handoff_service_is_metadata_only_and_non_rendering() -> None:
+    frontend_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(
+        encoding="utf-8"
+    )
+    lowered = frontend_service_text.lower()
+    design_handoff_block = frontend_service_text.split("def get_imperium_frontend_design_handoff_metadata", maxsplit=1)[1]
+
+    for forbidden in (
+        "db.add(",
+        "db.flush",
+        "db.commit",
+        "os.listdir",
+        "glob(",
+        "iterdir(",
+        ".exists(",
+        "open(",
+        "requests.",
+        "httpx.",
+        "base64",
+        "font file",
+        "react",
+        "html",
+        "css",
+        "generated frontend code",
+        "runtime rendering",
+        "filesystem scan",
+        "asset existence check",
+    ):
+        assert forbidden not in design_handoff_block.lower()
+    for forbidden in ("react", "html", "css"):
+        assert forbidden not in lowered
+
+    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    for text in (contracts_docs, schema_docs):
+        assert "claude code design handoff only" in text
+        assert "no ui rendering" in text
+        assert "no generated frontend code" in text
+
+
 def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() -> None:
     contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
     schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")

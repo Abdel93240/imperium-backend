@@ -94,6 +94,7 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
     assert body["frontend_metadata_endpoints"][-1] == "/api/imperium/frontend/design-handoff"
     assert "/api/imperium/frontend/static-copy" not in body["frontend_metadata_endpoints"]
     assert body["frontend_metadata_endpoints"].index("/api/imperium/frontend/asset-registry") == 9
+    assert body["frontend_metadata_endpoints"].index("/api/imperium/frontend/design-handoff") == 11
 
 
 def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -> None:
@@ -125,6 +126,15 @@ def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -
     assert "personalization" not in payload_text
     assert "filesystem scan" not in payload_text
     assert "asset existence check" not in payload_text
+    assert "react" not in payload_text
+    assert "html" not in payload_text
+    assert "css" not in payload_text
+    assert "screenshot" not in payload_text
+    assert "blob" not in payload_text
+    assert "image payload" not in payload_text
+    assert "upload" not in payload_text
+    assert "cdn" not in payload_text
+    assert "runtime rendering" not in payload_text
 
 
 def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:

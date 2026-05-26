@@ -22,6 +22,11 @@ static deterministic v1
 not runtime audit
 not runtime discovery
 does not include user_id
+frontend metadata layer v6 is stable
+design_handoff_version v1
+supported_modules order is deterministic
+asset_groups align with asset-registry expectations
+design_rules exact and declarative
 `/api/imperium/home/bootstrap`
 `/api/imperium/contracts/index`
 `/api/imperium/contracts/compliance`
@@ -177,6 +182,16 @@ no asset pipeline
 final assets provided later
 final assets can be provided later
 placeholders allowed
+asset-registry remains expected assets only
+asset-registry is not runtime inventory
+asset-registry allows placeholders
+asset-registry does not scan filesystem
+asset-registry does not check asset existence
+asset-registry does not require actual assets yet
+asset-registry does not use remote urls
+asset-registry does not use base64
+asset-registry does not include font files
+asset-registry does not include screenshots, blobs, or image payloads
 
 static deterministic v1
 not a dynamic theme

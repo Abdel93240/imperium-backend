@@ -141,6 +141,43 @@ def test_frontend_design_handoff_complete_shape_and_deterministic_order() -> Non
         "design_rules": EXPECTED_DESIGN_RULES,
         "safe_explanation": "Design handoff metadata only for Imperium V1.",
     }
+    assert body["design_handoff_version"] == "v1"
+    assert body["frontend_metadata_layer_version"] == "v6"
+    assert body["supported_modules"] == [
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+        "vector",
+        "weekly_review",
+    ]
+    assert body["asset_groups"] == [
+        "core",
+        "navigation",
+        "dashboard",
+        "modules",
+        "vault",
+        "path",
+        "pulse",
+        "vector",
+        "weekly_review",
+        "states",
+        "backgrounds",
+        "overlays",
+    ]
+    assert body["design_rules"] == [
+        "design_handoff_only",
+        "metadata_only_frontend_contracts",
+        "static_deterministic_v1",
+        "declared_metadata_no_runtime_discovery",
+        "declared_asset_groups_no_runtime_inventory",
+        "no_frontend_rendering",
+        "no_generated_frontend_code",
+        "placeholders_allowed",
+        "final_assets_can_be_provided_later",
+    ]
 
 
 def test_frontend_design_handoff_metadata_only_no_business_or_runtime_payload() -> None:
@@ -221,6 +258,16 @@ def test_frontend_design_handoff_exact_fields_contain_no_remote_or_embedded_asse
     assert "function " not in payload_text
     assert "const " not in payload_text
     assert "export default" not in payload_text
+    assert "runtime rendering" not in payload_text
+    assert "generated ui" not in payload_text
+    assert "react" not in payload_text
+    assert "html" not in payload_text
+    assert "css" not in payload_text
+    assert "screenshot" not in payload_text
+    assert "blob" not in payload_text
+    assert "image payload" not in payload_text
+    assert "asset existence check" not in payload_text
+    assert "filesystem scan" not in payload_text
 
 
 def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> None:
@@ -245,6 +292,8 @@ def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> No
         assert "claude code design" in text
         assert "metadata only" in text
         assert "static deterministic v1" in text
+        assert "frontend metadata layer version v6" in text
+        assert "design_handoff_version v1" in text
         assert "no filesystem scan" in text
         assert "no asset existence check" in text
         assert "no remote url" in text
@@ -257,3 +306,5 @@ def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> No
         assert "no generated frontend code" in text
         assert "no screenshots/blobs" in text
         assert "final assets provided later" in text
+        assert "supported_modules order is deterministic" in text
+        assert "asset_groups align with asset-registry expectations" in text

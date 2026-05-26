@@ -336,3 +336,24 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
         "/api/imperium/frontend/design-handoff",
     ]
     assert len(frontend_group["endpoints"]) == 9
+
+
+def test_contracts_index_frontend_group_is_metadata_only_and_no_runtime_assets() -> None:
+    response = _client(FakeDb(), _user()).get("/api/imperium/contracts/index")
+    assert response.status_code == 200
+    payload_text = str(response.json()).lower()
+
+    for forbidden in (
+        "react",
+        "html",
+        "css",
+        "screenshot",
+        "blob",
+        "image payload",
+        "upload",
+        "cdn",
+        "filesystem scan",
+        "runtime rendering",
+        "generated frontend code",
+    ):
+        assert forbidden not in payload_text

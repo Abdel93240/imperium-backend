@@ -233,6 +233,21 @@ final assets provided later
 final assets can be provided later
 placeholders allowed
 no asset pipeline
+stable v6 metadata surface
+design_handoff_version v1
+supported_modules order is deterministic
+asset_groups align with asset-registry expectations
+design_rules exact and declarative
+asset-registry remains expected assets only
+asset-registry is not runtime inventory
+asset-registry allows placeholders
+asset-registry does not scan filesystem
+asset-registry does not check asset existence
+asset-registry does not require actual assets yet
+asset-registry does not use remote urls
+asset-registry does not use base64
+asset-registry does not include font files
+asset-registry does not include screenshots, blobs, or image payloads
 
 ### Module Cards
 

@@ -135,6 +135,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     empty_states = client.get("/api/imperium/frontend/empty-states").json()
     actions = client.get("/api/imperium/frontend/actions").json()
     app_manifest = client.get("/api/imperium/frontend/app-manifest").json()
+    design_handoff = client.get("/api/imperium/frontend/design-handoff").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -260,6 +261,55 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert app_manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
     assert app_manifest["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
     assert app_manifest["frontend_metadata_endpoints"].index("/api/imperium/frontend/asset-registry") == 9
+    assert design_handoff["design_handoff_version"] == "v1"
+    assert design_handoff["frontend_metadata_layer_version"] == "v6"
+    assert design_handoff["supported_modules"] == [
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+        "vector",
+        "weekly_review",
+    ]
+    assert design_handoff["asset_groups"] == [
+        "core",
+        "navigation",
+        "dashboard",
+        "modules",
+        "vault",
+        "path",
+        "pulse",
+        "vector",
+        "weekly_review",
+        "states",
+        "backgrounds",
+        "overlays",
+    ]
+    assert design_handoff["design_rules"] == [
+        "design_handoff_only",
+        "metadata_only_frontend_contracts",
+        "static_deterministic_v1",
+        "declared_metadata_no_runtime_discovery",
+        "declared_asset_groups_no_runtime_inventory",
+        "no_frontend_rendering",
+        "no_generated_frontend_code",
+        "placeholders_allowed",
+        "final_assets_can_be_provided_later",
+    ]
+    assert design_handoff["safe_explanation"] == "Design handoff metadata only for Imperium V1."
+    assert "react" not in str(design_handoff).lower()
+    assert "html" not in str(design_handoff).lower()
+    assert "css" not in str(design_handoff).lower()
+    assert "screenshot" not in str(design_handoff).lower()
+    assert "blob" not in str(design_handoff).lower()
+    assert "image payload" not in str(design_handoff).lower()
+    assert "upload" not in str(design_handoff).lower()
+    assert "cdn" not in str(design_handoff).lower()
+    assert "filesystem scan" not in str(design_handoff).lower()
+    assert "runtime rendering" not in str(design_handoff).lower()
+    assert "generated frontend code" not in str(design_handoff).lower()
     assert "user_id" not in str(app_manifest).lower()
     assert "secret" not in str(app_manifest).lower()
     assert "provider" not in str(app_manifest).lower()
