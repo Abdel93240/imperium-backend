@@ -483,10 +483,13 @@ no auto-creation of pulse rows
 ### Module Cards
 
 `/api/imperium/frontend/module-cards`
+frontend module card metadata
 metadata only
 static deterministic v1
 not a health check
+not runtime status
 not runtime availability
+not module availability runtime
 not personalization
 not feature flag
 no business data read

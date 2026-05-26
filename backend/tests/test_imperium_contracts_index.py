@@ -239,6 +239,13 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                             "read_only": True,
                             "idempotency_key_required": False,
                         },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/module-cards",
+                            "purpose": "Frontend module cards metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
                     ],
                 },
             ],

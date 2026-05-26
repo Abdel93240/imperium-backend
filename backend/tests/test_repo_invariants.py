@@ -23,8 +23,8 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
-    "/api/imperium/frontend/app-manifest",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -3499,7 +3499,15 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     frontend_group = next(group for group in contracts_index["groups"] if group["name"] == "frontend")
 
     assert manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
-    assert [endpoint["path"] for endpoint in frontend_group["endpoints"]] == list(FRONTEND_METADATA_ENDPOINTS[3:])
+    assert [endpoint["path"] for endpoint in frontend_group["endpoints"]] == [
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/module-cards",
+    ]
     assert len(frontend_group["endpoints"]) == 7
     assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 7
     assert "openapi" not in str(manifest).lower()

@@ -142,16 +142,20 @@ def test_frontend_module_cards_read_only_no_db_write() -> None:
     assert db.committed is False
 
 
-def test_frontend_module_cards_docs_metadata_only_static_v1_not_runtime_availability_or_personalization_or_feature_flag() -> None:
+def test_frontend_module_cards_docs_metadata_only_static_v1_not_runtime_status_or_availability_or_personalization_or_feature_flag() -> None:
     contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
     schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
 
     for text in (contracts_docs, schema_docs):
         assert "/api/imperium/frontend/module-cards" in text
+        assert "frontend module card metadata" in text
         assert "metadata only" in text
         assert "static deterministic v1" in text
         assert "not a health check" in text
+        assert "not runtime status" in text
         assert "not runtime availability" in text
+        assert "not module availability runtime" in text
         assert "not personalization" in text
         assert "not feature flag" in text
         assert "no business data read" in text
+        assert "no secrets/providers/infra metadata" in text

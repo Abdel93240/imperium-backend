@@ -18,8 +18,8 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
-    "/api/imperium/frontend/app-manifest",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -152,7 +152,15 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     ]
     assert navigation["navigation_version"] == "v1"
     assert [group["name"] for group in contracts_index["groups"] if group["name"] == "frontend"] == ["frontend"]
-    assert [endpoint["path"] for endpoint in next(group for group in contracts_index["groups"] if group["name"] == "frontend")["endpoints"]] == list(FRONTEND_METADATA_ENDPOINTS[3:])
+    assert [endpoint["path"] for endpoint in next(group for group in contracts_index["groups"] if group["name"] == "frontend")["endpoints"]] == [
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/module-cards",
+    ]
     assert [check["key"] for check in compliance["checks"]] == [
         "metadata_only",
         "not_openapi",
@@ -169,6 +177,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/app-manifest",
     }
     assert all(

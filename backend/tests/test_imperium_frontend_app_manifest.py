@@ -18,8 +18,8 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
-    "/api/imperium/frontend/app-manifest",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/app-manifest",
 )
 
 
