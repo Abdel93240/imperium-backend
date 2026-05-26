@@ -1,4 +1,6 @@
 from app.schemas.frontend import (
+    ImperiumFrontendActionItem,
+    ImperiumFrontendActionsResponse,
     ImperiumFrontendEmptyStateItem,
     ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutRegion,
@@ -237,4 +239,65 @@ def get_imperium_frontend_empty_states_metadata() -> ImperiumFrontendEmptyStates
         read_only=True,
         items=list(IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS),
         safe_explanation="Frontend empty state metadata for Imperium V1.",
+    )
+
+
+IMPERIUM_FRONTEND_ACTION_ITEMS: tuple[ImperiumFrontendActionItem, ...] = (
+    ImperiumFrontendActionItem(
+        key="open_missions",
+        label="Open missions",
+        module="mission",
+        action_type="navigate",
+        route="/missions",
+        requires_confirmation=False,
+    ),
+    ImperiumFrontendActionItem(
+        key="open_vault",
+        label="Open Vault",
+        module="vault",
+        action_type="navigate",
+        route="/vault",
+        requires_confirmation=False,
+    ),
+    ImperiumFrontendActionItem(
+        key="open_path",
+        label="Open The Path",
+        module="path",
+        action_type="navigate",
+        route="/path",
+        requires_confirmation=False,
+    ),
+    ImperiumFrontendActionItem(
+        key="open_pulse",
+        label="Open Pulse",
+        module="pulse",
+        action_type="navigate",
+        route="/pulse",
+        requires_confirmation=False,
+    ),
+    ImperiumFrontendActionItem(
+        key="open_daily_plan",
+        label="Open Daily Plan",
+        module="daily_plan",
+        action_type="navigate",
+        route="/daily-plan",
+        requires_confirmation=False,
+    ),
+    ImperiumFrontendActionItem(
+        key="open_dashboard",
+        label="Open Dashboard",
+        module="dashboard",
+        action_type="navigate",
+        route="/dashboard",
+        requires_confirmation=False,
+    ),
+)
+
+
+def get_imperium_frontend_actions_metadata() -> ImperiumFrontendActionsResponse:
+    return ImperiumFrontendActionsResponse(
+        actions_version="v1",
+        read_only=True,
+        items=list(IMPERIUM_FRONTEND_ACTION_ITEMS),
+        safe_explanation="Frontend action registry metadata for Imperium V1.",
     )

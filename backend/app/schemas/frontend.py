@@ -114,3 +114,23 @@ class ImperiumFrontendEmptyStatesResponse(BaseModel):
     read_only: bool
     items: list[ImperiumFrontendEmptyStateItem]
     safe_explanation: str
+
+
+class ImperiumFrontendActionItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    module: str
+    action_type: str
+    route: str
+    requires_confirmation: bool
+
+
+class ImperiumFrontendActionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actions_version: str
+    read_only: bool
+    items: list[ImperiumFrontendActionItem]
+    safe_explanation: str

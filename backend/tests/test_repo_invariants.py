@@ -664,6 +664,7 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert frontend_route_text.count('@router.get("/frontend/navigation"') == 1
     assert frontend_route_text.count('@router.get("/frontend/theme-tokens"') == 1
     assert frontend_route_text.count('@router.get("/frontend/empty-states"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/actions"') == 1
     assert '@router.get("/frontend/static-copy"' not in frontend_route_text
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
@@ -3113,3 +3114,80 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
         assert "no action triggered" in docs_text
         assert "removed, not active, and not canonical" in docs_text
         assert "/api/imperium/frontend/static-copy" not in docs_text
+
+
+def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "frontend.py"
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    service_lower = service_text.lower()
+    schema_text = schema_path.read_text(encoding="utf-8")
+    schema_lower = schema_text.lower()
+
+    assert '@router.get("/frontend/actions"' in route_text
+    assert "CurrentUserDep" in route_text
+    assert "Idempotency-Key" not in route_text
+    assert "get_imperium_frontend_actions_metadata" in route_text
+
+    assert "ImperiumFrontendActionItem" in schema_text
+    assert "ImperiumFrontendActionsResponse" in schema_text
+    assert "actions_version: str" in schema_text
+    assert "requires_confirmation: bool" in schema_text
+
+    assert "IMPERIUM_FRONTEND_ACTION_ITEMS" in service_text
+    assert 'actions_version="v1"' in service_text
+    assert "Frontend action registry metadata for Imperium V1." in service_text
+    assert "open_missions" in service_text
+    assert "open_dashboard" in service_text
+    assert "db.add(" not in service_text
+    assert "db.flush" not in service_text
+    assert "db.commit" not in service_text
+    assert "select(" not in service_text
+
+    for forbidden in (
+        "services.imperium.missions",
+        "services.imperium.vault",
+        "services.path",
+        "services.pulse",
+        "services.imperium.dashboard",
+        "services.imperium.daily_plan",
+        "services.imperium.home",
+        "services.imperium.contracts",
+        "openapi",
+        "scan",
+        "dynamic discovery",
+        "health",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "recommendation",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "user_id",
+        "provider",
+        "secret",
+        "infra",
+        "post",
+        "mutation",
+        "destructive",
+    ):
+        assert forbidden not in service_lower
+
+    for docs_text in (docs_contracts, docs_schema):
+        assert "/api/imperium/frontend/actions" in docs_text
+        assert "metadata only" in docs_text
+        assert "static ui action metadata" in docs_text
+        assert "navigation only in 19a" in docs_text
+        assert "not a health check" in docs_text
+        assert "not a dynamic discovery" in docs_text
+        assert "no action triggered" in docs_text
+        assert "no destructive action" in docs_text
+        assert "no mutation action" in docs_text

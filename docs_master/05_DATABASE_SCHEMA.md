@@ -151,7 +151,7 @@ Contracts compliance metadata note:
 - no secrets, provider metadata, infra metadata, or user id
 
 Frontend metadata layer note:
-- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/navigation`, `GET /api/imperium/frontend/layout`, `GET /api/imperium/frontend/theme-tokens`, and `GET /api/imperium/frontend/empty-states` are metadata only
+- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/actions`, `GET /api/imperium/frontend/navigation`, `GET /api/imperium/frontend/layout`, `GET /api/imperium/frontend/theme-tokens`, and `GET /api/imperium/frontend/empty-states` are metadata only
 - they are JWT-scoped and read-only
 - they do not read business data
 - they are not health checks
@@ -167,12 +167,25 @@ Frontend metadata layer note:
 - `home/bootstrap` is frontend bootstrap metadata
 - `contracts/index` is a static index of the main contracts
 - `contracts/compliance` is declarative only, not a runtime audit
+- `frontend/actions` is static action registry metadata
 - `frontend/navigation` is static navigation metadata
 - `frontend/theme-tokens` is static deterministic V1 metadata and semantic tokens only
 - `frontend/empty-states` is static deterministic V1 UI copy metadata only
 - the legacy generic static copy contract was removed from the active v1 contract and is not part of the active V1 surface
 
 Frontend empty-states canonical contract note:
+- `GET /api/imperium/frontend/actions` is the canonical V1 contract for static UI action metadata
+- response shape is exactly: `actions_version`, `read_only`, `items`, `safe_explanation`
+- `items` deterministic order is exactly: `open_missions`, `open_vault`, `open_path`, `open_pulse`, `open_daily_plan`, `open_dashboard`
+- each `items[]` object has exactly: `key`, `label`, `module`, `action_type`, `route`, `requires_confirmation`
+- static UI action declarations only; metadata only
+- no business data read and no action triggered
+- navigation only in 19A
+- not personalized recommendation, not coaching, not AI decision, not a health check
+- no dynamic discovery, no cross-module writes
+- no destructive action
+- no mutation action
+- legacy `static-actions` remains removed, not active, and not canonical
 - `GET /api/imperium/frontend/empty-states` is the canonical V1 contract for empty-states metadata
 - response shape is exactly: `empty_states_version`, `read_only`, `items`, `safe_explanation`
 - `items` deterministic order is exactly: `no_active_mission`, `no_vault_transactions`, `no_path_habits`, `no_pulse_entry`

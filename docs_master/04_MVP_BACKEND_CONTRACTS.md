@@ -171,12 +171,15 @@ Shared rules:
 - not AI decision
 - no cross-module writes
 - no user id exposure
+- no action triggered
+- no destructive action
 
 Deterministic ordering rules:
 - Home Bootstrap modules order: `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
 - Contracts Index groups order: `home`, `dashboard`, `daily_plan`, `mission`, `vault`, `path`, `pulse`
 - Contracts Compliance checks order: `metadata_only`, `not_openapi`, `not_health_check`, `no_business_data_read`, `no_dynamic_discovery`
 - Frontend Navigation items order: `home`, `dashboard`, `daily_plan`, `missions`, `vault`, `path`, `pulse`
+- Frontend Action Registry items order: `open_missions`, `open_vault`, `open_path`, `open_pulse`, `open_daily_plan`, `open_dashboard`
 - Frontend Layout regions order: `hero`, `mission`, `daily_plan`, `path`, `pulse`, `vault`
 - Frontend Theme Tokens order:
   surfaces = `base`, `card`, `elevated`
@@ -195,6 +198,77 @@ Contract notes:
 - `Frontend Theme Tokens` has no font/assets exposure
 - `Frontend Empty States` is static UI copy metadata, not personalized recommendation, not coaching, not AI decision, not health check, and triggers no action
 - The legacy generic static copy contract was removed from the active V1 surface; removed from the active V1 contract; `Frontend Empty States` is the canonical static UI copy metadata contract
+
+### Imperium Frontend Action Registry V1
+
+`GET /api/imperium/frontend/actions`
+
+Purpose:
+- return frontend action registry metadata only for Imperium V1
+- provide static deterministic V1 UI action declarations
+- expose navigation-only actions for the frontend
+- avoid business reads, runtime checks, mutation, and dynamic discovery
+
+Rules:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- metadata only
+- static action registry metadata
+- no business data read
+- no writes
+- no auto-creation
+- not personalized recommendation
+- not coaching
+- not AI decision
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module write
+- no user_id exposure
+- no secrets/providers/infra metadata
+- no action triggered
+- no destructive action
+- no mutation action
+- no submit action
+- no POST
+- no permissions dynamic
+- no feature flags runtime
+- this is the canonical V1 contract for static UI action metadata
+
+Response shape (full):
+- `actions_version` = `v1`
+- `read_only` = `true`
+- `items` (deterministic order):
+  - `open_missions`
+  - `open_vault`
+  - `open_path`
+  - `open_pulse`
+  - `open_daily_plan`
+  - `open_dashboard`
+- `safe_explanation`
+
+`items[]` shape (exact):
+- `key`
+- `label`
+- `module`
+- `action_type`
+- `route`
+- `requires_confirmation`
+
+Contract boundaries:
+- static UI action declarations only
+- metadata only
+- no business data read
+- no action triggered
+- navigation only in 19A
+- no destructive action
+- no mutation action
+- no submit action
+- not personalized recommendation, not coaching, not AI decision, not a health check
+- no dynamic discovery, no cross-module writes
+- legacy `static-actions` is removed, not active, and not canonical in V1
 
 ### Imperium Frontend Empty States Config V1
 
