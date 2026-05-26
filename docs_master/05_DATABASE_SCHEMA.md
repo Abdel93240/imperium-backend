@@ -151,7 +151,7 @@ Contracts compliance metadata note:
 - no secrets, provider metadata, infra metadata, or user id
 
 Frontend metadata layer note:
-- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/navigation`, `GET /api/imperium/frontend/layout`, and `GET /api/imperium/frontend/theme-tokens` are metadata only
+- `GET /api/imperium/home/bootstrap`, `GET /api/imperium/contracts/index`, `GET /api/imperium/contracts/compliance`, `GET /api/imperium/frontend/navigation`, `GET /api/imperium/frontend/layout`, `GET /api/imperium/frontend/theme-tokens`, and `GET /api/imperium/frontend/empty-states` are metadata only
 - they are JWT-scoped and read-only
 - they do not read business data
 - they are not health checks
@@ -160,6 +160,8 @@ Frontend metadata layer note:
 - they do not scan FastAPI routes
 - they do not expose secrets, provider metadata, infra metadata, or user id
 - they do not use AI, n8n, OCR, scoring, coaching, or recommendations
+- they are static UI copy metadata when serving empty states
+- they are not personalized recommendation, not coaching, and not AI decision
 - they do not perform cross-module writes
 - their ordering is deterministic and static in V1
 - `home/bootstrap` is frontend bootstrap metadata
@@ -167,6 +169,7 @@ Frontend metadata layer note:
 - `contracts/compliance` is declarative only, not a runtime audit
 - `frontend/navigation` is static navigation metadata
 - `frontend/theme-tokens` is static deterministic V1 metadata and semantic tokens only
+- `frontend/empty-states` is static deterministic V1 UI copy metadata only
 
 Frontend theme tokens contract note:
 - `GET /api/imperium/frontend/theme-tokens` is metadata only

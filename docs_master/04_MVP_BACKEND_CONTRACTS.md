@@ -155,6 +155,7 @@ It contains six JWT-scoped, read-only, metadata-only contracts:
 - Frontend Navigation = static navigation configuration
 - Frontend Layout = static layout configuration
 - Frontend Theme Tokens = static semantic theme token metadata
+- Frontend Empty States = static UI copy metadata for V1 empty states
 
 Shared rules:
 - metadata only
@@ -165,6 +166,9 @@ Shared rules:
 - no FastAPI route scanning
 - no secrets, provider metadata, or infra metadata
 - no AI, n8n, OCR, scoring, coaching, or recommendations
+- not personalized recommendation
+- not coaching
+- not AI decision
 - no cross-module writes
 - no user id exposure
 
@@ -179,6 +183,7 @@ Deterministic ordering rules:
   spacing_scale = `xs`, `sm`, `md`, `lg`, `xl`
   radius_scale = `sm`, `md`, `lg`, `xl`
   typography_scale = `caption`, `body`, `title`, `hero`
+- Frontend Empty States items order: `no_active_mission`, `no_vault_transactions`, `no_path_habits`, `no_pulse_entry`
 
 Contract notes:
 - `Home Bootstrap` is metadata only and not a runtime health check
@@ -188,6 +193,36 @@ Contract notes:
 - `Frontend Layout` is static and deterministic, not a dynamic theme and not a discovery mechanism
 - `Frontend Theme Tokens` is static and deterministic, metadata only, semantic tokens only, not a dynamic theme, and not a user preference
 - `Frontend Theme Tokens` has no font/assets exposure
+- `Frontend Empty States` is static UI copy metadata, not personalized recommendation, not coaching, not AI decision, not health check, and triggers no action
+
+### Imperium Frontend Empty States Config V1
+
+`GET /api/imperium/frontend/empty-states`
+
+Purpose:
+- return frontend empty state metadata only for Imperium V1
+- provide static deterministic V1 UI copy
+- avoid business reads, runtime checks, and dynamic discovery
+
+Rules:
+- GET only
+- JWT-scoped via `CurrentUserDep`
+- no `Idempotency-Key` required
+- metadata only
+- static UI copy metadata
+- no business data read
+- no writes
+- no auto-creation
+- not personalized recommendation
+- not coaching
+- not AI decision
+- not a health check
+- not a dynamic discovery mechanism
+- no dynamic route scan
+- no AI, n8n, OCR, scoring, coaching, or recommendations
+- no cross-module write
+- no user_id exposure
+- no secrets/providers/infra metadata
 
 ### Imperium Frontend Theme Tokens Config V1
 

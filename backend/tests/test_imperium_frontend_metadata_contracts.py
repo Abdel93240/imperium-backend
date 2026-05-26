@@ -45,6 +45,7 @@ def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_sc
         "/api/imperium/frontend/navigation",
         "/api/imperium/frontend/layout",
         "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
     ):
         response = client.get(path)
         assert response.status_code == 200
@@ -63,6 +64,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
             "/api/imperium/frontend/navigation",
             "/api/imperium/frontend/layout",
             "/api/imperium/frontend/theme-tokens",
+            "/api/imperium/frontend/empty-states",
         )
     }
 
@@ -98,6 +100,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     navigation = client.get("/api/imperium/frontend/navigation").json()
     layout = client.get("/api/imperium/frontend/layout").json()
     theme_tokens = client.get("/api/imperium/frontend/theme-tokens").json()
+    empty_states = client.get("/api/imperium/frontend/empty-states").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -137,6 +140,12 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert [item["key"] for item in theme_tokens["spacing_scale"]] == ["xs", "sm", "md", "lg", "xl"]
     assert [item["key"] for item in theme_tokens["radius_scale"]] == ["sm", "md", "lg", "xl"]
     assert [item["key"] for item in theme_tokens["typography_scale"]] == ["caption", "body", "title", "hero"]
+    assert [item["key"] for item in empty_states["items"]] == [
+        "no_active_mission",
+        "no_vault_transactions",
+        "no_path_habits",
+        "no_pulse_entry",
+    ]
 
 
 def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_runtime_behavior() -> None:

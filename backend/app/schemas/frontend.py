@@ -94,3 +94,23 @@ class ImperiumFrontendThemeTokensResponse(BaseModel):
     radius_scale: list[ImperiumFrontendThemeScaleItem]
     typography_scale: list[ImperiumFrontendThemeTypographyItem]
     safe_explanation: str
+
+
+class ImperiumFrontendEmptyStateItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    module: str
+    title: str
+    message: str
+    primary_action_label: str
+    primary_route: str
+
+
+class ImperiumFrontendEmptyStatesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    empty_states_version: str
+    read_only: bool
+    items: list[ImperiumFrontendEmptyStateItem]
+    safe_explanation: str

@@ -1,4 +1,6 @@
 from app.schemas.frontend import (
+    ImperiumFrontendEmptyStateItem,
+    ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutRegion,
     ImperiumFrontendLayoutResponse,
     ImperiumFrontendLayoutShell,
@@ -190,4 +192,49 @@ def get_imperium_frontend_theme_tokens_metadata() -> ImperiumFrontendThemeTokens
         radius_scale=list(IMPERIUM_FRONTEND_THEME_RADIUS),
         typography_scale=list(IMPERIUM_FRONTEND_THEME_TYPOGRAPHY),
         safe_explanation="Frontend theme token metadata for Imperium V1.",
+    )
+
+
+IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS: tuple[ImperiumFrontendEmptyStateItem, ...] = (
+    ImperiumFrontendEmptyStateItem(
+        key="no_active_mission",
+        module="mission",
+        title="No active mission",
+        message="Create or promote a mission to focus your day.",
+        primary_action_label="Open missions",
+        primary_route="/missions",
+    ),
+    ImperiumFrontendEmptyStateItem(
+        key="no_vault_transactions",
+        module="vault",
+        title="No transactions yet",
+        message="Add your first income or expense to start tracking your finances.",
+        primary_action_label="Open Vault",
+        primary_route="/vault",
+    ),
+    ImperiumFrontendEmptyStateItem(
+        key="no_path_habits",
+        module="path",
+        title="No habits yet",
+        message="Create your first habit to build discipline.",
+        primary_action_label="Open The Path",
+        primary_route="/path",
+    ),
+    ImperiumFrontendEmptyStateItem(
+        key="no_pulse_entry",
+        module="pulse",
+        title="No Pulse entry today",
+        message="Log your sleep, energy, fatigue, weight, or workout for today.",
+        primary_action_label="Open Pulse",
+        primary_route="/pulse",
+    ),
+)
+
+
+def get_imperium_frontend_empty_states_metadata() -> ImperiumFrontendEmptyStatesResponse:
+    return ImperiumFrontendEmptyStatesResponse(
+        empty_states_version="v1",
+        read_only=True,
+        items=list(IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS),
+        safe_explanation="Frontend empty state metadata for Imperium V1.",
     )
