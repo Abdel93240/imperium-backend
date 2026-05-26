@@ -170,6 +170,7 @@ Frontend metadata layer note:
 - `frontend/navigation` is static navigation metadata
 - `frontend/theme-tokens` is static deterministic V1 metadata and semantic tokens only
 - `frontend/empty-states` is static deterministic V1 UI copy metadata only
+- the legacy generic static copy contract was removed from the active v1 contract and is not part of the active V1 surface
 
 Frontend theme tokens contract note:
 - `GET /api/imperium/frontend/theme-tokens` is metadata only

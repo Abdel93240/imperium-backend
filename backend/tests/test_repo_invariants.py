@@ -664,6 +664,7 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert frontend_route_text.count('@router.get("/frontend/navigation"') == 1
     assert frontend_route_text.count('@router.get("/frontend/theme-tokens"') == 1
     assert frontend_route_text.count('@router.get("/frontend/empty-states"') == 1
+    assert '@router.get("/frontend/static-copy"' not in frontend_route_text
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
         assert forbidden not in lowered_services
@@ -3063,6 +3064,8 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
     assert "Idempotency-Key" not in route_text
     assert "empty_states_version=\"v1\"" in service_text
     assert "Frontend empty state metadata for Imperium V1." in service_text
+    assert "static_copy_version" not in service_text
+    assert "Static frontend copy metadata" not in service_text
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session", "app.routes", "for route in"):
         assert forbidden not in service_text
@@ -3098,3 +3101,4 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
         assert "not ai decision" in docs_text
         assert "not a health check" in docs_text
         assert "no business data read" in docs_text
+        assert "/api/imperium/frontend/static-copy" not in docs_text

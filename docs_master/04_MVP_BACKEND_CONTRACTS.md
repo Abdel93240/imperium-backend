@@ -194,6 +194,7 @@ Contract notes:
 - `Frontend Theme Tokens` is static and deterministic, metadata only, semantic tokens only, not a dynamic theme, and not a user preference
 - `Frontend Theme Tokens` has no font/assets exposure
 - `Frontend Empty States` is static UI copy metadata, not personalized recommendation, not coaching, not AI decision, not health check, and triggers no action
+- The legacy generic static copy contract was removed from the active V1 surface; removed from the active V1 contract; `Frontend Empty States` is the canonical static UI copy metadata contract
 
 ### Imperium Frontend Empty States Config V1
 
@@ -223,6 +224,7 @@ Rules:
 - no cross-module write
 - no user_id exposure
 - no secrets/providers/infra metadata
+- this is the canonical V1 contract for static UI copy metadata
 
 ### Imperium Frontend Theme Tokens Config V1
 
