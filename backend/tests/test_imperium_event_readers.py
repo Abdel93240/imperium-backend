@@ -4,7 +4,13 @@ from uuid import uuid4
 import pytest
 
 from app.models.imperium import ImperiumEvent
-from app.services.imperium.event_readers import DEFAULT_EVENT_READER_LIMIT, MAX_EVENT_READER_LIMIT, list_events_for_user
+from app.services.imperium.event_readers import (
+    DEFAULT_EVENT_READER_LIMIT,
+    MAX_EVENT_READER_LIMIT,
+    EventReadFilters,
+    list_events_for_user,
+    read_imperium_events,
+)
 
 
 class _Db:
@@ -70,6 +76,21 @@ def test_list_events_for_user_requires_user_id() -> None:
     assert db.queries == []
 
 
+def test_event_read_filters_requires_user_id() -> None:
+    with pytest.raises(ValueError, match="user_id is required"):
+        EventReadFilters(user_id=None)  # type: ignore[arg-type]
+
+
+def test_event_read_filters_rejects_limit_above_max() -> None:
+    with pytest.raises(ValueError, match="limit"):
+        EventReadFilters(user_id=uuid4(), limit=MAX_EVENT_READER_LIMIT + 1)
+
+
+def test_event_read_filters_rejects_negative_offset() -> None:
+    with pytest.raises(ValueError, match="offset"):
+        EventReadFilters(user_id=uuid4(), offset=-1)
+
+
 def test_list_events_for_user_is_always_scoped_to_user_id() -> None:
     user_id = uuid4()
     event = _event(user_id)
@@ -91,7 +112,7 @@ def test_list_events_for_user_applies_bounded_default_pagination() -> None:
     list_events_for_user(db, user_id=user_id)
 
     params = _query_params(db.queries[0])
-    assert DEFAULT_EVENT_READER_LIMIT in params.values()
+    assert DEFAULT_EVENT_READER_LIMIT + 1 in params.values()
     assert 0 in params.values()
 
 
@@ -102,8 +123,40 @@ def test_list_events_for_user_applies_limit_and_offset() -> None:
     list_events_for_user(db, user_id=user_id, limit=25, offset=10)
 
     params = _query_params(db.queries[0])
-    assert 25 in params.values()
+    assert 26 in params.values()
     assert 10 in params.values()
+
+
+def test_read_imperium_events_returns_stable_page_with_next_offset() -> None:
+    user_id = uuid4()
+    first = _event(user_id, id=uuid4())
+    second = _event(user_id, id=uuid4())
+    overflow = _event(user_id, id=uuid4())
+    db = _Db([first, second, overflow])
+
+    page = read_imperium_events(db, EventReadFilters(user_id=user_id, limit=2, offset=4))
+
+    assert page.items == [first, second]
+    assert page.limit == 2
+    assert page.offset == 4
+    assert page.has_more is True
+    assert page.next_offset == 6
+    assert (
+        "order by imperium_events.occurred_at desc, "
+        "imperium_events.created_at desc, imperium_events.id desc"
+    ) in _query_text(db.queries[0])
+
+
+def test_read_imperium_events_returns_no_next_offset_on_final_page() -> None:
+    user_id = uuid4()
+    event = _event(user_id)
+    db = _Db([event])
+
+    page = read_imperium_events(db, EventReadFilters(user_id=user_id, limit=2))
+
+    assert page.items == [event]
+    assert page.has_more is False
+    assert page.next_offset is None
 
 
 @pytest.mark.parametrize("limit", [0, -1, MAX_EVENT_READER_LIMIT + 1, True, 10.5, "10"])
