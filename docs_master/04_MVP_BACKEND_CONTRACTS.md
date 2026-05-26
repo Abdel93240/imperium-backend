@@ -4,11 +4,12 @@ route owner canonique
 imperium_contracts.py
 imperium_frontend.py
 
-## Frontend Metadata Layer v3
+## Frontend Metadata Layer v4
 
 This layer is metadata only.
-Frontend Metadata Layer v3 is considered stable and locked.
+Frontend Metadata Layer v4 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
+This layer is static and deterministic in V1.
 It is not a full OpenAPI document.
 It is not a health check.
 It is not health check.
@@ -20,6 +21,9 @@ It does not perform cross-module writes.
 It is JWT-scoped.
 GET only.
 Idempotency-Key not required.
+It does not use OpenAPI or dynamic discovery.
+It does not perform runtime audit.
+It does not include user_id, secrets, provider metadata, or infra metadata.
 
 ### Home Bootstrap
 
@@ -45,6 +49,8 @@ not a health check
 not a dynamic runtime discovery
 no business data read
 no secrets/providers/infra metadata
+references the frontend metadata group when present
+no duplicate frontend metadata entries
 
 ### Contracts Compliance
 
@@ -56,6 +62,7 @@ not a runtime compliance audit
 not openapi
 not a health check
 not dynamic discovery
+not runtime audit
 
 ### Navigation
 
@@ -134,6 +141,10 @@ not openapi
 not a health check
 no business data read
 no secrets/providers/infra metadata
+lists exactly the 9 frontend metadata endpoints
+contains no user_id
+contains no provider metadata
+contains no infra metadata
 
 ## Mission Contracts
 

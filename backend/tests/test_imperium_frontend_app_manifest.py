@@ -9,6 +9,19 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
 
 
+FRONTEND_METADATA_ENDPOINTS = (
+    "/api/imperium/home/bootstrap",
+    "/api/imperium/contracts/index",
+    "/api/imperium/contracts/compliance",
+    "/api/imperium/frontend/navigation",
+    "/api/imperium/frontend/layout",
+    "/api/imperium/frontend/theme-tokens",
+    "/api/imperium/frontend/empty-states",
+    "/api/imperium/frontend/actions",
+    "/api/imperium/frontend/app-manifest",
+)
+
+
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
@@ -67,17 +80,11 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
         "default_timezone": "Europe/Paris",
     }
     assert body["frontend_metadata_endpoints"] == [
-        "/api/imperium/home/bootstrap",
-        "/api/imperium/contracts/index",
-        "/api/imperium/contracts/compliance",
-        "/api/imperium/frontend/navigation",
-        "/api/imperium/frontend/layout",
-        "/api/imperium/frontend/theme-tokens",
-        "/api/imperium/frontend/empty-states",
-        "/api/imperium/frontend/actions",
-        "/api/imperium/frontend/app-manifest",
+        *FRONTEND_METADATA_ENDPOINTS,
     ]
     assert body["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
+    assert len(body["frontend_metadata_endpoints"]) == 9
+    assert body["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
 
 
 def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -> None:
@@ -101,6 +108,10 @@ def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -
         "claude",
     ):
         assert forbidden not in payload_text
+    assert "frontend_metadata_endpoints" in payload_text
+    assert "openapi" not in payload_text
+    assert "runtime discovery" not in payload_text
+    assert "runtime audit" not in payload_text
 
 
 def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:
@@ -128,6 +139,7 @@ def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:
         "n8n",
     ):
         assert forbidden not in payload_text
+    assert "business data" not in payload_text
 
 
 def test_frontend_app_manifest_read_only_no_db_write() -> None:

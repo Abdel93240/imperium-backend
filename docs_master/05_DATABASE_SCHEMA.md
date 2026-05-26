@@ -1,6 +1,6 @@
 # Database Schema Notes
 
-frontend metadata layer v3
+frontend metadata layer v4
 metadata only
 declarative metadata only
 not openapi
@@ -17,6 +17,10 @@ jwt-scoped
 get only
 idempotency-key not required
 no secrets/providers/infra metadata
+static deterministic v1
+not runtime audit
+not runtime discovery
+does not include user_id
 `/api/imperium/home/bootstrap`
 `/api/imperium/contracts/index`
 `/api/imperium/contracts/compliance`

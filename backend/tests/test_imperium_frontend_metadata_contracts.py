@@ -9,7 +9,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
 
 
-FRONTEND_METADATA_ENDPOINTS = {
+FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/home/bootstrap",
     "/api/imperium/contracts/index",
     "/api/imperium/contracts/compliance",
@@ -19,7 +19,8 @@ FRONTEND_METADATA_ENDPOINTS = {
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
     "/api/imperium/frontend/app-manifest",
-}
+)
+FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
 
 class FakeDb:
@@ -65,13 +66,9 @@ def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_sc
 
 def test_frontend_metadata_surface_snapshot_is_exact_and_get_only() -> None:
     app = _app(FakeDb(), _user())
-    metadata_routes = [
-        route
-        for route in app.routes
-        if isinstance(route, APIRoute) and route.path in FRONTEND_METADATA_ENDPOINTS
-    ]
+    metadata_routes = [route for route in app.routes if isinstance(route, APIRoute) and route.path in FRONTEND_METADATA_ENDPOINT_SET]
 
-    assert {route.path for route in metadata_routes} == FRONTEND_METADATA_ENDPOINTS
+    assert {route.path for route in metadata_routes} == FRONTEND_METADATA_ENDPOINT_SET
     assert len(metadata_routes) == len(FRONTEND_METADATA_ENDPOINTS)
     assert all(route.methods == {"GET"} for route in metadata_routes)
     assert "/api/imperium/frontend/static-copy" not in {
@@ -83,10 +80,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
     db = FakeDb()
     client = _client(db, _user())
 
-    responses = {
-        path: client.get(path)
-        for path in FRONTEND_METADATA_ENDPOINTS
-    }
+    responses = {path: client.get(path) for path in FRONTEND_METADATA_ENDPOINTS}
 
     assert all(response.status_code == 200 for response in responses.values())
     assert db.added == []
@@ -157,6 +151,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     ]
     assert navigation["navigation_version"] == "v1"
     assert [group["name"] for group in contracts_index["groups"] if group["name"] == "frontend"] == ["frontend"]
+    assert [endpoint["path"] for endpoint in next(group for group in contracts_index["groups"] if group["name"] == "frontend")["endpoints"]] == list(FRONTEND_METADATA_ENDPOINTS[3:])
     assert [check["key"] for check in compliance["checks"]] == [
         "metadata_only",
         "not_openapi",
@@ -230,18 +225,12 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "default_locale": "fr-FR",
         "default_timezone": "Europe/Paris",
     }
-    assert app_manifest["frontend_metadata_endpoints"] == [
-        "/api/imperium/home/bootstrap",
-        "/api/imperium/contracts/index",
-        "/api/imperium/contracts/compliance",
-        "/api/imperium/frontend/navigation",
-        "/api/imperium/frontend/layout",
-        "/api/imperium/frontend/theme-tokens",
-        "/api/imperium/frontend/empty-states",
-        "/api/imperium/frontend/actions",
-        "/api/imperium/frontend/app-manifest",
-    ]
+    assert app_manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
     assert app_manifest["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
+    assert "user_id" not in str(app_manifest).lower()
+    assert "secret" not in str(app_manifest).lower()
+    assert "provider" not in str(app_manifest).lower()
+    assert "infra" not in str(app_manifest).lower()
     assert all(item["action_type"] == "navigate" for item in actions["items"])
     assert all(item["requires_confirmation"] is False for item in actions["items"])
 
@@ -328,8 +317,9 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
     )
-    assert "frontend metadata layer v3" in contracts_docs
+    assert "frontend metadata layer v4" in contracts_docs
     assert "stable and locked" in contracts_docs
     assert "metadata only" in contracts_docs
     assert "explicitly documented" in contracts_docs
@@ -340,10 +330,11 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "no action triggered" in contracts_docs
     assert "jwt-scoped" in contracts_docs
     assert "idempotency-key not required" in contracts_docs
+    assert "lists exactly the 9 frontend metadata endpoints" in contracts_docs
     for path in expected_paths:
         assert path in contracts_docs
 
-    assert "frontend metadata layer v3" in schema_docs
+    assert "frontend metadata layer v4" in schema_docs
     assert "metadata only" in schema_docs
     assert "no business data read" in schema_docs
     assert "not a health check" in schema_docs

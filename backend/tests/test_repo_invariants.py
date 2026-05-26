@@ -3301,7 +3301,7 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
     assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
 
     for docs_text in (docs_contracts, docs_schema):
-        assert "frontend metadata layer v3" in docs_text
+        assert "frontend metadata layer v4" in docs_text
         assert "metadata only" in docs_text
         assert "no business data read" in docs_text
         assert "not health check" in docs_text
@@ -3476,6 +3476,51 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
                 continue
             assert forbidden not in payload_text
 
-    assert "frontend metadata layer v3 is considered stable and locked." in docs_contracts
+    assert "frontend metadata layer v4 is considered stable and locked." in docs_contracts
     assert "any future frontend metadata surface must be explicitly documented" in docs_contracts
     assert "metadata-only" in docs_contracts
+    assert "static and deterministic in v1" in docs_contracts
+    assert "lists exactly the 9 frontend metadata endpoints" in docs_contracts
+
+
+def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_static() -> None:
+    app = _frontend_metadata_app()
+    client = TestClient(app)
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+    responses = {path: client.get(path) for path in FRONTEND_METADATA_ENDPOINTS}
+
+    assert all(response.status_code == 200 for response in responses.values())
+    assert all(response.request.method == "GET" for response in responses.values())
+
+    manifest = responses["/api/imperium/frontend/app-manifest"].json()
+    contracts_index = responses["/api/imperium/contracts/index"].json()
+    frontend_group = next(group for group in contracts_index["groups"] if group["name"] == "frontend")
+
+    assert manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
+    assert [endpoint["path"] for endpoint in frontend_group["endpoints"]] == list(FRONTEND_METADATA_ENDPOINTS[3:])
+    assert len(frontend_group["endpoints"]) == 6
+    assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 6
+    assert "openapi" not in str(manifest).lower()
+    assert "runtime discovery" not in str(manifest).lower()
+    assert "runtime audit" not in str(manifest).lower()
+    assert "user_id" not in str(manifest).lower()
+    assert "secret" not in str(manifest).lower()
+    assert "provider" not in str(manifest).lower()
+    assert "infra" not in str(manifest).lower()
+
+    assert contracts_index["contract_version"] == "v1"
+    assert [group["name"] for group in contracts_index["groups"]] == [
+        "home",
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+        "frontend",
+    ]
+    assert "dynamic discovery" not in str(contracts_index).lower()
+    assert "openapi" not in str(contracts_index).lower()
+    assert "frontend metadata layer v4" in docs_contracts
+    assert "frontend metadata layer v4" in docs_schema
