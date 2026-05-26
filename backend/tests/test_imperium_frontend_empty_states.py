@@ -129,5 +129,5 @@ def test_frontend_empty_states_docs_static_ui_copy_not_personalized_recommendati
         assert "not ai decision" in text
         assert "not a health check" in text
         assert "no business data read" in text
-        assert "static copy" in text
         assert "removed from the active v1 contract" in text
+        assert "/api/imperium/frontend/static-copy" not in text
