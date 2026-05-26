@@ -24,6 +24,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
@@ -709,6 +710,8 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert frontend_route_text.count('@router.get("/frontend/theme-tokens"') == 1
     assert frontend_route_text.count('@router.get("/frontend/empty-states"') == 1
     assert frontend_route_text.count('@router.get("/frontend/actions"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/module-cards"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/asset-registry"') == 1
     assert frontend_route_text.count('@router.get("/frontend/app-manifest"') == 1
     assert '@router.get("/frontend/static-copy"' not in frontend_route_text
 
@@ -3029,7 +3032,7 @@ def test_frontend_layout_service_is_metadata_only_and_has_no_business_or_discove
     assert "db.flush" not in service_text
     assert "db.commit" not in service_text
 
-    for forbidden in ("openapi", "scan", "dynamic discovery", "health", "n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "anthropic", "gemini", "claude"):
+    for forbidden in ("openapi", "filesystem scan", "dynamic discovery", "health", "n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "anthropic", "gemini", "claude"):
         assert forbidden not in service_lower
 
     for docs_text in (docs_contracts, docs_schema):
@@ -3068,7 +3071,7 @@ def test_frontend_theme_tokens_service_is_metadata_only_and_has_no_business_or_d
         "services.imperium.home",
         "services.imperium.contracts",
         "openapi",
-        "scan",
+        "filesystem scan",
         "dynamic discovery",
         "health",
         "n8n",
@@ -3203,7 +3206,7 @@ def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -
         "services.imperium.home",
         "services.imperium.contracts",
         "openapi",
-        "scan",
+        "filesystem scan",
         "dynamic discovery",
         "health",
         "n8n",
@@ -3481,7 +3484,7 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
     assert "any future frontend metadata surface must be explicitly documented" in docs_contracts
     assert "metadata-only" in docs_contracts
     assert "static and deterministic in v1" in docs_contracts
-    assert "lists exactly the 10 frontend metadata endpoints" in docs_contracts
+    assert "lists exactly the 11 frontend metadata endpoints" in docs_contracts
     assert "frontend module card metadata" in docs_contracts
     assert "module-cards" in docs_contracts
 
@@ -3518,11 +3521,12 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
-        "/api/imperium/frontend/app-manifest",
         "/api/imperium/frontend/module-cards",
+        "/api/imperium/frontend/asset-registry",
+        "/api/imperium/frontend/app-manifest",
     ]
-    assert len(frontend_group["endpoints"]) == 7
-    assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 7
+    assert len(frontend_group["endpoints"]) == 8
+    assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 8
     assert "openapi" not in str(manifest).lower()
     assert "runtime discovery" not in str(manifest).lower()
     assert "runtime audit" not in str(manifest).lower()
@@ -3547,4 +3551,4 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     assert "openapi" not in str(contracts_index).lower()
     assert "frontend metadata layer v5" in docs_contracts
     assert "frontend metadata layer v5" in docs_schema
-    assert "contains exactly 10 endpoints" in docs_schema
+    assert "contains exactly 11 endpoints" in docs_schema

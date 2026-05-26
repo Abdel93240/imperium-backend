@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUserDep
 from app.schemas.frontend import (
+    ImperiumFrontendAssetRegistryResponse,
     ImperiumFrontendAppManifestResponse,
     ImperiumFrontendActionsResponse,
     ImperiumFrontendEmptyStatesResponse,
@@ -11,6 +12,7 @@ from app.schemas.frontend import (
     ImperiumFrontendThemeTokensResponse,
 )
 from app.services.imperium.frontend import (
+    get_imperium_frontend_asset_registry_metadata,
     get_imperium_frontend_app_manifest_metadata,
     get_imperium_frontend_actions_metadata,
     get_imperium_frontend_empty_states_metadata,
@@ -45,6 +47,12 @@ def imperium_frontend_layout_route(current_user: CurrentUserDep) -> ImperiumFron
 def imperium_frontend_module_cards_route(current_user: CurrentUserDep) -> ImperiumFrontendModuleCardsResponse:
     _ = current_user
     return get_imperium_frontend_module_cards_metadata()
+
+
+@router.get("/frontend/asset-registry", response_model=ImperiumFrontendAssetRegistryResponse)
+def imperium_frontend_asset_registry_route(current_user: CurrentUserDep) -> ImperiumFrontendAssetRegistryResponse:
+    _ = current_user
+    return get_imperium_frontend_asset_registry_metadata()
 
 
 @router.get("/frontend/theme-tokens", response_model=ImperiumFrontendThemeTokensResponse)

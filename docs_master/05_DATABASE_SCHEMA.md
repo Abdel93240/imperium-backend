@@ -3,7 +3,7 @@
 frontend metadata layer v5
 metadata only
 declarative metadata only
-contains exactly 10 endpoints
+contains exactly 11 endpoints
 not openapi
 not a health check
 not a dynamic discovery
@@ -30,8 +30,9 @@ does not include user_id
 `/api/imperium/frontend/theme-tokens`
 `/api/imperium/frontend/empty-states`
 `/api/imperium/frontend/actions`
-`/api/imperium/frontend/app-manifest`
 `/api/imperium/frontend/module-cards`
+`/api/imperium/frontend/asset-registry`
+`/api/imperium/frontend/app-manifest`
 
 contracts index
 metadata only
@@ -98,6 +99,18 @@ no runtime count
 no runtime score
 no personalization
 no feature flag
+no business data read
+no secrets/providers/infra metadata
+
+frontend asset registry metadata
+metadata only
+static deterministic v1
+placeholder policy
+placeholder_allowed true
+semantic_luxury_placeholder
+no filesystem check
+not a health check
+not dynamic discovery
 no business data read
 no secrets/providers/infra metadata
 

@@ -1,4 +1,8 @@
 from app.schemas.frontend import (
+    ImperiumFrontendAssetRegistryGroup,
+    ImperiumFrontendAssetRegistryItem,
+    ImperiumFrontendAssetRegistryPlaceholderPolicy,
+    ImperiumFrontendAssetRegistryResponse,
     ImperiumFrontendActionItem,
     ImperiumFrontendAppManifestResponse,
     ImperiumFrontendApplicationMetadata,
@@ -307,6 +311,7 @@ IMPERIUM_FRONTEND_APP_MANIFEST_ENDPOINTS: tuple[str, ...] = (
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
 )
 
@@ -400,4 +405,375 @@ def get_imperium_frontend_module_cards_metadata() -> ImperiumFrontendModuleCards
         read_only=True,
         items=list(IMPERIUM_FRONTEND_MODULE_CARD_ITEMS),
         safe_explanation="Frontend module card metadata for Imperium V1.",
+    )
+
+
+def _asset_registry_item(
+    key: str,
+    label: str,
+    asset_type: str,
+    expected_filename: str,
+    usage: str,
+) -> ImperiumFrontendAssetRegistryItem:
+    return ImperiumFrontendAssetRegistryItem(
+        key=key,
+        label=label,
+        asset_type=asset_type,
+        expected_filename=expected_filename,
+        usage=usage,
+        status="expected",
+        placeholder_allowed=True,
+    )
+
+
+def _asset_registry_group(
+    key: str,
+    label: str,
+    base_path: str,
+    items: tuple[ImperiumFrontendAssetRegistryItem, ...],
+) -> ImperiumFrontendAssetRegistryGroup:
+    return ImperiumFrontendAssetRegistryGroup(
+        key=key,
+        label=label,
+        base_path=base_path,
+        items=list(items),
+    )
+
+
+IMPERIUM_FRONTEND_ASSET_REGISTRY_PLACEHOLDER_POLICY = ImperiumFrontendAssetRegistryPlaceholderPolicy(
+    placeholder_allowed=True,
+    placeholder_style="semantic_luxury_placeholder",
+    safe_explanation="Final PNG/SVG assets may be provided later; placeholders are allowed during UI assembly.",
+)
+
+IMPERIUM_FRONTEND_ASSET_REGISTRY_GROUPS: tuple[ImperiumFrontendAssetRegistryGroup, ...] = (
+    _asset_registry_group(
+        key="core",
+        label="Core Brand Assets",
+        base_path="/assets/imperium/core",
+        items=(
+            _asset_registry_item(
+                key="imperium_emblem",
+                label="Imperium Emblem",
+                asset_type="svg",
+                expected_filename="imperium_emblem.svg",
+                usage="Main brand emblem.",
+            ),
+            _asset_registry_item(
+                key="imperium_wordmark",
+                label="Imperium Wordmark",
+                asset_type="svg",
+                expected_filename="imperium_wordmark.svg",
+                usage="Main brand wordmark.",
+            ),
+            _asset_registry_item(
+                key="imperium_symbol_mini",
+                label="Imperium Symbol Mini",
+                asset_type="svg",
+                expected_filename="imperium_symbol_mini.svg",
+                usage="Compact brand symbol.",
+            ),
+            _asset_registry_item(
+                key="premium_divider",
+                label="Premium Divider",
+                asset_type="svg",
+                expected_filename="premium_divider.svg",
+                usage="Luxury section divider.",
+            ),
+            _asset_registry_item(
+                key="gold_frame",
+                label="Gold Frame",
+                asset_type="svg",
+                expected_filename="gold_frame.svg",
+                usage="Premium framing element.",
+            ),
+            _asset_registry_item(
+                key="corner_ornament",
+                label="Corner Ornament",
+                asset_type="svg",
+                expected_filename="corner_ornament.svg",
+                usage="Decorative corner detail.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="navigation",
+        label="Navigation Icons",
+        base_path="/assets/imperium/navigation",
+        items=(
+            _asset_registry_item("nav_home", "Home Navigation Icon", "svg", "nav_home.svg", "Home navigation item."),
+            _asset_registry_item(
+                "nav_dashboard",
+                "Dashboard Navigation Icon",
+                "svg",
+                "nav_dashboard.svg",
+                "Dashboard navigation item.",
+            ),
+            _asset_registry_item(
+                "nav_daily_plan",
+                "Daily Plan Navigation Icon",
+                "svg",
+                "nav_daily_plan.svg",
+                "Daily plan navigation item.",
+            ),
+            _asset_registry_item(
+                "nav_missions",
+                "Missions Navigation Icon",
+                "svg",
+                "nav_missions.svg",
+                "Missions navigation item.",
+            ),
+            _asset_registry_item("nav_vault", "Vault Navigation Icon", "svg", "nav_vault.svg", "Vault navigation item."),
+            _asset_registry_item("nav_path", "Path Navigation Icon", "svg", "nav_path.svg", "Path navigation item."),
+            _asset_registry_item("nav_pulse", "Pulse Navigation Icon", "svg", "nav_pulse.svg", "Pulse navigation item."),
+            _asset_registry_item("nav_vector", "Vector Navigation Icon", "svg", "nav_vector.svg", "Vector navigation item."),
+            _asset_registry_item(
+                "nav_settings",
+                "Settings Navigation Icon",
+                "svg",
+                "nav_settings.svg",
+                "Settings navigation item.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="dashboard",
+        label="Dashboard Assets",
+        base_path="/assets/imperium/dashboard",
+        items=(
+            _asset_registry_item(
+                "dashboard_hero_frame",
+                "Dashboard Hero Frame",
+                "svg",
+                "dashboard_hero_frame.svg",
+                "Dashboard hero frame.",
+            ),
+            _asset_registry_item(
+                "dashboard_focus_card",
+                "Dashboard Focus Card",
+                "svg",
+                "dashboard_focus_card.svg",
+                "Dashboard focus card.",
+            ),
+            _asset_registry_item(
+                "dashboard_kpi_card",
+                "Dashboard KPI Card",
+                "svg",
+                "dashboard_kpi_card.svg",
+                "Dashboard KPI card.",
+            ),
+            _asset_registry_item(
+                "dashboard_readiness_ring",
+                "Dashboard Readiness Ring",
+                "svg",
+                "dashboard_readiness_ring.svg",
+                "Dashboard readiness ring.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="modules",
+        label="Module Card Assets",
+        base_path="/assets/imperium/modules",
+        items=(
+            _asset_registry_item("module_card_frame", "Module Card Frame", "svg", "module_card_frame.svg", "Module card frame."),
+            _asset_registry_item(
+                "module_card_active_glow",
+                "Module Card Active Glow",
+                "svg",
+                "module_card_active_glow.svg",
+                "Active module card glow.",
+            ),
+            _asset_registry_item(
+                "module_card_empty_state",
+                "Module Card Empty State",
+                "svg",
+                "module_card_empty_state.svg",
+                "Empty module card state.",
+            ),
+            _asset_registry_item(
+                "module_card_locked_state",
+                "Module Card Locked State",
+                "svg",
+                "module_card_locked_state.svg",
+                "Locked module card state.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="vault",
+        label="Vault Assets",
+        base_path="/assets/imperium/vault",
+        items=(
+            _asset_registry_item("vault_emblem", "Vault Emblem", "svg", "vault_emblem.svg", "Vault emblem."),
+            _asset_registry_item("vault_income", "Vault Income", "svg", "vault_income.svg", "Income indicator."),
+            _asset_registry_item("vault_expense", "Vault Expense", "svg", "vault_expense.svg", "Expense indicator."),
+            _asset_registry_item("vault_ledger", "Vault Ledger", "svg", "vault_ledger.svg", "Vault ledger."),
+            _asset_registry_item("vault_pressure", "Vault Pressure", "svg", "vault_pressure.svg", "Financial pressure visual."),
+            _asset_registry_item(
+                "vault_receipt_scan",
+                "Vault Receipt Scan",
+                "svg",
+                "vault_receipt_scan.svg",
+                "Receipt scan affordance.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="path",
+        label="Path Assets",
+        base_path="/assets/imperium/path",
+        items=(
+            _asset_registry_item("path_arch_emblem", "Path Arch Emblem", "svg", "path_arch_emblem.svg", "Path arch emblem."),
+            _asset_registry_item("path_wordmark", "Path Wordmark", "svg", "path_wordmark.svg", "Path wordmark."),
+            _asset_registry_item("path_habit", "Path Habit", "svg", "path_habit.svg", "Habit asset."),
+            _asset_registry_item("path_check", "Path Check", "svg", "path_check.svg", "Check-in asset."),
+            _asset_registry_item(
+                "path_reflection",
+                "Path Reflection",
+                "svg",
+                "path_reflection.svg",
+                "Reflection asset.",
+            ),
+            _asset_registry_item(
+                "path_spiritual_divider",
+                "Path Spiritual Divider",
+                "svg",
+                "path_spiritual_divider.svg",
+                "Spiritual section divider.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="pulse",
+        label="Pulse Assets",
+        base_path="/assets/imperium/pulse",
+        items=(
+            _asset_registry_item("pulse_emblem", "Pulse Emblem", "svg", "pulse_emblem.svg", "Pulse emblem."),
+            _asset_registry_item("pulse_sleep", "Pulse Sleep", "svg", "pulse_sleep.svg", "Sleep indicator."),
+            _asset_registry_item("pulse_energy", "Pulse Energy", "svg", "pulse_energy.svg", "Energy indicator."),
+            _asset_registry_item("pulse_fatigue", "Pulse Fatigue", "svg", "pulse_fatigue.svg", "Fatigue indicator."),
+            _asset_registry_item("pulse_workout", "Pulse Workout", "svg", "pulse_workout.svg", "Workout indicator."),
+            _asset_registry_item("pulse_weight", "Pulse Weight", "svg", "pulse_weight.svg", "Weight indicator."),
+        ),
+    ),
+    _asset_registry_group(
+        key="vector",
+        label="Vector Assets",
+        base_path="/assets/imperium/vector",
+        items=(
+            _asset_registry_item("vector_emblem", "Vector Emblem", "svg", "vector_emblem.svg", "Vector emblem."),
+            _asset_registry_item("vector_car", "Vector Car", "svg", "vector_car.svg", "Driver vehicle asset."),
+            _asset_registry_item("vector_zone", "Vector Zone", "svg", "vector_zone.svg", "Zone asset."),
+            _asset_registry_item("vector_demand", "Vector Demand", "svg", "vector_demand.svg", "Demand asset."),
+            _asset_registry_item("vector_traffic", "Vector Traffic", "svg", "vector_traffic.svg", "Traffic asset."),
+            _asset_registry_item("vector_train", "Vector Train", "svg", "vector_train.svg", "Train disruption asset."),
+            _asset_registry_item("vector_event", "Vector Event", "svg", "vector_event.svg", "Event asset."),
+        ),
+    ),
+    _asset_registry_group(
+        key="weekly_review",
+        label="Weekly Review Assets",
+        base_path="/assets/imperium/weekly-review",
+        items=(
+            _asset_registry_item("wr_emblem", "Weekly Review Emblem", "svg", "wr_emblem.svg", "Weekly review emblem."),
+            _asset_registry_item("wr_report", "Weekly Review Report", "svg", "wr_report.svg", "Weekly report asset."),
+            _asset_registry_item("wr_timeline", "Weekly Review Timeline", "svg", "wr_timeline.svg", "Timeline asset."),
+            _asset_registry_item("wr_summary", "Weekly Review Summary", "svg", "wr_summary.svg", "Summary asset."),
+            _asset_registry_item("wr_reflection", "Weekly Review Reflection", "svg", "wr_reflection.svg", "Reflection asset."),
+        ),
+    ),
+    _asset_registry_group(
+        key="states",
+        label="State Assets",
+        base_path="/assets/imperium/states",
+        items=(
+            _asset_registry_item("state_loading", "Loading State", "svg", "state_loading.svg", "Loading state."),
+            _asset_registry_item("state_empty", "Empty State", "svg", "state_empty.svg", "Empty state."),
+            _asset_registry_item("state_locked", "Locked State", "svg", "state_locked.svg", "Locked state."),
+            _asset_registry_item("state_error", "Error State", "svg", "state_error.svg", "Error state."),
+        ),
+    ),
+    _asset_registry_group(
+        key="backgrounds",
+        label="Background Assets",
+        base_path="/assets/imperium/backgrounds",
+        items=(
+            _asset_registry_item(
+                "background_dashboard_gradient",
+                "Dashboard Background Gradient",
+                "png",
+                "background_dashboard_gradient.png",
+                "Dashboard background texture.",
+            ),
+            _asset_registry_item(
+                "background_daily_plan_gradient",
+                "Daily Plan Background Gradient",
+                "png",
+                "background_daily_plan_gradient.png",
+                "Daily plan background texture.",
+            ),
+            _asset_registry_item(
+                "background_vault_texture",
+                "Vault Background Texture",
+                "png",
+                "background_vault_texture.png",
+                "Vault background texture.",
+            ),
+            _asset_registry_item(
+                "background_path_light",
+                "Path Background Light",
+                "png",
+                "background_path_light.png",
+                "Path background light.",
+            ),
+            _asset_registry_item(
+                "background_pulse_light",
+                "Pulse Background Light",
+                "png",
+                "background_pulse_light.png",
+                "Pulse background light.",
+            ),
+        ),
+    ),
+    _asset_registry_group(
+        key="overlays",
+        label="Overlay Assets",
+        base_path="/assets/imperium/overlays",
+        items=(
+            _asset_registry_item("overlay_gold_noise", "Gold Noise Overlay", "png", "overlay_gold_noise.png", "Gold noise overlay."),
+            _asset_registry_item(
+                "overlay_corner_vignette",
+                "Corner Vignette Overlay",
+                "png",
+                "overlay_corner_vignette.png",
+                "Corner vignette overlay.",
+            ),
+            _asset_registry_item(
+                "overlay_glass_blur",
+                "Glass Blur Overlay",
+                "png",
+                "overlay_glass_blur.png",
+                "Glass blur overlay.",
+            ),
+            _asset_registry_item(
+                "overlay_focus_rim",
+                "Focus Rim Overlay",
+                "png",
+                "overlay_focus_rim.png",
+                "Focus rim overlay.",
+            ),
+        ),
+    ),
+)
+
+
+def get_imperium_frontend_asset_registry_metadata() -> ImperiumFrontendAssetRegistryResponse:
+    return ImperiumFrontendAssetRegistryResponse(
+        asset_registry_version="v1",
+        read_only=True,
+        asset_base_path="/assets/imperium",
+        placeholder_policy=IMPERIUM_FRONTEND_ASSET_REGISTRY_PLACEHOLDER_POLICY,
+        groups=list(IMPERIUM_FRONTEND_ASSET_REGISTRY_GROUPS),
+        safe_explanation="Frontend asset registry metadata for Imperium V1.",
     )

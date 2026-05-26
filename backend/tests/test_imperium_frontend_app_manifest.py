@@ -19,6 +19,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
     "/api/imperium/frontend/module-cards",
+    "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
@@ -85,7 +86,7 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
         *FRONTEND_METADATA_ENDPOINTS,
     ]
     assert body["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
-    assert len(body["frontend_metadata_endpoints"]) == 10
+    assert len(body["frontend_metadata_endpoints"]) == 11
     assert body["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
     assert set(body["frontend_metadata_endpoints"]) == FRONTEND_METADATA_ENDPOINT_SET
     assert body["frontend_metadata_endpoints"][0] == "/api/imperium/home/bootstrap"

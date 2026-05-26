@@ -11,7 +11,7 @@ This layer is metadata only.
 Frontend Metadata Layer v5 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 This layer is static and deterministic in V1.
-It contains exactly 10 endpoints:
+It contains exactly 11 endpoints:
 `/api/imperium/home/bootstrap`
 `/api/imperium/contracts/index`
 `/api/imperium/contracts/compliance`
@@ -20,8 +20,9 @@ It contains exactly 10 endpoints:
 `/api/imperium/frontend/theme-tokens`
 `/api/imperium/frontend/empty-states`
 `/api/imperium/frontend/actions`
-`/api/imperium/frontend/app-manifest`
 `/api/imperium/frontend/module-cards`
+`/api/imperium/frontend/asset-registry`
+`/api/imperium/frontend/app-manifest`
 It is not a full OpenAPI document.
 It is not a health check.
 It is not health check.
@@ -37,6 +38,7 @@ It does not use OpenAPI or dynamic discovery.
 It does not perform runtime audit.
 It does not include user_id, secrets, provider metadata, or infra metadata.
 `module-cards` is part of the stable frontend metadata layer and must remain in the canonical endpoint list.
+`asset-registry` is part of the stable frontend metadata layer and must remain in the canonical endpoint list.
 
 ### Home Bootstrap
 
@@ -64,7 +66,7 @@ not a dynamic runtime discovery
 no business data read
 no secrets/providers/infra metadata
 no duplicate frontend metadata entries
-frontend group includes module-cards
+frontend group includes module-cards and asset-registry
 
 ### Contracts Compliance
 
@@ -155,7 +157,7 @@ not openapi
 not a health check
 no business data read
 no secrets/providers/infra metadata
-lists exactly the 10 frontend metadata endpoints
+lists exactly the 11 frontend metadata endpoints
 ordered canonical endpoint list
 contains no user_id
 contains no provider metadata
@@ -174,6 +176,21 @@ no runtime count
 no runtime score
 no personalization
 no feature flag
+no business data read
+no secrets/providers/infra metadata
+
+### Asset Registry
+
+`/api/imperium/frontend/asset-registry`
+frontend asset registry metadata
+metadata only
+static deterministic v1
+placeholder policy
+placeholder_allowed true
+semantic_luxury_placeholder
+no filesystem check
+not a health check
+not dynamic discovery
 no business data read
 no secrets/providers/infra metadata
 

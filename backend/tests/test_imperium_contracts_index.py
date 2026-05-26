@@ -234,15 +234,22 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                         },
                         {
                             "method": "GET",
-                            "path": "/api/imperium/frontend/app-manifest",
-                            "purpose": "Frontend application manifest metadata.",
+                            "path": "/api/imperium/frontend/module-cards",
+                            "purpose": "Frontend module cards metadata.",
                             "read_only": True,
                             "idempotency_key_required": False,
                         },
                         {
                             "method": "GET",
-                            "path": "/api/imperium/frontend/module-cards",
-                            "purpose": "Frontend module cards metadata.",
+                            "path": "/api/imperium/frontend/asset-registry",
+                            "purpose": "Frontend asset registry metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/app-manifest",
+                            "purpose": "Frontend application manifest metadata.",
                             "read_only": True,
                             "idempotency_key_required": False,
                         },
@@ -316,7 +323,8 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
-        "/api/imperium/frontend/app-manifest",
         "/api/imperium/frontend/module-cards",
+        "/api/imperium/frontend/asset-registry",
+        "/api/imperium/frontend/app-manifest",
     ]
-    assert len(frontend_group["endpoints"]) == 7
+    assert len(frontend_group["endpoints"]) == 8

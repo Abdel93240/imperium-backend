@@ -175,3 +175,43 @@ class ImperiumFrontendModuleCardsResponse(BaseModel):
     read_only: bool
     items: list[ImperiumFrontendModuleCardItem]
     safe_explanation: str
+
+
+class ImperiumFrontendAssetRegistryPlaceholderPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    placeholder_allowed: bool
+    placeholder_style: str
+    safe_explanation: str
+
+
+class ImperiumFrontendAssetRegistryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    asset_type: str
+    expected_filename: str
+    usage: str
+    status: str
+    placeholder_allowed: bool
+
+
+class ImperiumFrontendAssetRegistryGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    label: str
+    base_path: str
+    items: list[ImperiumFrontendAssetRegistryItem]
+
+
+class ImperiumFrontendAssetRegistryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    asset_registry_version: str
+    read_only: bool
+    asset_base_path: str
+    placeholder_policy: ImperiumFrontendAssetRegistryPlaceholderPolicy
+    groups: list[ImperiumFrontendAssetRegistryGroup]
+    safe_explanation: str
