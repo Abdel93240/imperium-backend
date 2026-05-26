@@ -185,6 +185,13 @@ CONTRACT_INDEX_GROUPS: tuple[ContractIndexGroup, ...] = (
                 read_only=True,
                 idempotency_key_required=False,
             ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/app-manifest",
+                purpose="Frontend application manifest metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
         ],
     ),
 )

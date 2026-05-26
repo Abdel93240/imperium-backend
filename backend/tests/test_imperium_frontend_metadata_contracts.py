@@ -18,6 +18,7 @@ FRONTEND_METADATA_ENDPOINTS = {
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
+    "/api/imperium/frontend/app-manifest",
 }
 
 
@@ -121,6 +122,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     theme_tokens = client.get("/api/imperium/frontend/theme-tokens").json()
     empty_states = client.get("/api/imperium/frontend/empty-states").json()
     actions = client.get("/api/imperium/frontend/actions").json()
+    app_manifest = client.get("/api/imperium/frontend/app-manifest").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -171,6 +173,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
     }
     assert all(
         endpoint["method"] == "GET"
@@ -211,6 +214,34 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "open_daily_plan",
         "open_dashboard",
     ]
+    assert set(app_manifest) == {
+        "manifest_version",
+        "read_only",
+        "application",
+        "frontend_metadata_endpoints",
+        "safe_explanation",
+    }
+    assert app_manifest["manifest_version"] == "v1"
+    assert app_manifest["read_only"] is True
+    assert app_manifest["application"] == {
+        "name": "Imperium",
+        "tagline": "Personal command center.",
+        "default_route": "/dashboard",
+        "default_locale": "fr-FR",
+        "default_timezone": "Europe/Paris",
+    }
+    assert app_manifest["frontend_metadata_endpoints"] == [
+        "/api/imperium/home/bootstrap",
+        "/api/imperium/contracts/index",
+        "/api/imperium/contracts/compliance",
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
+    ]
+    assert app_manifest["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
     assert all(item["action_type"] == "navigate" for item in actions["items"])
     assert all(item["requires_confirmation"] is False for item in actions["items"])
 
@@ -232,6 +263,20 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert actions["read_only"] is True
     assert actions["safe_explanation"] == "Frontend action registry metadata for Imperium V1."
     assert set(actions) == {"actions_version", "read_only", "items", "safe_explanation"}
+    assert "user_id" not in str(app_manifest).lower()
+    assert "secret" not in str(app_manifest).lower()
+    assert "provider" not in str(app_manifest).lower()
+    assert "infra" not in str(app_manifest).lower()
+    assert "business" not in str(app_manifest).lower()
+    assert "openapi" not in str(app_manifest).lower()
+    assert "health check" not in str(app_manifest).lower()
+    assert "runtime audit" not in str(app_manifest).lower()
+    assert "dynamic discovery" not in str(app_manifest).lower()
+    assert "n8n" not in str(app_manifest).lower()
+    assert "ocr" not in str(app_manifest).lower()
+    assert "scoring" not in str(app_manifest).lower()
+    assert "coaching" not in str(app_manifest).lower()
+    assert "recommendation" not in str(app_manifest).lower()
     payload_text = str(empty_states).lower()
     for forbidden in (
         "user_id",

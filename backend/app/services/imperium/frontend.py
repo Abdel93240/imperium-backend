@@ -1,5 +1,7 @@
 from app.schemas.frontend import (
     ImperiumFrontendActionItem,
+    ImperiumFrontendAppManifestResponse,
+    ImperiumFrontendApplicationMetadata,
     ImperiumFrontendActionsResponse,
     ImperiumFrontendEmptyStateItem,
     ImperiumFrontendEmptyStatesResponse,
@@ -292,6 +294,34 @@ IMPERIUM_FRONTEND_ACTION_ITEMS: tuple[ImperiumFrontendActionItem, ...] = (
         requires_confirmation=False,
     ),
 )
+
+IMPERIUM_FRONTEND_APP_MANIFEST_ENDPOINTS: tuple[str, ...] = (
+    "/api/imperium/home/bootstrap",
+    "/api/imperium/contracts/index",
+    "/api/imperium/contracts/compliance",
+    "/api/imperium/frontend/navigation",
+    "/api/imperium/frontend/layout",
+    "/api/imperium/frontend/theme-tokens",
+    "/api/imperium/frontend/empty-states",
+    "/api/imperium/frontend/actions",
+    "/api/imperium/frontend/app-manifest",
+)
+
+
+def get_imperium_frontend_app_manifest_metadata() -> ImperiumFrontendAppManifestResponse:
+    return ImperiumFrontendAppManifestResponse(
+        manifest_version="v1",
+        read_only=True,
+        application=ImperiumFrontendApplicationMetadata(
+            name="Imperium",
+            tagline="Personal command center.",
+            default_route="/dashboard",
+            default_locale="fr-FR",
+            default_timezone="Europe/Paris",
+        ),
+        frontend_metadata_endpoints=list(IMPERIUM_FRONTEND_APP_MANIFEST_ENDPOINTS),
+        safe_explanation="Frontend application manifest metadata for Imperium V1.",
+    )
 
 
 def get_imperium_frontend_actions_metadata() -> ImperiumFrontendActionsResponse:

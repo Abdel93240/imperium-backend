@@ -122,6 +122,19 @@ no mutation/destructive action
 not permissions/feature flags
 no ai, n8n, ocr, scoring, coaching, or recommendations
 
+### App Manifest
+
+`/api/imperium/frontend/app-manifest`
+frontend application manifest metadata
+metadata only
+static deterministic v1
+declarative endpoint list only
+not runtime discovery
+not openapi
+not a health check
+no business data read
+no secrets/providers/infra metadata
+
 ## Mission Contracts
 
 `/api/imperium/missions/start`

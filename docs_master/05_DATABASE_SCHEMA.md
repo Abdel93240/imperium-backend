@@ -25,6 +25,7 @@ no secrets/providers/infra metadata
 `/api/imperium/frontend/theme-tokens`
 `/api/imperium/frontend/empty-states`
 `/api/imperium/frontend/actions`
+`/api/imperium/frontend/app-manifest`
 
 contracts index
 metadata only
@@ -69,6 +70,17 @@ no destructive action
 no mutation/destructive action
 no action triggered
 `/api/imperium/frontend/actions`
+
+frontend application manifest metadata
+metadata only
+static deterministic v1
+declarative endpoint list only
+not runtime discovery
+not openapi
+not a health check
+no business data read
+no secrets/providers/infra metadata
+`/api/imperium/frontend/app-manifest`
 
 static deterministic v1
 not a dynamic theme

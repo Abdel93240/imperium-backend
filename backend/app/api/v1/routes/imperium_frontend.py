@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import CurrentUserDep
 from app.schemas.frontend import (
+    ImperiumFrontendAppManifestResponse,
     ImperiumFrontendActionsResponse,
     ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutResponse,
@@ -9,6 +10,7 @@ from app.schemas.frontend import (
     ImperiumFrontendThemeTokensResponse,
 )
 from app.services.imperium.frontend import (
+    get_imperium_frontend_app_manifest_metadata,
     get_imperium_frontend_actions_metadata,
     get_imperium_frontend_empty_states_metadata,
     get_imperium_frontend_layout_metadata,
@@ -47,3 +49,9 @@ def imperium_frontend_theme_tokens_route(current_user: CurrentUserDep) -> Imperi
 def imperium_frontend_empty_states_route(current_user: CurrentUserDep) -> ImperiumFrontendEmptyStatesResponse:
     _ = current_user
     return get_imperium_frontend_empty_states_metadata()
+
+
+@router.get("/frontend/app-manifest", response_model=ImperiumFrontendAppManifestResponse)
+def imperium_frontend_app_manifest_route(current_user: CurrentUserDep) -> ImperiumFrontendAppManifestResponse:
+    _ = current_user
+    return get_imperium_frontend_app_manifest_metadata()

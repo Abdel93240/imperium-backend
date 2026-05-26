@@ -23,6 +23,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/theme-tokens",
     "/api/imperium/frontend/empty-states",
     "/api/imperium/frontend/actions",
+    "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -707,6 +708,7 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert frontend_route_text.count('@router.get("/frontend/theme-tokens"') == 1
     assert frontend_route_text.count('@router.get("/frontend/empty-states"') == 1
     assert frontend_route_text.count('@router.get("/frontend/actions"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/app-manifest"') == 1
     assert '@router.get("/frontend/static-copy"' not in frontend_route_text
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
@@ -3295,6 +3297,8 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
     assert "get_imperium_frontend_theme_tokens_metadata" in frontend_service
     assert "get_imperium_frontend_empty_states_metadata" in frontend_service
     assert "get_imperium_frontend_actions_metadata" in frontend_service
+    assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
+    assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
 
     for docs_text in (docs_contracts, docs_schema):
         assert "frontend metadata layer v3" in docs_text
@@ -3306,6 +3310,8 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
         assert "not runtime audit" in docs_text
         assert "no action triggered" in docs_text
         assert "no cross-module write" in docs_text
+        assert "declarative endpoint list only" in docs_text
+        assert "not runtime discovery" in docs_text
 
 
 def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_static() -> None:

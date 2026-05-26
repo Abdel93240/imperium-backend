@@ -134,3 +134,23 @@ class ImperiumFrontendActionsResponse(BaseModel):
     read_only: bool
     items: list[ImperiumFrontendActionItem]
     safe_explanation: str
+
+
+class ImperiumFrontendApplicationMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    tagline: str
+    default_route: str
+    default_locale: str
+    default_timezone: str
+
+
+class ImperiumFrontendAppManifestResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    manifest_version: str
+    read_only: bool
+    application: ImperiumFrontendApplicationMetadata
+    frontend_metadata_endpoints: list[str]
+    safe_explanation: str
