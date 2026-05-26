@@ -6,6 +6,8 @@ from app.schemas.frontend import (
     ImperiumFrontendLayoutShell,
     ImperiumFrontendNavigationItem,
     ImperiumFrontendNavigationResponse,
+    ImperiumFrontendStaticCopyItem,
+    ImperiumFrontendStaticCopyResponse,
     ImperiumFrontendThemePalette,
     ImperiumFrontendThemeScaleItem,
     ImperiumFrontendThemeSurface,
@@ -237,4 +239,37 @@ def get_imperium_frontend_empty_states_metadata() -> ImperiumFrontendEmptyStates
         read_only=True,
         items=list(IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS),
         safe_explanation="Frontend empty state metadata for Imperium V1.",
+    )
+
+
+IMPERIUM_FRONTEND_STATIC_COPY_ITEMS: tuple[ImperiumFrontendStaticCopyItem, ...] = (
+    ImperiumFrontendStaticCopyItem(
+        key="mission_focus_rule",
+        module="mission",
+        text="Only one active mission can exist at a time.",
+    ),
+    ImperiumFrontendStaticCopyItem(
+        key="vault_scope_rule",
+        module="vault",
+        text="The Vault tracks and reports financial reality.",
+    ),
+    ImperiumFrontendStaticCopyItem(
+        key="path_scope_rule",
+        module="path",
+        text="The Path records worship routines and consistency.",
+    ),
+    ImperiumFrontendStaticCopyItem(
+        key="pulse_scope_rule",
+        module="pulse",
+        text="Pulse stays simple for fast daily health logging.",
+    ),
+)
+
+
+def get_imperium_frontend_static_copy_metadata() -> ImperiumFrontendStaticCopyResponse:
+    return ImperiumFrontendStaticCopyResponse(
+        static_copy_version="v1",
+        read_only=True,
+        items=list(IMPERIUM_FRONTEND_STATIC_COPY_ITEMS),
+        safe_explanation="Static frontend copy metadata for Imperium V1.",
     )

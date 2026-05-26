@@ -46,6 +46,7 @@ def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_sc
         "/api/imperium/frontend/layout",
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/static-copy",
     ):
         response = client.get(path)
         assert response.status_code == 200
@@ -65,6 +66,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
             "/api/imperium/frontend/layout",
             "/api/imperium/frontend/theme-tokens",
             "/api/imperium/frontend/empty-states",
+            "/api/imperium/frontend/static-copy",
         )
     }
 
@@ -101,6 +103,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     layout = client.get("/api/imperium/frontend/layout").json()
     theme_tokens = client.get("/api/imperium/frontend/theme-tokens").json()
     empty_states = client.get("/api/imperium/frontend/empty-states").json()
+    static_copy = client.get("/api/imperium/frontend/static-copy").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -145,6 +148,12 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "no_vault_transactions",
         "no_path_habits",
         "no_pulse_entry",
+    ]
+    assert [item["key"] for item in static_copy["items"]] == [
+        "mission_focus_rule",
+        "vault_scope_rule",
+        "path_scope_rule",
+        "pulse_scope_rule",
     ]
 
 

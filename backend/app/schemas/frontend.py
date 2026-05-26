@@ -114,3 +114,20 @@ class ImperiumFrontendEmptyStatesResponse(BaseModel):
     read_only: bool
     items: list[ImperiumFrontendEmptyStateItem]
     safe_explanation: str
+
+
+class ImperiumFrontendStaticCopyItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str
+    module: str
+    text: str
+
+
+class ImperiumFrontendStaticCopyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    static_copy_version: str
+    read_only: bool
+    items: list[ImperiumFrontendStaticCopyItem]
+    safe_explanation: str

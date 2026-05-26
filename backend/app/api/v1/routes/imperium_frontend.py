@@ -5,12 +5,14 @@ from app.schemas.frontend import (
     ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutResponse,
     ImperiumFrontendNavigationResponse,
+    ImperiumFrontendStaticCopyResponse,
     ImperiumFrontendThemeTokensResponse,
 )
 from app.services.imperium.frontend import (
     get_imperium_frontend_empty_states_metadata,
     get_imperium_frontend_layout_metadata,
     get_imperium_frontend_navigation_metadata,
+    get_imperium_frontend_static_copy_metadata,
     get_imperium_frontend_theme_tokens_metadata,
 )
 
@@ -39,3 +41,9 @@ def imperium_frontend_theme_tokens_route(current_user: CurrentUserDep) -> Imperi
 def imperium_frontend_empty_states_route(current_user: CurrentUserDep) -> ImperiumFrontendEmptyStatesResponse:
     _ = current_user
     return get_imperium_frontend_empty_states_metadata()
+
+
+@router.get("/frontend/static-copy", response_model=ImperiumFrontendStaticCopyResponse)
+def imperium_frontend_static_copy_route(current_user: CurrentUserDep) -> ImperiumFrontendStaticCopyResponse:
+    _ = current_user
+    return get_imperium_frontend_static_copy_metadata()
