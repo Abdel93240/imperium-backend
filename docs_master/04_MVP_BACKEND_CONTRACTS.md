@@ -226,6 +226,37 @@ Rules:
 - no secrets/providers/infra metadata
 - this is the canonical V1 contract for static UI copy metadata
 
+Response shape (full):
+- `empty_states_version` = `v1`
+- `read_only` = `true`
+- `items` (deterministic order):
+  - `no_active_mission`
+  - `no_vault_transactions`
+  - `no_path_habits`
+  - `no_pulse_entry`
+- `safe_explanation`
+
+`items[]` shape (exact):
+- `key`
+- `module`
+- `title`
+- `message`
+- `primary_action_label`
+- `primary_route`
+
+Contract boundaries:
+- static UI copy only
+- metadata only
+- no business data read
+- no action triggered
+- not personalized recommendation
+- not coaching
+- not AI decision
+- not a health check
+- no dynamic discovery
+- no cross-module writes
+- legacy `static-copy` is removed, not active, and not canonical in V1
+
 ### Imperium Frontend Theme Tokens Config V1
 
 `GET /api/imperium/frontend/theme-tokens`

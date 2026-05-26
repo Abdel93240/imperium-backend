@@ -172,6 +172,17 @@ Frontend metadata layer note:
 - `frontend/empty-states` is static deterministic V1 UI copy metadata only
 - the legacy generic static copy contract was removed from the active v1 contract and is not part of the active V1 surface
 
+Frontend empty-states canonical contract note:
+- `GET /api/imperium/frontend/empty-states` is the canonical V1 contract for empty-states metadata
+- response shape is exactly: `empty_states_version`, `read_only`, `items`, `safe_explanation`
+- `items` deterministic order is exactly: `no_active_mission`, `no_vault_transactions`, `no_path_habits`, `no_pulse_entry`
+- each `items[]` object has exactly: `key`, `module`, `title`, `message`, `primary_action_label`, `primary_route`
+- static UI copy only; metadata only
+- no business data read and no action triggered
+- not personalized recommendation, not coaching, not AI decision, not a health check
+- no dynamic discovery, no cross-module writes
+- legacy `static-copy` remains removed, not active, and not canonical
+
 Frontend theme tokens contract note:
 - `GET /api/imperium/frontend/theme-tokens` is metadata only
 - static deterministic V1

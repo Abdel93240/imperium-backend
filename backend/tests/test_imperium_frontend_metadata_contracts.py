@@ -159,6 +159,28 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
             "primary_route",
         }
 
+    assert set(empty_states) == {"empty_states_version", "read_only", "items", "safe_explanation"}
+    assert empty_states["empty_states_version"] == "v1"
+    assert empty_states["read_only"] is True
+    assert empty_states["safe_explanation"] == "Frontend empty state metadata for Imperium V1."
+    payload_text = str(empty_states).lower()
+    for forbidden in (
+        "user_id",
+        "recommendation",
+        "coaching",
+        "ai decision",
+        "health",
+        "dynamic discovery",
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n",
+        "ocr",
+        "scoring",
+    ):
+        assert forbidden not in payload_text
+
 
 def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_runtime_behavior() -> None:
     backend_root = __import__("pathlib").Path(__file__).resolve().parents[1]

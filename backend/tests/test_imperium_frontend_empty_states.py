@@ -49,6 +49,8 @@ def test_frontend_empty_states_endpoint_present_and_jwt_scoped() -> None:
 def test_frontend_empty_states_get_only_no_idempotency_key_required() -> None:
     response = _client(FakeDb(), _user()).get("/api/imperium/frontend/empty-states")
     assert response.status_code == 200
+    assert "idempotency-key" not in {key.lower() for key in response.request.headers}
+    assert _client(FakeDb(), _user()).get("/api/imperium/frontend/static-copy").status_code == 404
 
 
 def test_frontend_empty_states_response_shape_and_deterministic_order() -> None:
@@ -113,7 +115,22 @@ def test_frontend_empty_states_not_ai_not_recommendation_not_coaching_not_health
     response = _client(FakeDb(), _user()).get("/api/imperium/frontend/empty-states")
     assert response.status_code == 200
     payload_text = str(response.json()).lower()
-    for forbidden in ("openai", "anthropic", "gemini", "claude", "n8n", "ocr", "scoring", "coaching", "health"):
+    for forbidden in (
+        "openai",
+        "anthropic",
+        "gemini",
+        "claude",
+        "n8n",
+        "ocr",
+        "scoring",
+        "coaching",
+        "health",
+        "recommendation",
+        "personalized",
+        "dynamic",
+        "discovery",
+        "ai decision",
+    ):
         assert forbidden not in payload_text
 
 

@@ -3064,6 +3064,11 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
     assert "Idempotency-Key" not in route_text
     assert "empty_states_version=\"v1\"" in service_text
     assert "Frontend empty state metadata for Imperium V1." in service_text
+    assert "IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS" in service_text
+    assert "no_active_mission" in service_text
+    assert "no_vault_transactions" in service_text
+    assert "no_path_habits" in service_text
+    assert "no_pulse_entry" in service_text
     assert "static_copy_version" not in service_text
     assert "Static frontend copy metadata" not in service_text
 
@@ -3086,6 +3091,9 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
         "scoring",
         "coaching",
         "recommendation",
+        "personalized",
+        "dynamic discovery",
+        "discover",
         "openai",
         "anthropic",
         "gemini",
@@ -3095,10 +3103,13 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
 
     for docs_text in (docs_contracts, docs_schema):
         assert "/api/imperium/frontend/empty-states" in docs_text
+        assert "canonical v1 contract" in docs_text
         assert "static ui copy metadata" in docs_text
         assert "not personalized recommendation" in docs_text
         assert "not coaching" in docs_text
         assert "not ai decision" in docs_text
         assert "not a health check" in docs_text
         assert "no business data read" in docs_text
+        assert "no action triggered" in docs_text
+        assert "removed, not active, and not canonical" in docs_text
         assert "/api/imperium/frontend/static-copy" not in docs_text
