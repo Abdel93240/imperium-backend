@@ -43,6 +43,7 @@ def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_sc
         "/api/imperium/contracts/index",
         "/api/imperium/contracts/compliance",
         "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
         "/api/imperium/frontend/theme-tokens",
     ):
         response = client.get(path)

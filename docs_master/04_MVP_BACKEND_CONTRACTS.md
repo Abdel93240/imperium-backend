@@ -148,7 +148,7 @@ Frontend bootstrap usage:
 
 This layer is a static metadata surface for the frontend only.
 
-It contains four JWT-scoped, read-only, metadata-only contracts:
+It contains six JWT-scoped, read-only, metadata-only contracts:
 - Home Bootstrap = bootstrap frontend metadata
 - Contracts Index = index static of the main contracts
 - Contracts Compliance = declarative only, not a runtime audit
