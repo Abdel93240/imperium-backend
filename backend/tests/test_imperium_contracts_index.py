@@ -309,3 +309,14 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
     assert response.status_code == 200
     group_names = [group["name"] for group in response.json()["groups"]]
     assert group_names == ["home", "dashboard", "daily_plan", "mission", "vault", "path", "pulse", "frontend"]
+    frontend_group = next(group for group in response.json()["groups"] if group["name"] == "frontend")
+    assert [endpoint["path"] for endpoint in frontend_group["endpoints"]] == [
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+        "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/module-cards",
+    ]
+    assert len(frontend_group["endpoints"]) == 7

@@ -10,6 +10,17 @@ This layer is metadata only.
 Frontend Metadata Layer v5 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 This layer is static and deterministic in V1.
+It contains exactly 10 endpoints:
+`/api/imperium/home/bootstrap`
+`/api/imperium/contracts/index`
+`/api/imperium/contracts/compliance`
+`/api/imperium/frontend/navigation`
+`/api/imperium/frontend/layout`
+`/api/imperium/frontend/theme-tokens`
+`/api/imperium/frontend/empty-states`
+`/api/imperium/frontend/actions`
+`/api/imperium/frontend/app-manifest`
+`/api/imperium/frontend/module-cards`
 It is not a full OpenAPI document.
 It is not a health check.
 It is not health check.
@@ -24,6 +35,7 @@ Idempotency-Key not required.
 It does not use OpenAPI or dynamic discovery.
 It does not perform runtime audit.
 It does not include user_id, secrets, provider metadata, or infra metadata.
+`module-cards` is part of the stable frontend metadata layer and must remain in the canonical endpoint list.
 
 ### Home Bootstrap
 
@@ -42,6 +54,7 @@ no secrets/providers/infra metadata
 `/api/imperium/contracts/index`
 contract index
 frontend contracts compliance metadata
+references the frontend metadata group
 `status` is always `declared`
 deterministic `checks[]` order
 not a full openapi
@@ -49,8 +62,8 @@ not a health check
 not a dynamic runtime discovery
 no business data read
 no secrets/providers/infra metadata
-references the frontend metadata group when present
 no duplicate frontend metadata entries
+frontend group includes module-cards
 
 ### Contracts Compliance
 
@@ -142,9 +155,26 @@ not a health check
 no business data read
 no secrets/providers/infra metadata
 lists exactly the 10 frontend metadata endpoints
+ordered canonical endpoint list
 contains no user_id
 contains no provider metadata
 contains no infra metadata
+
+### Module Cards
+
+`/api/imperium/frontend/module-cards`
+frontend module card metadata
+metadata only
+static deterministic v1
+deterministic order
+primary_endpoint is canonical
+no runtime status
+no runtime count
+no runtime score
+no personalization
+no feature flag
+no business data read
+no secrets/providers/infra metadata
 
 ## Mission Contracts
 

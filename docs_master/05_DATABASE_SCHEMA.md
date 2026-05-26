@@ -3,6 +3,7 @@
 frontend metadata layer v5
 metadata only
 declarative metadata only
+contains exactly 10 endpoints
 not openapi
 not a health check
 not a dynamic discovery
@@ -85,6 +86,19 @@ not a health check
 no business data read
 no secrets/providers/infra metadata
 `/api/imperium/frontend/app-manifest`
+
+frontend module card metadata
+metadata only
+static deterministic v1
+deterministic order
+primary_endpoint canonical
+no runtime status
+no runtime count
+no runtime score
+no personalization
+no feature flag
+no business data read
+no secrets/providers/infra metadata
 
 static deterministic v1
 not a dynamic theme

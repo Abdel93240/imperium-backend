@@ -22,6 +22,17 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/app-manifest",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
+FRONTEND_METADATA_VERSION_FIELDS = (
+    "manifest_version",
+    "backend_version",
+    "contract_version",
+    "navigation_version",
+    "layout_version",
+    "theme_version",
+    "empty_states_version",
+    "actions_version",
+    "module_cards_version",
+)
 
 
 class FakeDb:
@@ -276,6 +287,46 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert "scoring" not in str(app_manifest).lower()
     assert "coaching" not in str(app_manifest).lower()
     assert "recommendation" not in str(app_manifest).lower()
+    assert FRONTEND_METADATA_VERSION_FIELDS == (
+        "manifest_version",
+        "backend_version",
+        "contract_version",
+        "navigation_version",
+        "layout_version",
+        "theme_version",
+        "empty_states_version",
+        "actions_version",
+        "module_cards_version",
+    )
+    module_cards = client.get("/api/imperium/frontend/module-cards").json()
+    assert module_cards["module_cards_version"] == "v1"
+    assert [item["key"] for item in module_cards["items"]] == [
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+    ]
+    assert [item["primary_endpoint"] for item in module_cards["items"]] == [
+        "/api/imperium/dashboard",
+        "/api/imperium/daily-plan",
+        "/api/imperium/missions/active",
+        "/api/imperium/vault/summary",
+        "/api/imperium/path/today",
+        "/api/imperium/pulse/today",
+    ]
+    assert [item["order"] for item in module_cards["items"]] == [10, 20, 30, 40, 50, 60]
+    assert all(item["enabled"] is True for item in module_cards["items"])
+    assert all(
+        set(item) == {"key", "title", "subtitle", "route", "primary_endpoint", "order", "enabled"}
+        for item in module_cards["items"]
+    )
+    assert "status" not in str(module_cards).lower()
+    assert "count" not in str(module_cards).lower()
+    assert "score" not in str(module_cards).lower()
+    assert "feature flag" not in str(module_cards).lower()
+    assert "personalization" not in str(module_cards).lower()
     payload_text = str(empty_states).lower()
     for forbidden in (
         "user_id",
@@ -328,6 +379,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/empty-states",
         "/api/imperium/frontend/actions",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/module-cards",
     )
     assert "frontend metadata layer v5" in contracts_docs
     assert "stable and locked" in contracts_docs
@@ -341,6 +393,8 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "jwt-scoped" in contracts_docs
     assert "idempotency-key not required" in contracts_docs
     assert "lists exactly the 10 frontend metadata endpoints" in contracts_docs
+    assert "frontend module card metadata" in contracts_docs
+    assert "module-cards" in contracts_docs
     for path in expected_paths:
         assert path in contracts_docs
 
@@ -353,5 +407,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "no action triggered" in schema_docs
     assert "jwt-scoped" in schema_docs
     assert "idempotency-key not required" in schema_docs
+    assert "frontend module card metadata" in schema_docs
+    assert "contains exactly 10 endpoints" in schema_docs
     for path in expected_paths:
         assert path in schema_docs

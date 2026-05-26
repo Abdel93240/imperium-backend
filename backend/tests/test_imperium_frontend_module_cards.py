@@ -86,6 +86,14 @@ def test_frontend_module_cards_response_shape_and_deterministic_order() -> None:
     ]
     assert [item["order"] for item in body["items"]] == [10, 20, 30, 40, 50, 60]
     assert all(item["enabled"] is True for item in body["items"])
+    assert [set(item) for item in body["items"]] == [
+        {"key", "title", "subtitle", "route", "primary_endpoint", "order", "enabled"}
+    ] * 6
+    assert "status" not in str(body).lower()
+    assert "count" not in str(body).lower()
+    assert "score" not in str(body).lower()
+    assert "feature flag" not in str(body).lower()
+    assert "personalization" not in str(body).lower()
 
 
 def test_frontend_module_cards_has_no_user_or_secret_provider_infra_metadata() -> None:
@@ -106,6 +114,8 @@ def test_frontend_module_cards_has_no_user_or_secret_provider_infra_metadata() -
         "anthropic",
         "gemini",
         "claude",
+        "feature flag",
+        "personalization",
     ):
         assert forbidden not in payload_text
 
@@ -151,6 +161,8 @@ def test_frontend_module_cards_docs_metadata_only_static_v1_not_runtime_status_o
         assert "frontend module card metadata" in text
         assert "metadata only" in text
         assert "static deterministic v1" in text
+        assert "deterministic order" in text
+        assert "primary_endpoint" in text
         assert "not a health check" in text
         assert "not runtime status" in text
         assert "not runtime availability" in text

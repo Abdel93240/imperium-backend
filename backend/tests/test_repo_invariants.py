@@ -3482,6 +3482,8 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
     assert "metadata-only" in docs_contracts
     assert "static and deterministic in v1" in docs_contracts
     assert "lists exactly the 10 frontend metadata endpoints" in docs_contracts
+    assert "frontend module card metadata" in docs_contracts
+    assert "module-cards" in docs_contracts
 
 
 def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_static() -> None:
@@ -3496,9 +3498,20 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
 
     manifest = responses["/api/imperium/frontend/app-manifest"].json()
     contracts_index = responses["/api/imperium/contracts/index"].json()
+    module_cards = responses["/api/imperium/frontend/module-cards"].json()
     frontend_group = next(group for group in contracts_index["groups"] if group["name"] == "frontend")
 
+    assert manifest["manifest_version"] == "v1"
     assert manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
+    assert module_cards["module_cards_version"] == "v1"
+    assert [item["key"] for item in module_cards["items"]] == [
+        "dashboard",
+        "daily_plan",
+        "mission",
+        "vault",
+        "path",
+        "pulse",
+    ]
     assert [endpoint["path"] for endpoint in frontend_group["endpoints"]] == [
         "/api/imperium/frontend/navigation",
         "/api/imperium/frontend/layout",
@@ -3519,6 +3532,7 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     assert "infra" not in str(manifest).lower()
 
     assert contracts_index["contract_version"] == "v1"
+    assert [group["name"] for group in contracts_index["groups"] if group["name"] == "frontend"] == ["frontend"]
     assert [group["name"] for group in contracts_index["groups"]] == [
         "home",
         "dashboard",
@@ -3533,3 +3547,4 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     assert "openapi" not in str(contracts_index).lower()
     assert "frontend metadata layer v5" in docs_contracts
     assert "frontend metadata layer v5" in docs_schema
+    assert "contains exactly 10 endpoints" in docs_schema

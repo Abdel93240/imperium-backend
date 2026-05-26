@@ -21,6 +21,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/app-manifest",
 )
+FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -86,6 +87,10 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
     assert body["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
     assert len(body["frontend_metadata_endpoints"]) == 10
     assert body["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
+    assert set(body["frontend_metadata_endpoints"]) == FRONTEND_METADATA_ENDPOINT_SET
+    assert body["frontend_metadata_endpoints"][0] == "/api/imperium/home/bootstrap"
+    assert body["frontend_metadata_endpoints"][-1] == "/api/imperium/frontend/app-manifest"
+    assert "/api/imperium/frontend/static-copy" not in body["frontend_metadata_endpoints"]
 
 
 def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -> None:
@@ -113,6 +118,8 @@ def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -
     assert "openapi" not in payload_text
     assert "runtime discovery" not in payload_text
     assert "runtime audit" not in payload_text
+    assert "feature flag" not in payload_text
+    assert "personalization" not in payload_text
 
 
 def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:
@@ -138,6 +145,8 @@ def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:
         "ocr",
         "ai",
         "n8n",
+        "count",
+        "score",
     ):
         assert forbidden not in payload_text
     assert "business data" not in payload_text
