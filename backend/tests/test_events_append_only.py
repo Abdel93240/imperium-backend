@@ -1,7 +1,7 @@
-"""Append-only trigger verification tests for events and auth_events.
+"""Append-only trigger verification tests for events, auth_events, and imperium_events.
 
 These tests require a real PostgreSQL database with the migrations applied
-(append-only triggers are installed by migrations 0002 and 0003). They skip
+(append-only triggers are installed by migrations 0002, 0003, and 0029). They skip
 locally when IMPERIUM_TEST_DATABASE_URL is not set and fail in CI if the
 variable is missing.
 
@@ -31,6 +31,7 @@ from sqlalchemy import create_engine, text  # noqa: E402
 from app.models.auth import AuthEvent, User  # noqa: E402
 from app.models.event import Event  # noqa: E402
 from app.models.enums import PrivacyLevel, SourceApp  # noqa: E402
+from app.models.imperium import ImperiumEvent  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -86,6 +87,27 @@ def _insert_auth_event(conn, *, user_id: str) -> str:
         {"id": auth_event_pk, "user_id": user_id, "now": datetime.now(UTC)},
     )
     return auth_event_pk
+
+
+def _insert_imperium_event(conn, *, user_id: str) -> str:
+    event_pk = str(uuid4())
+    occurred_at = datetime.now(UTC)
+    conn.execute(
+        text(
+            "INSERT INTO imperium_events (id, user_id, event_type, source_module, occurred_at, "
+            "payload_json, schema_version, idempotency_key, created_at, updated_at) "
+            "VALUES (:id, :user_id, 'mission_started', 'mission', :occurred_at, '{}'::jsonb, "
+            "'v1', :idem, :now, :now)"
+        ),
+        {
+            "id": event_pk,
+            "user_id": user_id,
+            "occurred_at": occurred_at,
+            "idem": f"idem-{event_pk}",
+            "now": occurred_at,
+        },
+    )
+    return event_pk
 
 
 def _expect_append_only_failure(exc: Exception) -> None:
@@ -169,6 +191,41 @@ def test_auth_event_truncate_is_rejected_by_trigger(engine) -> None:
     _expect_append_only_failure(excinfo.value)
 
 
+# ---- imperium_events ------------------------------------------------------
+
+
+def test_imperium_event_update_is_rejected_by_trigger(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        event_pk = _insert_imperium_event(conn, user_id=user_id)
+
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE imperium_events SET event_type = 'mutated' WHERE id = :id"),
+                {"id": event_pk},
+            )
+    _expect_append_only_failure(excinfo.value)
+
+
+def test_imperium_event_delete_is_rejected_by_trigger(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        event_pk = _insert_imperium_event(conn, user_id=user_id)
+
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM imperium_events WHERE id = :id"), {"id": event_pk})
+    _expect_append_only_failure(excinfo.value)
+
+
+def test_imperium_event_truncate_is_rejected_by_trigger(engine) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(text("TRUNCATE TABLE imperium_events"))
+    _expect_append_only_failure(excinfo.value)
+
+
 # Reference imports used to keep models in this module's coverage even when
 # the test suite is skipped — also surfaces import errors at collection time.
-_ = (Event, AuthEvent, User, PrivacyLevel, SourceApp)
+_ = (Event, AuthEvent, User, PrivacyLevel, SourceApp, ImperiumEvent)

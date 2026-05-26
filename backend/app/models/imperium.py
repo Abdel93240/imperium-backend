@@ -61,6 +61,54 @@ class ImperiumDayReview(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class ImperiumEvent(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "imperium_events"
+    __table_args__ = (
+        CheckConstraint("length(btrim(event_type)) > 0", name="imperium_events_event_type_non_empty"),
+        CheckConstraint("length(btrim(source_module)) > 0", name="imperium_events_source_module_non_empty"),
+        CheckConstraint("length(btrim(schema_version)) > 0", name="imperium_events_schema_version_non_empty"),
+        Index("imperium_events_user_occurred_at_desc_idx", "user_id", text("occurred_at DESC")),
+        Index(
+            "imperium_events_user_source_module_occurred_at_desc_idx",
+            "user_id",
+            "source_module",
+            text("occurred_at DESC"),
+        ),
+        Index(
+            "imperium_events_user_event_type_occurred_at_desc_idx",
+            "user_id",
+            "event_type",
+            text("occurred_at DESC"),
+        ),
+        Index(
+            "imperium_events_user_idempotency_key_unique_idx",
+            "user_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    source_module: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    schema_version: Mapped[str] = mapped_column(Text, nullable=False, default="v1", server_default="v1")
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_missions"
     __table_args__ = (
