@@ -21,6 +21,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/design-handoff",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -86,11 +87,11 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
         *FRONTEND_METADATA_ENDPOINTS,
     ]
     assert body["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
-    assert len(body["frontend_metadata_endpoints"]) == 11
+    assert len(body["frontend_metadata_endpoints"]) == 12
     assert body["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
     assert set(body["frontend_metadata_endpoints"]) == FRONTEND_METADATA_ENDPOINT_SET
     assert body["frontend_metadata_endpoints"][0] == "/api/imperium/home/bootstrap"
-    assert body["frontend_metadata_endpoints"][-1] == "/api/imperium/frontend/app-manifest"
+    assert body["frontend_metadata_endpoints"][-1] == "/api/imperium/frontend/design-handoff"
     assert "/api/imperium/frontend/static-copy" not in body["frontend_metadata_endpoints"]
     assert body["frontend_metadata_endpoints"].index("/api/imperium/frontend/asset-registry") == 9
 
@@ -171,6 +172,7 @@ def test_frontend_app_manifest_docs_metadata_only_static_v1_not_discovery_not_he
 
     for text in (contracts_docs, schema_docs):
         assert "/api/imperium/frontend/app-manifest" in text
+        assert "/api/imperium/frontend/design-handoff" in text
         assert "metadata only" in text
         assert "static deterministic v1" in text
         assert "declarative endpoint list only" in text

@@ -11,7 +11,7 @@ This layer is metadata only.
 Frontend Metadata Layer v6 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 This layer is static and deterministic in V1.
-It contains exactly 11 endpoints:
+It contains exactly 12 endpoints:
 `/api/imperium/home/bootstrap`
 `/api/imperium/contracts/index`
 `/api/imperium/contracts/compliance`
@@ -23,6 +23,7 @@ It contains exactly 11 endpoints:
 `/api/imperium/frontend/module-cards`
 `/api/imperium/frontend/asset-registry`
 `/api/imperium/frontend/app-manifest`
+`/api/imperium/frontend/design-handoff`
 It is not a full OpenAPI document.
 It is not a health check.
 It is not health check.
@@ -51,6 +52,7 @@ The canonical frontend metadata surface is:
 `/api/imperium/frontend/module-cards`
 `/api/imperium/frontend/asset-registry`
 `/api/imperium/frontend/app-manifest`
+`/api/imperium/frontend/design-handoff`
 
 ### Home Bootstrap
 
@@ -169,11 +171,54 @@ not openapi
 not a health check
 no business data read
 no secrets/providers/infra metadata
-lists exactly the 11 frontend metadata endpoints
+lists exactly the 12 frontend metadata endpoints
 ordered canonical endpoint list
 contains no user_id
 contains no provider metadata
 contains no infra metadata
+
+### Design Handoff
+
+`/api/imperium/frontend/design-handoff`
+frontend design handoff metadata
+metadata only
+static deterministic v1
+frontend metadata layer version v6
+read only
+GET only
+JWT-scoped
+Idempotency-Key not required
+prepares Claude Code Design handoff
+declares design direction metadata
+declares supported modules
+declares existing frontend metadata endpoints
+declares expected asset groups
+declares design rules
+does not generate UI
+does not generate images
+does not generate React
+does not perform layout runtime
+does not perform dynamic rendering
+does not perform filesystem scan
+does not perform asset existence check
+does not perform OpenAPI scan
+does not perform runtime audit
+does not read business data
+does not trigger actions
+does not perform cross-module writes
+does not include user_id
+does not include secrets/providers/infra metadata
+no upload
+no remote URL
+no CDN
+no base64
+no font file
+no code frontend
+no React/HTML/CSS
+no screenshots
+no blobs
+no Figma
+no asset pipeline
 
 ### Module Cards
 

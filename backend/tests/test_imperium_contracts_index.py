@@ -253,6 +253,13 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                             "read_only": True,
                             "idempotency_key_required": False,
                         },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/design-handoff",
+                            "purpose": "Frontend design handoff metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
                     ],
                 },
             ],
@@ -326,5 +333,6 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
         "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/design-handoff",
     ]
-    assert len(frontend_group["endpoints"]) == 8
+    assert len(frontend_group["endpoints"]) == 9

@@ -3,7 +3,7 @@
 frontend metadata layer v6
 metadata only
 declarative metadata only
-contains exactly 11 endpoints
+contains exactly 12 endpoints
 not openapi
 not a health check
 not a dynamic discovery
@@ -33,6 +33,7 @@ does not include user_id
 `/api/imperium/frontend/module-cards`
 `/api/imperium/frontend/asset-registry`
 `/api/imperium/frontend/app-manifest`
+`/api/imperium/frontend/design-handoff`
 
 contracts index
 metadata only
@@ -122,6 +123,46 @@ not a health check
 not dynamic discovery
 no business data read
 no secrets/providers/infra metadata
+
+frontend design handoff metadata
+metadata only
+static deterministic v1
+frontend metadata layer version v6
+read only
+GET only
+JWT-scoped
+Idempotency-Key not required
+prepares Claude Code Design handoff
+declares design direction metadata
+declares supported modules
+declares existing frontend metadata endpoints
+declares expected asset groups
+declares design rules
+does not generate UI
+does not generate images
+does not generate React
+does not perform layout runtime
+does not perform dynamic rendering
+does not perform filesystem scan
+does not perform asset existence check
+does not perform OpenAPI scan
+does not perform runtime audit
+does not read business data
+does not trigger actions
+does not perform cross-module writes
+does not include user_id
+does not include secrets/providers/infra metadata
+no upload
+no remote URL
+no CDN
+no base64
+no font file
+no code frontend
+no React/HTML/CSS
+no screenshots
+no blobs
+no Figma
+no asset pipeline
 
 static deterministic v1
 not a dynamic theme

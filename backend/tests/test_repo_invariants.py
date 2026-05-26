@@ -26,6 +26,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/design-handoff",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 
@@ -713,6 +714,7 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
     assert frontend_route_text.count('@router.get("/frontend/module-cards"') == 1
     assert frontend_route_text.count('@router.get("/frontend/asset-registry"') == 1
     assert frontend_route_text.count('@router.get("/frontend/app-manifest"') == 1
+    assert frontend_route_text.count('@router.get("/frontend/design-handoff"') == 1
     assert '@router.get("/frontend/static-copy"' not in frontend_route_text
 
     for forbidden in ("db.add(", "db.flush", "db.commit", "select(", "session"):
@@ -3484,7 +3486,7 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
     assert "any future frontend metadata surface must be explicitly documented" in docs_contracts
     assert "metadata-only" in docs_contracts
     assert "static and deterministic in v1" in docs_contracts
-    assert "lists exactly the 11 frontend metadata endpoints" in docs_contracts
+    assert "lists exactly the 12 frontend metadata endpoints" in docs_contracts
     assert "frontend module card metadata" in docs_contracts
     assert "module-cards" in docs_contracts
     assert "asset registry means expected asset contract" in docs_contracts
@@ -3527,9 +3529,10 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
         "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/design-handoff",
     ]
-    assert len(frontend_group["endpoints"]) == 8
-    assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 8
+    assert len(frontend_group["endpoints"]) == 9
+    assert len({endpoint["path"] for endpoint in frontend_group["endpoints"]}) == 9
     assert "openapi" not in str(manifest).lower()
     assert "runtime discovery" not in str(manifest).lower()
     assert "runtime audit" not in str(manifest).lower()
@@ -3554,7 +3557,7 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     assert "openapi" not in str(contracts_index).lower()
     assert "frontend metadata layer v6" in docs_contracts
     assert "frontend metadata layer v6" in docs_schema
-    assert "contains exactly 11 endpoints" in docs_schema
+    assert "contains exactly 12 endpoints" in docs_schema
     assert "no filesystem scan" in docs_contracts
     assert "no asset existence check" in docs_contracts
     assert "final png/svg assets may be provided later" in docs_contracts

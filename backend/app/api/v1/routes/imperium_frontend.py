@@ -5,6 +5,7 @@ from app.schemas.frontend import (
     ImperiumFrontendAssetRegistryResponse,
     ImperiumFrontendAppManifestResponse,
     ImperiumFrontendActionsResponse,
+    ImperiumFrontendDesignHandoffResponse,
     ImperiumFrontendEmptyStatesResponse,
     ImperiumFrontendLayoutResponse,
     ImperiumFrontendModuleCardsResponse,
@@ -15,6 +16,7 @@ from app.services.imperium.frontend import (
     get_imperium_frontend_asset_registry_metadata,
     get_imperium_frontend_app_manifest_metadata,
     get_imperium_frontend_actions_metadata,
+    get_imperium_frontend_design_handoff_metadata,
     get_imperium_frontend_empty_states_metadata,
     get_imperium_frontend_layout_metadata,
     get_imperium_frontend_module_cards_metadata,
@@ -71,3 +73,9 @@ def imperium_frontend_empty_states_route(current_user: CurrentUserDep) -> Imperi
 def imperium_frontend_app_manifest_route(current_user: CurrentUserDep) -> ImperiumFrontendAppManifestResponse:
     _ = current_user
     return get_imperium_frontend_app_manifest_metadata()
+
+
+@router.get("/frontend/design-handoff", response_model=ImperiumFrontendDesignHandoffResponse)
+def imperium_frontend_design_handoff_route(current_user: CurrentUserDep) -> ImperiumFrontendDesignHandoffResponse:
+    _ = current_user
+    return get_imperium_frontend_design_handoff_metadata()

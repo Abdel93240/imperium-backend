@@ -215,3 +215,27 @@ class ImperiumFrontendAssetRegistryResponse(BaseModel):
     placeholder_policy: ImperiumFrontendAssetRegistryPlaceholderPolicy
     groups: list[ImperiumFrontendAssetRegistryGroup]
     safe_explanation: str
+
+
+class ImperiumFrontendDesignDirection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    style: str
+    visual_language: str
+    mood: str
+    ui_philosophy: str
+    safe_explanation: str
+
+
+class ImperiumFrontendDesignHandoffResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    design_handoff_version: str
+    read_only: bool
+    frontend_metadata_layer_version: str
+    design_direction: ImperiumFrontendDesignDirection
+    supported_modules: list[str]
+    frontend_metadata_endpoints: list[str]
+    asset_groups: list[str]
+    design_rules: list[str]
+    safe_explanation: str

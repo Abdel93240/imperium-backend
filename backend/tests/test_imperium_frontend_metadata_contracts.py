@@ -21,6 +21,7 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/module-cards",
     "/api/imperium/frontend/asset-registry",
     "/api/imperium/frontend/app-manifest",
+    "/api/imperium/frontend/design-handoff",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
 FRONTEND_METADATA_VERSION_FIELDS = (
@@ -34,6 +35,7 @@ FRONTEND_METADATA_VERSION_FIELDS = (
     "actions_version",
     "module_cards_version",
     "asset_registry_version",
+    "design_handoff_version",
 )
 
 
@@ -176,6 +178,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/design-handoff",
     ]
     assert contracts_index["groups"][-1]["name"] == "frontend"
     assert [check["key"] for check in compliance["checks"]] == [
@@ -197,6 +200,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/design-handoff",
     }
     assert all(
         endpoint["method"] == "GET"
@@ -306,6 +310,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "actions_version",
         "module_cards_version",
         "asset_registry_version",
+        "design_handoff_version",
     )
     module_cards = client.get("/api/imperium/frontend/module-cards").json()
     assert module_cards["module_cards_version"] == "v1"
@@ -390,6 +395,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/module-cards",
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
+        "/api/imperium/frontend/design-handoff",
     )
     assert "frontend metadata layer v6" in contracts_docs
     assert "stable and locked" in contracts_docs
@@ -402,7 +408,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "no action triggered" in contracts_docs
     assert "jwt-scoped" in contracts_docs
     assert "idempotency-key not required" in contracts_docs
-    assert "lists exactly the 11 frontend metadata endpoints" in contracts_docs
+    assert "lists exactly the 12 frontend metadata endpoints" in contracts_docs
     assert "frontend module card metadata" in contracts_docs
     assert "module-cards" in contracts_docs
     assert "frontend asset registry metadata" in contracts_docs
@@ -421,6 +427,6 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     assert "idempotency-key not required" in schema_docs
     assert "frontend module card metadata" in schema_docs
     assert "frontend asset registry metadata" in schema_docs
-    assert "contains exactly 11 endpoints" in schema_docs
+    assert "contains exactly 12 endpoints" in schema_docs
     for path in expected_paths:
         assert path in schema_docs
