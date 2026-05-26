@@ -375,10 +375,14 @@ no secrets/providers/infra metadata
 ## Event Foundation 23A
 
 table `imperium_events`
+route owner canonique
+`app/api/v1/routes/imperium_events.py`
 append-only
 user-scoped
 Idempotency-Key required on POST
 read-only GETs
+strict CurrentUserDep
+no user_id exposed
 no projections
 no cross-module writes
 no AI
@@ -405,6 +409,10 @@ source_module non-empty
 schema_version non-empty
 source_module allowed values
 unique idempotency_key per user when present
+index user/occurred_at
+index user/source_module/occurred_at
+index user/event_type/occurred_at
+source_module check constraint
 intended future use:
 Vault snapshots
 Path consistency

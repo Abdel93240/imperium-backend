@@ -1633,6 +1633,18 @@ def test_patch_23a_imperium_events_foundation_is_append_only_user_scoped_idempot
     assert 'revision: str = "20260526_0030"' in migration_text
     assert 'down_revision: str | None = "20260526_0029"' in migration_text
     assert "imperium_events_source_module_allowed_check" in migration_text
+    assert "no PUT/PATCH/DELETE" in event_docs04
+    assert "route owner canonique" in event_docs04
+    assert "route owner canonique" in event_docs05
+    assert "app/api/v1/routes/imperium_events.py" in event_docs04
+    assert "app/api/v1/routes/imperium_events.py" in event_docs05
+    assert "source_module allowed values" in event_docs04
+    assert "source_module allowed values" in event_docs05
+    assert "strict CurrentUserDep" in event_docs04
+    assert "strict CurrentUserDep" in event_docs05
+    assert "no user_id exposed" in event_docs04
+    assert "no user_id exposed" in event_docs05
+    assert "GET list and detail do not require Idempotency-Key" in event_docs04
     assert "append-only" in event_docs04
     assert "append-only" in event_docs05
     assert "user-scoped" in event_docs04
@@ -1657,6 +1669,69 @@ def test_patch_23a_imperium_events_foundation_is_append_only_user_scoped_idempot
     assert "Weekly Review" in event_docs05
     for forbidden in ("n8n", "ocr", "pgvector", "memory", "scoring", "coaching", "recommendations"):
         assert forbidden not in lowered_code
+
+
+def test_patch_23c_imperium_events_contract_consolidation_remains_stable() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_events.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "events.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "events.py"
+    model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
+    docs04_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    docs05_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    router_path = BACKEND_ROOT / "app" / "api" / "v1" / "router.py"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    model_text = model_path.read_text(encoding="utf-8")
+    docs04_text = docs04_path.read_text(encoding="utf-8")
+    docs05_text = docs05_path.read_text(encoding="utf-8")
+    router_text = router_path.read_text(encoding="utf-8")
+
+    assert "imperium_events" in router_text
+    assert "imperium.py" not in route_text.split("@router", maxsplit=1)[0]
+    assert route_text.count('@router.post("/events"') == 1
+    assert route_text.count('@router.get("/events",') == 1
+    assert route_text.count('@router.get("/events/{event_id}"') == 1
+    assert '@router.put("/events"' not in route_text
+    assert '@router.patch("/events"' not in route_text
+    assert '@router.delete("/events"' not in route_text
+    assert "CurrentUserDep" in route_text
+    assert "user_id" not in route_text.split("def create_imperium_event_route", maxsplit=1)[0]
+    assert "user_id" not in schema_text.split("class EventRead", maxsplit=1)[1].split(
+        "class ImperiumEventWriteResponse",
+        maxsplit=1,
+    )[0]
+    assert "source_module IN ('mission', 'vault', 'path', 'pulse', 'vector'," in model_text
+    assert "'dashboard', 'daily_plan', 'system', 'manual')" in model_text
+    assert "append-only" in docs04_text.lower()
+    assert "append-only" in docs05_text.lower()
+    assert "no projections" in docs04_text.lower()
+    assert "no projections" in docs05_text.lower()
+    assert "no cross-module writes" in docs04_text.lower()
+    assert "no cross-module writes" in docs05_text.lower()
+    assert "vault snapshots" in docs04_text.lower()
+    assert "path consistency" in docs04_text.lower()
+    assert "pulse tracking" in docs04_text.lower()
+    assert "vector analytics" in docs04_text.lower()
+    assert "weekly review" in docs04_text.lower()
+    assert "vault snapshots" in docs05_text.lower()
+    assert "path consistency" in docs05_text.lower()
+    assert "pulse tracking" in docs05_text.lower()
+    assert "vector analytics" in docs05_text.lower()
+    assert "weekly review" in docs05_text.lower()
+    assert "index user/occurred_at" in docs05_text.lower()
+    assert "index user/source_module/occurred_at" in docs05_text.lower()
+    assert "index user/event_type/occurred_at" in docs05_text.lower()
+    assert "unique idempotency_key per user" in docs05_text.lower()
+    assert "source_module check constraint" in docs05_text.lower()
+    assert "idempotency-key required on post" in docs04_text.lower()
+    assert "get list and detail do not require idempotency-key" in docs04_text.lower()
+    assert "strict currentuserdep" in docs04_text.lower()
+    assert "strict currentuserdep" in docs05_text.lower()
+    assert "no user_id exposed" in docs04_text.lower()
+    assert "no user_id exposed" in docs05_text.lower()
+    for forbidden in ("qwen", "n8n", "ocr", "pgvector", "memory commit", "scoring", "coaching", "recommendations", "projection write", "cross-module writes"):
+        assert forbidden not in service_text.lower()
 
 
 def test_alembic_heads_are_unique() -> None:

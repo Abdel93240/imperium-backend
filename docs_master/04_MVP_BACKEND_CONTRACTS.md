@@ -641,11 +641,15 @@ no secrets/providers/infra metadata
 ## Event Foundation 23A
 
 `/api/imperium/events`
-Event Foundation 23A
+route owner canonique
+`app/api/v1/routes/imperium_events.py`
+Event Foundation 23A / 23B / 23C
 append-only
 user-scoped
 Idempotency-Key required on POST
 read-only GETs
+strict CurrentUserDep
+no user_id exposed
 no projections
 no cross-module writes
 no AI
@@ -657,6 +661,19 @@ no recommendations
 POST creates the current user's event only
 GET list returns current-user events only
 GET detail returns current-user event only
+no PUT/PATCH/DELETE
+POST is idempotent
+GET list and detail do not require Idempotency-Key
+source_module allowed values:
+mission
+vault
+path
+pulse
+vector
+dashboard
+daily_plan
+system
+manual
 intended future use:
 Vault snapshots
 Path consistency
