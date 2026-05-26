@@ -67,6 +67,11 @@ class ImperiumEvent(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("length(btrim(event_type)) > 0", name="imperium_events_event_type_non_empty"),
         CheckConstraint("length(btrim(source_module)) > 0", name="imperium_events_source_module_non_empty"),
         CheckConstraint("length(btrim(schema_version)) > 0", name="imperium_events_schema_version_non_empty"),
+        CheckConstraint(
+            "source_module IN ('mission', 'vault', 'path', 'pulse', 'vector', "
+            "'dashboard', 'daily_plan', 'system', 'manual')",
+            name="imperium_events_source_module_allowed_check",
+        ),
         Index("imperium_events_user_occurred_at_desc_idx", "user_id", text("occurred_at DESC")),
         Index(
             "imperium_events_user_source_module_occurred_at_desc_idx",

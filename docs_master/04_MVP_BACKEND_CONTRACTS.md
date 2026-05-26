@@ -637,3 +637,29 @@ not personalization
 not feature flag
 no business data read
 no secrets/providers/infra metadata
+
+## Event Foundation 23A
+
+`/api/imperium/events`
+Event Foundation 23A
+append-only
+user-scoped
+Idempotency-Key required on POST
+read-only GETs
+no projections
+no cross-module writes
+no AI
+no n8n
+no OCR
+no scoring
+no coaching
+no recommendations
+POST creates the current user's event only
+GET list returns current-user events only
+GET detail returns current-user event only
+intended future use:
+Vault snapshots
+Path consistency
+Pulse tracking
+Vector analytics
+Weekly Review

@@ -98,6 +98,15 @@ def test_imperium_events_reject_blank_source_module(engine) -> None:
     _expect_constraint_failure(excinfo.value)
 
 
+def test_imperium_events_reject_invalid_source_module(engine) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            user_id = _make_user(conn)
+            _insert_imperium_event(conn, user_id=user_id, source_module="ocr")
+
+    _expect_constraint_failure(excinfo.value)
+
+
 def test_imperium_events_reject_blank_schema_version(engine) -> None:
     with pytest.raises(Exception) as excinfo:
         with engine.begin() as conn:

@@ -150,6 +150,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "home",
         "dashboard",
         "daily_plan",
+        "events",
         "mission",
         "vault",
         "path",

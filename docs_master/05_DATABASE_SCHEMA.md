@@ -371,3 +371,43 @@ not personalization
 not feature flag
 no business data read
 no secrets/providers/infra metadata
+
+## Event Foundation 23A
+
+table `imperium_events`
+append-only
+user-scoped
+Idempotency-Key required on POST
+read-only GETs
+no projections
+no cross-module writes
+no AI
+no n8n
+no OCR
+no scoring
+no coaching
+no recommendations
+columns:
+`id`
+`user_id`
+`event_type`
+`source_module`
+`occurred_at`
+`payload_json`
+`schema_version`
+`idempotency_key`
+`created_at`
+`updated_at`
+constraints:
+append-only trigger guards
+event_type non-empty
+source_module non-empty
+schema_version non-empty
+source_module allowed values
+unique idempotency_key per user when present
+intended future use:
+Vault snapshots
+Path consistency
+Pulse tracking
+Vector analytics
+Weekly Review

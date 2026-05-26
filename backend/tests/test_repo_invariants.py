@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -1568,6 +1570,107 @@ def test_patch_7h_calendar_foundation_stays_minimal_and_backend_owned() -> None:
     assert "providers" not in service_text
     assert "n8n_client" not in service_text
     assert "trigger_n8n" not in service_text
+
+
+def test_patch_23a_imperium_events_foundation_is_append_only_user_scoped_idempotent_and_non_projecting() -> None:
+    route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_events.py"
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "events.py"
+    schema_path = BACKEND_ROOT / "app" / "schemas" / "events.py"
+    model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260526_0030_imperium_events_source_module_check.py"
+    docs04_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    docs05_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    router_path = BACKEND_ROOT / "app" / "api" / "v1" / "router.py"
+    route_text = route_path.read_text(encoding="utf-8")
+    service_text = service_path.read_text(encoding="utf-8")
+    schema_text = schema_path.read_text(encoding="utf-8")
+    model_text = model_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+    docs04_text = docs04_path.read_text(encoding="utf-8")
+    docs05_text = docs05_path.read_text(encoding="utf-8")
+    router_text = router_path.read_text(encoding="utf-8")
+    event_read_section = schema_text.split("class EventRead", maxsplit=1)[1].split(
+        "class ImperiumEventWriteResponse",
+        maxsplit=1,
+    )[0]
+    event_model_section = model_text.split("class ImperiumEvent", maxsplit=1)[1].split(
+        "class ImperiumMission",
+        maxsplit=1,
+    )[0]
+    event_docs04 = docs04_text.split("## Event Foundation 23A", maxsplit=1)[1]
+    event_docs05 = docs05_text.split("## Event Foundation 23A", maxsplit=1)[1]
+    post_section = route_text.split('@router.post("/events"', maxsplit=1)[1].split(
+        '@router.get("/events"',
+        maxsplit=1,
+    )[0]
+    list_section = route_text.split('@router.get("/events"', maxsplit=1)[1].split(
+        '@router.get("/events/{event_id}"',
+        maxsplit=1,
+    )[0]
+    detail_section = route_text.split('@router.get("/events/{event_id}"', maxsplit=1)[1]
+    detail_route_section = detail_section.split("def _require_idempotency_key", maxsplit=1)[0]
+    lowered_code = "\n".join([route_text, service_text, schema_text, event_model_section, migration_text, router_text]).lower()
+
+    assert "imperium_events.router" in router_text
+    assert route_text.count('@router.post("/events"') == 1
+    assert route_text.count('@router.get("/events",') == 1
+    assert route_text.count('@router.get("/events/{event_id}"') == 1
+    assert '@router.put("/events"' not in route_text
+    assert '@router.patch("/events"' not in route_text
+    assert '@router.delete("/events"' not in route_text
+    assert "Idempotency-Key" in post_section
+    assert "Idempotency-Key" not in list_section
+    assert "Idempotency-Key" not in detail_route_section
+    assert "CurrentUserDep" in route_text
+    assert "SessionDep" in route_text
+    assert "response_model=ImperiumEventWriteResponse" in route_text
+    assert "response_model=ImperiumEventListResponse" in route_text
+    assert "response_model=ImperiumEventDetailResponse" in route_text
+    assert "extra=\"forbid\"" in schema_text
+    assert "user_id" not in event_read_section
+    assert "source_module IN ('mission', 'vault', 'path', 'pulse', 'vector'," in model_text
+    assert "'dashboard', 'daily_plan', 'system', 'manual')" in model_text
+    assert 'revision: str = "20260526_0030"' in migration_text
+    assert 'down_revision: str | None = "20260526_0029"' in migration_text
+    assert "imperium_events_source_module_allowed_check" in migration_text
+    assert "append-only" in event_docs04
+    assert "append-only" in event_docs05
+    assert "user-scoped" in event_docs04
+    assert "user-scoped" in event_docs05
+    assert "Idempotency-Key required on POST" in event_docs04
+    assert "Idempotency-Key required on POST" in event_docs05
+    assert "read-only GETs" in event_docs04
+    assert "read-only GETs" in event_docs05
+    assert "no projections" in event_docs04
+    assert "no projections" in event_docs05
+    assert "no cross-module writes" in event_docs04
+    assert "no cross-module writes" in event_docs05
+    assert "Vault snapshots" in event_docs04
+    assert "Vault snapshots" in event_docs05
+    assert "Path consistency" in event_docs04
+    assert "Path consistency" in event_docs05
+    assert "Pulse tracking" in event_docs04
+    assert "Pulse tracking" in event_docs05
+    assert "Vector analytics" in event_docs04
+    assert "Vector analytics" in event_docs05
+    assert "Weekly Review" in event_docs04
+    assert "Weekly Review" in event_docs05
+    for forbidden in ("n8n", "ocr", "pgvector", "memory", "scoring", "coaching", "recommendations"):
+        assert forbidden not in lowered_code
+
+
+def test_alembic_heads_are_unique() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "heads"],
+        cwd=BACKEND_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    heads = [line for line in result.stdout.splitlines() if line.strip()]
+    assert len(heads) == 1
+    assert heads[0].endswith("(head)")
 
 
 def test_patch_9a_vault_ledger_routes_have_no_ai_n8n_or_memory_side_effects() -> None:
@@ -3417,6 +3520,7 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
         "home",
         "dashboard",
         "daily_plan",
+        "events",
         "mission",
         "vault",
         "path",
@@ -3587,6 +3691,7 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
         "home",
         "dashboard",
         "daily_plan",
+        "events",
         "mission",
         "vault",
         "path",
