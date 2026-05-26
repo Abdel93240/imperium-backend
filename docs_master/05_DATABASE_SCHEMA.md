@@ -1,6 +1,6 @@
 # Database Schema Notes
 
-frontend metadata layer v5
+frontend metadata layer v6
 metadata only
 declarative metadata only
 contains exactly 11 endpoints
@@ -108,7 +108,16 @@ static deterministic v1
 placeholder policy
 placeholder_allowed true
 semantic_luxury_placeholder
-no filesystem check
+asset registry means expected asset contract, not runtime inventory
+no filesystem scan
+no asset existence check
+no upload
+no CDN
+no remote URLs
+no base64
+no font files
+final PNG/SVG assets may be provided later
+designed for Claude Code Design handoff
 not a health check
 not dynamic discovery
 no business data read

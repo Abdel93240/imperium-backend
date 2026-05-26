@@ -5,10 +5,10 @@ imperium_contracts.py
 imperium_frontend.py
 imperium_home.py (`/api/imperium/home/bootstrap`)
 
-## Frontend Metadata Layer v5
+## Frontend Metadata Layer v6
 
 This layer is metadata only.
-Frontend Metadata Layer v5 is considered stable and locked.
+Frontend Metadata Layer v6 is considered stable and locked.
 Any future frontend metadata surface must be explicitly documented, deterministic, metadata-only, and must not introduce business logic.
 This layer is static and deterministic in V1.
 It contains exactly 11 endpoints:
@@ -39,6 +39,18 @@ It does not perform runtime audit.
 It does not include user_id, secrets, provider metadata, or infra metadata.
 `module-cards` is part of the stable frontend metadata layer and must remain in the canonical endpoint list.
 `asset-registry` is part of the stable frontend metadata layer and must remain in the canonical endpoint list.
+The canonical frontend metadata surface is:
+`/api/imperium/home/bootstrap`
+`/api/imperium/contracts/index`
+`/api/imperium/contracts/compliance`
+`/api/imperium/frontend/navigation`
+`/api/imperium/frontend/layout`
+`/api/imperium/frontend/theme-tokens`
+`/api/imperium/frontend/empty-states`
+`/api/imperium/frontend/actions`
+`/api/imperium/frontend/module-cards`
+`/api/imperium/frontend/asset-registry`
+`/api/imperium/frontend/app-manifest`
 
 ### Home Bootstrap
 
@@ -188,7 +200,16 @@ static deterministic v1
 placeholder policy
 placeholder_allowed true
 semantic_luxury_placeholder
-no filesystem check
+asset registry means expected asset contract, not runtime inventory
+no filesystem scan
+no asset existence check
+no upload
+no CDN
+no remote URLs
+no base64
+no font files
+final PNG/SVG assets may be provided later
+designed for Claude Code Design handoff
 not a health check
 not dynamic discovery
 no business data read

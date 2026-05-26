@@ -3305,7 +3305,7 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
     assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
 
     for docs_text in (docs_contracts, docs_schema):
-        assert "frontend metadata layer v5" in docs_text
+        assert "frontend metadata layer v6" in docs_text
         assert "metadata only" in docs_text
         assert "no business data read" in docs_text
         assert "not health check" in docs_text
@@ -3480,13 +3480,16 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
                 continue
             assert forbidden not in payload_text
 
-    assert "frontend metadata layer v5 is considered stable and locked." in docs_contracts
+    assert "frontend metadata layer v6 is considered stable and locked." in docs_contracts
     assert "any future frontend metadata surface must be explicitly documented" in docs_contracts
     assert "metadata-only" in docs_contracts
     assert "static and deterministic in v1" in docs_contracts
     assert "lists exactly the 11 frontend metadata endpoints" in docs_contracts
     assert "frontend module card metadata" in docs_contracts
     assert "module-cards" in docs_contracts
+    assert "asset registry means expected asset contract" in docs_contracts
+    assert "no filesystem scan" in docs_contracts
+    assert "no asset existence check" in docs_contracts
 
 
 def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_static() -> None:
@@ -3549,6 +3552,9 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     ]
     assert "dynamic discovery" not in str(contracts_index).lower()
     assert "openapi" not in str(contracts_index).lower()
-    assert "frontend metadata layer v5" in docs_contracts
-    assert "frontend metadata layer v5" in docs_schema
+    assert "frontend metadata layer v6" in docs_contracts
+    assert "frontend metadata layer v6" in docs_schema
     assert "contains exactly 11 endpoints" in docs_schema
+    assert "no filesystem scan" in docs_contracts
+    assert "no asset existence check" in docs_contracts
+    assert "final png/svg assets may be provided later" in docs_contracts

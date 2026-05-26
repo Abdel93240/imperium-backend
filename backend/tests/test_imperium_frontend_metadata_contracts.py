@@ -114,6 +114,8 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
         assert "recommendation" not in payload_text
         assert "dynamic discovery" not in payload_text
         assert "runtime audit" not in payload_text
+        assert "filesystem scan" not in payload_text
+        assert "asset existence check" not in payload_text
         if path != "/api/imperium/contracts/compliance":
             assert "openapi" not in payload_text
             assert "health check" not in payload_text
@@ -175,6 +177,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
     ]
+    assert contracts_index["groups"][-1]["name"] == "frontend"
     assert [check["key"] for check in compliance["checks"]] == [
         "metadata_only",
         "not_openapi",
@@ -252,6 +255,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     }
     assert app_manifest["frontend_metadata_endpoints"] == list(FRONTEND_METADATA_ENDPOINTS)
     assert app_manifest["safe_explanation"] == "Frontend application manifest metadata for Imperium V1."
+    assert app_manifest["frontend_metadata_endpoints"].index("/api/imperium/frontend/asset-registry") == 9
     assert "user_id" not in str(app_manifest).lower()
     assert "secret" not in str(app_manifest).lower()
     assert "provider" not in str(app_manifest).lower()
@@ -387,7 +391,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
         "/api/imperium/frontend/asset-registry",
         "/api/imperium/frontend/app-manifest",
     )
-    assert "frontend metadata layer v5" in contracts_docs
+    assert "frontend metadata layer v6" in contracts_docs
     assert "stable and locked" in contracts_docs
     assert "metadata only" in contracts_docs
     assert "explicitly documented" in contracts_docs
@@ -406,7 +410,7 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     for path in expected_paths:
         assert path in contracts_docs
 
-    assert "frontend metadata layer v5" in schema_docs
+    assert "frontend metadata layer v6" in schema_docs
     assert "metadata only" in schema_docs
     assert "no business data read" in schema_docs
     assert "not a health check" in schema_docs

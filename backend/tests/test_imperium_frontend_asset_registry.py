@@ -73,6 +73,10 @@ def test_frontend_asset_registry_response_shape_and_deterministic_registry() -> 
         "safe_explanation": "Final PNG/SVG assets may be provided later; placeholders are allowed during UI assembly.",
     }
     assert body["safe_explanation"] == "Frontend asset registry metadata for Imperium V1."
+    assert body["placeholder_policy"]["placeholder_allowed"] is True
+    assert body["placeholder_policy"]["placeholder_style"] == "semantic_luxury_placeholder"
+    assert "final png/svg assets may be provided later" in body["placeholder_policy"]["safe_explanation"].lower()
+    assert body["asset_base_path"] == "/assets/imperium"
 
     assert [group["key"] for group in body["groups"]] == [
         "core",
@@ -228,6 +232,7 @@ def test_frontend_asset_registry_response_shape_and_deterministic_registry() -> 
     for group in body["groups"]:
         assert group["base_path"] == expected_group_base_paths[group["key"]]
         assert [item["key"] for item in group["items"]] == expected_group_item_keys[group["key"]]
+        assert group["items"]
         assert all(item["status"] == "expected" for item in group["items"])
         assert all(item["placeholder_allowed"] is True for item in group["items"])
         assert all(item["asset_type"] == expected_asset_types[group["key"]] for item in group["items"])
@@ -235,6 +240,7 @@ def test_frontend_asset_registry_response_shape_and_deterministic_registry() -> 
             item["expected_filename"] == f'{item["key"]}.{expected_asset_types[group["key"]]}'
             for item in group["items"]
         )
+        assert all(item["expected_filename"].endswith((".svg", ".png")) for item in group["items"])
         assert all(set(item) == {"key", "label", "asset_type", "expected_filename", "usage", "status", "placeholder_allowed"} for item in group["items"])
 
     payload_text = str(body).lower()
@@ -259,8 +265,17 @@ def test_frontend_asset_registry_response_shape_and_deterministic_registry() -> 
         "scoring",
         "coaching",
         "recommendation",
+        "base64",
+        "font",
+        "cdn",
+        "upload",
+        "http://",
+        "https://",
     ):
         assert forbidden not in payload_text
+    assert "filesystem scan" not in payload_text
+    assert "asset existence check" not in payload_text
+    assert "runtime inventory" not in payload_text
 
 
 def test_frontend_asset_registry_read_only_no_db_write() -> None:
@@ -284,7 +299,9 @@ def test_frontend_asset_registry_docs_metadata_only_static_v1_placeholder_policy
         assert "placeholder policy" in text
         assert "placeholder_allowed" in text
         assert "semantic_luxury_placeholder" in text
-        assert "no filesystem check" in text
+        assert "no filesystem scan" in text
+        assert "no asset existence check" in text
+        assert "final png/svg assets may be provided later" in text
         assert "not a health check" in text
         assert "not dynamic discovery" in text
         assert "no business data read" in text

@@ -92,6 +92,7 @@ def test_frontend_app_manifest_response_shape_and_deterministic_order() -> None:
     assert body["frontend_metadata_endpoints"][0] == "/api/imperium/home/bootstrap"
     assert body["frontend_metadata_endpoints"][-1] == "/api/imperium/frontend/app-manifest"
     assert "/api/imperium/frontend/static-copy" not in body["frontend_metadata_endpoints"]
+    assert body["frontend_metadata_endpoints"].index("/api/imperium/frontend/asset-registry") == 9
 
 
 def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -> None:
@@ -121,6 +122,8 @@ def test_frontend_app_manifest_has_no_user_or_secret_provider_infra_metadata() -
     assert "runtime audit" not in payload_text
     assert "feature flag" not in payload_text
     assert "personalization" not in payload_text
+    assert "filesystem scan" not in payload_text
+    assert "asset existence check" not in payload_text
 
 
 def test_frontend_app_manifest_contains_no_business_payload_keys() -> None:
@@ -176,3 +179,4 @@ def test_frontend_app_manifest_docs_metadata_only_static_v1_not_discovery_not_he
         assert "not a health check" in text
         assert "no business data read" in text
         assert "no secrets/providers/infra metadata" in text
+        assert "/api/imperium/frontend/asset-registry" in text
