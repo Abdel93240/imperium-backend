@@ -168,11 +168,11 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                     },
                 ],
             },
-            {
-                "name": "pulse",
-                "endpoints": [
-                    {
-                        "method": "GET",
+                {
+                    "name": "pulse",
+                    "endpoints": [
+                        {
+                            "method": "GET",
                         "path": "/api/imperium/pulse/today",
                         "purpose": "Read Pulse today entry.",
                         "read_only": True,
@@ -191,12 +191,52 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                         "purpose": "Create Pulse daily entry.",
                         "read_only": False,
                         "idempotency_key_required": True,
-                    },
-                ],
-            },
-        ],
-        "safe_explanation": "Frontend API contract index metadata.",
-    }
+                        },
+                    ],
+                },
+                {
+                    "name": "frontend",
+                    "endpoints": [
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/navigation",
+                            "purpose": "Frontend navigation metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/layout",
+                            "purpose": "Frontend layout metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/theme-tokens",
+                            "purpose": "Frontend theme token metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/empty-states",
+                            "purpose": "Frontend empty state metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                        {
+                            "method": "GET",
+                            "path": "/api/imperium/frontend/actions",
+                            "purpose": "Frontend action metadata.",
+                            "read_only": True,
+                            "idempotency_key_required": False,
+                        },
+                    ],
+                },
+            ],
+            "safe_explanation": "Frontend API contract index metadata.",
+        }
 
 
 def test_contracts_index_read_only_no_db_write_and_no_sensitive_metadata() -> None:
@@ -254,4 +294,4 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
     response = _client(FakeDb(), _user()).get("/api/imperium/contracts/index")
     assert response.status_code == 200
     group_names = [group["name"] for group in response.json()["groups"]]
-    assert group_names == ["home", "dashboard", "daily_plan", "mission", "vault", "path", "pulse"]
+    assert group_names == ["home", "dashboard", "daily_plan", "mission", "vault", "path", "pulse", "frontend"]

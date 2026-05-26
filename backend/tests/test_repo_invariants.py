@@ -3192,3 +3192,75 @@ def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -
         assert "no destructive action" in docs_text
         assert "no mutation/destructive action" in docs_text
         assert "not permissions/feature flags" in docs_text
+
+
+def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_not_call_business_layers() -> None:
+    home_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "home.py").read_text(encoding="utf-8")
+    contracts_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "contracts.py").read_text(encoding="utf-8")
+    frontend_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(encoding="utf-8")
+    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
+    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
+
+    for service_text in (home_service, contracts_service, frontend_service):
+        lowered = service_text.lower()
+        forbidden_terms = (
+            "db.add(",
+            "db.flush",
+            "db.commit",
+            "db.query",
+            "session.execute",
+            "select(",
+            "fastapi.openapi",
+            "runtime audit",
+            "dynamic discovery",
+            "health check",
+            "n8n",
+            "ocr",
+            "scoring",
+            "coaching",
+            "recommendation",
+            "openai",
+            "anthropic",
+            "gemini",
+            "claude",
+            "provider",
+            "secret",
+            "infra",
+            "user_id",
+        )
+        if service_text is contracts_service:
+            forbidden_terms = tuple(term for term in forbidden_terms if term not in {"health check"})
+        for forbidden in forbidden_terms:
+            assert forbidden not in lowered
+
+    for forbidden in (
+        "services.imperium.missions",
+        "services.imperium.vault",
+        "services.path",
+        "services.pulse",
+        "services.imperium.dashboard",
+        "services.imperium.daily_plan",
+    ):
+        assert forbidden not in home_service.lower()
+        assert forbidden not in contracts_service.lower()
+        assert forbidden not in frontend_service.lower()
+
+    assert "get_home_bootstrap_metadata" in home_service
+    assert "get_imperium_contracts_index_metadata" in contracts_service
+    assert "get_imperium_contracts_compliance_metadata" in contracts_service
+    assert "get_imperium_frontend_navigation_metadata" in frontend_service
+    assert "get_imperium_frontend_layout_metadata" in frontend_service
+    assert "get_imperium_frontend_theme_tokens_metadata" in frontend_service
+    assert "get_imperium_frontend_empty_states_metadata" in frontend_service
+    assert "get_imperium_frontend_actions_metadata" in frontend_service
+
+    for docs_text in (docs_contracts, docs_schema):
+        assert "frontend metadata layer v3" in docs_text
+        assert "metadata only" in docs_text
+        assert "no business data read" in docs_text
+        assert "not health check" in docs_text
+        assert "not openapi" in docs_text
+        assert "not dynamic discovery" in docs_text
+        assert "not runtime audit" in docs_text
+        assert "no action triggered" in docs_text
+        assert "no cross-module write" in docs_text

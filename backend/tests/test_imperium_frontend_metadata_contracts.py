@@ -46,6 +46,7 @@ def test_frontend_metadata_contract_endpoints_are_registered_get_only_and_jwt_sc
         "/api/imperium/frontend/layout",
         "/api/imperium/frontend/theme-tokens",
         "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
     ):
         response = client.get(path)
         assert response.status_code == 200
@@ -67,6 +68,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
             "/api/imperium/frontend/layout",
             "/api/imperium/frontend/theme-tokens",
             "/api/imperium/frontend/empty-states",
+            "/api/imperium/frontend/actions",
         )
     }
 
@@ -87,7 +89,7 @@ def test_frontend_metadata_contracts_are_metadata_only_read_only_and_do_not_writ
         assert "coaching" not in payload_text
         assert "recommendation" not in payload_text
         assert "dynamic discovery" not in payload_text
-
+        assert "runtime audit" not in payload_text
         if path != "/api/imperium/contracts/compliance":
             assert "openapi" not in payload_text
             assert "health check" not in payload_text
@@ -103,6 +105,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     layout = client.get("/api/imperium/frontend/layout").json()
     theme_tokens = client.get("/api/imperium/frontend/theme-tokens").json()
     empty_states = client.get("/api/imperium/frontend/empty-states").json()
+    actions = client.get("/api/imperium/frontend/actions").json()
 
     assert [module["name"] for module in home["modules"]] == [
         "dashboard",
@@ -120,6 +123,7 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "vault",
         "path",
         "pulse",
+        "frontend",
     ]
     assert [check["status"] for check in compliance["checks"]] == ["declared"] * 5
     assert [item["key"] for item in navigation["items"]] == [
@@ -131,10 +135,38 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "path",
         "pulse",
     ]
+    assert [group["name"] for group in contracts_index["groups"] if group["name"] == "frontend"] == ["frontend"]
+    assert [check["key"] for check in compliance["checks"]] == [
+        "metadata_only",
+        "not_openapi",
+        "not_health_check",
+        "no_business_data_read",
+        "no_dynamic_discovery",
+    ]
 
     assert all(module["status"] == "available" for module in home["modules"])
+    assert all(module["primary_endpoint"].startswith("/api/imperium/") for module in home["modules"])
+    frontend_contract_paths = {
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+    }
+    assert all(
+        endpoint["method"] == "GET"
+        for group in contracts_index["groups"]
+        for endpoint in group["endpoints"]
+        if endpoint["path"] in frontend_contract_paths
+    )
     assert all(endpoint["method"] in {"GET", "POST"} for group in contracts_index["groups"] for endpoint in group["endpoints"])
     assert all(endpoint["read_only"] is True or endpoint["read_only"] is False for group in contracts_index["groups"] for endpoint in group["endpoints"])
+    assert all(
+        endpoint["idempotency_key_required"] is False
+        for group in contracts_index["groups"]
+        for endpoint in group["endpoints"]
+        if endpoint["path"] in frontend_contract_paths
+    )
     assert all(check["status"] == "declared" for check in compliance["checks"])
     assert all(item["enabled"] is True for item in navigation["items"])
     assert [region["key"] for region in layout["regions"]] == ["hero", "mission", "daily_plan", "path", "pulse", "vault"]
@@ -148,6 +180,16 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "no_path_habits",
         "no_pulse_entry",
     ]
+    assert [item["key"] for item in actions["items"]] == [
+        "open_missions",
+        "open_vault",
+        "open_path",
+        "open_pulse",
+        "open_daily_plan",
+        "open_dashboard",
+    ]
+    assert all(item["action_type"] == "navigate" for item in actions["items"])
+    assert all(item["requires_confirmation"] is False for item in actions["items"])
 
     for item in empty_states["items"]:
         assert set(item) == {
@@ -163,6 +205,10 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     assert empty_states["empty_states_version"] == "v1"
     assert empty_states["read_only"] is True
     assert empty_states["safe_explanation"] == "Frontend empty state metadata for Imperium V1."
+    assert actions["actions_version"] == "v1"
+    assert actions["read_only"] is True
+    assert actions["safe_explanation"] == "Frontend action registry metadata for Imperium V1."
+    assert set(actions) == {"actions_version", "read_only", "items", "safe_explanation"}
     payload_text = str(empty_states).lower()
     for forbidden in (
         "user_id",
@@ -178,8 +224,25 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
         "n8n",
         "ocr",
         "scoring",
+        "action triggered",
     ):
         assert forbidden not in payload_text
+    actions_text = str(actions).lower()
+    for forbidden in (
+        "user_id",
+        "secret",
+        "provider",
+        "infra",
+        "openapi",
+        "health",
+        "business data",
+        "recommendation",
+        "coaching",
+        "n8n",
+        "ocr",
+        "scoring",
+    ):
+        assert forbidden not in actions_text
 
 
 def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_runtime_behavior() -> None:
@@ -188,11 +251,25 @@ def test_frontend_metadata_contract_docs_explicitly_state_metadata_only_and_non_
     contracts_docs = (docs_root / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
     schema_docs = (docs_root / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
 
+    expected_paths = (
+        "/api/imperium/home/bootstrap",
+        "/api/imperium/contracts/index",
+        "/api/imperium/contracts/compliance",
+        "/api/imperium/frontend/navigation",
+        "/api/imperium/frontend/layout",
+        "/api/imperium/frontend/theme-tokens",
+        "/api/imperium/frontend/empty-states",
+        "/api/imperium/frontend/actions",
+    )
     for text in (contracts_docs, schema_docs):
-        assert "frontend metadata layer" in text
+        assert "frontend metadata layer v3" in text
         assert "metadata only" in text
+        assert "no business data read" in text
         assert "not a health check" in text
         assert "not openapi" in text
         assert "not dynamic discovery" in text
-        assert "no business data read" in text
-        assert "no secrets/providers/infra metadata" in text
+        assert "no action triggered" in text
+        assert "jwt-scoped" in text
+        assert "idempotency-key not required" in text
+        for path in expected_paths:
+            assert path in text

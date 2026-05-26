@@ -147,6 +147,46 @@ CONTRACT_INDEX_GROUPS: tuple[ContractIndexGroup, ...] = (
             ),
         ],
     ),
+    ContractIndexGroup(
+        name="frontend",
+        endpoints=[
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/navigation",
+                purpose="Frontend navigation metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/layout",
+                purpose="Frontend layout metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/theme-tokens",
+                purpose="Frontend theme token metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/empty-states",
+                purpose="Frontend empty state metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
+            ContractIndexEndpoint(
+                method="GET",
+                path="/api/imperium/frontend/actions",
+                purpose="Frontend action metadata.",
+                read_only=True,
+                idempotency_key_required=False,
+            ),
+        ],
+    ),
 )
 
 COMPLIANCE_CHECKS: tuple[ImperiumContractsComplianceCheck, ...] = (
