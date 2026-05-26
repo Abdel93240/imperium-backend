@@ -215,6 +215,9 @@ Rules:
 - no `Idempotency-Key` required
 - metadata only
 - static action registry metadata
+- static deterministic V1
+- declarative navigation actions only
+- no action triggered
 - no business data read
 - no writes
 - no auto-creation
@@ -235,6 +238,18 @@ Rules:
 - no POST
 - no permissions dynamic
 - no feature flags runtime
+- not permissions/feature flags
+- not health check
+- not dynamic discovery
+- no business data read
+- no mutation/destructive action
+- no cross-module writes
+- no AI
+- no n8n
+- no OCR
+- no scoring
+- no coaching
+- no recommendations
 - this is the canonical V1 contract for static UI action metadata
 
 Response shape (full):

@@ -178,13 +178,18 @@ Frontend empty-states canonical contract note:
 - response shape is exactly: `actions_version`, `read_only`, `items`, `safe_explanation`
 - `items` deterministic order is exactly: `open_missions`, `open_vault`, `open_path`, `open_pulse`, `open_daily_plan`, `open_dashboard`
 - each `items[]` object has exactly: `key`, `label`, `module`, `action_type`, `route`, `requires_confirmation`
+- static deterministic V1
 - static UI action declarations only; metadata only
+- declarative navigation actions only
 - no business data read and no action triggered
-- navigation only in 19A
 - not personalized recommendation, not coaching, not AI decision, not a health check
-- no dynamic discovery, no cross-module writes
+- not permissions/feature flags
+- not dynamic discovery
+- no cross-module writes
 - no destructive action
 - no mutation action
+- no mutation/destructive action
+- no AI, n8n, OCR, scoring, coaching, or recommendations
 - legacy `static-actions` remains removed, not active, and not canonical
 - `GET /api/imperium/frontend/empty-states` is the canonical V1 contract for empty-states metadata
 - response shape is exactly: `empty_states_version`, `read_only`, `items`, `safe_explanation`

@@ -3127,7 +3127,6 @@ def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -
     service_text = service_path.read_text(encoding="utf-8")
     service_lower = service_text.lower()
     schema_text = schema_path.read_text(encoding="utf-8")
-    schema_lower = schema_text.lower()
 
     assert '@router.get("/frontend/actions"' in route_text
     assert "CurrentUserDep" in route_text
@@ -3185,9 +3184,11 @@ def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -
         assert "/api/imperium/frontend/actions" in docs_text
         assert "metadata only" in docs_text
         assert "static ui action metadata" in docs_text
-        assert "navigation only in 19a" in docs_text
+        assert "static deterministic v1" in docs_text
+        assert "declarative navigation actions only" in docs_text
         assert "not a health check" in docs_text
-        assert "not a dynamic discovery" in docs_text
+        assert "not dynamic discovery" in docs_text or "not a dynamic discovery" in docs_text
         assert "no action triggered" in docs_text
         assert "no destructive action" in docs_text
-        assert "no mutation action" in docs_text
+        assert "no mutation/destructive action" in docs_text
+        assert "not permissions/feature flags" in docs_text

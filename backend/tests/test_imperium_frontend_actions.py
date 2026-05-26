@@ -60,6 +60,15 @@ def test_frontend_actions_response_shape_and_deterministic_order() -> None:
     assert body["actions_version"] == "v1"
     assert body["read_only"] is True
     assert body["safe_explanation"] == "Frontend action registry metadata for Imperium V1."
+    assert len(body["items"]) == 6
+    assert [item["key"] for item in body["items"]] == [
+        "open_missions",
+        "open_vault",
+        "open_path",
+        "open_pulse",
+        "open_daily_plan",
+        "open_dashboard",
+    ]
 
     expected = [
         ("open_missions", "Open missions", "mission", "navigate", "/missions", False),
@@ -151,8 +160,13 @@ def test_frontend_actions_docs_metadata_only_static_v1_not_health_not_discovery(
         assert "/api/imperium/frontend/actions" in text
         assert "metadata only" in text
         assert "static ui action metadata" in text
-        assert "navigation only in 19a" in text
+        assert "static deterministic v1" in text
+        assert "declarative navigation actions only" in text
         assert "not a health check" in text
-        assert "not a dynamic discovery" in text
+        assert "not dynamic discovery" in text or "not a dynamic discovery" in text
         assert "no business data read" in text
         assert "no action triggered" in text
+        assert "not permissions/feature flags" in text
+        assert "no mutation/destructive action" in text
+        assert "no cross-module writes" in text
+        assert "no ai, n8n, ocr, scoring, coaching, or recommendations" in text
