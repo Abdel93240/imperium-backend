@@ -1784,6 +1784,46 @@ def test_patch_23d_imperium_events_db_constraints_hardening_remains_stable() -> 
     assert "index user/event_type/occurred_at desc" in docs05_text.lower()
 
 
+def test_patch_24e_1_imperium_events_contract_clarity_remains_documented_and_read_only() -> None:
+    docs04_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
+    docs05_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260526_0029_imperium_events_foundation.py"
+    service_root = BACKEND_ROOT / "app" / "services"
+
+    docs04_text = docs04_path.read_text(encoding="utf-8")
+    docs05_text = docs05_path.read_text(encoding="utf-8")
+    migration_text = migration_path.read_text(encoding="utf-8")
+
+    for docs_text in (docs04_text, docs05_text):
+        lowered = docs_text.lower()
+        assert "`updated_at` exists for basemodel compatibility only" in lowered
+        assert "events v1 keep `updated_at == created_at`" in lowered
+        assert "no runtime update is allowed" in lowered
+        assert "count = page_count = len(items)" in lowered
+        assert "not a total_count" in lowered or "does not expose a total_count" in lowered
+        assert "app/services/imperium/event_readers.py" in lowered
+        assert "limit + 1" in lowered
+        assert "has_more" in lowered
+        assert "next_offset" in lowered
+
+    assert 'revision: str = "20260526_0029"' in migration_text
+    assert 'down_revision: str | None = "20260525_0028"' in migration_text
+    assert 'depends_on: str | Sequence[str] | None = "20260426_0003"' in migration_text
+
+    allowed_service_paths = {
+        BACKEND_ROOT / "app" / "services" / "imperium" / "events.py",
+        BACKEND_ROOT / "app" / "services" / "imperium" / "event_readers.py",
+    }
+    offending_service_files: list[str] = []
+    for path in service_root.rglob("*.py"):
+        if path in allowed_service_paths:
+            continue
+        if "select(ImperiumEvent)" in path.read_text(encoding="utf-8"):
+            offending_service_files.append(str(path.relative_to(BACKEND_ROOT)))
+
+    assert offending_service_files == []
+
+
 def test_alembic_heads_are_unique() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "heads"],

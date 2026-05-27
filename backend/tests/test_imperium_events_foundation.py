@@ -232,8 +232,11 @@ def test_get_imperium_events_does_not_require_idempotency_key() -> None:
     response = _client(db, current_user).get("/api/imperium/events")
 
     assert response.status_code == 200
-    assert response.json()["count"] == 1
-    assert response.json()["items"][0]["id"] == str(event.id)
+    body = response.json()
+    assert body["count"] == len(body["items"])
+    assert "total_count" not in body
+    assert body["items"][0]["id"] == str(event.id)
+    assert body["items"][0]["created_at"] == body["items"][0]["updated_at"]
 
 
 def test_list_imperium_events_is_user_scoped() -> None:
@@ -250,6 +253,7 @@ def test_list_imperium_events_is_user_scoped() -> None:
     assert body["limit"] == 1
     assert body["offset"] == 0
     assert body["items"][0]["id"] == str(event.id)
+    assert body["items"][0]["created_at"] == body["items"][0]["updated_at"]
     _assert_no_user_id(body)
     query_text = str(db.queries[-1])
     assert "imperium_events.user_id" in query_text

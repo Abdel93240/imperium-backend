@@ -646,6 +646,9 @@ route owner canonique
 Event Foundation 23A / 23B / 23C
 append-only
 user-scoped
+`updated_at` exists for BaseModel compatibility only
+Events V1 keep `updated_at == created_at`
+no runtime UPDATE is allowed
 Idempotency-Key required on POST
 read-only GETs
 DB constraints aligned with Pydantic
@@ -668,6 +671,10 @@ GET detail returns current-user event only
 no PUT/PATCH/DELETE
 POST is idempotent
 GET list and detail do not require Idempotency-Key
+GET /api/imperium/events returns `count = page_count = len(items)`
+`count` is not a total_count
+future internal consumers should prefer `app/services/imperium/event_readers.py`
+the internal reader uses `limit + 1`, `has_more`, and `next_offset`
 source_module allowed values:
 mission
 vault
@@ -731,6 +738,9 @@ The returned page contains at most `limit` items.
 `has_more` is true when the extra row exists.
 `next_offset` is `offset + limit` when `has_more` is true.
 `next_offset` is null when the page is final.
+`count` in the public route is only the returned page size.
+It is not a total_count.
+Future internal consumers should read imperium_events through `app/services/imperium/event_readers.py`.
 
 Runtime constraints:
 read-only

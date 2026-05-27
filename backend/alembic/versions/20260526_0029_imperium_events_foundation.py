@@ -15,7 +15,7 @@ from sqlalchemy.dialects import postgresql
 revision: str = "20260526_0029"
 down_revision: str | None = "20260525_0028"
 branch_labels: str | Sequence[str] | None = None
-depends_on: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = "20260426_0003"
 
 
 def upgrade() -> None:

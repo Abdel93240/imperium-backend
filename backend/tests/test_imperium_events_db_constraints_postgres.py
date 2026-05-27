@@ -168,6 +168,18 @@ def test_imperium_events_accept_payload_json_object(engine) -> None:
     assert event_id
 
 
+def test_imperium_events_keep_created_at_and_updated_at_in_sync_on_insert(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        event_id = _insert_imperium_event(conn, user_id=user_id)
+        row = conn.execute(
+            text("SELECT created_at, updated_at FROM imperium_events WHERE id = :id"),
+            {"id": event_id},
+        ).one()
+
+    assert row.created_at == row.updated_at
+
+
 def test_imperium_events_reject_duplicate_idempotency_key_for_same_user(engine) -> None:
     with pytest.raises(Exception) as excinfo:
         with engine.begin() as conn:

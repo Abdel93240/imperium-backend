@@ -379,6 +379,9 @@ route owner canonique
 `app/api/v1/routes/imperium_events.py`
 append-only
 user-scoped
+`updated_at` exists for BaseModel compatibility only
+Events V1 keep `updated_at == created_at`
+no runtime UPDATE is allowed
 Idempotency-Key required on POST
 read-only GETs
 strict CurrentUserDep
@@ -426,3 +429,6 @@ Path consistency
 Pulse tracking
 Vector analytics
 Weekly Review
+Internal backend readers must use `app/services/imperium/event_readers.py`.
+The public list route returns `count = page_count = len(items)` and does not expose a total_count.
+The internal reader uses `limit + 1`, `has_more`, and `next_offset`.
