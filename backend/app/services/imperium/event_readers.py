@@ -24,6 +24,7 @@ class EventReadFilters:
     def __post_init__(self) -> None:
         if self.user_id is None:
             raise ValueError("user_id is required to read Imperium events.")
+        _validate_occurred_range(self.occurred_from, self.occurred_to)
         object.__setattr__(self, "limit", _validate_limit(self.limit))
         object.__setattr__(self, "offset", _validate_offset(self.offset))
 
@@ -111,3 +112,8 @@ def _validate_offset(offset: int) -> int:
     if offset < 0:
         raise ValueError("offset must be greater than or equal to 0.")
     return offset
+
+
+def _validate_occurred_range(occurred_from: datetime | None, occurred_to: datetime | None) -> None:
+    if occurred_from is not None and occurred_to is not None and occurred_from > occurred_to:
+        raise ValueError("occurred_from must be less than or equal to occurred_to.")

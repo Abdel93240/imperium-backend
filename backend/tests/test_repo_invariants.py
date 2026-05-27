@@ -1,3 +1,4 @@
+import ast
 import json
 import subprocess
 import sys
@@ -62,6 +63,39 @@ def _python_files_under(*relative_roots: str) -> list[Path]:
     for relative_root in relative_roots:
         files.extend((BACKEND_ROOT / relative_root).rglob("*.py"))
     return files
+
+
+def _call_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _references_imperium_event(node: ast.AST) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id == "ImperiumEvent"
+    if isinstance(node, ast.Attribute) and node.attr == "ImperiumEvent":
+        return True
+    return any(_references_imperium_event(child) for child in ast.iter_child_nodes(node))
+
+
+def _imperium_event_read_patterns(path: Path) -> list[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+    offenders: list[str] = []
+    direct_read_call_names = {"select", "query", "select_from"}
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        call_name = _call_name(node.func)
+        if call_name not in direct_read_call_names:
+            continue
+        if any(_references_imperium_event(arg) for arg in node.args):
+            offenders.append(f"{path.relative_to(BACKEND_ROOT)}:{node.lineno} {call_name}(ImperiumEvent)")
+
+    return offenders
 
 
 def test_no_plaintext_internal_secret_header_reference_in_backend_python() -> None:
@@ -1806,6 +1840,13 @@ def test_patch_24e_1_imperium_events_contract_clarity_remains_documented_and_rea
         assert "has_more" in lowered
         assert "next_offset" in lowered
 
+    assert "canonical imperium event read path" in docs04_text.lower()
+    assert "all future internal consumers must use" in docs04_text.lower()
+    assert "direct `imperiumevent` reads are forbidden outside approved services" in docs04_text.lower()
+    assert "deterministic ordering" in docs04_text.lower()
+    assert "centralized validation" in docs04_text.lower()
+    assert "append-only guarantees" in docs04_text.lower()
+
     assert 'revision: str = "20260526_0029"' in migration_text
     assert 'down_revision: str | None = "20260525_0028"' in migration_text
     assert 'depends_on: str | Sequence[str] | None = "20260426_0003"' in migration_text
@@ -1822,6 +1863,21 @@ def test_patch_24e_1_imperium_events_contract_clarity_remains_documented_and_rea
             offending_service_files.append(str(path.relative_to(BACKEND_ROOT)))
 
     assert offending_service_files == []
+
+
+def test_imperium_event_direct_reads_stay_on_canonical_reader_paths() -> None:
+    allowed_paths = {
+        BACKEND_ROOT / "app" / "services" / "imperium" / "event_readers.py",
+        BACKEND_ROOT / "app" / "services" / "imperium" / "events.py",
+    }
+    offenders: list[str] = []
+
+    for path in (BACKEND_ROOT / "app").rglob("*.py"):
+        if path in allowed_paths:
+            continue
+        offenders.extend(_imperium_event_read_patterns(path))
+
+    assert offenders == []
 
 
 def test_alembic_heads_are_unique() -> None:

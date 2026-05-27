@@ -91,6 +91,64 @@ def test_event_read_filters_rejects_negative_offset() -> None:
         EventReadFilters(user_id=uuid4(), offset=-1)
 
 
+def test_event_read_filters_accepts_valid_occurred_range() -> None:
+    occurred_from = datetime(2026, 5, 26, 8, 40, tzinfo=UTC)
+    occurred_to = datetime(2026, 5, 26, 9, 0, tzinfo=UTC)
+
+    filters = EventReadFilters(
+        user_id=uuid4(),
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+    assert filters.occurred_from == occurred_from
+    assert filters.occurred_to == occurred_to
+
+
+def test_event_read_filters_accepts_equal_occurred_range() -> None:
+    occurred_at = datetime(2026, 5, 26, 9, 0, tzinfo=UTC)
+
+    filters = EventReadFilters(
+        user_id=uuid4(),
+        occurred_from=occurred_at,
+        occurred_to=occurred_at,
+    )
+
+    assert filters.occurred_from == occurred_at
+    assert filters.occurred_to == occurred_at
+
+
+def test_event_read_filters_rejects_inverted_occurred_range() -> None:
+    occurred_from = datetime(2026, 5, 26, 9, 1, tzinfo=UTC)
+    occurred_to = datetime(2026, 5, 26, 9, 0, tzinfo=UTC)
+
+    with pytest.raises(ValueError, match="occurred_from must be less than or equal to occurred_to"):
+        EventReadFilters(
+            user_id=uuid4(),
+            occurred_from=occurred_from,
+            occurred_to=occurred_to,
+        )
+
+
+@pytest.mark.parametrize(
+    ("occurred_from", "occurred_to"),
+    [
+        (None, None),
+        (datetime(2026, 5, 26, 8, 40, tzinfo=UTC), None),
+        (None, datetime(2026, 5, 26, 9, 0, tzinfo=UTC)),
+    ],
+)
+def test_event_read_filters_accepts_missing_occurred_bounds(occurred_from, occurred_to) -> None:
+    filters = EventReadFilters(
+        user_id=uuid4(),
+        occurred_from=occurred_from,
+        occurred_to=occurred_to,
+    )
+
+    assert filters.occurred_from == occurred_from
+    assert filters.occurred_to == occurred_to
+
+
 def test_list_events_for_user_is_always_scoped_to_user_id() -> None:
     user_id = uuid4()
     event = _event(user_id)

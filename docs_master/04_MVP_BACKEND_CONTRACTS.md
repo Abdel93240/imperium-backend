@@ -709,6 +709,22 @@ Compatibility function:
 `list_events_for_user(...)`
 delegates to the modern `read_imperium_events` contract and returns only `EventReadPage.items`.
 
+### Canonical Imperium Event Read Path
+
+All future internal consumers MUST use:
+`app/services/imperium/event_readers.py`
+
+Direct `ImperiumEvent` reads are forbidden outside approved services:
+`app/services/imperium/event_readers.py`
+`app/services/imperium/events.py`
+
+Motivation:
+deterministic ordering
+future consistency
+pagination semantics
+centralized validation
+append-only guarantees
+
 Scope:
 `user_id` is mandatory.
 Every read must be scoped by `imperium_events.user_id`.
