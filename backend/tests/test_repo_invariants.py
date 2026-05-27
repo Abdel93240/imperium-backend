@@ -1880,6 +1880,25 @@ def test_imperium_event_direct_reads_stay_on_canonical_reader_paths() -> None:
     assert offenders == []
 
 
+def test_imperium_events_public_list_uses_canonical_reader_contract() -> None:
+    service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "events.py"
+    service_text = service_path.read_text(encoding="utf-8")
+    list_section = service_text.split("def list_imperium_events(", maxsplit=1)[1].split(
+        "def get_imperium_event(",
+        maxsplit=1,
+    )[0]
+
+    assert "from app.services.imperium.event_readers import EventReadFilters, read_imperium_events" in service_text
+    assert "read_imperium_events(" in list_section
+    assert "EventReadFilters(" in list_section
+    assert "user_id=current_user.id" in list_section
+    assert "select(ImperiumEvent)" not in list_section
+    assert ".query(ImperiumEvent)" not in list_section
+    assert "db.scalar(" not in list_section
+    assert "db.add(" not in list_section
+    assert "db.commit(" not in list_section
+
+
 def test_alembic_heads_are_unique() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "heads"],

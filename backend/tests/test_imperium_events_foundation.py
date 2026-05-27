@@ -239,6 +239,26 @@ def test_get_imperium_events_does_not_require_idempotency_key() -> None:
     assert body["items"][0]["created_at"] == body["items"][0]["updated_at"]
 
 
+def test_get_imperium_events_keeps_public_contract_when_reader_fetches_overflow_row() -> None:
+    current_user = _user()
+    first_event = _event(current_user.id, id=uuid4(), idempotency_key="event-idem-1")
+    overflow_event = _event(current_user.id, id=uuid4(), idempotency_key="event-idem-2")
+    db = FakeDb(scalars_result=[first_event, overflow_event])
+
+    response = _client(db, current_user).get("/api/imperium/events?limit=1&offset=2")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["limit"] == 1
+    assert body["offset"] == 2
+    assert len(body["items"]) == 1
+    assert body["items"][0]["id"] == str(first_event.id)
+    assert "has_more" not in body
+    assert "next_offset" not in body
+    assert "total_count" not in body
+
+
 def test_list_imperium_events_is_user_scoped() -> None:
     current_user = _user()
     event = _event(current_user.id, event_type="mission_started", source_module="mission")

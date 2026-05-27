@@ -14,6 +14,7 @@ from app.schemas.events import (
     ImperiumEventListResponse,
     ImperiumEventWriteResponse,
 )
+from app.services.imperium.event_readers import EventReadFilters, read_imperium_events
 
 IMPERIUM_EVENTS_SAFE_EXPLANATION = "Imperium events for current user."
 
@@ -85,34 +86,24 @@ def list_imperium_events(
     occurred_from: datetime | None = None,
     occurred_to: datetime | None = None,
 ) -> ImperiumEventListResponse:
-    query = select(ImperiumEvent).where(ImperiumEvent.user_id == current_user.id)
-
-    if event_type is not None:
-        query = query.where(ImperiumEvent.event_type == event_type)
-    if source_module is not None:
-        query = query.where(ImperiumEvent.source_module == source_module)
-    if occurred_from is not None:
-        query = query.where(ImperiumEvent.occurred_at >= occurred_from)
-    if occurred_to is not None:
-        query = query.where(ImperiumEvent.occurred_at <= occurred_to)
-
-    items = list(
-        db.scalars(
-            query.order_by(
-                ImperiumEvent.occurred_at.desc(),
-                ImperiumEvent.created_at.desc(),
-                ImperiumEvent.id.desc(),
-            )
-            .limit(limit)
-            .offset(offset)
-        )
+    page = read_imperium_events(
+        db,
+        EventReadFilters(
+            user_id=current_user.id,
+            event_type=event_type,
+            source_module=source_module,
+            occurred_from=occurred_from,
+            occurred_to=occurred_to,
+            limit=limit,
+            offset=offset,
+        ),
     )
 
     return ImperiumEventListResponse(
-        items=[EventRead.model_validate(item) for item in items],
-        count=len(items),
-        limit=limit,
-        offset=offset,
+        items=[EventRead.model_validate(item) for item in page.items],
+        count=len(page.items),
+        limit=page.limit,
+        offset=page.offset,
     )
 
 
