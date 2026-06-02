@@ -8,6 +8,7 @@ DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 DESIGN_SYSTEM_TOKENS_KT_PATH = DOCS_ROOT / "60_DESIGN_SYSTEM_TOKENS_KT.md"
 DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH = DOCS_ROOT / "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md"
 DESIGN_SYSTEM_COMPONENT_CATALOG_PATH = DOCS_ROOT / "62_DESIGN_SYSTEM_COMPONENT_CATALOG.md"
+FRONTEND_ARCHITECTURE_PATH = DOCS_ROOT / "63_FRONTEND_ARCHITECTURE_V1.md"
 APP_ROOT = BACKEND_ROOT / "app"
 
 IMPERIUM_ROUTE_PREFIXES = {
@@ -76,6 +77,10 @@ def _design_system_composite_components_text() -> str:
 
 def _design_system_component_catalog_text() -> str:
     return DESIGN_SYSTEM_COMPONENT_CATALOG_PATH.read_text(encoding="utf-8")
+
+
+def _frontend_architecture_text() -> str:
+    return FRONTEND_ARCHITECTURE_PATH.read_text(encoding="utf-8")
 
 
 def _numbered_heading_lines(text: str) -> list[str]:
@@ -645,6 +650,142 @@ def test_app_specific_composed_patterns_are_not_in_foundation() -> None:
     assert "### 14.15 Vector-specific composed patterns" in text
     assert "### 15.17 Pulse-specific composed patterns" in text
     assert "### 16.14 Path-specific composed patterns" in text
+
+
+def test_frontend_architecture_63_exists_references_design_docs_and_has_all_sections() -> None:
+    text = _frontend_architecture_text()
+
+    assert FRONTEND_ARCHITECTURE_PATH.exists()
+
+    for source_doc in (
+        "59_DESIGN_SYSTEM_V1_DRAFT.md",
+        "60_DESIGN_SYSTEM_TOKENS_KT.md",
+        "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md",
+        "62_DESIGN_SYSTEM_COMPONENT_CATALOG.md",
+    ):
+        assert source_doc in text
+
+    expected_headings = [
+        "## 1. Principes",
+        "## 2. Repository Structure",
+        "## 3. Design System Integration",
+        "## 4. Navigation Architecture",
+        "## 5. State Management",
+        "## 6. Network Layer",
+        "## 7. Local Cache",
+        "## 8. Sync Layer",
+        "## 9. Feature Modules",
+        "## 10. Widgets",
+        "## 11. Tablet Strategy",
+        "## 12. Offline Strategy",
+        "## 13. Security",
+        "## 14. Performance",
+        "## 15. Non Goals",
+        "## 16. Frontend Generation Readiness",
+    ]
+
+    positions = [text.index(heading) for heading in expected_headings]
+    assert positions == sorted(positions)
+
+
+def test_frontend_architecture_63_declares_feature_modules_tablet_and_sync_states() -> None:
+    text = _frontend_architecture_text()
+    structure = _top_level_section(text, 2)
+    features = _top_level_section(text, 9)
+    sync = _top_level_section(text, 8)
+    tablet = _top_level_section(text, 11)
+
+    for feature_module in (
+        "feature_imperium/",
+        "feature_vault/",
+        "feature_vector/",
+        "feature_pulse/",
+        "feature_path/",
+    ):
+        assert feature_module in structure
+        assert feature_module.rstrip("/") in features
+
+    for sync_state in ("pending", "syncing", "synced", "failed", "conflict", "cached", "stale"):
+        assert f"`{sync_state}`" in sync
+
+    for required in (
+        "Galaxy Tab S10 Ultra",
+        "Sidebar | Content | Context Panel",
+        "240dp",
+        "max 1280dp",
+        "320-480dp",
+        "Téléphone",
+    ):
+        assert required in tablet
+
+
+def test_frontend_architecture_63_defines_security_performance_and_non_goals() -> None:
+    text = _frontend_architecture_text()
+    security = _top_level_section(text, 13)
+    performance = _top_level_section(text, 14)
+    non_goals = _top_level_section(text, 15)
+
+    for required in (
+        "JWT",
+        "Secure storage",
+        "Encrypted preferences",
+        "No secrets in UI",
+        "Android Keystore",
+        "aucune API key Gemini, OpenAI, Claude, n8n",
+    ):
+        assert required in security
+
+    for required in (
+        "LazyColumn",
+        "Image loading",
+        "Pagination",
+        "Memory rules",
+        "clés stables obligatoires",
+        "pas de liste infinie gardée intégralement en mémoire",
+    ):
+        assert required in performance
+
+    for excluded_surface in (
+        "iOS",
+        "Web",
+        "Desktop",
+        "Compose Multiplatform",
+        "Wear OS",
+        "Android Auto",
+        "OCR runtime V1",
+        "AI runtime local frontend",
+    ):
+        assert excluded_surface in non_goals
+
+    for forbidden_artifact in ("android/", "frontend/", "fichier Kotlin"):
+        assert forbidden_artifact in non_goals
+
+
+def test_frontend_architecture_63_declares_ready_for_compose_scaffold_gate() -> None:
+    readiness = _top_level_section(_frontend_architecture_text(), 16)
+
+    assert "READY_FOR_COMPOSE_SCAFFOLD = YES" in readiness
+
+    for condition in (
+        "DS canonique",
+        "Tokens",
+        "Components",
+        "Composite Components",
+        "Screen Architecture",
+    ):
+        assert condition in readiness
+
+    for source_doc in (
+        "docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md",
+        "docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md",
+        "docs_master/61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md",
+        "docs_master/62_DESIGN_SYSTEM_COMPONENT_CATALOG.md",
+        "docs_master/63_FRONTEND_ARCHITECTURE_V1.md",
+    ):
+        assert source_doc in readiness
+
+    assert "cinq modules feature V1 seulement" in readiness
+    assert "non goals de la section 15" in readiness
 
 
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:

@@ -1008,6 +1008,166 @@ Non autorisé comme vérité offline :
 - produire sadaqa canonique sans handoff backend ;
 - écrire mémoire long terme.
 
+---
+
+## 13. Security
+
+### 13.1 JWT
+
+JWT frontend V1 :
+
+- le backend émet, valide et révoque les JWT ;
+- le frontend transmet uniquement le bearer token aux endpoints autorisés ;
+- le frontend ne décode jamais un JWT pour prendre une décision métier canonique ;
+- access token court, refresh contrôlé, rotation côté backend ;
+- logout efface token, cache sensible local et write queue sensible ;
+- expiration, issuer, audience et algorithm restent des validations backend ;
+- aucun token n'entre dans `UiState`, previews Compose, analytics, logs, screenshots ou widgets.
+
+### 13.2 Secure storage
+
+Stockage sécurisé Android cible :
+
+- Android Keystore pour les clés locales ;
+- stockage chiffré pour access/refresh tokens ;
+- séparation stricte entre préférences UI non sensibles et secrets ;
+- pas de secret dans Room non chiffré ;
+- pas de secret dans fichier de config livré avec l'app ;
+- aucun token en extra de navigation, deep link, route string ou saved state handle visible.
+
+### 13.3 Encrypted preferences
+
+Préférences chiffrées :
+
+- autorisées pour secrets d'auth, identifiants de session et flags sensibles ;
+- interdites comme source de vérité métier ;
+- nettoyées au logout, à la révocation auth et en cas de corruption ;
+- versionnées par schéma pour migration contrôlée ;
+- jamais utilisées pour stocker audio brut, image brute, OCR brut, note santé sensible ou contenu spirituel sensible si Room/API offre un chemin plus sûr.
+
+### 13.4 No secrets in UI
+
+No secrets in UI :
+
+- aucune API key Gemini, OpenAI, Claude, n8n, backend admin ou service externe dans le frontend ;
+- aucun secret affiché dans Compose, logs, previews, widgets, debug banners ou crash reports ;
+- les screenshots UI ne doivent pas révéler token, cookie, Authorization header, refresh token ou payload sensible ;
+- les erreurs affichées sont redaction-safe ;
+- toute clé nécessaire aux modèles AI reste côté backend ou orchestration n8n.
+
+---
+
+## 14. Performance
+
+### 14.1 LazyColumn
+
+Règles `LazyColumn` :
+
+- listes longues rendues via `LazyColumn` ou `LazyVerticalGrid`, jamais via `Column` scrollée non bornée ;
+- clés stables obligatoires pour missions, transactions, recommandations, repas, workouts, prières et logs ;
+- item content léger, sans calcul métier, parsing lourd ou chargement image synchrone ;
+- sections sticky autorisées uniquement si elles améliorent la lecture ;
+- pas de `LazyColumn` imbriquée non contrainte ;
+- placeholders, empty states et loading rows respectent les composants foundation du document 62.
+
+### 14.2 Image loading
+
+Image loading :
+
+- loader Android dédié type Coil ou équivalent Compose-ready ;
+- dimension cible connue avant chargement ;
+- thumbnails pour listes, image complète seulement en détail ;
+- placeholders et error states explicites ;
+- cache mémoire/disque contrôlé par le loader ;
+- aucune image brute plein format dans `UiState`, ViewModel ou saved state ;
+- uploads image passent par repository et sync layer, pas par composant Compose direct.
+
+### 14.3 Pagination
+
+Pagination :
+
+- pagination backend-driven pour historiques, transactions, recommandations, logs Pulse et listes de mosquées ;
+- curseur ou page token conservé dans repository/cache, pas dans composant visuel ;
+- chargement suivant déclenché par seuil de scroll ;
+- retry visible en pied de liste ;
+- refresh ne duplique pas les items ;
+- Paging 3 autorisé si le backend expose un contrat compatible ;
+- pas de liste infinie gardée intégralement en mémoire.
+
+### 14.4 Memory rules
+
+Memory rules :
+
+- `UiState` contient des IDs, URLs, métadonnées et snapshots légers, pas de blobs lourds ;
+- audio, image, OCR et exports passent par fichiers temporaires contrôlés et repositories ;
+- ViewModels ne conservent pas de contexte Android long-lived ;
+- caches Room bornés par feature et horodatés ;
+- cleanup WorkManager pour uploads terminés ou abandonnés ;
+- widgets lisent des snapshots compacts ;
+- navigation arguments limités aux IDs stables et paramètres courts.
+
+---
+
+## 15. Non Goals
+
+Les surfaces suivantes sont explicitement exclues du frontend V1 :
+
+- iOS ;
+- Web ;
+- Desktop ;
+- Compose Multiplatform ;
+- Wear OS ;
+- Android Auto ;
+- OCR runtime V1 ;
+- AI runtime local frontend.
+
+Conséquences :
+
+- aucun dossier `android/`, `frontend/` ou fichier Kotlin n'est créé par cette documentation ;
+- aucune architecture multiplateforme n'est prévue en V1 ;
+- OCR, vision Gemini, routage AI et modèles locaux restent backend/orchestration ;
+- le frontend Android peut capturer ou uploader, mais il n'exécute pas l'OCR runtime V1 ;
+- Qwen local router/scorer reste côté backend, pas dans le frontend.
+
+---
+
+## 16. Frontend Generation Readiness
+
+### 16.1 Gate
+
+```text
+READY_FOR_COMPOSE_SCAFFOLD = YES
+```
+
+Ce statut signifie : les documents canoniques permettent de générer un scaffold Android Compose futur. Il ne signifie pas qu'un scaffold Android existe déjà dans ce repo.
+
+### 16.2 Conditions
+
+Conditions remplies pour `READY_FOR_COMPOSE_SCAFFOLD` :
+
+| Condition | Source canonique | Statut |
+|---|---|---|
+| DS canonique | `docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md` | OK |
+| Tokens | `docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md` | OK |
+| Components | `docs_master/62_DESIGN_SYSTEM_COMPONENT_CATALOG.md` | OK |
+| Composite Components | `docs_master/61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md` | OK |
+| Screen Architecture | `docs_master/63_FRONTEND_ARCHITECTURE_V1.md` | OK |
+
+### 16.3 Guardrails
+
+Un scaffold Compose futur doit respecter :
+
+- `ImperiumTheme` et tokens des documents 59/60 ;
+- composants foundation du document 62 ;
+- composants composites du document 61 ;
+- architecture repository/navigation/state/sync de ce document ;
+- cinq modules feature V1 seulement ;
+- stratégie tablette Galaxy Tab S10 Ultra + téléphone Android ;
+- sync states `pending|syncing|synced|failed|conflict|cached|stale` ;
+- non goals de la section 15.
+
+Un générateur frontend ne peut pas promouvoir un non-goal en surface V1 ni créer de logique métier frontend autonome.
+
 **Document version :** 1.0
 **Statut :** FRONTEND ARCHITECTURE V1 — ready for future Android scaffolding, not implemented yet.
 **Last updated :** 2026-06-02
