@@ -5,6 +5,7 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT / "docs_master"
 DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
+DESIGN_SYSTEM_TOKENS_KT_PATH = DOCS_ROOT / "60_DESIGN_SYSTEM_TOKENS_KT.md"
 APP_ROOT = BACKEND_ROOT / "app"
 
 IMPERIUM_ROUTE_PREFIXES = {
@@ -61,6 +62,10 @@ PATH_SOURCE_DOCS = [
 
 def _design_system_text() -> str:
     return DESIGN_SYSTEM_PATH.read_text(encoding="utf-8")
+
+
+def _design_system_tokens_kt_text() -> str:
+    return DESIGN_SYSTEM_TOKENS_KT_PATH.read_text(encoding="utf-8")
 
 
 def _numbered_heading_lines(text: str) -> list[str]:
@@ -232,6 +237,76 @@ def test_design_system_defines_extraction_contracts_for_tokens_and_components() 
         assert component_family in component_contract
 
     assert "préparer `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md`" in component_contract
+
+
+def test_design_system_tokens_kt_spec_exists_and_covers_required_token_families() -> None:
+    text = _design_system_tokens_kt_text()
+
+    assert DESIGN_SYSTEM_TOKENS_KT_PATH.exists()
+    assert "docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md" in text
+    assert "033277a" in text
+
+    for token_family in (
+        "Color Tokens",
+        "Typography Tokens",
+        "Spacing Tokens",
+        "Radius Tokens",
+        "Elevation Tokens",
+        "Icon Size Tokens",
+        "State Tokens",
+        "Kotlin naming conventions",
+        "Non-goals",
+    ):
+        assert token_family in text
+
+    for color_object in (
+        "ImperiumColors",
+        "VaultColors",
+        "VectorColors",
+        "PulseColors",
+        "PathColors",
+        "SemanticStateColors",
+        "VectorHaloColors",
+    ):
+        assert color_object in text
+
+    for app_name in ("Imperium", "Vault", "Vector", "Pulse", "Path"):
+        assert app_name in text
+
+
+def test_design_system_tokens_kt_spec_keeps_semantic_states_and_vector_halo_separate() -> None:
+    text = _design_system_tokens_kt_text()
+
+    semantic_section = _subsection(text, "### 1.6 SemanticStateColors")
+    halo_section = _subsection(text, "### 1.7 VectorHaloColors")
+
+    assert "Success | `#34C759`" in semantic_section
+    assert "Warning | `#F5A524`" in semantic_section
+    assert "Error | `#E5484D`" in semantic_section
+    assert "Info | `#0091FF`" in semantic_section
+    assert "Halo" not in semantic_section
+
+    assert "HaloSuccess | `#22D673`" in halo_section
+    assert "HaloWarning | `#F5C842`" in halo_section
+    assert "HaloError | `#FF4A4A`" in halo_section
+    assert "HaloAnalyzing | `#FFFFFF` @ 80%" in halo_section
+    assert "SemanticStateColors" in halo_section
+
+
+def test_design_system_tokens_kt_spec_does_not_create_frontend_or_kotlin_runtime() -> None:
+    text = _design_system_tokens_kt_text()
+
+    assert not (BACKEND_ROOT / "android").exists()
+    assert not (BACKEND_ROOT / "frontend").exists()
+    assert list(BACKEND_ROOT.rglob("*.kt")) == []
+
+    for non_goal in (
+        "No Android frontend creation",
+        "No Kotlin runtime implementation yet",
+        "No asset import",
+        "No screen implementation",
+    ):
+        assert non_goal in text
 
 
 def test_design_system_keeps_foundation_and_guardrails_before_app_architectures() -> None:
