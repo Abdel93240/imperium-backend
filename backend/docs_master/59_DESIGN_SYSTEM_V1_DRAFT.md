@@ -394,6 +394,26 @@ Chaque écran expose obligatoirement les 7 états :
 | **Synced** | Confirmation transitoire (Snackbar `Success`) puis disparition. | "Mission complétée — synced". |
 | **Conflict** | Banner `Error`, Dialog au tap : "Conflit côté serveur" + diff visible + 2 actions (Garder local / Garder serveur). | Doc 07 §Sync Flow. |
 
+### 7.8 Vault-specific composed patterns
+
+Ces patterns assemblent les composants foundation pour Vault. Ils ne créent pas de cerveau local : ils affichent la vérité financière, collectent une validation utilisateur, puis appellent le backend.
+
+| Pattern | Composition V1 | Ecrans |
+|---|---|---|
+| **Camera Capture Surface** | Fullscreen surface L0 avec preview caméra, permission inline, frame guide, shutter icon button 64dp, action secondaire "Saisie manuelle". Etats permission denied / camera unavailable redirigent vers VAU-03. | VAU-04 |
+| **Draft Transaction Card** | Card L2, badge Warning "Draft", montant JetBrains Mono, merchant/ligne, category dropdown, confidence chip, checkbox inclure/exclure, inline edit. Jamais Success avant validation backend. | VAU-05 |
+| **Pressure Gauge** | Score JetBrains Mono H3/H1 selon surface, label doc 11 (`safe|stable|attention|pressure|critical`), icon state + couleur sémantique. Financial pressure UI renders doc 11 raw 0-100. | VAU-01, VAU-06 |
+| **Money Display Hierarchy** | Un seul montant Display par écran. Dashboard: wallet total Display, week/month H3, row amounts Body Medium. Lists: Body Medium JetBrains Mono aligné à droite. Inputs: Body Large JetBrains Mono. | VAU-01, VAU-07, VAU-10 |
+| **Money Input** | Number input avec clavier numérique, devise EUR fixe V1, cents visibles, validation `amount > 0`, supporting text pour wallet source. | VAU-02, VAU-03, VAU-08, VAU-10 |
+| **Filter Chip Bar** | Segmented `business|personal|all`, date range picker, category chip, clear filter icon. | VAU-07, VAU-09 |
+| **Category Dropdown** | Defaults read-only par book, customs éditables, option "Autre" ouvrant TextField, suggestion Qwen en chip Warning jusqu'à validation. | VAU-02, VAU-03, VAU-05, VAU-09 |
+| **Wallet Allocation Display** | Stack bar cash/bank/crypto + total dérivé. Ne stocke pas un solde indépendant. | VAU-01, VAU-10 |
+| **Upcoming Expense Row** | Title, amount JetBrains Mono, due date, countdown, recurrence chip, status `pending|paid|overdue`; overdue utilise Error + icon. | VAU-01, VAU-11 |
+| **Sync Pending Banner** | Banner Warning haut d'écran si mutation locale non confirmée ; snackbar Success uniquement après 200 backend. | tous VAU-* |
+| **Date Picker** | Picker Material 3, date locale par défaut aujourd'hui, timezone conservée dans payload. | VAU-02, VAU-03, VAU-07, VAU-11 |
+| **Stats Sparkline** | 64dp height max, tendance catégorie/semaine, jamais seul pour une décision. | VAU-09 |
+| **Confirm Destructive Dialog** | Dialog L3 pour reversal/suppression apparente ; libellé explicite "Annuler par écriture inverse". | VAU-08, VAU-11 |
+
 ---
 
 ## 8. IMPERIUM SCREEN ARCHITECTURE MAPPING V1
@@ -635,6 +655,235 @@ Transitions conditionnelles canoniques V1 :
 Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP-01`), Plan History (`IMP-07`), Decisions Log (`IMP-09`), Weekly Reviews (`IMP-10`), Settings (`IMP-14`). `Mon OS personnel` is excluded from V1 navigation because doc 54 marks System Health Dashboard as V3.
 
 Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` is a deep_link read surface backed by `GET /api/imperium/missions/{mission_id}` and may reuse the Mission card components; it is not counted as one of the 14 Imperium V1 screens until product explicitly promotes it.
+
+---
+
+## 13. VAULT SCREEN ARCHITECTURE MAPPING V1
+
+Mapping écran Vault ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Sources canoniques locales : docs `01`, `07`, `11`, `27`, `37`, `42`. Vault observe et rapporte ; il ne prend pas de décision financière autonome.
+
+### 13.0 Vault Product Decisions V1
+
+| Décision | Règle V1 |
+|---|---|
+| Pressure score | Financial pressure UI renders doc 11 raw 0-100, avec label canonique `safe|stable|attention|pressure|critical`. Le résumé doc 42 `0-10` est non canonique pour l'UI V1. |
+| Quick actions VAU-01 | Une seule Primary visible : `+ Dépense` car c'est la capture la plus urgente. `+ Gain` et `Scan ticket` sont Secondary icon buttons dans l'action bar Vault. |
+| Scan ticket Vault/Pulse | VAU-05 est l'unique écran de validation receipt. Les food items validés créent un handoff Pulse backend non bloquant ; pas de deuxième validation Pulse en V1. |
+| Sadaqa percentage | sadaqa percentage is owned by Path. VAU-12 affiche la valeur read-only et deep link vers Path settings. |
+| Sadaqa donation | PAT-03 reste l'écran unique de donation ; Vault reçoit ensuite une transaction personnelle confirmée. |
+| Wallet refresh / Upcoming | VAU-10 et VAU-11 sont routes dédiées, accessibles depuis VAU-12 et depuis les banners VAU-01. |
+| Transaction removal | transaction removal uses reversal : VAU-08 n'exécute pas de hard delete ; il appelle l'écriture inverse. |
+| Weekly profit | `vault.weekly_profit.computed` est surfacé par une banner/card VAU-01 et consommé par Path pour la cible sadaqa. |
+
+Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (`VAU-09`), Settings (`VAU-12`). Les autres écrans sont des overlays, routes dédiées ou deep links.
+
+### 13.1 VAU-01 Vault Dashboard (`VAU-01`)
+
+- **Screen name:** VAU-01 Vault Dashboard.
+- **Type / slug :** `route`, `vault/dashboard`, stable ID `VAU.DASH.MAIN`.
+- **Composants :** Top Bar Vault, Sidebar/Bottom Nav, wallet total card, Wallet Allocation Display, week/month balance cards, Pressure Gauge with "Voir pourquoi", upcoming banner/list, weekly profit banner, action bar with Primary `+ Dépense`, Secondary `+ Gain`, Secondary `Scan ticket`.
+- **Données affichées :** derived wallet total cash/bank/crypto, business/personal week and month balances, financial_pressure_score raw 0-100, label doc 11, upcoming expenses next 7 days, latest weekly_business_profit and sadaqa target availability.
+- **Widgets :** Pressure Gauge, wallet stack bar, week/month comparator, upcoming countdown rows.
+- **Assets :** Vault emblem 48dp, Material Symbols `payments`, `receipt_long`, `warning`, `account_balance`; no hero.
+- **Etats :** Loading=skeleton wallet/balance/pressure cards ; Empty=first run with wallet snapshot CTA and transaction CTA ; Error=summary/pressure fetch failure with retry ; Offline=cached values banner with timestamp ; Syncing=top sync line for pending transaction ; Synced=snackbar only after backend confirmation ; Conflict=server ledger conflict banner opens diff dialog.
+- **Backend deps :** `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly`, `TBD GET /api/vault/pressure/current`, event `vault.weekly_profit.computed`.
+- **Navigation :** entry from app nav `/vault` ; exits to VAU-02, VAU-03, VAU-04, VAU-06, VAU-07, VAU-10, VAU-11, VAU-12.
+- **Tab S10 Ultra :** 3 columns: Sidebar 240dp, dashboard max 1280dp, right panel 320dp for upcoming + pressure details.
+
+### 13.2 VAU-02 Add Income Bottom Sheet (`VAU-02`)
+
+- **Screen name:** VAU-02 Add Income Bottom Sheet.
+- **Type / slug :** `bottom_sheet`, `vault/transactions/new-income`, stable ID `VAU.TX.ADD_INCOME`.
+- **Composants :** Bottom Sheet L3, Money Input, business/personal segmented control, Category Dropdown, description TextField with optional Voice button, Date Picker, wallet source segmented control cash/bank/crypto, Primary "Ajouter", Ghost "Annuler".
+- **Données affichées :** empty income draft, defaults Business `VTC|Autre pro`, Personal `Side income|RSA|Gift|Salaire|Autre`, date default today, idempotency pending state.
+- **Widgets :** none.
+- **Assets :** Material Symbols only (`add`, `payments`, `mic`).
+- **Etats :** Loading=submit spinner ; Empty=form untouched ; Error=validation amount/category/idempotency error under fields ; Offline=local draft pending banner ; Syncing=submit line and disabled fields ; Synced=sheet closes and VAU-01 refreshes ; Conflict=409 Idempotency-Key different payload dialog.
+- **Backend deps :** `POST /api/vault/transactions` with `Idempotency-Key`, optional `POST /api/imperium/vault/transactions` for Imperium ledger V1, ai_task `vault.categorization_suggestion`.
+- **Navigation :** opened from VAU-01 `+ Gain`; success returns to source and may refresh VAU-07.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard, not centered dialog.
+
+### 13.3 VAU-03 Add Expense Bottom Sheet (`VAU-03`)
+
+- **Screen name:** VAU-03 Add Expense Bottom Sheet.
+- **Type / slug :** `bottom_sheet`, `vault/transactions/new-expense`, stable ID `VAU.TX.ADD_EXPENSE`.
+- **Composants :** Bottom Sheet L3, Money Input, business/personal segmented control, Category Dropdown with "Autre" inline TextField, description TextField with optional Voice button, Date Picker, wallet source segmented control, Primary "Ajouter", Ghost "Annuler".
+- **Données affichées :** empty expense draft, Business defaults `Carburant|Plateformes|Entretien|Assurance pro|Outils VTC|Charges|Provision impôt|Autre`, Personal defaults `Courses|Loyer|Restaurant|Loisirs|Vêtements|Téléphone|Santé|Abonnements|Autre`.
+- **Widgets :** none.
+- **Assets :** Material Symbols only (`remove`, `receipt`, `mic`).
+- **Etats :** Loading=submit spinner ; Empty=form untouched ; Error=amount/category/custom collision validation ; Offline=local draft pending banner ; Syncing=submit line ; Synced=sheet closes and dashboard/list refresh ; Conflict=409 Idempotency-Key or duplicate pending draft dialog.
+- **Backend deps :** `POST /api/vault/transactions` with `Idempotency-Key`, `POST /api/imperium/vault/transactions`, ai_task `vault.categorization_suggestion`.
+- **Navigation :** opened from VAU-01 Primary `+ Dépense`, camera denied fallback from VAU-04, or VAU-08 duplicate correction.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard/list.
+
+### 13.4 VAU-04 Scan Ticket Capture (`VAU-04`)
+
+- **Screen name:** VAU-04 Scan Ticket Capture.
+- **Type / slug :** `route`, `vault/receipts/capture`, stable ID `VAU.TX.SCAN_CAPTURE`.
+- **Composants :** Camera Capture Surface, Top Bar minimal, shutter icon button, manual expense fallback, permission inline, blur/lighting helper banner.
+- **Données affichées :** camera permission state, live preview, capture status, privacy note that receipt image is sent to Gemini and redacted from logs.
+- **Widgets :** viewfinder frame, image quality helper.
+- **Assets :** Vault receipt scan asset, Material Symbols `photo_camera`, `flash_on`, `close`.
+- **Etats :** Loading=camera initializing ; Empty=permission not requested with CTA ; Error=camera unavailable/OCR upload failure with retry/manual entry ; Offline=camera can capture local draft but OCR disabled banner ; Syncing=photo upload/Gemini task creation line ; Synced=route to VAU-05 when draft ready ; Conflict=duplicate pending receipt task dialog.
+- **Backend deps :** `TBD POST /api/vault/receipt-extractions`, ai_task `vault.receipt_extract`, Gemini prompt doc 37 §3.
+- **Navigation :** opened from VAU-01 `Scan ticket`; VAU-04 --> VAU-05 after OCR draft; camera denied/manual exits to VAU-03.
+- **Tab S10 Ultra :** fullscreen route, preview centered max 1280dp, right 320dp panel for capture guidance.
+
+### 13.5 VAU-05 Receipt Review & Validate (`VAU-05`)
+
+- **Screen name:** VAU-05 Receipt Review & Validate.
+- **Type / slug :** `route`, `vault/receipts/{receipt_task_id}/review`, stable ID `VAU.TX.RECEIPT_REVIEW`.
+- **Composants :** receipt thumbnail, Draft Transaction Card list, line include checkboxes, Category Dropdown, low-confidence Warning chips, Primary "Valider", Secondary "Re-scanner", Ghost "Annuler".
+- **Données affichées :** merchant, date/time, total_eur, payment_method, OCR confidence, warnings, draft expense, line_items, Qwen category suggestions, food handoff preview.
+- **Widgets :** OCR confidence badge, total comparator, Pulse handoff summary.
+- **Assets :** receipt thumbnail image, Material Symbols `receipt_long`, `inventory_2`, `warning`.
+- **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=Gemini fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
+- **Backend deps :** `TBD GET /api/vault/receipt-extractions/{receipt_task_id}`, `TBD POST /api/vault/receipt-extractions/{receipt_task_id}/validate`, `POST /api/vault/transactions`, `TBD POST /api/pulse/food-stock/drafts/confirm`.
+- **Navigation :** from VAU-04; VAU-05 --> VAU-01 on validation; VAU-05 --> PULSE_HANDOFF as backend event only, no second screen V1; re-scan returns VAU-04.
+- **Tab S10 Ultra :** two-column: receipt preview left 40%, draft cards right 60%, sticky validation bar bottom.
+
+### 13.6 VAU-06 Pressure "Voir pourquoi" Popup (`VAU-06`)
+
+- **Screen name:** VAU-06 Pressure Detail Popup.
+- **Type / slug :** `dialog`, `vault/pressure/explain`, stable ID `VAU.PRESSURE.EXPLAIN`.
+- **Composants :** Dialog L3, Pressure Gauge, deterministic input breakdown list, Haiku 3-sentence advice card, cooldown label, Primary "Compris".
+- **Données affichées :** financial_pressure_score 0-100, label, available_liquidity, required_money_this_week, remaining_realistic_earning_capacity, overdue_expenses, critical_signals, AI explanation when requested.
+- **Widgets :** pressure breakdown bar, critical signal chips.
+- **Assets :** Vault pressure asset 96dp max, Material Symbols `insights`, `warning`.
+- **Etats :** Loading=Haiku advice spinner while deterministic breakdown remains visible ; Empty=no pressure snapshot yet with wallet update CTA ; Error=advice failure falls back to deterministic explanation ; Offline=deterministic cached breakdown only ; Syncing=advice request line ; Synced=advice displayed no success toast ; Conflict=pressure snapshot stale warning with refresh action.
+- **Backend deps :** `TBD GET /api/vault/pressure/current`, `POST /api/vault/advice/detail`, ai_task `vault.detailed_advice`.
+- **Navigation :** opened from VAU-01 "Voir pourquoi"; dismiss returns VAU-01.
+- **Tab S10 Ultra :** centered Dialog max 720dp; no side sheet.
+
+### 13.7 VAU-07 Transactions Tab (`VAU-07`)
+
+- **Screen name:** VAU-07 Transactions Tab.
+- **Type / slug :** `tab`, `vault/transactions`, stable ID `VAU.TX.LIST`.
+- **Composants :** Top Bar, Filter Chip Bar, transaction LazyColumn 12-20 rows, sync status chips, row trailing amount JetBrains Mono, FAB/toolbar add actions, pull refresh.
+- **Données affichées :** date, label/description, category, transaction_type, wallet/source, book filter where available, amount, currency, sync/reversal state.
+- **Widgets :** filtered total mini-card, category count chip.
+- **Assets :** empty-state illustration only when no transaction exists; Material Symbols for income/expense/reversal.
+- **Etats :** Loading=skeleton rows ; Empty=distinguish no ledger vs no filter results ; Error=list fetch failure ; Offline=cached list banner ; Syncing=pending row indicators ; Synced=refresh snackbar ; Conflict=row-level conflict opens VAU-08 diff.
+- **Backend deps :** `GET /api/imperium/vault/transactions`, `GET /api/vault/transactions/recent`, `GET /api/imperium/vault/summary/categories`.
+- **Navigation :** top-level Vault tab; row tap opens VAU-08; filter category can come from VAU-09.
+- **Tab S10 Ultra :** list/detail split: list max 880dp, optional 320dp selected transaction preview.
+
+### 13.8 VAU-08 Transaction Edit (`VAU-08`)
+
+- **Screen name:** VAU-08 Transaction Edit.
+- **Type / slug :** `deep_link`, `vault/transactions/{transaction_id}/edit`, stable ID `VAU.TX.EDIT`.
+- **Composants :** route on phone / side sheet on Tab, read-only audit header, Money Input for correction draft, Category Dropdown, notes TextField, Secondary "Enregistrer correction" when PATCH exists, Destructive "Annuler par écriture inverse" with Confirm Destructive Dialog.
+- **Données affichées :** canonical transaction detail, created_at/updated_at, reversal status, editable correction reason, current category/label.
+- **Widgets :** reversal history row, audit log row.
+- **Assets :** Material Symbols only (`edit`, `undo`, `history`, `delete`).
+- **Etats :** Loading=detail skeleton ; Empty=transaction missing returns VAU-07 ; Error=404/validation/reversal failure ; Offline=read-only cached detail ; Syncing=reversal/correction submit line ; Synced=returns VAU-07 with snackbar ; Conflict=already reversed or changed server-side diff dialog.
+- **Backend deps :** `GET /api/imperium/vault/transactions/{transaction_id}`, `POST /api/imperium/vault/transactions/{transaction_id}/reverse` with `Idempotency-Key`, `TBD PATCH /api/imperium/vault/transactions/{transaction_id}`.
+- **Navigation :** opened from VAU-07 row; save/reverse returns VAU-07; no hard delete path.
+- **Tab S10 Ultra :** right side-sheet 480dp over VAU-07 list/detail split.
+
+### 13.9 VAU-09 Categories Tab (`VAU-09`)
+
+- **Screen name:** VAU-09 Categories Tab.
+- **Type / slug :** `tab`, `vault/categories`, stable ID `VAU.CATEGORIES.LIST`.
+- **Composants :** Top Bar, Filter Chip Bar by book, default category read-only cards, custom category editable rows, stats sparkline, rename dialog for custom only.
+- **Données affichées :** default categories by business/personal, custom categories, counts, income/expense/net by category, user_category_memory suggestion count.
+- **Widgets :** category stats cards, 64dp sparkline, custom/default badges.
+- **Assets :** Material Symbols only (`category`, `lock`, `edit`).
+- **Etats :** Loading=skeleton category cards ; Empty=no custom categories yet while defaults remain visible ; Error=summary fetch failure ; Offline=cached stats read-only ; Syncing=rename/save line ; Synced=saved snackbar ; Conflict=rename collision or stale user_category_memory dialog.
+- **Backend deps :** `GET /api/imperium/vault/summary/categories`, `TBD GET /api/vault/categories`, `TBD PATCH /api/vault/categories/{category_id}`.
+- **Navigation :** top-level Vault tab; tapping category opens VAU-07 with category filter; settings link opens VAU-12.
+- **Tab S10 Ultra :** two columns: defaults left, custom/stats right.
+
+### 13.10 VAU-10 Wallet Update Form (`VAU-10`)
+
+- **Screen name:** VAU-10 Wallet Update Form.
+- **Type / slug :** `route`, `vault/wallet/update`, stable ID `VAU.WALLET.UPDATE`.
+- **Composants :** Top Bar, Money Input fields cash/bank/crypto, Wallet Allocation Display, predicted vs actual delta banner, Primary "Enregistrer", Ghost "Annuler".
+- **Données affichées :** last snapshot timestamp, cash_eur, bank_eur, crypto_eur, total_eur calculated, predicted_wallet, actual delta >5% prompt.
+- **Widgets :** wallet stack bar, delta warning banner.
+- **Assets :** Material Symbols only (`account_balance_wallet`, `account_balance`, `currency_bitcoin`).
+- **Etats :** Loading=snapshot skeleton ; Empty=first snapshot form ; Error=negative/invalid total or endpoint failure ; Offline=editing disabled unless local draft explicitly allowed ; Syncing=save line ; Synced=return VAU-01/VAU-12 with snackbar ; Conflict=server snapshot changed diff dialog.
+- **Backend deps :** `TBD GET /api/vault/wallet/snapshots/latest`, `TBD POST /api/vault/wallet/snapshots`.
+- **Navigation :** opened from VAU-01 soft prompt or VAU-12 settings row; back returns source.
+- **Tab S10 Ultra :** centered content max 720dp plus right 320dp explanation panel for predicted vs actual.
+
+### 13.11 VAU-11 Upcoming Expenses Management (`VAU-11`)
+
+- **Screen name:** VAU-11 Upcoming Expenses Management.
+- **Type / slug :** `route`, `vault/upcoming-expenses`, stable ID `VAU.UPCOMING.MANAGE`.
+- **Composants :** Top Bar, Upcoming Expense Row list, add/edit bottom sheet, Date Picker, recurrence segmented control, reminder stepper, mark-paid action, Confirm Destructive Dialog for removal/postpone.
+- **Données affichées :** title, amount_eur, due_date, book, status `pending|paid|overdue`, recurrence, reminder_days_before, paid_at.
+- **Widgets :** overdue count badge, nearest due countdown, recurring chips.
+- **Assets :** empty-state illustration when no upcoming expense exists; Material Symbols `event`, `payments`, `error_outline`.
+- **Etats :** Loading=skeleton rows ; Empty=no upcoming expenses with CTA add ; Error=CRUD/fetch failure ; Offline=cached read-only list ; Syncing=row mutation line ; Synced=saved/paid snackbar ; Conflict=expense edited elsewhere diff dialog.
+- **Backend deps :** `TBD GET /api/vault/upcoming-expenses`, `TBD POST /api/vault/upcoming-expenses`, `TBD PATCH /api/vault/upcoming-expenses/{expense_id}`, `TBD POST /api/vault/upcoming-expenses/{expense_id}/mark-paid`.
+- **Navigation :** opened from VAU-01 upcoming banner or VAU-12; overdue row may deep link from Imperium alert.
+- **Tab S10 Ultra :** list/detail split: upcoming list left, edit/detail panel right 480dp.
+
+### 13.12 VAU-12 Vault Settings (`VAU-12`)
+
+- **Screen name:** VAU-12 Vault Settings.
+- **Type / slug :** `route`, `vault/settings`, stable ID `VAU.SETTINGS.CORE`.
+- **Composants :** Top Bar, settings rows, read-only sadaqa percentage row with Path deep link, default categories link, wallet refresh link, upcoming expenses link, sync status chip.
+- **Données affichées :** sadaqa_percentage from Path read model, default categories access, wallet refresh action, upcoming management action, last sync status.
+- **Widgets :** settings completion badge, sync status chip.
+- **Assets :** Vault emblem 48dp, Material Symbols `settings`, `volunteer_activism`, `category`, `account_balance_wallet`, `event`.
+- **Etats :** Loading=settings skeleton ; Empty=defaults not initialized CTA ; Error=settings fetch failure ; Offline=cached settings read-only ; Syncing=settings refresh line ; Synced=snackbar after confirmed setting refresh ; Conflict=Path/Vault setting mismatch banner with Path source winning.
+- **Backend deps :** `TBD GET /api/vault/settings`, `TBD PATCH /api/vault/settings`, `TBD GET /api/path/settings/sadaqa`, `GET /api/imperium/frontend/app-manifest`.
+- **Navigation :** top-level Vault settings; rows open VAU-09, VAU-10, VAU-11; VAU-12 --> PATH_SETTINGS for sadaqa percentage.
+- **Tab S10 Ultra :** two-column settings grid, no nested card inside card.
+
+### 13.13 Vault Navigation Graph V1
+
+```mermaid
+flowchart TD
+  NAV[Vault top-level nav] --> VAU01[VAU-01 Dashboard]
+  NAV --> VAU07[VAU-07 Transactions]
+  NAV --> VAU09[VAU-09 Categories]
+  NAV --> VAU12[VAU-12 Settings]
+  VAU01 --> VAU02[VAU-02 Add Income]
+  VAU01 --> VAU03[VAU-03 Add Expense]
+  VAU01 --> VAU04[VAU-04 Scan Ticket Capture]
+  VAU04 --> VAU05[VAU-05 Receipt Review]
+  VAU05 --> VAU01
+  VAU05 --> PULSE_HANDOFF[Pulse food stock backend handoff]
+  VAU01 --> VAU06[VAU-06 Pressure Explain]
+  VAU06 --> VAU01
+  VAU01 --> VAU10[VAU-10 Wallet Update]
+  VAU01 --> VAU11[VAU-11 Upcoming Expenses]
+  VAU07 --> VAU08[VAU-08 Transaction Edit]
+  VAU08 --> VAU07
+  VAU09 --> VAU07
+  VAU12 --> VAU09
+  VAU12 --> VAU10
+  VAU12 --> VAU11
+  VAU12 --> PATH_SETTINGS[Path sadaqa settings]
+```
+
+Transitions conditionnelles canoniques V1 :
+
+| Transition | Condition |
+|---|---|
+| VAU-04 --> VAU-05 | Gemini OCR task returns a valid draft or pending draft is available for review. |
+| VAU-05 --> PULSE_HANDOFF | User validates receipt lines containing food items; backend creates Pulse draft/stock updates without a second V1 screen. |
+| VAU-12 --> PATH_SETTINGS | User wants to change sadaqa percentage; Path owns the setting. |
+| VAU-08 --> VAU-07 | Reversal or correction is confirmed by backend. |
+| VAU-01 --> VAU-10 | Predicted vs actual wallet delta >5% or user taps wallet update. |
+
+### 13.14 Vault Endpoint Matrix V1
+
+| Screen | Real endpoints | TBD endpoints |
+|---|---|---|
+| VAU-01 | `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly` | `GET /api/vault/pressure/current` |
+| VAU-02/03 | `POST /api/vault/transactions`, `POST /api/imperium/vault/transactions` | none |
+| VAU-04/05 | none | `POST /api/vault/receipt-extractions`, `GET /api/vault/receipt-extractions/{receipt_task_id}`, `POST /api/vault/receipt-extractions/{receipt_task_id}/validate` |
+| VAU-06 | none | `GET /api/vault/pressure/current`, `POST /api/vault/advice/detail` |
+| VAU-07 | `GET /api/imperium/vault/transactions`, `GET /api/vault/transactions/recent` | none |
+| VAU-08 | `GET /api/imperium/vault/transactions/{transaction_id}`, `POST /api/imperium/vault/transactions/{transaction_id}/reverse` | `PATCH /api/imperium/vault/transactions/{transaction_id}` |
+| VAU-09 | `GET /api/imperium/vault/summary/categories` | `GET /api/vault/categories`, `PATCH /api/vault/categories/{category_id}` |
+| VAU-10 | none | `GET /api/vault/wallet/snapshots/latest`, `POST /api/vault/wallet/snapshots` |
+| VAU-11 | none | `GET|POST /api/vault/upcoming-expenses`, `PATCH /api/vault/upcoming-expenses/{expense_id}`, `POST /api/vault/upcoming-expenses/{expense_id}/mark-paid` |
+| VAU-12 | `GET /api/imperium/frontend/app-manifest` | `GET|PATCH /api/vault/settings`, `GET /api/path/settings/sadaqa` |
 
 ---
 
