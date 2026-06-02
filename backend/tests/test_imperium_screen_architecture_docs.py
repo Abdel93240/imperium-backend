@@ -5,6 +5,17 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT / "docs_master"
 DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
+APP_ROOT = BACKEND_ROOT / "app"
+
+IMPERIUM_ROUTE_PREFIXES = {
+    APP_ROOT / "api/v1/routes/imperium.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_contracts.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_daily_plan.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_dashboard.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_events.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_frontend.py": "/api/imperium",
+    APP_ROOT / "api/v1/routes/imperium_home.py": "/api/imperium",
+}
 
 IMPERIUM_SCREEN_IDS = [f"IMP-{number:02d}" for number in range(1, 15)]
 VAULT_SCREEN_IDS = [f"VAU-{number:02d}" for number in range(1, 13)]
@@ -66,6 +77,12 @@ def _subsection(text: str, heading: str) -> str:
     return text.split(marker, maxsplit=1)[1].split("\n### ", maxsplit=1)[0]
 
 
+def _named_section(text: str, heading: str) -> str:
+    marker = f"## {heading}"
+    assert marker in text
+    return text.split(marker, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
+
+
 def _screen_section(text: str, screen_id: str) -> str:
     marker_pattern = re.compile(rf"^### \d+\.\d+ .*`{re.escape(screen_id)}`.*$", re.MULTILINE)
     marker_match = marker_pattern.search(text)
@@ -93,20 +110,128 @@ def _path_screen_section(text: str, screen_id: str) -> str:
     return _screen_section(text, screen_id)
 
 
+def _imperium_backend_routes() -> set[str]:
+    route_pattern = re.compile(
+        r"@router\.(get|post|patch|put|delete)\(\s*\"([^\"]+)\"",
+        re.MULTILINE,
+    )
+    endpoints = set()
+    for route_file, prefix in IMPERIUM_ROUTE_PREFIXES.items():
+        route_text = route_file.read_text(encoding="utf-8")
+        for method, route_path in route_pattern.findall(route_text):
+            endpoints.add(f"{method.upper()} {prefix}{route_path}")
+    return endpoints
+
+
+def _imperium_endpoint_matrix_real_endpoints(text: str) -> set[str]:
+    matrix = _subsection(text, "### 12.17 Imperium Endpoint Matrix V1")
+    rows = [line for line in matrix.splitlines() if line.startswith("| IMP-")]
+    real_endpoints = set()
+    for row in rows:
+        cells = [cell.strip() for cell in row.strip("|").split("|")]
+        real_cell = cells[1]
+        real_endpoints.update(
+            f"{method} {path}"
+            for method, path in re.findall(r"`(GET|POST|PATCH|PUT|DELETE) (/api/imperium[^`]+)`", real_cell)
+        )
+    return real_endpoints
+
+
 def test_design_system_has_table_of_contents_for_canonical_sections() -> None:
     text = _design_system_text()
     toc = text.split("## Table des matières", maxsplit=1)[1].split("\n---", maxsplit=1)[0]
 
     for required in (
+        "[Sources de vérité V1]",
+        "[V1 Scope Lock]",
         "[0. Principe fondateur]",
         "[1. Color System]",
         "[7. Compose Foundation Components]",
         "[8. Responsive Strategy]",
         "[10. Implementation Guardrail]",
+        "[Design Token Extraction Contract]",
+        "[Component Catalog Extraction Contract]",
         "[12. Imperium Screen Architecture Mapping V1]",
         "[16. Path Screen Architecture Mapping V1]",
     ):
         assert required in toc
+
+
+def test_design_system_declares_reproducible_sources_and_scope_lock() -> None:
+    text = _design_system_text()
+    sources = _named_section(text, "Sources de vérité V1")
+    scope = _named_section(text, "V1 Scope Lock")
+
+    assert "**Statut :** CANONICAL V1" in text
+    assert "docs réellement présents" in sources
+    assert "docs importés" in sources
+    assert "audits utilisés" in sources
+    assert "documents archivés/non canoniques" in sources
+
+    for source_doc in (
+        "01_SIGNAL_VARIABLES_DICTIONARY.md",
+        "07_ANDROID_APP_RESPONSIBILITIES.md",
+        "33_VECTOR_LOGIC_DETAIL.md",
+        "40_PULSE_LOGIC_DETAIL.md",
+        "41_PATH_LOGIC_DETAIL.md",
+        "42_VAULT_LOGIC_DETAIL.md",
+        "43_IMPERIUM_LOGIC_DETAIL.md",
+    ):
+        assert source_doc in sources
+
+    for audit_doc in (
+        "audits/2026-06-02_0519_audit.md",
+        "audits/2026-06-02_1233_audit.md",
+        "score 7.5/10",
+    ):
+        assert audit_doc in sources
+
+    for excluded_surface in (
+        "Bolt OCR",
+        "Smart Fuel UI",
+        "Mon OS Personnel",
+        "Body Photo Review",
+        "Sunnah",
+        "Witr",
+        "Duha",
+        "Tahajjud",
+        "toute autre surface V2/V3",
+    ):
+        assert excluded_surface in scope
+
+    assert "peuvent apparaitre dans des docs historiques" in scope
+    assert "ne font pas partie du périmètre V1" in scope
+
+
+def test_design_system_defines_extraction_contracts_for_tokens_and_components() -> None:
+    text = _design_system_text()
+    token_contract = _named_section(text, "Design Token Extraction Contract")
+    component_contract = _named_section(text, "Component Catalog Extraction Contract")
+
+    for token_family in ("Colors", "Typography", "Spacing", "Radius", "Elevation", "Icons", "States"):
+        assert token_family in token_contract
+
+    for kotlin_name in (
+        "ImperiumColor.Primary",
+        "ImperiumSpacing.MD",
+        "ImperiumElevation.L2",
+        "ImperiumRadius.Card",
+        "ImperiumState.Syncing",
+    ):
+        assert kotlin_name in token_contract
+
+    for component_family in (
+        "Button",
+        "Input",
+        "Selection",
+        "Navigation",
+        "Feedback",
+        "Containers",
+        "States",
+    ):
+        assert component_family in component_contract
+
+    assert "préparer `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md`" in component_contract
 
 
 def test_design_system_keeps_foundation_and_guardrails_before_app_architectures() -> None:
@@ -267,6 +392,8 @@ def test_design_system_declares_screen_types_navigation_and_backend_dependencies
         "deep_link",
         "/api/imperium/dashboard",
         "/api/imperium/day/finish",
+        "/api/imperium/day/plan",
+        "/api/imperium/day/plan/{plan_id}/activate",
         "/api/imperium/missions/backlog",
         "/api/imperium/missions/history",
         "/api/imperium/weekly-review/history",
@@ -329,13 +456,29 @@ def test_design_system_adds_imperium_product_decisions_and_endpoint_matrix() -> 
         "IMP-01",
         "`GET /api/imperium/dashboard`",
         "IMP-05",
-        "`POST /api/imperium/daily-plans/{plan_id}/activate`",
+        "`POST /api/imperium/day/plan/{plan_id}/activate`",
         "IMP-12",
         "`GET /api/imperium/weekly-review/current`",
         "IMP-14",
         "`GET /api/imperium/frontend/app-manifest`",
     ):
         assert required in endpoint_matrix
+
+
+def test_imperium_endpoint_matrix_only_marks_real_backend_routes_as_real() -> None:
+    text = _design_system_text()
+    matrix = _subsection(text, "### 12.17 Imperium Endpoint Matrix V1")
+    backend_routes = _imperium_backend_routes()
+    documented_real_endpoints = _imperium_endpoint_matrix_real_endpoints(text)
+
+    assert "/api/imperium/daily-plans" not in matrix
+    assert "`GET /api/imperium/day/plan/today`" in matrix
+    assert "`GET /api/imperium/day/plan`" in matrix
+    assert "`POST /api/imperium/day/plan/{plan_id}/activate`" in matrix
+    assert "TBD daily plan history read endpoint" in matrix
+
+    missing_from_backend = documented_real_endpoints - backend_routes
+    assert missing_from_backend == set()
 
 
 def test_design_system_maps_all_12_vault_screens_with_stable_ids() -> None:

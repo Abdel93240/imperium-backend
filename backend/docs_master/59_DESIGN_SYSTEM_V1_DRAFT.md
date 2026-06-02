@@ -4,15 +4,17 @@
 **Cible technique :** Android natif Kotlin + Jetpack Compose (Material 3)
 **Device principal :** Samsung Galaxy Tab S10 Ultra (14.6", 2960×1848, ~239 ppi, landscape primaire)
 **Périmètre :** 5 apps (Imperium, Vault, Vector, Pulse, Path), 62 écrans V1
-**Statut :** DRAFT V1 — toute déviation doit être justifiée par PR contre ce document.
+**Statut :** CANONICAL V1 — toute déviation doit être justifiée par PR contre ce document.
 
-> **Note DRAFT :** Ce document est un draft de fondation. Les palettes HEX et règles visuelles devront être revalidées lorsque les Style Masters et assets_registry seront versionnés dans le repo.
+> **Note canonique :** Ce document est la source locale canonique du Design System V1. Les Style Masters, `design_reviews/` et `assets_registry/` ne sont pas versionnés dans ce repo ; ils ne peuvent donc pas être une dépendance bloquante ni promouvoir une surface V2/V3 dans le périmètre V1.
 
 ---
 
 ## Table des matières
 
 - [0. Principe fondateur](#0-principe-fondateur)
+- [Sources de vérité V1](#sources-de-verite-v1)
+- [V1 Scope Lock](#v1-scope-lock)
 - [1. Color System](#1-color-system)
 - [2. Typography System](#2-typography-system)
 - [3. Spacing System](#3-spacing-system)
@@ -24,6 +26,8 @@
 - [9. Design Rules](#9-design-rules-synthese-non-negociables)
 - [10. Implementation Guardrail](#10-implementation-guardrail-compose)
 - [11. Annexes](#11-annexes-a-produire-post-v1)
+- [Design Token Extraction Contract](#design-token-extraction-contract)
+- [Component Catalog Extraction Contract](#component-catalog-extraction-contract)
 - [12. Imperium Screen Architecture Mapping V1](#12-imperium-screen-architecture-mapping-v1)
 - [13. Vault Screen Architecture Mapping V1](#13-vault-screen-architecture-mapping-v1)
 - [14. Vector Screen Architecture Mapping V1](#14-vector-screen-architecture-mapping-v1)
@@ -31,6 +35,66 @@
 - [16. Path Screen Architecture Mapping V1](#16-path-screen-architecture-mapping-v1)
 
 ---
+
+## Sources de vérité V1
+
+Cette section remplace les références ambiguës du type "doc 55", "Style Masters" ou `assets_registry` par des sources reproductibles depuis ce dépôt au 2026-06-02.
+
+### docs réellement présents
+
+Les documents canoniques exploitables par le DS V1 sont les fichiers physiquement présents dans `docs_master/` :
+
+- `01_SIGNAL_VARIABLES_DICTIONARY.md`
+- `07_ANDROID_APP_RESPONSIBILITIES.md`
+- `11_FINANCIAL_PRESSURE_FORMULA.md`
+- `24_DAY_FINISHED_WORKFLOW.md`
+- `26_PRIORITY_RULES_WORKFLOW.md`
+- `27_VAULT_TRANSACTIONS_WORKFLOW.md`
+- `29_WEEKLY_REPORT_WORKFLOW.md`
+- `32_WR_INTERACTIVE_WORKFLOW.md`
+- `33_VECTOR_LOGIC_DETAIL.md`
+- `34_PULSE_MEDICAL_FEED_AI.md`
+- `37_GEMINI_VISION_PROMPTS.md`
+- `40_PULSE_LOGIC_DETAIL.md`
+- `41_PATH_LOGIC_DETAIL.md`
+- `42_VAULT_LOGIC_DETAIL.md`
+- `43_IMPERIUM_LOGIC_DETAIL.md`
+- `59_DESIGN_SYSTEM_V1_DRAFT.md`
+
+### docs importés
+
+Les docs `40_PULSE_LOGIC_DETAIL.md`, `41_PATH_LOGIC_DETAIL.md` et `42_VAULT_LOGIC_DETAIL.md` ont été importés dans `docs_master/` par des patches précédents et sont désormais traités comme sources locales présentes. Aucun autre document externe n'est requis pour interpréter le périmètre V1 de ce DS.
+
+### audits utilisés
+
+- `audits/2026-06-02_0519_audit.md` : inventaire initial de 62 écrans V1 et constat d'absence de `design_reviews/`, `assets_registry/` et Style Masters.
+- `audits/2026-06-02_1233_audit.md` : audit READ-ONLY de structure DS V1, exclusions V2/V3, gaps de tests et extraction.
+- Audit final fourni dans la tâche du 2026-06-02 : verdict initial `READY_FOR_CANONICAL_V1 = NO`, `READY_FOR_FRONTEND_SCAFFOLD = NO`, `READY_FOR_SCREEN_DESIGN = YES`, score 7.5/10.
+
+### documents archivés/non canoniques
+
+- `design_reviews/`, `assets_registry/` et Style Masters : absents du repo. Ils ne sont pas des sources de vérité V1 tant qu'ils ne sont pas versionnés.
+- Docs historiques/futurs mentionnés par les docs locales ou audits (`doc 51`, `doc 52`, `doc 53`, `doc 54`, `doc 55`, F-documents) : non présents dans `docs_master/` et non canoniques pour V1. Ils peuvent expliquer une origine historique, jamais créer une surface V1.
+- `patch_reports/*` : rapports historiques utiles au contexte, non canoniques pour le DS V1.
+- `audits/*` : documents d'audit et de vérification ; ils guident les corrections mais ne remplacent pas les contrats de `docs_master/`.
+
+## V1 Scope Lock
+
+Le périmètre V1 est verrouillé à 62 écrans : Imperium 14, Vault 12, Vector 11, Pulse 14, Path 11. Aucun écran n'est ajouté, supprimé ou renommé par ce patch.
+
+EXCLUS V1 :
+
+- Bolt OCR
+- Smart Fuel UI
+- Mon OS Personnel
+- Body Photo Review
+- Sunnah
+- Witr
+- Duha
+- Tahajjud
+- toute autre surface V2/V3
+
+Ces éléments peuvent apparaitre dans des docs historiques, des audits ou des notes de roadmap, mais ne font pas partie du périmètre V1. En V1, ils doivent rester absents de la navigation, absents des matrices d'écrans et absents des contrats d'extraction composants. Une mention documentaire est autorisée uniquement pour expliquer explicitement leur exclusion.
 
 ## 0. Principe fondateur
 
@@ -114,7 +178,7 @@ Règle Vault : **les montants sont toujours en JetBrains Mono** (cf. §2) pour a
 
 | Token | HEX | Usage |
 |---|---|---|
-| Primary | `#0E2A33` | fond HUD standby (doc 55 §5.1) |
+| Primary | `#0E2A33` | fond HUD standby V1, aligné avec `07_ANDROID_APP_RESPONSIBILITIES.md` et `33_VECTOR_LOGIC_DETAIL.md` |
 | Secondary | `#1C4753` | cards info, side panel |
 | Accent | `#00D9E0` | actions kinétiques (start session, where should I go) |
 | Background | `#06181E` | fond global (Tab et phone) |
@@ -131,7 +195,7 @@ Règle Vault : **les montants sont toujours en JetBrains Mono** (cf. §2) pour a
 | Text Secondary | `#B6CCD2` | labels |
 | Text Muted | `#778C92` | metadata |
 
-Règle Vector : **en mode NAVIGATION (doc 55 §5.2), le halo prend précédence visuelle sur tout autre accent**. Les overlays se réduisent automatiquement. Le Vector Halo utilise ses propres tokens `Halo Success|Halo Warning|Halo Error|Halo Analyzing` pour la décision conduite ; les états UI génériques restent `Success|Warning|Error|Info` du §1.1.
+Règle Vector : **en mode NAVIGATION V1 (cf. §14.14), le halo prend précédence visuelle sur tout autre accent**. Les overlays se réduisent automatiquement. Le Vector Halo utilise ses propres tokens `Halo Success|Halo Warning|Halo Error|Halo Analyzing` pour la décision conduite ; les états UI génériques restent `Success|Warning|Error|Info` du §1.1.
 
 ### 1.5 PULSE — Biological Layer (deep crimson + warm coral)
 
@@ -461,7 +525,7 @@ Layout canonique Tab S10 Ultra landscape :
 
 ### 8.4 Driving surface (Vector navigation)
 
-Override du responsive : en mode driving (cf. doc 55 §5.2), le contenu se réduit à :
+Override du responsive : en mode driving V1 (cf. §14.14), le contenu se réduit à :
 - 1 carte centrale info essentielle
 - 0 sidebar
 - Top bar minimaliste 40dp
@@ -558,12 +622,91 @@ Si une réponse est non, le composant n'est pas mergeable.
 - `62_DESIGN_SYSTEM_FIGMA_REF.md` (références Figma synchronisées).
 - `63_DESIGN_SYSTEM_A11Y.md` (audit accessibilité WCAG complet).
 
+## Design Token Extraction Contract
+
+Ce contrat définit le format stable attendu pour extraire les tokens vers un futur `60_DESIGN_SYSTEM_TOKENS.kt`. Aucun Kotlin réel n'est produit dans ce patch.
+
+### Naming Kotlin attendu
+
+| Famille | Objet Kotlin attendu | Convention |
+|---|---|---|
+| Colors | `ImperiumColor` | `PascalCase` pour le token, suffixe app si nécessaire : `ImperiumColor.Primary`, `ImperiumColor.VectorHaloSuccess`. |
+| Typography | `ImperiumTypography` | Styles `Display`, `H1`, `H2`, `H3`, `H4`, `BodyLarge`, `BodyMedium`, `BodySmall`, `Caption`, `Label`. |
+| Spacing | `ImperiumSpacing` | Tokens en majuscules courtes : `XXS`, `XS`, `SM`, `MD`, `LG`, `XL`, `XXL`, `XXXL`. |
+| Radius | `ImperiumRadius` | Nom par usage : `Chip`, `Button`, `Input`, `Card`, `BottomSheet`, `Dialog`, `Fullscreen`, `Avatar`, `ImageCard`. |
+| Elevation | `ImperiumElevation` | Niveaux fixes : `L0`, `L1`, `L2`, `L3`, `L4`. |
+| Icons | `ImperiumIcon` | Alias Material Symbols Outlined : `Check`, `Warning`, `Error`, `Info`, `Mic`, `UploadFile`, `Navigation`. |
+| States | `ImperiumState` | Enum sync/UI : `Loading`, `Empty`, `Error`, `Offline`, `Syncing`, `Synced`, `Conflict`, `Cached`, `Stale`, `Pending`, `Failed`. |
+
+### Tokens obligatoires
+
+Colors :
+- App palettes : `ImperiumColor.Primary`, `Secondary`, `Accent`, `Background`, `Surface`, `SurfaceVariant`, `Border`, `Divider`, `TextPrimary`, `TextSecondary`, `TextMuted` pour Imperium, Vault, Vector, Pulse, Path.
+- Semantic states : `ImperiumColor.Success`, `Warning`, `Error`, `Info`.
+- Vector halo : `ImperiumColor.VectorHaloSuccess`, `VectorHaloWarning`, `VectorHaloError`, `VectorHaloAnalyzing`.
+
+Typography :
+- `ImperiumTypography.Display`, `H1`, `H2`, `H3`, `H4`, `BodyLarge`, `BodyMedium`, `BodySmall`, `Caption`, `Label`.
+- Chaque style expose `fontFamily`, `fontSizeSp`, `fontWeight`, `lineHeightSp`, `letterSpacingSp`.
+
+Spacing :
+- `ImperiumSpacing.XXS`, `XS`, `SM`, `MD`, `LG`, `XL`, `XXL`, `XXXL`.
+- Exemple d'usage attendu : `ImperiumSpacing.MD`.
+
+Radius :
+- `ImperiumRadius.Chip`, `Button`, `Input`, `Card`, `BottomSheet`, `Dialog`, `Fullscreen`, `Avatar`, `ImageCard`.
+- Exemple d'usage attendu : `ImperiumRadius.Card`.
+- Les valeurs sont en dp et ne créent aucune valeur intermédiaire hors §4.
+
+Elevation :
+- `ImperiumElevation.L0`, `L1`, `L2`, `L3`, `L4`.
+- Exemple d'usage attendu : `ImperiumElevation.L2`.
+
+Icons :
+- Les alias pointent vers Material Symbols Outlined sauf asset premium explicitement déclaré.
+- Un alias d'icône ne porte jamais une décision métier ; il décrit uniquement le pictogramme.
+
+States :
+- `ImperiumState` est un enum unique, partagé par les cinq apps.
+- Les états de sync backend autorisés sont `Pending`, `Syncing`, `Synced`, `Failed`, `Conflict`, `Cached`, `Stale`.
+- Les états d'écran obligatoires sont `Loading`, `Empty`, `Error`, `Offline`, `Syncing`, `Synced`, `Conflict`.
+- Exemple d'usage attendu : `ImperiumState.Syncing`.
+
+### Règles d'extraction
+
+- Les noms Kotlin attendus sont stables et ne doivent pas être localisés.
+- Les valeurs affichées à l'utilisateur restent localisées côté UI, jamais dans le token.
+- Un token absent de ce DS ne peut pas être inventé par l'extracteur.
+- Toute collision de nom doit être résolue par suffixe app explicite, jamais par renommage silencieux.
+- Les références aux documents absents ou non canoniques ne sont pas extractibles.
+
+## Component Catalog Extraction Contract
+
+Ce contrat prépare `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md`. Il décrit les Foundation Components obligatoires, leur nom canonique, leurs variantes et leur responsabilité. Objectif : préparer `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md` sans produire de composant Compose réel dans ce patch.
+
+| Famille obligatoire | Nom canonique | Variantes V1 | Responsabilité |
+|---|---|---|---|
+| Button | `ImperiumButton` | `Primary`, `Secondary`, `Ghost`, `Destructive`, `Icon`, `Voice` | Déclencher une action utilisateur explicite, gérer `enabled/loading/icons`, respecter 1 Primary visible par écran. |
+| Input | `ImperiumInput` | `Text`, `Number`, `Search`, `Voice`, `Slider`, `Stepper`, `Date` | Collecter une donnée utilisateur sans créer d'action canonique hors validation backend. |
+| Selection | `ImperiumSelection` | `Switch`, `Checkbox`, `Radio`, `SegmentedControl`, `FilterChip` | Choisir une option ou un état local, avec libellé visible et feedback clair. |
+| Navigation | `ImperiumNavigation` | `TopBar`, `SidebarRail`, `BottomNavigation`, `TabBar`, `DeepLinkTarget` | Exposer les destinations V1 seulement, sans surface V2/V3 ni doublon top-level. |
+| Feedback | `ImperiumFeedback` | `Snackbar`, `Toast`, `Banner`, `DialogAlert`, `SyncChip` | Afficher résultat, erreur, pending sync, conflit ou alerte sans fake success. |
+| Containers | `ImperiumContainer` | `Card`, `InteractiveCard`, `BottomSheet`, `Dialog`, `Drawer`, `ContextPanel` | Structurer l'information en respectant radius, elevation, spacing et densité par surface. |
+| States | `ImperiumStateSurface` | `Loading`, `Empty`, `Error`, `Offline`, `Syncing`, `Synced`, `Conflict` | Rendre chaque état d'écran obligatoire avec copy, icône/illustration et CTA approprié. |
+
+### Contraintes catalogue
+
+- Le catalogue ne peut pas ajouter de famille hors de cette liste sans PR sur ce DS.
+- Les composed patterns spécifiques à une app restent dans les sections app (`13.15`, `14.15`, `15.17`, `16.14`) et ne deviennent pas des Foundation Components.
+- Les composants ne prennent jamais de décision métier : ils affichent, collectent ou déclenchent une action backend.
+- Les variantes V2/V3 exclues par le V1 Scope Lock ne doivent pas apparaitre dans le catalogue V1.
+
 
 ---
 
 ## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1
 
-Mapping écran ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Cette section couvre les 14 écrans Imperium V1 issus de l'audit `2026-06-02_0519_audit.md` et des docs sources locales `07`, `24`, `26`, `29`, `32`, `43`.
+Mapping écran ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Cette section couvre les 14 écrans Imperium V1 issus de `audits/2026-06-02_0519_audit.md` et des docs sources locales présentes `07_ANDROID_APP_RESPONSIBILITIES.md`, `24_DAY_FINISHED_WORKFLOW.md`, `26_PRIORITY_RULES_WORKFLOW.md`, `29_WEEKLY_REPORT_WORKFLOW.md`, `32_WR_INTERACTIVE_WORKFLOW.md`, `43_IMPERIUM_LOGIC_DETAIL.md`.
 
 Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affiche, collecte ou déclenche une action backend. Les endpoints marqués `TBD` doivent être créés dans un patch backend séparé avant implémentation UI.
 
@@ -638,7 +781,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Widgets :** day completion counter, discipline today mini KPI.
 - **Assets :** end-of-day hero 240x240 only when first empty state is shown.
 - **Etats :** Loading=submit spinner ; Empty=form ready for today's review ; Error=day already finished or validation failure ; Offline=pending local review banner ; Syncing=sync line ; Synced=snackbar then IMP-01 ; Conflict=existing review conflict with server timestamp.
-- **Backend deps :** `POST /api/imperium/day/finish`, `GET /api/imperium/day/review/latest`.
+- **Backend deps :** `POST /api/imperium/day/finish`, `GET /api/imperium/day/latest`.
 - **Navigation :** opened by Finish Day action on IMP-01 or notification ; closes to IMP-01.
 - **Tab S10 Ultra :** centered Dialog max 760dp, two-column sliders/text on landscape.
 
@@ -651,7 +794,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Widgets :** none.
 - **Assets :** none.
 - **Etats :** Loading=replan in progress with spinner ; Empty=no proposal yet ; Error=replan failed dialog ; Offline=cannot validate new AI plan offline banner ; Syncing=acceptance pending line ; Synced=accepted plan snackbar ; Conflict=proposal stale against current plan.
-- **Backend deps :** `TBD GET /api/imperium/replans/{replan_event_id}`, `TBD POST /api/imperium/replans/{replan_event_id}/accept`, `POST /api/imperium/daily-plans/{plan_id}/activate` when proposal is materialized.
+- **Backend deps :** `TBD GET /api/imperium/replans/{replan_event_id}`, `TBD POST /api/imperium/replans/{replan_event_id}/accept`, `POST /api/imperium/day/plan/{plan_id}/activate` when proposal is materialized.
 - **Navigation :** from IMP-02, IMP-03, explicit Dashboard replan action, or hook banner ; accept goes IMP-01 ; cancel returns source screen.
 - **Tab S10 Ultra :** true two-column Before/After in main content, optional 320dp reason panel.
 
@@ -677,7 +820,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Widgets :** weekly completion mini trend.
 - **Assets :** empty-state illustration 240x240 only when no history exists.
 - **Etats :** Loading=skeleton timeline ; Empty=no past plan with CTA Dashboard ; Error=history fetch failure ; Offline=cached history banner ; Syncing=refresh line ; Synced=refresh snackbar ; Conflict=not applicable for read-only, show conflict banner only if backend reports stale cache.
-- **Backend deps :** `GET /api/imperium/daily-plans/today`, `TBD GET /api/imperium/daily-plans/history`, fallback `GET /api/imperium/missions/history`.
+- **Backend deps :** `GET /api/imperium/daily-plan`, `GET /api/imperium/day/plan/today`, `GET /api/imperium/day/plan`, fallback `GET /api/imperium/missions/history`, `TBD daily plan history read endpoint` because no backend route exists yet.
 - **Navigation :** top-level Sidebar/Bottom Nav tab ; deep links to IMP.MISSION.DETAIL ; back returns previous top-level tab.
 - **Tab S10 Ultra :** main timeline max 1280dp, no right panel by default.
 
@@ -755,7 +898,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Widgets :** priority count and last updated status chip.
 - **Assets :** Material Symbols only.
 - **Etats :** Loading=priorities skeleton ; Empty=initialize defaults CTA ; Error=duplicate rank/key or fetch failure ; Offline=editing disabled with cached values ; Syncing=save line ; Synced=saved snackbar ; Conflict=idempotency or concurrent update diff dialog.
-- **Backend deps :** `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, legacy read `GET /api/imperium/priority-rules`.
+- **Backend deps :** `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, legacy read `GET /api/imperium/priorities`.
 - **Navigation :** from IMP-14 Settings ; save/back returns IMP-14.
 - **Tab S10 Ultra :** two columns: draggable list left, explanation/audit panel right.
 
@@ -810,7 +953,7 @@ Transitions conditionnelles canoniques V1 :
 | IMP-03 --> IMP-05 | Mission ratée/annulée et hook replan accepté par le backend. |
 | IMP-12 --> IMP-11 | Weekly Review approuvée puis stockée/affichable en read-only. |
 
-Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP-01`), Plan History (`IMP-07`), Decisions Log (`IMP-09`), Weekly Reviews (`IMP-10`), Settings (`IMP-14`). `Mon OS personnel` is excluded from V1 navigation because doc 54 marks System Health Dashboard as V3.
+Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP-01`), Plan History (`IMP-07`), Decisions Log (`IMP-09`), Weekly Reviews (`IMP-10`), Settings (`IMP-14`). `Mon OS personnel` is excluded from V1 navigation because `audits/2026-06-02_0519_audit.md` records the historical System Health Dashboard as V3; the referenced historical doc is not present in `docs_master/` and is not canonical for V1.
 
 Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` is a deep_link read surface backed by `GET /api/imperium/missions/{mission_id}` and may reuse the Mission card components; it is not counted as one of the 14 Imperium V1 screens until product explicitly promotes it.
 
@@ -823,16 +966,16 @@ Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` is a deep_link read sur
 | IMP-01 | `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active` | none |
 | IMP-02 | none | `POST /api/imperium/morning-checkins` |
 | IMP-03 | `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail` | `POST /api/imperium/missions/{mission_id}/cancel` |
-| IMP-04 | `POST /api/imperium/day/finish`, `GET /api/imperium/day/review/latest` | none |
-| IMP-05 | `POST /api/imperium/daily-plans/{plan_id}/activate` | `GET /api/imperium/replans/{replan_event_id}`, `POST /api/imperium/replans/{replan_event_id}/accept` |
-| IMP-06 | `POST /api/imperium/missions` | none |
-| IMP-07 | `GET /api/imperium/daily-plans/history` | none |
+| IMP-04 | `POST /api/imperium/day/finish`, `GET /api/imperium/day/latest` | none |
+| IMP-05 | `POST /api/imperium/day/plan/{plan_id}/activate` | `GET /api/imperium/replans/{replan_event_id}`, `POST /api/imperium/replans/{replan_event_id}/accept` |
+| IMP-06 | `POST /api/imperium/missions/backlog`, `GET /api/imperium/missions/backlog/decision-preview`, `POST /api/imperium/missions/backlog/{mission_id}/promote` | none |
+| IMP-07 | `GET /api/imperium/daily-plan`, `GET /api/imperium/day/plan/today`, `GET /api/imperium/day/plan`, `GET /api/imperium/missions/history` | TBD daily plan history read endpoint |
 | IMP-08 | none | `GET /api/imperium/chat/conversations`, `POST /api/imperium/chat/messages` |
 | IMP-09 | none | `GET /api/imperium/decisions-log` |
 | IMP-10 | `GET /api/imperium/weekly-review/history`, `GET /api/imperium/weekly-review/final-reports/stored`, `GET /api/imperium/weekly-review/state` | none |
 | IMP-11 | `GET /api/imperium/weekly-review/{session_id}/final-report`, `GET /api/imperium/weekly-review/{session_id}/final-report/markdown`, `GET /api/imperium/weekly-review/final-reports/{report_id}` | none |
 | IMP-12 | `GET /api/imperium/weekly-review/current`, `POST /api/imperium/weekly-review/launch`, `GET /api/imperium/weekly-review/{session_id}/conversation`, `POST /api/imperium/weekly-review/{session_id}/chat/messages`, `POST /api/imperium/weekly-review/{session_id}/chat/confirm-no-more-input`, `POST /api/imperium/weekly-review/{session_id}/draft/approve`, `POST /api/imperium/weekly-review/{session_id}/draft/store` | none |
-| IMP-13 | `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, `GET /api/imperium/priority-rules` | none |
+| IMP-13 | `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, `GET /api/imperium/priorities` | none |
 | IMP-14 | `GET /api/imperium/frontend/app-manifest` | `GET /api/imperium/settings`, `PATCH /api/imperium/settings` |
 
 All mutation endpoints require backend/user validation before creating canonical actions. Endpoint names are canonical UI contracts; `TBD` endpoints require backend patches before UI implementation.
@@ -1950,5 +2093,5 @@ Path handles high and very-high privacy data. V1 rules:
 ---
 
 **Document version :** 1.0
-**Statut :** DRAFT V1 — toute déviation requiert PR.
+**Statut :** CANONICAL V1 — toute déviation requiert PR.
 **Last updated :** 2026-06-02
