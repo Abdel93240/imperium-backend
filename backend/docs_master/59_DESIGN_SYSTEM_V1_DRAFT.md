@@ -10,6 +10,28 @@
 
 ---
 
+## Table des matières
+
+- [0. Principe fondateur](#0-principe-fondateur)
+- [1. Color System](#1-color-system)
+- [2. Typography System](#2-typography-system)
+- [3. Spacing System](#3-spacing-system)
+- [4. Radius System](#4-radius-system)
+- [5. Elevation System](#5-elevation-system)
+- [6. Iconography System](#6-iconography-system)
+- [7. Compose Foundation Components](#7-compose-foundation-components)
+- [8. Responsive Strategy](#8-responsive-strategy)
+- [9. Design Rules](#9-design-rules-synthese-non-negociables)
+- [10. Implementation Guardrail](#10-implementation-guardrail-compose)
+- [11. Annexes](#11-annexes-a-produire-post-v1)
+- [12. Imperium Screen Architecture Mapping V1](#12-imperium-screen-architecture-mapping-v1)
+- [13. Vault Screen Architecture Mapping V1](#13-vault-screen-architecture-mapping-v1)
+- [14. Vector Screen Architecture Mapping V1](#14-vector-screen-architecture-mapping-v1)
+- [15. Pulse Screen Architecture Mapping V1](#15-pulse-screen-architecture-mapping-v1)
+- [16. Path Screen Architecture Mapping V1](#16-path-screen-architecture-mapping-v1)
+
+---
+
 ## 0. Principe fondateur
 
 ```text
@@ -29,15 +51,14 @@ Corollaires :
 
 ## 1. COLOR SYSTEM
 
-### 1.1 Système global (cross-app)
+### 1.1 Semantic state colors (cross-app)
 
 | Token sémantique | HEX | Usage | Règle |
 |---|---|---|---|
-| Success | `#34C759` | confirmation backend, sync OK, halo Vector vert | Réservé aux états positifs **confirmés**. Jamais pour un draft. |
+| Success | `#34C759` | confirmation backend, sync OK, action accomplie | Réservé aux états positifs **confirmés**. Jamais pour un draft. |
 | Warning | `#F5A524` | dérive légère, low confidence, sync lent | Pas pour un blocage. |
-| Error | `#E5484D` | échec sync, mission failed, halo Vector rouge | Toujours accompagné d'un texte explicatif. |
+| Error | `#E5484D` | échec sync, mission failed, blocage validé | Toujours accompagné d'un texte explicatif. |
 | Info | `#0091FF` | recommandation, conseil AI non urgent | Jamais en remplacement de Success. |
-| Halo Analyzing (Vector) | `#FFFFFF` opacité 80% | overlay en analyse | Halo blanc = "analyse en cours, ne pas décider" |
 
 Contraste cible : **WCAG AA (4.5:1)** sur surface primaire de chaque app en dark mode (mode par défaut).
 
@@ -87,9 +108,9 @@ Contraste cible : **WCAG AA (4.5:1)** sur surface primaire de chaque app en dark
 
 Règle Vault : **les montants sont toujours en JetBrains Mono** (cf. §2) pour aligner les chiffres en colonnes.
 
-### 1.4 VECTOR — Strategic VTC Copilot (deep teal + electric cyan, halo trichromique)
+### 1.4 VECTOR — Strategic VTC Copilot (deep teal + electric cyan, halo conduite)
 
-> Identité : kinétique, instantanée, lisible en conduite. Le halo (white/green/red) est sacré.
+> Identité : kinétique, instantanée, lisible en conduite. Les couleurs du Vector Halo sont optimisées pour la conduite et ne remplacent pas les semantic state colors cross-app du §1.1.
 
 | Token | HEX | Usage |
 |---|---|---|
@@ -110,7 +131,7 @@ Règle Vault : **les montants sont toujours en JetBrains Mono** (cf. §2) pour a
 | Text Secondary | `#B6CCD2` | labels |
 | Text Muted | `#778C92` | metadata |
 
-Règle Vector : **en mode NAVIGATION (doc 55 §5.2), le halo prend précédence visuelle sur tout autre accent**. Les overlays se réduisent automatiquement.
+Règle Vector : **en mode NAVIGATION (doc 55 §5.2), le halo prend précédence visuelle sur tout autre accent**. Les overlays se réduisent automatiquement. Le Vector Halo utilise ses propres tokens `Halo Success|Halo Warning|Halo Error|Halo Analyzing` pour la décision conduite ; les états UI génériques restent `Success|Warning|Error|Info` du §1.1.
 
 ### 1.5 PULSE — Biological Layer (deep crimson + warm coral)
 
@@ -160,9 +181,9 @@ Règle Vector : **en mode NAVIGATION (doc 55 §5.2), le halo prend précédence 
 
 - **Dark mode = défaut V1.** Light mode = V2.
 - **Une seule couleur d'accent visible par écran.** Si un écran cross-app affiche du contenu de Vault + Vector simultanément, l'app *hôte* impose son accent ; les autres descendent en `Surface Variant`.
-- **Halo states (Success/Warning/Error/Info)** ont la même HEX dans les 5 apps : sémantique > marque.
+- **Semantic state colors (`Success|Warning|Error|Info`)** ont la même HEX dans les 5 apps : sémantique > marque. Les `Halo *` de Vector sont des tokens de conduite séparés et n'entrent pas dans cette règle.
 - **L'or (`#C9A24B` Imperium / `#B58A4C` Vault / `#D9B265` Path)** : max 1 élément doré visible par écran. Sinon dilution.
-- **Accessibilité daltonisme** : les halo states ne sont JAMAIS utilisés seuls — toujours couplés à une icône (✓ ⚠ ✕ ⓘ) ou un libellé textuel. Cf. §6.
+- **Accessibilité daltonisme** : les semantic states et le Vector Halo ne sont JAMAIS utilisés seuls — toujours couplés à une icône (`check`, `warning`, `close`, `info`) ou un libellé textuel. Cf. §6.
 
 ---
 
@@ -197,7 +218,7 @@ Règle Vector : **en mode NAVIGATION (doc 55 §5.2), le halo prend précédence 
 ### 2.3 Règles d'application
 
 - **Tab S10 Ultra landscape :** échelle ci-dessus inchangée. La marge gagnée se déverse en spacing/whitespace, pas en agrandissement.
-- **Phone portrait :** réduire Display→40, H1→32, H2→24, H3→20 (cf. §9 responsive). Le reste inchangé.
+- **Phone portrait :** réduire Display→40, H1→32, H2→24, H3→20 (cf. §8 responsive). Le reste inchangé.
 - **Numériques (€, km/h, h, score) :** **toujours JetBrains Mono Regular ou Medium**, taille = celle du contexte. Permet alignement colonnes dans Vault et Vector.
 - **Arabe (Path) :** **Noto Naskh Arabic Regular**, +2 sp par rapport à Body équivalent pour compensation densité.
 - **Letter-spacing :** par défaut Compose `0.sp`. Exception : `Label` et `Caption` en `0.2.sp` pour majuscules de chips.
@@ -316,7 +337,7 @@ Règles :
 
 ## 7. COMPOSE FOUNDATION COMPONENTS
 
-> Description fonctionnelle uniquement (mode read-only). Le code Compose sera produit ultérieurement.
+> Description fonctionnelle uniquement (mode read-only). Le code Compose sera produit ultérieurement. Les composed patterns spécifiques à une app sont documentés dans la section architecture de cette app, pas dans la foundation.
 
 ### 7.1 Buttons
 
@@ -394,35 +415,172 @@ Chaque écran expose obligatoirement les 7 états :
 | **Synced** | Confirmation transitoire (Snackbar `Success`) puis disparition. | "Mission complétée — synced". |
 | **Conflict** | Banner `Error`, Dialog au tap : "Conflit côté serveur" + diff visible + 2 actions (Garder local / Garder serveur). | Doc 07 §Sync Flow. |
 
-### 7.8 Vault-specific composed patterns
+---
 
-Ces patterns assemblent les composants foundation pour Vault. Ils ne créent pas de cerveau local : ils affichent la vérité financière, collectent une validation utilisateur, puis appellent le backend.
+## 8. RESPONSIVE STRATEGY
 
-| Pattern | Composition V1 | Ecrans |
+### 8.1 Breakpoints
+
+| Mode | Largeur (dp) | Layout |
 |---|---|---|
-| **Camera Capture Surface** | Fullscreen surface L0 avec preview caméra, permission inline, frame guide, shutter icon button 64dp, action secondaire "Saisie manuelle". Etats permission denied / camera unavailable redirigent vers VAU-03. | VAU-04 |
-| **Draft Transaction Card** | Card L2, badge Warning "Draft", montant JetBrains Mono, merchant/ligne, category dropdown, confidence chip, checkbox inclure/exclure, inline edit. Jamais Success avant validation backend. | VAU-05 |
-| **Pressure Gauge** | Score JetBrains Mono H3/H1 selon surface, label doc 11 (`safe|stable|attention|pressure|critical`), icon state + couleur sémantique. Financial pressure UI renders doc 11 raw 0-100. | VAU-01, VAU-06 |
-| **Money Display Hierarchy** | Un seul montant Display par écran. Dashboard: wallet total Display, week/month H3, row amounts Body Medium. Lists: Body Medium JetBrains Mono aligné à droite. Inputs: Body Large JetBrains Mono. | VAU-01, VAU-07, VAU-10 |
-| **Money Input** | Number input avec clavier numérique, devise EUR fixe V1, cents visibles, validation `amount > 0`, supporting text pour wallet source. | VAU-02, VAU-03, VAU-08, VAU-10 |
-| **Filter Chip Bar** | Segmented `business|personal|all`, date range picker, category chip, clear filter icon. | VAU-07, VAU-09 |
-| **Category Dropdown** | Defaults read-only par book, customs éditables, option "Autre" ouvrant TextField, suggestion Qwen en chip Warning jusqu'à validation. | VAU-02, VAU-03, VAU-05, VAU-09 |
-| **Wallet Allocation Display** | Stack bar cash/bank/crypto + total dérivé. Ne stocke pas un solde indépendant. | VAU-01, VAU-10 |
-| **Upcoming Expense Row** | Title, amount JetBrains Mono, due date, countdown, recurrence chip, status `pending|paid|overdue`; overdue utilise Error + icon. | VAU-01, VAU-11 |
-| **Sync Pending Banner** | Banner Warning haut d'écran si mutation locale non confirmée ; snackbar Success uniquement après 200 backend. | tous VAU-* |
-| **Date Picker** | Picker Material 3, date locale par défaut aujourd'hui, timezone conservée dans payload. | VAU-02, VAU-03, VAU-07, VAU-11 |
-| **Stats Sparkline** | 64dp height max, tendance catégorie/semaine, jamais seul pour une décision. | VAU-09 |
-| **Confirm Destructive Dialog** | Dialog L3 pour reversal/suppression apparente ; libellé explicite "Annuler par écriture inverse". | VAU-08, VAU-11 |
+| **Portrait Phone** | 0 – 599 | 1 colonne, Bottom Navigation, padding `MD`, échelle typographique réduite (cf. §2.3). |
+| **Landscape Phone** | 600 – 839 | 1-2 colonnes selon écran, Bottom Nav éventuellement, padding `MD`-`LG`. |
+| **Tablet Portrait** | 840 – 1199 | 2 colonnes, Sidebar Rail compact 80dp ou Bottom Nav, padding `LG`. |
+| **Tablet Landscape** | 1200+ (**cible Tab S10 Ultra : 2960dp à 239ppi → ~1860dp logiques en landscape selon density**) | **3 colonnes max**, Sidebar Rail étendu 240dp, padding `XL`, contenu central max-width 1280dp avec marges latérales. |
+
+### 8.2 Priorité Tab S10 Ultra Landscape
+
+C'est **le device par défaut V1.** Toutes les maquettes V1 sont d'abord conçues pour ce form factor.
+
+Layout canonique Tab S10 Ultra landscape :
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ Top Bar 64dp                                                     │
+├────────┬──────────────────────────────────────────┬──────────────┤
+│        │                                          │              │
+│        │                                          │              │
+│ Side-  │     Contenu principal                    │  Panneau     │
+│ bar    │     (max-width 1280dp, centré)           │  contextuel  │
+│ Rail   │                                          │  optionnel   │
+│ 240dp  │                                          │  320dp       │
+│        │                                          │              │
+│        │                                          │              │
+└────────┴──────────────────────────────────────────┴──────────────┘
+```
+
+- **Colonne gauche (Sidebar 240dp) :** navigation primaire Imperium V1 : Dashboard, Plan History, Decisions Log, Weekly Reviews, Settings. `Mon OS personnel` reste V3 et n'apparait pas dans la Sidebar V1.
+- **Colonne centrale (flex, max 1280dp) :** contenu principal.
+- **Colonne droite (320dp, optionnelle) :** panneau contextuel persistant (ex: chatbot dock sur Dashboard, side panel HUD Vector).
+
+### 8.3 Règles de conversion
+
+- **Portrait → Landscape :** la Bottom Nav devient Sidebar Rail. Les cards 1-col deviennent 2-col grid.
+- **Rotation :** transition `Crossfade` 200ms ; pas de scroll loss.
+- **Multi-window Samsung DeX :** support V2 (V1 : layout phone-style minimum).
+
+### 8.4 Driving surface (Vector navigation)
+
+Override du responsive : en mode driving (cf. doc 55 §5.2), le contenu se réduit à :
+- 1 carte centrale info essentielle
+- 0 sidebar
+- Top bar minimaliste 40dp
+- Halo en overlay plein écran semi-transparent
 
 ---
 
-## 8. IMPERIUM SCREEN ARCHITECTURE MAPPING V1
+## 9. DESIGN RULES (synthèse non-négociables)
+
+### 9.1 Quand utiliser les assets premium
+
+- ✅ Emblèmes d'app (header).
+- ✅ Hero d'écran à charge émotionnelle (Morning Check-In, Weekly Review intro, End-of-day Bilan, milestone).
+- ✅ Empty states de cœur de flow (jamais d'illustration pour un empty state d'utilité technique).
+- ❌ Buttons, top bar actions, listes, chips → Material Symbols.
+- ❌ Jamais 2 assets premium côte à côte (sauf emblème + hero).
+
+### 9.2 Quand utiliser une simple icône
+
+- Toute action courante (tap, swipe, dismiss).
+- Tout indicateur d'état (✓ ⚠ ✕ ⓘ).
+- Toute navigation.
+- Tout adornment d'input.
+→ **Material Symbols Outlined, weight 400.**
+
+### 9.3 Fréquence maximale des accents gold
+
+- **Maximum 1 élément gold visible par écran.** Si une Card a un accent gold, le bouton primary de l'écran prend la couleur Accent app (non-or).
+- Le gold marque ce qui mérite d'être regardé en priorité (current focus mission, sadaqa target, balance principale).
+- L'or n'est jamais utilisé sur du texte courant.
+
+### 9.4 Lisibilité
+
+- Contraste WCAG AA minimum (4.5:1) pour tout texte sur surface.
+- Body Small et Caption : interdit en dessous de Text Muted.
+- Texte sur image / illustration : **toujours sur surface scrim (overlay noir 40-60%)**.
+- Texte en mouvement (animations) : durée min 400ms pour rester lisible.
+- Texte clignotant : **interdit V1** (sauf cursor input).
+
+### 9.5 Densité d'information
+
+| Surface | Cible items visibles (Tab landscape) | Logique |
+|---|---|---|
+| Dashboard Imperium | 5-7 cards majeures | Vue d'ensemble. |
+| Mission detail | 1 mission hero + 3-5 metadata blocks | Focus. |
+| Vault transactions list | 12-20 transactions / écran | Liste lourde. |
+| Path next prayer | 1 info principale + 4 indicateurs secondaires | Glance. |
+| HUD Vector standby | Map plein écran + 2-3 overlays | Spatial. |
+| HUD Vector navigation | Map + 1 info dominante (lane/destination/halo) | Driving. |
+| Weekly Review section | 1 question + contexte + 1 input | Guidée. |
+
+### 9.6 Hiérarchie visuelle (cascade canonique)
+
+1. **Display / H1** → 1 par écran maximum.
+2. **Accent color (gold)** → 1 élément par écran maximum.
+3. **Élévation L4** → 1 surface par écran maximum.
+4. **Banner persistant** → 1 par écran maximum (sauf Critical Alert + WR available qui peuvent cohabiter dans cet ordre).
+5. **Button Primary** → 1 par écran maximum.
+
+Toute infraction à un de ces 5 points dilue la hiérarchie ; toute infraction simultanée à deux d'entre eux invalide l'écran.
+
+### 9.7 Motion (durations & easings)
+
+| Type | Durée | Easing |
+|---|---|---|
+| Micro-interactions (hover, press) | 100ms | `FastOutSlowIn` |
+| Transitions standards (page, sheet) | 250-300ms | `FastOutSlowIn` |
+| Replan transitions (avant/après) | 400ms | `FastOutLinearIn` |
+| Skeleton shimmer | 1500ms loop | `LinearEasing` |
+| Halo Vector pulsing (analyzing) | 1200ms loop | `EaseInOutSine` |
+| **Mode driving** | **toutes durations × 0.5** | éviter distraction |
+
+---
+
+## 10. Implementation Guardrail (Compose)
+
+Avant d'implémenter un composant V1, l'équipe Compose vérifie :
+
+1. Le token utilisé existe-t-il dans ce DS ? (Si non : escalation, pas d'invention.)
+2. La radius / spacing / typography correspond-elle à l'échelle officielle ?
+3. Le composant gère-t-il les 7 states (§7.7) ?
+4. La couleur d'état (Success/Warning/Error/Info) est-elle accompagnée d'une icône + libellé ?
+5. Le device par défaut testé est-il Tab S10 Ultra landscape ?
+6. Le composant respecte-t-il la règle "no fake success" ?
+
+Si une réponse est non, le composant n'est pas mergeable.
+
+---
+
+## 11. Annexes (à produire post-V1)
+
+- `60_DESIGN_SYSTEM_TOKENS.kt` (extraction Kotlin auto-générée).
+- `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md` (catalogue détaillé Compose).
+- `62_DESIGN_SYSTEM_FIGMA_REF.md` (références Figma synchronisées).
+- `63_DESIGN_SYSTEM_A11Y.md` (audit accessibilité WCAG complet).
+
+
+---
+
+## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1
 
 Mapping écran ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Cette section couvre les 14 écrans Imperium V1 issus de l'audit `2026-06-02_0519_audit.md` et des docs sources locales `07`, `24`, `26`, `29`, `32`, `43`.
 
 Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affiche, collecte ou déclenche une action backend. Les endpoints marqués `TBD` doivent être créés dans un patch backend séparé avant implémentation UI.
 
-### 8.0 Canonical Routing Typology
+### 12.0 Imperium Product Decisions V1
+
+| Décision | Règle V1 |
+|---|---|
+| Command center | Imperium reste le command center : il décide quoi faire maintenant via backend/n8n/AI router, puis l'app affiche, collecte ou déclenche. |
+| One active mission | Une seule mission active peut exister à la fois. Toute UI concurrente affiche un conflit et renvoie vers le backend. |
+| Current focus | `IMP-01` est la surface canonique de mission active ; les autres écrans ne créent pas une deuxième mission active. |
+| Mon OS personnel V3 | `Mon OS personnel` / System Health Dashboard is explicitly excluded from V1 navigation ; il reste V3 et ne doit pas apparaître dans Sidebar/Bottom Nav V1. |
+| Mission detail V1 | Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` est une surface `deep_link` read/detail contextuelle, non une entrée top-level navigation et non un écran V1 supplémentaire. |
+| Weekly Review | `IMP-12` est l'interaction guidée ; `IMP-11` est le rapport stocké read-only après validation. |
+| Backend ownership | Les écrans Imperium n'inventent pas la stratégie : mission creation/replan/priority changes passent par endpoints backend ou tasks n8n. |
+| Voice input | Les notes voix peuvent collecter une intention, mais Whisper/faster-whisper transcrit et le backend valide avant action canonique. |
+
+### 12.1 Canonical Routing Typology
 
 | Type | Définition Compose V1 | Usage Imperium |
 |---|---|---|
@@ -432,7 +590,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 | `bottom_sheet` | Overlay bas lié à un contexte existant. | Mission Outcome depuis une mission. |
 | `deep_link` | Route directe vers une ressource identifiée. | Mission detail read, Weekly Review final report. |
 
-### 8.1 IMP-01 Imperium Dashboard (`IMP-01`)
+### 12.2 IMP-01 Imperium Dashboard (`IMP-01`)
 
 - **Screen name:** IMP-01 Imperium Dashboard.
 - **Type / slug :** `route`, `imperium/dashboard`, stable ID `IMP.DASH.MAIN`.
@@ -445,7 +603,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** entry after auth/onboarding/morning check-in ; exits to IMP-02, IMP-03, IMP-05, IMP-06, IMP-07, IMP-08, IMP-09, IMP-10, IMP-14.
 - **Tab S10 Ultra :** 3 columns: Sidebar 240dp, main dashboard max 1280dp, chatbot/context panel 320dp.
 
-### 8.2 IMP-02 Morning Check-In Popup (`IMP-02`)
+### 12.3 IMP-02 Morning Check-In Popup (`IMP-02`)
 
 - **Screen name:** IMP-02 Morning Check-In Popup.
 - **Type / slug :** `dialog`, `imperium/morning-check-in`, stable ID `IMP.CHECKIN.MORNING`.
@@ -458,7 +616,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** opened by morning trigger before Dashboard ; continue can open IMP-05 when replan proposal exists, otherwise IMP-01 ; later closes to IMP-01.
 - **Tab S10 Ultra :** centered Dialog max 720dp, no right panel.
 
-### 8.3 IMP-03 Mission Outcome Form (`IMP-03`)
+### 12.4 IMP-03 Mission Outcome Form (`IMP-03`)
 
 - **Screen name:** IMP-03 Mission Outcome Form.
 - **Type / slug :** `bottom_sheet`, `imperium/mission/{mission_id}/outcome`, stable ID `IMP.MISSION.OUTCOME`.
@@ -471,7 +629,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** opened from IMP-01 mission card or IMP.MISSION.DETAIL ; failed/cancelled can trigger IMP-05 ; done returns to IMP-01.
 - **Tab S10 Ultra :** right-side sheet 480dp or bottom sheet max 640dp anchored to mission context.
 
-### 8.4 IMP-04 Day Finished Form (`IMP-04`)
+### 12.5 IMP-04 Day Finished Form (`IMP-04`)
 
 - **Screen name:** IMP-04 Day Finished Form.
 - **Type / slug :** `dialog`, `imperium/day-finished`, stable ID `IMP.DAY.FINISH`.
@@ -484,7 +642,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** opened by Finish Day action on IMP-01 or notification ; closes to IMP-01.
 - **Tab S10 Ultra :** centered Dialog max 760dp, two-column sliders/text on landscape.
 
-### 8.5 IMP-05 Replan Validation Screen (`IMP-05`)
+### 12.6 IMP-05 Replan Validation Screen (`IMP-05`)
 
 - **Screen name:** IMP-05 Replan Validation Screen.
 - **Type / slug :** `dialog`, `imperium/replan/validation`, stable ID `IMP.REPLAN.VALIDATE`.
@@ -497,7 +655,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** from IMP-02, IMP-03, explicit Dashboard replan action, or hook banner ; accept goes IMP-01 ; cancel returns source screen.
 - **Tab S10 Ultra :** true two-column Before/After in main content, optional 320dp reason panel.
 
-### 8.6 IMP-06 Add Manual Mission Form (`IMP-06`)
+### 12.7 IMP-06 Add Manual Mission Form (`IMP-06`)
 
 - **Screen name:** IMP-06 Add Manual Mission Form.
 - **Type / slug :** `dialog`, `imperium/missions/new`, stable ID `IMP.MISSION.ADD_MANUAL`.
@@ -510,7 +668,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** opened from IMP-01 "+ Mission manuelle" ; save returns to IMP-01 or IMP-07 depending source.
 - **Tab S10 Ultra :** centered Dialog max 720dp; preview score can use right contextual panel.
 
-### 8.7 IMP-07 Plan History Tab (`IMP-07`)
+### 12.8 IMP-07 Plan History Tab (`IMP-07`)
 
 - **Screen name:** IMP-07 Plan History Tab.
 - **Type / slug :** `tab`, `imperium/plan-history`, stable ID `IMP.PLAN.HISTORY`.
@@ -523,7 +681,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** top-level Sidebar/Bottom Nav tab ; deep links to IMP.MISSION.DETAIL ; back returns previous top-level tab.
 - **Tab S10 Ultra :** main timeline max 1280dp, no right panel by default.
 
-### 8.8 IMP-08 Chatbot Conversation View (`IMP-08`)
+### 12.9 IMP-08 Chatbot Conversation View (`IMP-08`)
 
 - **Screen name:** IMP-08 Chatbot Conversation View.
 - **Type / slug :** `route`, `imperium/chat`, stable ID `IMP.CHAT.CONVERSATION`.
@@ -536,7 +694,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** opened from Dashboard dock or direct route ; decisions link to IMP-09.
 - **Tab S10 Ultra :** full route when opened directly; docked 320dp right panel on IMP-01.
 
-### 8.9 IMP-09 Decisions Log Tab (`IMP-09`)
+### 12.10 IMP-09 Decisions Log Tab (`IMP-09`)
 
 - **Screen name:** IMP-09 Decisions Log Tab.
 - **Type / slug :** `tab`, `imperium/decisions-log`, stable ID `IMP.DECISIONS.LOG`.
@@ -549,7 +707,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** top-level Sidebar/Bottom Nav tab ; can deep link back to IMP-08 conversation context.
 - **Tab S10 Ultra :** list/detail split: decisions list main, selected rationale in optional 320dp panel.
 
-### 8.10 IMP-10 Weekly Review List (`IMP-10`)
+### 12.11 IMP-10 Weekly Review List (`IMP-10`)
 
 - **Screen name:** IMP-10 Weekly Review List.
 - **Type / slug :** `tab`, `imperium/weekly-reviews`, stable ID `IMP.WR.LIST`.
@@ -562,7 +720,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** top-level Sidebar/Bottom Nav tab ; item tap opens IMP-11 ; active banner opens IMP-12.
 - **Tab S10 Ultra :** list/detail split allowed; detail preview in 320dp panel only after selection.
 
-### 8.11 IMP-11 Weekly Review Read-only View (`IMP-11`)
+### 12.12 IMP-11 Weekly Review Read-only View (`IMP-11`)
 
 - **Screen name:** IMP-11 Weekly Review Read-only View.
 - **Type / slug :** `deep_link`, `imperium/weekly-reviews/{session_id}`, stable ID `IMP.WR.READ_ONLY`.
@@ -575,7 +733,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** from IMP-10 list or IMP-12 after validation/storage ; back returns IMP-10.
 - **Tab S10 Ultra :** report content max 960dp, optional right panel for memory candidate preview.
 
-### 8.12 IMP-12 Weekly Review Interactive Popup (`IMP-12`)
+### 12.13 IMP-12 Weekly Review Interactive Popup (`IMP-12`)
 
 - **Screen name:** IMP-12 Weekly Review Interactive Popup.
 - **Type / slug :** `dialog`, `imperium/weekly-review/current/interactive`, stable ID `IMP.WR.INTERACTIVE`.
@@ -588,7 +746,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** from IMP-01/IMP-10 WR banner ; after stored final report route to IMP-11 ; cancel returns source.
 - **Tab S10 Ultra :** modal max 1040dp with timeline left and draft/action panel right; not a bottom sheet on Tab.
 
-### 8.13 IMP-13 Priority Rules Settings (`IMP-13`)
+### 12.14 IMP-13 Priority Rules Settings (`IMP-13`)
 
 - **Screen name:** IMP-13 Priority Rules Settings.
 - **Type / slug :** `route`, `imperium/settings/priorities`, stable ID `IMP.SETTINGS.PRIORITIES`.
@@ -601,7 +759,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** from IMP-14 Settings ; save/back returns IMP-14.
 - **Tab S10 Ultra :** two columns: draggable list left, explanation/audit panel right.
 
-### 8.14 IMP-14 Imperium Settings Core (`IMP-14`)
+### 12.15 IMP-14 Imperium Settings Core (`IMP-14`)
 
 - **Screen name:** IMP-14 Imperium Settings (core).
 - **Type / slug :** `route`, `imperium/settings`, stable ID `IMP.SETTINGS.CORE`.
@@ -614,7 +772,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Navigation :** top-level Sidebar/Bottom Nav item ; Priority Rules row opens IMP-13.
 - **Tab S10 Ultra :** settings sections in two-column grid, no nested card inside card.
 
-### 8.15 Imperium Navigation Graph V1
+### 12.16 Imperium Navigation Graph V1
 
 ```mermaid
 flowchart TD
@@ -655,6 +813,29 @@ Transitions conditionnelles canoniques V1 :
 Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP-01`), Plan History (`IMP-07`), Decisions Log (`IMP-09`), Weekly Reviews (`IMP-10`), Settings (`IMP-14`). `Mon OS personnel` is excluded from V1 navigation because doc 54 marks System Health Dashboard as V3.
 
 Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` is a deep_link read surface backed by `GET /api/imperium/missions/{mission_id}` and may reuse the Mission card components; it is not counted as one of the 14 Imperium V1 screens until product explicitly promotes it.
+
+---
+
+### 12.17 Imperium Endpoint Matrix V1
+
+| Screen | Real endpoints | TBD endpoints |
+|---|---|---|
+| IMP-01 | `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active` | none |
+| IMP-02 | none | `POST /api/imperium/morning-checkins` |
+| IMP-03 | `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail` | `POST /api/imperium/missions/{mission_id}/cancel` |
+| IMP-04 | `POST /api/imperium/day/finish`, `GET /api/imperium/day/review/latest` | none |
+| IMP-05 | `POST /api/imperium/daily-plans/{plan_id}/activate` | `GET /api/imperium/replans/{replan_event_id}`, `POST /api/imperium/replans/{replan_event_id}/accept` |
+| IMP-06 | `POST /api/imperium/missions` | none |
+| IMP-07 | `GET /api/imperium/daily-plans/history` | none |
+| IMP-08 | none | `GET /api/imperium/chat/conversations`, `POST /api/imperium/chat/messages` |
+| IMP-09 | none | `GET /api/imperium/decisions-log` |
+| IMP-10 | `GET /api/imperium/weekly-review/history`, `GET /api/imperium/weekly-review/final-reports/stored`, `GET /api/imperium/weekly-review/state` | none |
+| IMP-11 | `GET /api/imperium/weekly-review/{session_id}/final-report`, `GET /api/imperium/weekly-review/{session_id}/final-report/markdown`, `GET /api/imperium/weekly-review/final-reports/{report_id}` | none |
+| IMP-12 | `GET /api/imperium/weekly-review/current`, `POST /api/imperium/weekly-review/launch`, `GET /api/imperium/weekly-review/{session_id}/conversation`, `POST /api/imperium/weekly-review/{session_id}/chat/messages`, `POST /api/imperium/weekly-review/{session_id}/chat/confirm-no-more-input`, `POST /api/imperium/weekly-review/{session_id}/draft/approve`, `POST /api/imperium/weekly-review/{session_id}/draft/store` | none |
+| IMP-13 | `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, `GET /api/imperium/priority-rules` | none |
+| IMP-14 | `GET /api/imperium/frontend/app-manifest` | `GET /api/imperium/settings`, `PATCH /api/imperium/settings` |
+
+All mutation endpoints require backend/user validation before creating canonical actions. Endpoint names are canonical UI contracts; `TBD` endpoints require backend patches before UI implementation.
 
 ---
 
@@ -887,6 +1068,28 @@ Transitions conditionnelles canoniques V1 :
 
 ---
 
+### 13.15 Vault-specific composed patterns
+
+Ces patterns assemblent les composants foundation pour Vault. Ils ne créent pas de cerveau local : ils affichent la vérité financière, collectent une validation utilisateur, puis appellent le backend.
+
+| Pattern | Composition V1 | Ecrans |
+|---|---|---|
+| **Camera Capture Surface** | Fullscreen surface L0 avec preview caméra, permission inline, frame guide, shutter icon button 64dp, action secondaire "Saisie manuelle". Etats permission denied / camera unavailable redirigent vers VAU-03. | VAU-04 |
+| **Draft Transaction Card** | Card L2, badge Warning "Draft", montant JetBrains Mono, merchant/ligne, category dropdown, confidence chip, checkbox inclure/exclure, inline edit. Jamais Success avant validation backend. | VAU-05 |
+| **Pressure Gauge** | Score JetBrains Mono H3/H1 selon surface, label doc 11 (`safe|stable|attention|pressure|critical`), icon state + couleur sémantique. Financial pressure UI renders doc 11 raw 0-100. | VAU-01, VAU-06 |
+| **Money Display Hierarchy** | Un seul montant Display par écran. Dashboard: wallet total Display, week/month H3, row amounts Body Medium. Lists: Body Medium JetBrains Mono aligné à droite. Inputs: Body Large JetBrains Mono. | VAU-01, VAU-07, VAU-10 |
+| **Money Input** | Number input avec clavier numérique, devise EUR fixe V1, cents visibles, validation `amount > 0`, supporting text pour wallet source. | VAU-02, VAU-03, VAU-08, VAU-10 |
+| **Filter Chip Bar** | Segmented `business|personal|all`, date range picker, category chip, clear filter icon. | VAU-07, VAU-09 |
+| **Category Dropdown** | Defaults read-only par book, customs éditables, option "Autre" ouvrant TextField, suggestion Qwen en chip Warning jusqu'à validation. | VAU-02, VAU-03, VAU-05, VAU-09 |
+| **Wallet Allocation Display** | Stack bar cash/bank/crypto + total dérivé. Ne stocke pas un solde indépendant. | VAU-01, VAU-10 |
+| **Upcoming Expense Row** | Title, amount JetBrains Mono, due date, countdown, recurrence chip, status `pending|paid|overdue`; overdue utilise Error + icon. | VAU-01, VAU-11 |
+| **Sync Pending Banner** | Banner Warning haut d'écran si mutation locale non confirmée ; snackbar Success uniquement après 200 backend. | tous VAU-* |
+| **Date Picker** | Picker Material 3, date locale par défaut aujourd'hui, timezone conservée dans payload. | VAU-02, VAU-03, VAU-07, VAU-11 |
+| **Stats Sparkline** | 64dp height max, tendance catégorie/semaine, jamais seul pour une décision. | VAU-09 |
+| **Confirm Destructive Dialog** | Dialog L3 pour reversal/suppression apparente ; libellé explicite "Annuler par écriture inverse". | VAU-08, VAU-11 |
+
+---
+
 ## 14. VECTOR SCREEN ARCHITECTURE MAPPING V1
 
 Mapping écran Vector ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Sources canoniques locales : docs `01`, `07`, `33`, `37`. Vector conseille et analyse l'activité VTC ; il ne clique pas Bolt, ne contourne pas les plateformes, et ne transforme jamais une recommandation cachée en vérité live.
@@ -909,16 +1112,6 @@ Mapping écran Vector ↔ composants foundation ↔ assets ↔ états ↔ naviga
 | Halo | Vector Halo Emblem supporte 40dp status, 64dp card, 96dp focus, 128dp hero. Etats : white=analyse, green=aller/accepter, yellow=hésitation/low confidence, red=éviter/refuser. |
 | Handoff Imperium | VEC-11 peut déclencher un handoff backend vers Imperium replan. L'UI affiche un toast non bloquant `Imperium replanning...`; elle ne choisit pas la mission suivante. |
 | Offline | Offline Vector crée des drafts locaux pour start/end session, revenus, dépenses, screenshots, drop zone et feedback avec `Idempotency-Key`. Les recommandations offline affichent uniquement le cache clairement marqué. |
-
-Composants Vector V1 ajoutés au DS :
-
-- **Vector Halo Emblem :** cercle plein, couleur seule variable, sizes 40/64/96/128dp, motion analyzing 1200ms `EaseInOutSine`.
-- **Driving Mode Indicator :** chip compact en top bar 40dp, visible seulement en session active ou sur surface driving.
-- **Cached Recommendation Card :** zone recommandée, halo, timestamp, state chip `cached|stale|synced`, raison courte.
-- **Confidence Breakdown Component :** quatre lignes max : `return_probability`, `hourly_rate_estimate`, `airport_value`, `event_value`.
-- **Screenshot Upload Surface :** zone fichier/preview/progress, sans OCR review V1.
-- **Session Active KPI Card :** CA session, objectif, durée, progress, destination mode remaining.
-- **Rail/Event/Traffic Banner :** banner Warning/Info avec source, timestamp, impact VTC, auto-remplacement par priorité.
 
 Top-level Vector V1 : Dashboard (`VEC-01`) et Active Session (`VEC-03`). Les autres écrans sont bottom sheets, dialogs, routes dédiées ou deep links contextuels.
 
@@ -959,7 +1152,7 @@ Top-level Vector V1 : Dashboard (`VEC-01`) et Active Session (`VEC-03`). Les aut
 - **Etats :** Loading=session hydration and first signal skeleton ; Empty=not possible, redirects VEC-01 with no active session notice ; Error=session fetch/GPS unavailable/backend disconnect banner ; Offline=session remains visible with live reco disabled and cache-only banner ; Syncing=pending revenue/drop/end line ; Synced=snackbar for confirmed manual action only ; Conflict=session ended elsewhere dialog opens VEC-11 or VEC-01.
 - **Backend deps :** `TBD GET /api/vector/sessions/current`, `TBD GET /api/vector/recommendations/latest`, `TBD GET /api/vector/signals/operational`, `TBD PATCH /api/vector/sessions/{session_id}`, events `vector.manual.revenue.recorded`, `vector.manual.expense.recorded`, `vector.last_drop_zone.recorded`.
 - **Navigation :** from VEC-02 or VEC-01 active card; exits VEC-03 --> VEC-07, VEC-04, VEC-05, VEC-10, VEC-11.
-- **Tab S10 Ultra :** planning mode uses 2 columns when stationary; driving mode uses §9.4 one central card, 0 sidebar, top bar 40dp, halo overlay.
+- **Tab S10 Ultra :** planning mode uses 2 columns when stationary; driving mode uses §8.4 one central card, 0 sidebar, top bar 40dp, halo overlay.
 
 ### 14.4 VEC-04 Manual Revenue Input (`VEC-04`)
 
@@ -1153,6 +1346,20 @@ Fallback behavior:
 - Disabled actions show a short `Mode conduite` reason and optional Voice Button.
 - Offline/stale recommendation state is more visually important than halo color.
 - Cached or stale data never uses the same visual treatment as `synced`.
+
+---
+
+### 14.15 Vector-specific composed patterns
+
+| Pattern | Composition V1 | Ecrans |
+|---|---|---|
+| **Vector Halo Emblem** | Cercle plein, couleur seule variable, sizes 40/64/96/128dp, motion analyzing 1200ms `EaseInOutSine`. Les HEX viennent des tokens `Halo *` Vector, pas des semantic state colors cross-app. | VEC-01, VEC-03, VEC-07, VEC-08, VEC-11 |
+| **Driving Mode Indicator** | Chip compact en top bar 40dp, visible seulement en session active ou sur surface driving. | VEC-03, VEC-07, VEC-08 |
+| **Cached Recommendation Card** | Zone recommandée, halo, timestamp, state chip `cached|stale|synced`, raison courte. | VEC-01, VEC-07, VEC-08 |
+| **Confidence Breakdown Component** | Quatre lignes max : `return_probability`, `hourly_rate_estimate`, `airport_value`, `event_value`. | VEC-08 |
+| **Screenshot Upload Surface** | Zone fichier/preview/progress, sans OCR review V1. | VEC-06 |
+| **Session Active KPI Card** | CA session, objectif, durée, progress, destination mode remaining. | VEC-01, VEC-03, VEC-11 |
+| **Rail/Event/Traffic Banner** | Banner Warning/Info avec source, timestamp, impact VTC, auto-remplacement par priorité. | VEC-01, VEC-03 |
 
 ---
 
@@ -1490,7 +1697,9 @@ Mapping écran Path ↔ composants foundation ↔ assets ↔ états ↔ navigati
 | Voice input | Whisper/faster-whisper can support PAT-03 notes and PAT-06 counting, but tactile/manual input remains canonical when confidence is low. |
 | Sub-screens | PAT-06b, PAT-07b, PAT-09b, PAT-10b, PAT-11b/c/d/e/f are internal panes/dialogs and do not increase the V1 screen count. |
 
-Top-level Path V1 : Dashboard (`PAT-01`), Prayers (`PAT-02`), Sadaqa (`PAT-03`), Ghusl (`PAT-04`, `PAT-10`), Fasting (`PAT-05`), Adhkar (`PAT-06`), Quran (`PAT-07`), Mosques (`PAT-08`, `PAT-09`), Settings (`PAT-11`).
+Surfaces principales Path V1 : Dashboard (`PAT-01`), Prayer Mark (`PAT-02`), Sadaqa (`PAT-03`), Ghusl (`PAT-04`, `PAT-10`), Fasting (`PAT-05`), Adhkar (`PAT-06`), Quran (`PAT-07`), Mosque Detail (`PAT-08`), Mosques Management (`PAT-09`), Settings (`PAT-11`).
+
+Vraies entrées top-level navigation Path V1, alignées avec le graph Mermaid : Dashboard (`PAT-01`), Mosques (`PAT-09`), Ghusl Addresses (`PAT-10`), Settings (`PAT-11`). Les autres surfaces sont des actions contextuelles, tabs internes, dialogs, routes dédiées ou deep links.
 
 ### 16.1 PAT-01 Path Dashboard (`PAT-01`)
 
@@ -1737,149 +1946,6 @@ Path handles high and very-high privacy data. V1 rules:
 - Error messages never expose sensitive religious details.
 - Delete/export workflows must include Path records and linked Vault transaction references; Vault immutability uses reversal/anonymized linkage rather than silent deletion.
 - UI copy must avoid presenting discipline signals, sadaqa carry, or prayer non-marking as religious rulings.
-
----
-
-## 9. RESPONSIVE STRATEGY
-
-### 9.1 Breakpoints
-
-| Mode | Largeur (dp) | Layout |
-|---|---|---|
-| **Portrait Phone** | 0 – 599 | 1 colonne, Bottom Navigation, padding `MD`, échelle typographique réduite (cf. §2.3). |
-| **Landscape Phone** | 600 – 839 | 1-2 colonnes selon écran, Bottom Nav éventuellement, padding `MD`-`LG`. |
-| **Tablet Portrait** | 840 – 1199 | 2 colonnes, Sidebar Rail compact 80dp ou Bottom Nav, padding `LG`. |
-| **Tablet Landscape** | 1200+ (**cible Tab S10 Ultra : 2960dp à 239ppi → ~1860dp logiques en landscape selon density**) | **3 colonnes max**, Sidebar Rail étendu 240dp, padding `XL`, contenu central max-width 1280dp avec marges latérales. |
-
-### 9.2 Priorité Tab S10 Ultra Landscape
-
-C'est **le device par défaut V1.** Toutes les maquettes V1 sont d'abord conçues pour ce form factor.
-
-Layout canonique Tab S10 Ultra landscape :
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│ Top Bar 64dp                                                     │
-├────────┬──────────────────────────────────────────┬──────────────┤
-│        │                                          │              │
-│        │                                          │              │
-│ Side-  │     Contenu principal                    │  Panneau     │
-│ bar    │     (max-width 1280dp, centré)           │  contextuel  │
-│ Rail   │                                          │  optionnel   │
-│ 240dp  │                                          │  320dp       │
-│        │                                          │              │
-│        │                                          │              │
-└────────┴──────────────────────────────────────────┴──────────────┘
-```
-
-- **Colonne gauche (Sidebar 240dp) :** navigation primaire Imperium V1 : Dashboard, Plan History, Decisions Log, Weekly Reviews, Settings. `Mon OS personnel` reste V3 et n'apparait pas dans la Sidebar V1.
-- **Colonne centrale (flex, max 1280dp) :** contenu principal.
-- **Colonne droite (320dp, optionnelle) :** panneau contextuel persistant (ex: chatbot dock sur Dashboard, side panel HUD Vector).
-
-### 9.3 Règles de conversion
-
-- **Portrait → Landscape :** la Bottom Nav devient Sidebar Rail. Les cards 1-col deviennent 2-col grid.
-- **Rotation :** transition `Crossfade` 200ms ; pas de scroll loss.
-- **Multi-window Samsung DeX :** support V2 (V1 : layout phone-style minimum).
-
-### 9.4 Driving surface (Vector navigation)
-
-Override du responsive : en mode driving (cf. doc 55 §5.2), le contenu se réduit à :
-- 1 carte centrale info essentielle
-- 0 sidebar
-- Top bar minimaliste 40dp
-- Halo en overlay plein écran semi-transparent
-
----
-
-## 10. DESIGN RULES (synthèse non-négociables)
-
-### 10.1 Quand utiliser les assets premium
-
-- ✅ Emblèmes d'app (header).
-- ✅ Hero d'écran à charge émotionnelle (Morning Check-In, Weekly Review intro, End-of-day Bilan, milestone).
-- ✅ Empty states de cœur de flow (jamais d'illustration pour un empty state d'utilité technique).
-- ❌ Buttons, top bar actions, listes, chips → Material Symbols.
-- ❌ Jamais 2 assets premium côte à côte (sauf emblème + hero).
-
-### 10.2 Quand utiliser une simple icône
-
-- Toute action courante (tap, swipe, dismiss).
-- Tout indicateur d'état (✓ ⚠ ✕ ⓘ).
-- Toute navigation.
-- Tout adornment d'input.
-→ **Material Symbols Outlined, weight 400.**
-
-### 10.3 Fréquence maximale des accents gold
-
-- **Maximum 1 élément gold visible par écran.** Si une Card a un accent gold, le bouton primary de l'écran prend la couleur Accent app (non-or).
-- Le gold marque ce qui mérite d'être regardé en priorité (current focus mission, sadaqa target, balance principale).
-- L'or n'est jamais utilisé sur du texte courant.
-
-### 10.4 Lisibilité
-
-- Contraste WCAG AA minimum (4.5:1) pour tout texte sur surface.
-- Body Small et Caption : interdit en dessous de Text Muted.
-- Texte sur image / illustration : **toujours sur surface scrim (overlay noir 40-60%)**.
-- Texte en mouvement (animations) : durée min 400ms pour rester lisible.
-- Texte clignotant : **interdit V1** (sauf cursor input).
-
-### 10.5 Densité d'information
-
-| Surface | Cible items visibles (Tab landscape) | Logique |
-|---|---|---|
-| Dashboard Imperium | 5-7 cards majeures | Vue d'ensemble. |
-| Mission detail | 1 mission hero + 3-5 metadata blocks | Focus. |
-| Vault transactions list | 12-20 transactions / écran | Liste lourde. |
-| Path next prayer | 1 info principale + 4 indicateurs secondaires | Glance. |
-| HUD Vector standby | Map plein écran + 2-3 overlays | Spatial. |
-| HUD Vector navigation | Map + 1 info dominante (lane/destination/halo) | Driving. |
-| Weekly Review section | 1 question + contexte + 1 input | Guidée. |
-
-### 10.6 Hiérarchie visuelle (cascade canonique)
-
-1. **Display / H1** → 1 par écran maximum.
-2. **Accent color (gold)** → 1 élément par écran maximum.
-3. **Élévation L4** → 1 surface par écran maximum.
-4. **Banner persistant** → 1 par écran maximum (sauf Critical Alert + WR available qui peuvent cohabiter dans cet ordre).
-5. **Button Primary** → 1 par écran maximum.
-
-Toute infraction à un de ces 5 points dilue la hiérarchie ; toute infraction simultanée à deux d'entre eux invalide l'écran.
-
-### 10.7 Motion (durations & easings)
-
-| Type | Durée | Easing |
-|---|---|---|
-| Micro-interactions (hover, press) | 100ms | `FastOutSlowIn` |
-| Transitions standards (page, sheet) | 250-300ms | `FastOutSlowIn` |
-| Replan transitions (avant/après) | 400ms | `FastOutLinearIn` |
-| Skeleton shimmer | 1500ms loop | `LinearEasing` |
-| Halo Vector pulsing (analyzing) | 1200ms loop | `EaseInOutSine` |
-| **Mode driving** | **toutes durations × 0.5** | éviter distraction |
-
----
-
-## 11. Implementation Guardrail (Compose)
-
-Avant d'implémenter un composant V1, l'équipe Compose vérifie :
-
-1. Le token utilisé existe-t-il dans ce DS ? (Si non : escalation, pas d'invention.)
-2. La radius / spacing / typography correspond-elle à l'échelle officielle ?
-3. Le composant gère-t-il les 7 states (§7.7) ?
-4. La couleur d'état (Success/Warning/Error/Info) est-elle accompagnée d'une icône + libellé ?
-5. Le device par défaut testé est-il Tab S10 Ultra landscape ?
-6. Le composant respecte-t-il la règle "no fake success" ?
-
-Si une réponse est non, le composant n'est pas mergeable.
-
----
-
-## 12. Annexes (à produire post-V1)
-
-- `60_DESIGN_SYSTEM_TOKENS.kt` (extraction Kotlin auto-générée).
-- `61_DESIGN_SYSTEM_COMPONENTS_CATALOG.md` (catalogue détaillé Compose).
-- `62_DESIGN_SYSTEM_FIGMA_REF.md` (références Figma synchronisées).
-- `63_DESIGN_SYSTEM_A11Y.md` (audit accessibilité WCAG complet).
 
 ---
 

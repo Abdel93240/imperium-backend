@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -51,24 +52,156 @@ def _design_system_text() -> str:
     return DESIGN_SYSTEM_PATH.read_text(encoding="utf-8")
 
 
+def _numbered_heading_lines(text: str) -> list[str]:
+    return [line for line in text.splitlines() if re.match(r"^## \d+\. ", line)]
+
+
+def _top_level_section(text: str, section_number: int) -> str:
+    marker = next(line for line in text.splitlines() if line.startswith(f"## {section_number}. "))
+    return text.split(marker, maxsplit=1)[1].split("\n## ", maxsplit=1)[0]
+
+
+def _subsection(text: str, heading: str) -> str:
+    marker = next(line for line in text.splitlines() if line.startswith(heading))
+    return text.split(marker, maxsplit=1)[1].split("\n### ", maxsplit=1)[0]
+
+
+def _screen_section(text: str, screen_id: str) -> str:
+    marker_pattern = re.compile(rf"^### \d+\.\d+ .*`{re.escape(screen_id)}`.*$", re.MULTILINE)
+    marker_match = marker_pattern.search(text)
+    assert marker_match is not None, f"Missing screen section for {screen_id}"
+
+    section_start = marker_match.end()
+    next_marker = re.search(r"^### \d+\.\d+ ", text[section_start:], re.MULTILINE)
+    section_end = section_start + next_marker.start() if next_marker else len(text)
+    return text[section_start:section_end]
+
+
 def _vault_screen_section(text: str, screen_id: str) -> str:
-    marker = next(line for line in text.splitlines() if line.startswith("### 13.") and f"`{screen_id}`" in line)
-    return text.split(marker, maxsplit=1)[1].split("\n### 13.", maxsplit=1)[0]
+    return _screen_section(text, screen_id)
 
 
 def _vector_screen_section(text: str, screen_id: str) -> str:
-    marker = next(line for line in text.splitlines() if line.startswith("### 14.") and f"`{screen_id}`" in line)
-    return text.split(marker, maxsplit=1)[1].split("\n### 14.", maxsplit=1)[0]
+    return _screen_section(text, screen_id)
 
 
 def _pulse_screen_section(text: str, screen_id: str) -> str:
-    marker = next(line for line in text.splitlines() if line.startswith("### 15.") and f"`{screen_id}`" in line)
-    return text.split(marker, maxsplit=1)[1].split("\n### 15.", maxsplit=1)[0]
+    return _screen_section(text, screen_id)
 
 
 def _path_screen_section(text: str, screen_id: str) -> str:
-    marker = next(line for line in text.splitlines() if line.startswith("### 16.") and f"`{screen_id}`" in line)
-    return text.split(marker, maxsplit=1)[1].split("\n### 16.", maxsplit=1)[0]
+    return _screen_section(text, screen_id)
+
+
+def test_design_system_has_table_of_contents_for_canonical_sections() -> None:
+    text = _design_system_text()
+    toc = text.split("## Table des matières", maxsplit=1)[1].split("\n---", maxsplit=1)[0]
+
+    for required in (
+        "[0. Principe fondateur]",
+        "[1. Color System]",
+        "[7. Compose Foundation Components]",
+        "[8. Responsive Strategy]",
+        "[10. Implementation Guardrail]",
+        "[12. Imperium Screen Architecture Mapping V1]",
+        "[16. Path Screen Architecture Mapping V1]",
+    ):
+        assert required in toc
+
+
+def test_design_system_keeps_foundation_and_guardrails_before_app_architectures() -> None:
+    text = _design_system_text()
+    headings = _numbered_heading_lines(text)
+
+    assert headings[:17] == [
+        "## 0. Principe fondateur",
+        "## 1. COLOR SYSTEM",
+        "## 2. TYPOGRAPHY SYSTEM",
+        "## 3. SPACING SYSTEM",
+        "## 4. RADIUS SYSTEM",
+        "## 5. ELEVATION SYSTEM",
+        "## 6. ICONOGRAPHY SYSTEM",
+        "## 7. COMPOSE FOUNDATION COMPONENTS",
+        "## 8. RESPONSIVE STRATEGY",
+        "## 9. DESIGN RULES (synthèse non-négociables)",
+        "## 10. Implementation Guardrail (Compose)",
+        "## 11. Annexes (à produire post-V1)",
+        "## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1",
+        "## 13. VAULT SCREEN ARCHITECTURE MAPPING V1",
+        "## 14. VECTOR SCREEN ARCHITECTURE MAPPING V1",
+        "## 15. PULSE SCREEN ARCHITECTURE MAPPING V1",
+        "## 16. PATH SCREEN ARCHITECTURE MAPPING V1",
+    ]
+
+
+def test_design_system_foundation_declares_palettes_typography_spacing_and_elevation() -> None:
+    text = _design_system_text()
+
+    for app_heading in (
+        "### 1.2 IMPERIUM",
+        "### 1.3 VAULT",
+        "### 1.4 VECTOR",
+        "### 1.5 PULSE",
+        "### 1.6 PATH",
+    ):
+        assert app_heading in text
+
+    for style in ("**Display**", "**H1**", "**H2**", "**Body Large**", "**Caption**", "**Label**"):
+        assert style in text
+
+    spacing_section = _top_level_section(text, 3)
+    assert "### 3.1 Base 8dp" in spacing_section
+    for token in ("**SM** | 8", "**MD** | 16", "**LG** | 24", "**XL** | 32"):
+        assert token in spacing_section
+
+    elevation_section = _top_level_section(text, 5)
+    for level in ("**L0**", "**L1**", "**L2**", "**L3**", "**L4**"):
+        assert level in elevation_section
+
+
+def test_design_system_defines_responsive_tab_s10_ultra_as_default_surface() -> None:
+    text = _design_system_text()
+    responsive_section = _top_level_section(text, 8)
+
+    assert "### 8.2 Priorité Tab S10 Ultra Landscape" in responsive_section
+    assert "le device par défaut V1" in responsive_section
+    assert "Sidebar Rail étendu 240dp" in responsive_section
+    assert "contenu central max-width 1280dp" in responsive_section
+    assert "panneau contextuel persistant" in responsive_section
+
+
+def test_vector_semantic_state_colors_and_halo_colors_are_non_contradictory() -> None:
+    text = _design_system_text()
+    semantic_section = _subsection(text, "### 1.1 Semantic state colors")
+    vector_palette = _subsection(text, "### 1.4 VECTOR")
+
+    assert "Success | `#34C759`" in semantic_section
+    assert "Error | `#E5484D`" in semantic_section
+    assert "Halo" not in semantic_section
+
+    assert "**Halo Success (green)** | `#22D673`" in vector_palette
+    assert "**Halo Warning (yellow)** | `#F5C842`" in vector_palette
+    assert "**Halo Error (red)** | `#FF4A4A`" in vector_palette
+    assert "ne remplacent pas les semantic state colors cross-app" in vector_palette
+    assert "états UI génériques restent `Success|Warning|Error|Info`" in vector_palette
+
+    assert "halo Vector vert" not in text
+    assert "Halo states (Success/Warning/Error/Info)" not in text
+
+
+def test_app_specific_composed_patterns_are_not_in_foundation() -> None:
+    text = _design_system_text()
+    foundation_section = _top_level_section(text, 7)
+
+    assert "Vault-specific composed patterns" not in foundation_section
+    assert "Vector-specific composed patterns" not in foundation_section
+    assert "Pulse-specific composed patterns" not in foundation_section
+    assert "Path-specific composed patterns" not in foundation_section
+
+    assert "### 13.15 Vault-specific composed patterns" in text
+    assert "### 14.15 Vector-specific composed patterns" in text
+    assert "### 15.17 Pulse-specific composed patterns" in text
+    assert "### 16.14 Path-specific composed patterns" in text
 
 
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:
@@ -104,8 +237,13 @@ def test_path_screen_source_docs_are_available_in_audited_docs_master() -> None:
 def test_design_system_maps_all_14_imperium_screens_with_stable_ids() -> None:
     text = _design_system_text()
 
+    assert "## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1" in text
+    assert "### 12.0 Imperium Product Decisions V1" in text
+    assert "### 12.16 Imperium Navigation Graph V1" in text
+    assert "### 12.17 Imperium Endpoint Matrix V1" in text
+
     for screen_id in IMPERIUM_SCREEN_IDS:
-        assert "### 8." in text
+        assert "### 12." in text
         assert screen_id in text
         assert f"`{screen_id}`" in text
 
@@ -118,9 +256,10 @@ def test_design_system_declares_screen_types_navigation_and_backend_dependencies
     text = _design_system_text()
 
     for required in (
-        "## 8. IMPERIUM SCREEN ARCHITECTURE MAPPING V1",
-        "### 8.0 Canonical Routing Typology",
-        "### 8.15 Imperium Navigation Graph V1",
+        "## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1",
+        "### 12.1 Canonical Routing Typology",
+        "### 12.16 Imperium Navigation Graph V1",
+        "### 12.17 Imperium Endpoint Matrix V1",
         "route",
         "tab",
         "dialog",
@@ -146,7 +285,7 @@ def test_design_system_instantiates_states_widgets_assets_and_tablet_layout_per_
     text = _design_system_text()
 
     for screen_id in IMPERIUM_SCREEN_IDS:
-        section = text.split(f"`{screen_id}`", maxsplit=1)[1].split("\n### 8.", maxsplit=1)[0]
+        section = _screen_section(text, screen_id)
         for required_label in (
             "**Composants :**",
             "**Widgets :**",
@@ -164,12 +303,39 @@ def test_design_system_instantiates_states_widgets_assets_and_tablet_layout_per_
 
 def test_design_system_resolves_audit_ambiguities_without_adding_os_personnel_v1() -> None:
     text = _design_system_text()
+    imperium_decisions = _subsection(text, "### 12.0 Imperium Product Decisions V1")
 
-    assert "Mon OS personnel" in text
-    assert "V3" in text
-    assert "excluded from V1 navigation" in text
-    assert "Mission detail is not IMP-15 in V1" in text
-    assert "IMP.MISSION.DETAIL" in text
+    assert "Mon OS personnel" in imperium_decisions
+    assert "V3" in imperium_decisions
+    assert "is explicitly excluded from V1 navigation" in imperium_decisions
+    assert "Mission detail is not IMP-15 in V1" in imperium_decisions
+    assert "IMP.MISSION.DETAIL" in imperium_decisions
+    assert "non une entrée top-level navigation" in imperium_decisions
+
+
+def test_design_system_adds_imperium_product_decisions_and_endpoint_matrix() -> None:
+    text = _design_system_text()
+    endpoint_matrix = _subsection(text, "### 12.17 Imperium Endpoint Matrix V1")
+
+    for required in (
+        "One active mission",
+        "Mon OS personnel V3",
+        "Mission detail V1",
+        "Backend ownership",
+    ):
+        assert required in text
+
+    for required in (
+        "IMP-01",
+        "`GET /api/imperium/dashboard`",
+        "IMP-05",
+        "`POST /api/imperium/daily-plans/{plan_id}/activate`",
+        "IMP-12",
+        "`GET /api/imperium/weekly-review/current`",
+        "IMP-14",
+        "`GET /api/imperium/frontend/app-manifest`",
+    ):
+        assert required in endpoint_matrix
 
 
 def test_design_system_maps_all_12_vault_screens_with_stable_ids() -> None:
@@ -463,6 +629,23 @@ def test_design_system_maps_all_11_path_screens_with_stable_ids() -> None:
         "PAT.SETTINGS.CORE",
     ):
         assert stable_id in text
+
+
+def test_path_top_level_navigation_is_consistent_with_mermaid_graph() -> None:
+    text = _design_system_text()
+    path_decisions = _subsection(text, "### 16.0 Path Product Decisions V1")
+    path_graph = _subsection(text, "### 16.12 Path Navigation Graph V1")
+
+    assert "Surfaces principales Path V1" in path_decisions
+    assert "Vraies entrées top-level navigation Path V1" in path_decisions
+    assert "alignées avec le graph Mermaid" in path_decisions
+    assert "Top-level Path V1 : Dashboard (`PAT-01`), Prayers" not in text
+
+    nav_targets = set(re.findall(r"NAV(?:\[[^\]]+\])? --> (PAT\d+)", path_graph))
+    assert nav_targets == {"PAT01", "PAT09", "PAT10", "PAT11"}
+
+    for contextual_surface in ("PAT02", "PAT03", "PAT04", "PAT05", "PAT06", "PAT07", "PAT08"):
+        assert f"NAV --> {contextual_surface}" not in path_graph
 
 
 def test_design_system_instantiates_path_contracts_and_religious_guardrails() -> None:
