@@ -7,6 +7,7 @@ DOCS_ROOT = BACKEND_ROOT / "docs_master"
 DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 DESIGN_SYSTEM_TOKENS_KT_PATH = DOCS_ROOT / "60_DESIGN_SYSTEM_TOKENS_KT.md"
 DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH = DOCS_ROOT / "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md"
+DESIGN_SYSTEM_COMPONENT_CATALOG_PATH = DOCS_ROOT / "62_DESIGN_SYSTEM_COMPONENT_CATALOG.md"
 APP_ROOT = BACKEND_ROOT / "app"
 
 IMPERIUM_ROUTE_PREFIXES = {
@@ -71,6 +72,10 @@ def _design_system_tokens_kt_text() -> str:
 
 def _design_system_composite_components_text() -> str:
     return DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH.read_text(encoding="utf-8")
+
+
+def _design_system_component_catalog_text() -> str:
+    return DESIGN_SYSTEM_COMPONENT_CATALOG_PATH.read_text(encoding="utf-8")
 
 
 def _numbered_heading_lines(text: str) -> list[str]:
@@ -415,6 +420,136 @@ def test_design_system_composite_components_spec_does_not_create_frontend_or_kot
         "Ne pas créer de vrai `.kt`",
     ):
         assert non_goal in text
+
+
+def test_design_system_component_catalog_spec_exists_and_references_sources() -> None:
+    text = _design_system_component_catalog_text()
+
+    assert DESIGN_SYSTEM_COMPONENT_CATALOG_PATH.exists()
+    assert "docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md" in text
+    assert "docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md" in text
+    assert "docs_master/61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md" in text
+    assert "Foundation Component Catalog V1" in text
+
+
+def test_design_system_component_catalog_includes_required_families() -> None:
+    text = _design_system_component_catalog_text()
+
+    for family_heading in (
+        "## 3. Buttons",
+        "## 4. Inputs",
+        "## 5. Selection",
+        "## 6. Navigation",
+        "## 7. Feedback",
+        "## 8. Containers",
+        "## 9. States",
+        "## 10. Data Display",
+    ):
+        assert family_heading in text
+
+    for required_column in (
+        "Purpose",
+        "Compose responsibility",
+        "Tokens used",
+        "Variants",
+        "States",
+        "Accessibility rules",
+        "Responsive behavior Tab S10 Ultra",
+        "When to use",
+        "When not to use",
+    ):
+        assert required_column in text
+
+
+def test_design_system_component_catalog_includes_main_foundation_components() -> None:
+    text = _design_system_component_catalog_text()
+
+    for component in (
+        "ImperiumPrimaryButton",
+        "ImperiumSecondaryButton",
+        "ImperiumGhostButton",
+        "ImperiumDestructiveButton",
+        "ImperiumTextField",
+        "ImperiumNumberField",
+        "ImperiumSearchField",
+        "ImperiumVoiceInput",
+        "ImperiumToggle",
+        "ImperiumCheckbox",
+        "ImperiumRadio",
+        "ImperiumSegmentedControl",
+        "ImperiumTopBar",
+        "ImperiumSidebar",
+        "ImperiumBottomNavigation",
+        "ImperiumTabBar",
+        "ImperiumDrawer",
+        "ImperiumSnackbar",
+        "ImperiumToast",
+        "ImperiumBanner",
+        "ImperiumAlertDialog",
+        "SyncStateChip",
+        "ImperiumCard",
+        "ImperiumInteractiveCard",
+        "ImperiumBottomSheet",
+        "ImperiumDialog",
+        "ImperiumModalFrame",
+        "ImperiumSectionHeader",
+        "ImperiumLoadingState",
+        "ImperiumEmptyState",
+        "ImperiumErrorState",
+        "ImperiumOfflineState",
+        "ImperiumConflictState",
+        "ImperiumSkeleton",
+        "ImperiumMetricCard",
+        "ImperiumKpiBlock",
+        "ImperiumProgressBar",
+        "ImperiumProgressRing",
+        "ImperiumTimeline",
+        "ImperiumListItem",
+        "ImperiumTransactionRow",
+        "ImperiumStatusChip",
+    ):
+        assert component in text
+
+
+def test_design_system_component_catalog_documents_theme_awareness() -> None:
+    text = _design_system_component_catalog_text()
+    theme_awareness = _top_level_section(text, 2)
+
+    assert "Theme Awareness" in text
+    for app_name in ("Imperium", "Vault", "Vector", "Pulse", "Path"):
+        assert app_name in theme_awareness
+
+    for token_object in (
+        "ImperiumColors",
+        "VaultColors",
+        "VectorColors",
+        "PulseColors",
+        "PathColors",
+        "SemanticStateColors",
+        "VectorHaloColors",
+    ):
+        assert token_object in theme_awareness
+
+    assert "seul le theme, le copy et les donnees changent" in theme_awareness
+
+
+def test_design_system_component_catalog_non_goals_prevent_runtime_creation() -> None:
+    text = _design_system_component_catalog_text()
+    non_goals = _top_level_section(text, 11)
+
+    assert not (BACKEND_ROOT / "android").exists()
+    assert not (BACKEND_ROOT / "frontend").exists()
+    assert list(BACKEND_ROOT.rglob("*.kt")) == []
+
+    for non_goal in (
+        "Ne pas creer Kotlin",
+        "Ne pas creer Android",
+        "Ne pas creer `android/`",
+        "Ne pas creer `frontend/`",
+        "Ne pas creer de vrai `.kt`",
+        "Ne pas modifier le backend runtime",
+    ):
+        assert non_goal in non_goals
 
 
 def test_design_system_keeps_foundation_and_guardrails_before_app_architectures() -> None:
