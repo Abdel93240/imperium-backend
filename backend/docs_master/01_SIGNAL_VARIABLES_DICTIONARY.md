@@ -146,7 +146,7 @@ Storage values:
 | vtc_objective_reached | Vector | Vector | boolean | `true` | Vector, Imperium, learning | backend | session end | system_calculated | medium | yes | yes | summary_only | Compared with VTC session revenue reference when available. |
 | ride_offer_id | Vector | Vector | uuid | `ride_123` | Vector, n8n, learning | backend | ride detection | system_calculated | high | yes | yes | no | Derived from screenshot/capture. |
 | ride_offer_price | Vector | Vector | decimal | `38.00` | Vector decision engine | Gemini/OCR/user | ride detection | mixed | high | yes | yes | no | Extracted from Bolt offer or entered manually. |
-| pickup_distance | Vector | Vector | decimal | `2.4` | Vector decision engine | Gemini/OCR/maps | ride detection | mixed | high | yes | yes | no | Unit TODO. |
+| pickup_distance | Vector | Vector | decimal | `2.4` | Vector decision engine | Gemini/OCR/maps | ride detection | mixed | high | yes | yes | no | Unit: kilometers. |
 | total_estimated_time | Vector | Vector | integer | `42` | Vector decision engine | Gemini/OCR/maps/backend | ride detection | mixed | high | yes | yes | summary_only | Minutes, adjusted by learned multiplier if possible. |
 | destination_zone | Vector | Vector | string | `Orly` | Vector, Imperium | Gemini/OCR/maps/user | ride detection | mixed | high | yes | yes | summary_only | Zone taxonomy TODO. |
 | return_probability | Vector | Vector | number | `0.72` | Vector decision engine | AI/rules | ride analysis | ai_inferred | high | yes | yes | summary_only | Must be explainable. |
@@ -164,9 +164,9 @@ Storage values:
 | real_duration_minutes | Vector | Vector | integer | `14` | Vector learning | user/device | after route/session | mixed | high | yes | yes | summary_only | Used to learn ETA multiplier. |
 | learned_eta_multiplier | Vector | Vector | decimal | `1.35` | Vector decision engine | backend/learning | after enough observations | system_calculated | medium | yes | yes | summary_only | Dynamic, not hardcoded. |
 | ride_decision | Vector | Vector | enum | `ACCEPT` | Vector UI, learning | rules/AI | ride analysis | mixed | high | yes | yes | summary_only | Recommendation only. User decides. |
-| recommendation_halo_state | Vector | Vector | enum | `green` | Vector overlay | backend/AI | ride analysis | system_calculated | medium | yes | conditional | no | `white`, `green`, `red`. |
+| recommendation_halo_state | Vector | Vector | enum | `green` | Vector overlay | backend/AI | ride analysis | system_calculated | medium | yes | conditional | no | `white`, `green`, `yellow`, `red`; matches DS §1.4 Vector halos. |
 | no_auto_click_enforced | Vector | Vector | boolean | `true` | Vector, compliance checks | backend/app | fixed | system_calculated | low | yes | yes | no | Critical platform boundary. |
-| ride_user_action | Vector | Vector | enum | `accepted` | Vector, learning | user | after offer | user_confirmed | high | yes | yes | summary_only | Accepted/refused/missed TODO. |
+| ride_user_action | Vector | Vector | enum | `accepted` | Vector, learning | user | after offer | user_confirmed | high | yes | yes | summary_only | `accepted`, `refused`, `missed`, `ignored`, `unknown`; user-confirmed learning input. |
 | bad_recommendation_flag | Vector | Vector/Imperium | boolean | `true` | Vector, learning, weekly review | user | feedback/review | user_confirmed | high | yes | yes | summary_only | Critical learning data. |
 
 ## The Vault Variables

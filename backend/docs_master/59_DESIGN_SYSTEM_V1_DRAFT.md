@@ -887,6 +887,275 @@ Transitions conditionnelles canoniques V1 :
 
 ---
 
+## 14. VECTOR SCREEN ARCHITECTURE MAPPING V1
+
+Mapping écran Vector ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Sources canoniques locales : docs `01`, `07`, `33`, `37`. Vector conseille et analyse l'activité VTC ; il ne clique pas Bolt, ne contourne pas les plateformes, et ne transforme jamais une recommandation cachée en vérité live.
+
+### 14.0 Vector Product Decisions V1
+
+| Décision | Règle V1 |
+|---|---|
+| Source canonique | `33_VECTOR_LOGIC_DETAIL.md` est importée dans `docs_master/` et définit l'objectif VTC, les inputs, le scoring, les recommandations de zone, la learning loop et la conformité. |
+| Manual-first | Vector V1 ne dépend pas d'interception Bolt, de live screen capture forcé, d'accessibility abuse, d'auto-click ou de fake GPS. Le user confirme les actions. |
+| VEC-06 screenshot | VEC-06 Screenshot Upload is V1 upload-only : upload manuel, preview, stockage/queue backend, état terminal `uploaded`. Bolt OCR remains V2 ; le prompt `vector.bolt_screenshot_parse` de doc 37 §4 reste documenté mais non consommé en V1. |
+| Revenus/dépenses | Manual revenue and expense are Vector shortcuts to Vault transactions : VEC-04/05 réutilisent la sémantique Vault `POST /api/vault/transactions` avec `book=Business`, `transaction_source=vector_manual`, `vtc_session_id` optionnel, et event Vector pour learning. Pas de wallet Vector séparé. |
+| Cache recommandation | Recommendation cache TTL is 15 minutes. Une reco `0-15 min` peut être affichée `cached` avec timestamp ; elle devient stale after 30 minutes ou après déplacement GPS > 2 km. Une reco stale ne peut pas être présentée comme `synced`. |
+| Timestamp reco | Format V1 : relatif court dans les cartes (`il y a 8 min`) et heure absolue dans le détail (`17:23`). Le label `cached` ou `stale` est toujours visible. |
+| Driving mode | Driving mode activates when GPS speed is > 5 km/h pendant une session active, ou via toggle user `Mode conduite`. Il se désactive sous 3 km/h pendant 60 s ou par toggle explicite. |
+| Sécurité conduite | En driving mode, VEC-04/05/06/09 désactivent la saisie longue et proposent Voice Button ou report `pending`. VEC-03/07/08 gardent une action principale maximum. |
+| Last drop | Last drop zone is user-triggered from VEC-03 par bouton `Dépose effectuée`; GPS peut préremplir la zone mais ne confirme jamais seul. |
+| Smart fuel | smart fuel is V2 in UI. Le hook `vector.smart_fuel.requested` peut exister côté backend/futur, mais aucun écran/bouton V1 n'est ajouté. |
+| Signaux externes | Rail/event/traffic banners are hosted by VEC-01 and VEC-03. VEC-07/08 les intègrent seulement comme raisons de recommandation. Les banners sont transitoires, non empilées, dismissibles, et timestampées. |
+| Halo | Vector Halo Emblem supporte 40dp status, 64dp card, 96dp focus, 128dp hero. Etats : white=analyse, green=aller/accepter, yellow=hésitation/low confidence, red=éviter/refuser. |
+| Handoff Imperium | VEC-11 peut déclencher un handoff backend vers Imperium replan. L'UI affiche un toast non bloquant `Imperium replanning...`; elle ne choisit pas la mission suivante. |
+| Offline | Offline Vector crée des drafts locaux pour start/end session, revenus, dépenses, screenshots, drop zone et feedback avec `Idempotency-Key`. Les recommandations offline affichent uniquement le cache clairement marqué. |
+
+Composants Vector V1 ajoutés au DS :
+
+- **Vector Halo Emblem :** cercle plein, couleur seule variable, sizes 40/64/96/128dp, motion analyzing 1200ms `EaseInOutSine`.
+- **Driving Mode Indicator :** chip compact en top bar 40dp, visible seulement en session active ou sur surface driving.
+- **Cached Recommendation Card :** zone recommandée, halo, timestamp, state chip `cached|stale|synced`, raison courte.
+- **Confidence Breakdown Component :** quatre lignes max : `return_probability`, `hourly_rate_estimate`, `airport_value`, `event_value`.
+- **Screenshot Upload Surface :** zone fichier/preview/progress, sans OCR review V1.
+- **Session Active KPI Card :** CA session, objectif, durée, progress, destination mode remaining.
+- **Rail/Event/Traffic Banner :** banner Warning/Info avec source, timestamp, impact VTC, auto-remplacement par priorité.
+
+Top-level Vector V1 : Dashboard (`VEC-01`) et Active Session (`VEC-03`). Les autres écrans sont bottom sheets, dialogs, routes dédiées ou deep links contextuels.
+
+### 14.1 VEC-01 Vector Dashboard (`VEC-01`)
+
+- **Screen name:** VEC-01 Vector Dashboard.
+- **Type / slug :** `route`, `vector/dashboard`, stable ID `VEC.DASH.MAIN`.
+- **Composants :** Top Bar Vector, Sidebar/Bottom Nav, Vector Halo Emblem 64dp, Session Active KPI Card compact, Cached Recommendation Card, Rail/Event/Traffic Banner host, action bar with Primary `Démarrer session`, Secondary icon buttons revenue/expense/screenshot/where.
+- **Données affichées :** active `vtc_session_id` or none, `vtc_target_ca`, session revenue summary when active, latest recommendation zone, `recommendation_halo_state`, cache timestamp, `destination_mode_remaining`, `strategic_direction`, current rail/event/traffic signal if operational.
+- **Widgets :** halo status, last recommendation card, destination mode counter, latest session mini KPI.
+- **Assets :** Vector emblem 48dp, Vector Halo Emblem, Material Symbols `explore`, `payments`, `receipt_long`, `upload_file`, `route`; empty-state illustration only before first session.
+- **Etats :** Loading=session/reco skeleton ; Empty=no active session with start CTA and no fake data ; Error=session or latest reco fetch failure with retry ; Offline=cached dashboard banner with timestamp ; Syncing=pending session/action line ; Synced=snackbar after backend-confirmed action ; Conflict=active session mismatch dialog.
+- **Backend deps :** `TBD GET /api/vector/sessions/current`, `TBD GET /api/vector/recommendations/latest`, `TBD GET /api/vector/signals/operational`, events `vector.session.started`, `vector.zone.recommendation.requested`.
+- **Navigation :** entry from Vector nav or Imperium VTC mission deep link ; exits to VEC-02, VEC-03 if active, VEC-04, VEC-05, VEC-06, VEC-07, VEC-08.
+- **Tab S10 Ultra :** 3 columns: Sidebar 240dp, dashboard max 1280dp, right panel 320dp for operational banners and last recommendation details.
+
+### 14.2 VEC-02 Start Session Action (`VEC-02`)
+
+- **Screen name:** VEC-02 Start Session Action.
+- **Type / slug :** `bottom_sheet`, `vector/sessions/start`, stable ID `VEC.SESSION.START`.
+- **Composants :** Bottom Sheet L3, Money Input for target CA, optional duration/intention segmented control, strategic direction chip, permission inline for GPS/voice, Primary `Démarrer`, Ghost `Annuler`.
+- **Données affichées :** empty session draft, suggested `vtc_target_ca`, linked Imperium mission reference when present, GPS permission status, offline draft/idempotency state.
+- **Widgets :** target CA input, mission link chip, permission status chip.
+- **Assets :** Material Symbols `play_arrow`, `flag`, `gps_fixed`, `mic`; no hero in V1.
+- **Etats :** Loading=submit spinner ; Empty=form untouched ; Error=validation/session already active/GPS denied message ; Offline=local pending session allowed banner ; Syncing=start request line and disabled submit ; Synced=sheet closes and opens VEC-03 ; Conflict=server already has active session dialog.
+- **Backend deps :** `TBD POST /api/vector/sessions` with `Idempotency-Key`, event `vector.session.started`, optional `GET /api/imperium/missions/active`.
+- **Navigation :** opened from VEC-01 or Imperium VTC deep link; success VEC-02 --> VEC-03.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard, not centered dialog.
+
+### 14.3 VEC-03 Active Session View (`VEC-03`)
+
+- **Screen name:** VEC-03 Active Session View.
+- **Type / slug :** `route`, `vector/sessions/active`, stable ID `VEC.SESSION.ACTIVE`.
+- **Composants :** driving-aware Top Bar 40dp/64dp, Driving Mode Indicator, Vector Halo Emblem 96dp in focus mode, Session Active KPI Card, one Primary `Où aller ?`, compact revenue/expense/drop/end icon buttons, Rail/Event/Traffic Banner host.
+- **Données affichées :** `vtc_session_id`, elapsed duration, `vtc_target_ca`, current session revenue, progress to target, `vtc_objective_reached`, latest `recommendation_halo_state`, `strategic_direction`, `destination_mode_remaining`, active operational signal.
+- **Widgets :** elapsed timer, revenue progress, halo overlay, destination quota chip, operational banner.
+- **Assets :** Vector Halo Emblem, Material Symbols `explore`, `add`, `remove`, `location_on`, `stop_circle`; no decorative illustration.
+- **Etats :** Loading=session hydration and first signal skeleton ; Empty=not possible, redirects VEC-01 with no active session notice ; Error=session fetch/GPS unavailable/backend disconnect banner ; Offline=session remains visible with live reco disabled and cache-only banner ; Syncing=pending revenue/drop/end line ; Synced=snackbar for confirmed manual action only ; Conflict=session ended elsewhere dialog opens VEC-11 or VEC-01.
+- **Backend deps :** `TBD GET /api/vector/sessions/current`, `TBD GET /api/vector/recommendations/latest`, `TBD GET /api/vector/signals/operational`, `TBD PATCH /api/vector/sessions/{session_id}`, events `vector.manual.revenue.recorded`, `vector.manual.expense.recorded`, `vector.last_drop_zone.recorded`.
+- **Navigation :** from VEC-02 or VEC-01 active card; exits VEC-03 --> VEC-07, VEC-04, VEC-05, VEC-10, VEC-11.
+- **Tab S10 Ultra :** planning mode uses 2 columns when stationary; driving mode uses §9.4 one central card, 0 sidebar, top bar 40dp, halo overlay.
+
+### 14.4 VEC-04 Manual Revenue Input (`VEC-04`)
+
+- **Screen name:** VEC-04 Manual Revenue Input.
+- **Type / slug :** `bottom_sheet`, `vector/revenue/manual`, stable ID `VEC.REVENUE.MANUAL`.
+- **Composants :** Bottom Sheet L3, Money Input, Business category prefilled `VTC`, optional ride zone TextField, description TextField with Voice button, Date/Time Picker, Primary `Ajouter revenu`, Ghost `Annuler`.
+- **Données affichées :** amount, session id if active, `book=Business`, `transaction_source=vector_manual`, category `VTC`, idempotency state, optional ride metadata.
+- **Widgets :** mini session progress row, voice input button when driving.
+- **Assets :** Material Symbols `payments`, `mic`, `add`.
+- **Etats :** Loading=submit spinner ; Empty=form untouched ; Error=amount/category/session validation ; Offline=local Vault transaction draft pending banner ; Syncing=submit line ; Synced=sheet closes and VEC-03/VAU refreshes ; Conflict=409 Idempotency-Key or duplicate payload dialog.
+- **Backend deps :** `POST /api/vault/transactions` with `Idempotency-Key`, `TBD POST /api/vector/sessions/{session_id}/manual-revenue`, event `vector.manual.revenue.recorded`.
+- **Navigation :** opened from VEC-01 or VEC-03; success returns to source without opening Vault.
+- **Tab S10 Ultra :** right side-sheet 480dp; if driving mode active, text fields collapse behind voice-first prompt.
+
+### 14.5 VEC-05 Manual Expense Input (`VEC-05`)
+
+- **Screen name:** VEC-05 Manual Expense Input.
+- **Type / slug :** `bottom_sheet`, `vector/expense/manual`, stable ID `VEC.EXPENSE.MANUAL`.
+- **Composants :** Bottom Sheet L3, Money Input, Business category dropdown `Carburant|Péage|Parking|Entretien|Plateformes|Autre`, description TextField with Voice button, Date/Time Picker, wallet source segmented control, Primary `Ajouter dépense`.
+- **Données affichées :** amount, category, wallet source, session id if active, `book=Business`, `transaction_source=vector_manual`, idempotency state.
+- **Widgets :** quick category chips, mini session expense warning row.
+- **Assets :** Material Symbols `local_gas_station`, `receipt`, `mic`, `remove`.
+- **Etats :** Loading=submit spinner ; Empty=form untouched ; Error=amount/category/custom category validation ; Offline=local Vault transaction draft pending banner ; Syncing=submit line ; Synced=sheet closes and VEC-03/VAU refreshes ; Conflict=409 Idempotency-Key or duplicate pending draft dialog.
+- **Backend deps :** `POST /api/vault/transactions` with `Idempotency-Key`, `TBD POST /api/vector/sessions/{session_id}/manual-expense`, event `vector.manual.expense.recorded`.
+- **Navigation :** opened from VEC-01 or VEC-03; success returns to source.
+- **Tab S10 Ultra :** right side-sheet 480dp; driving mode uses voice-first and disables long free text.
+
+### 14.6 VEC-06 Screenshot Upload (`VEC-06`)
+
+- **Screen name:** VEC-06 Screenshot Upload.
+- **Type / slug :** `route`, `vector/screenshots/upload`, stable ID `VEC.SCREENSHOT.UPLOAD`.
+- **Composants :** Screenshot Upload Surface, file picker, thumbnail preview, upload progress, explicit V1 upload-only status, Primary `Envoyer`, Secondary `Remplacer`, Ghost `Annuler`.
+- **Données affichées :** selected file name, preview, upload status `pending|uploading|uploaded|failed`, session id if active, media retention note, no OCR result in V1.
+- **Widgets :** thumbnail preview, upload progress line, V2 OCR-disabled info chip.
+- **Assets :** Material Symbols `upload_file`, `image`, `check_circle`, `error`; no OCR confidence asset in V1.
+- **Etats :** Loading=file metadata/preview loading ; Empty=no file selected ; Error=invalid type/size/upload failure with retry ; Offline=local file queued for upload only ; Syncing=upload progress ; Synced=status `uploaded` and returns to source ; Conflict=duplicate screenshot idempotency dialog.
+- **Backend deps :** `TBD POST /api/vector/screenshots` with `Idempotency-Key`, event `vector.screenshot.uploaded`; no V1 call to ai_task `vector.bolt_screenshot_parse`.
+- **Navigation :** opened from VEC-01 or VEC-03; success returns to source. No VEC-06b review screen in V1.
+- **Tab S10 Ultra :** fullscreen route with preview max 960dp and right 320dp panel for upload state; no drag-drop requirement on Android.
+
+### 14.7 VEC-07 Where Should I Go? (`VEC-07`)
+
+- **Screen name:** VEC-07 Where Should I Go.
+- **Type / slug :** `route`, `vector/recommendations/request`, stable ID `VEC.RECO.REQUEST`.
+- **Composants :** driving-aware route or bottom overlay, one Primary `Calculer`, Vector Halo Emblem analyzing/decision, Cached Recommendation Card, compact reason text, destination quota chip, retry icon button.
+- **Données affichées :** request status, latest destination zone, short reason, `recommendation_halo_state`, cache state/timestamp, `destination_mode_remaining`, `hourly_rate_estimate`, `return_probability`, top operational signal reason.
+- **Widgets :** halo pulsing loading indicator, cached recommendation card, destination quota chip.
+- **Assets :** Vector Halo Emblem, Material Symbols `explore`, `refresh`, `schedule`, `warning`.
+- **Etats :** Loading=white halo pulsing 1200ms plus "analyse" label ; Empty=no recommendation available with keep/wait fallback ; Error=backend timeout uses cached card if available ; Offline=cache-only card with timestamp ; Syncing=recommendation request in progress ; Synced=fresh recommendation displayed ; Conflict=simultaneous request result superseded dialog/banner.
+- **Backend deps :** `TBD POST /api/vector/recommendations` with `Idempotency-Key`, `TBD GET /api/vector/recommendations/latest`, event `vector.zone.recommendation.requested`, ai_task `vector.zone_recommendation`.
+- **Navigation :** opened from VEC-01 or VEC-03; VEC-07 --> VEC-08 on detail tap; back returns to source.
+- **Tab S10 Ultra :** stationary mode can show result left and detail preview right; driving mode keeps one centered recommendation card.
+
+### 14.8 VEC-08 Recommendation Detail / Explanation (`VEC-08`)
+
+- **Screen name:** VEC-08 Recommendation Detail / Explanation.
+- **Type / slug :** `route`, `vector/recommendations/{recommendation_id}`, stable ID `VEC.RECO.DETAIL`.
+- **Composants :** Cached Recommendation Card expanded, Confidence Breakdown Component, reason sections, halo state header, timestamp/state chip, feedback CTA, Primary `J'ai compris`.
+- **Données affichées :** destination zone, recommendation type, reason, `return_probability`, `hourly_rate_estimate`, `airport_value`, `event_value`, `strategic_direction`, `rail_status|event_signal|traffic_state` reasons when used, cache timestamp.
+- **Widgets :** confidence breakdown, timestamp chip, stale warning banner.
+- **Assets :** Vector Halo Emblem 64dp, Material Symbols `info`, `schedule`, `thumbs_up_down`.
+- **Etats :** Loading=detail skeleton ; Empty=no previous recommendation with request CTA ; Error=detail fetch fail falls back to summary card ; Offline=cached read-only detail ; Syncing=feedback submit line if inline feedback used ; Synced=feedback saved snackbar ; Conflict=recommendation replaced by newer one banner.
+- **Backend deps :** `TBD GET /api/vector/recommendations/{recommendation_id}`, `TBD GET /api/vector/recommendations/latest`, event `vector.recommendation.feedback.recorded`.
+- **Navigation :** from VEC-07 or VEC-01 cached card; exits VEC-08 --> VEC-09, VEC-07, or source.
+- **Tab S10 Ultra :** two-column: recommendation card left, explanation/confidence right 480dp; driving mode read-only compact with feedback deferred.
+
+### 14.9 VEC-09 Recommendation Feedback (`VEC-09`)
+
+- **Screen name:** VEC-09 Recommendation Feedback.
+- **Type / slug :** `bottom_sheet`, `vector/recommendations/{recommendation_id}/feedback`, stable ID `VEC.RECO.FEEDBACK`.
+- **Composants :** Bottom Sheet L3, thumbs up/down segmented control, ride user action chips `accepted|refused|missed|ignored`, optional reason TextField with Voice button, Primary `Enregistrer`.
+- **Données affichées :** recommendation id, `bad_recommendation_flag`, `ride_user_action`, reason text/audio draft, idempotency state.
+- **Widgets :** feedback chips, voice button, duplicate feedback warning.
+- **Assets :** Material Symbols `thumb_up`, `thumb_down`, `feedback`, `mic`.
+- **Etats :** Loading=submit spinner ; Empty=no selection yet ; Error=validation/backend failure ; Offline=local feedback draft pending banner ; Syncing=submit line ; Synced=sheet closes and VEC-08 updates ; Conflict=feedback already recorded dialog.
+- **Backend deps :** `TBD POST /api/vector/recommendations/{recommendation_id}/feedback` with `Idempotency-Key`, event `vector.recommendation.feedback.recorded`.
+- **Navigation :** opened from VEC-08; success returns VEC-08. In driving mode, feedback is deferred unless voice-only quick feedback is used.
+- **Tab S10 Ultra :** right side-sheet 480dp over VEC-08.
+
+### 14.10 VEC-10 Last Drop Zone Confirmation (`VEC-10`)
+
+- **Screen name:** VEC-10 Last Drop Zone Confirmation.
+- **Type / slug :** `bottom_sheet`, `vector/drop-zone/confirm`, stable ID `VEC.DROP.CONFIRM`.
+- **Composants :** Bottom Sheet L3, detected zone chip, editable zone TextField, GPS confidence label, Primary `Confirmer la dépose`, Secondary `Modifier`, Ghost `Annuler`.
+- **Données affichées :** current GPS-derived zone if available, manual zone value, `real_duration_minutes` if known, session id, idempotency state.
+- **Widgets :** zone chip, GPS confidence chip, learning note one-liner.
+- **Assets :** Material Symbols `location_on`, `edit`, `check`.
+- **Etats :** Loading=zone detection pending ; Empty=no detected zone, manual entry required ; Error=GPS unavailable/invalid zone/backend failure ; Offline=local drop zone draft pending banner ; Syncing=submit line ; Synced=sheet closes and session learning refreshes ; Conflict=drop zone already confirmed dialog.
+- **Backend deps :** `TBD POST /api/vector/sessions/{session_id}/drop-zone` with `Idempotency-Key`, event `vector.last_drop_zone.recorded`.
+- **Navigation :** opened by user from VEC-03 button `Dépose effectuée`; success returns VEC-03.
+- **Tab S10 Ultra :** right side-sheet 480dp; driving mode permits only confirm detected zone or voice/manual deferred.
+
+### 14.11 VEC-11 Session Review (`VEC-11`)
+
+- **Screen name:** VEC-11 Session Review.
+- **Type / slug :** `route`, `vector/sessions/{session_id}/review`, stable ID `VEC.SESSION.REVIEW`.
+- **Composants :** Top Bar Vector, KPI summary cards, Session Active KPI Card final, objective reached status, feedback TextField with Voice button, bad recommendation summary, Primary `Terminer`, Secondary `Retour session`.
+- **Données affichées :** `vtc_final_ca`, elapsed duration, number of manual revenue/expense entries, net session estimate, `vtc_target_ca`, `vtc_objective_reached`, last recommendation outcome count, optional review note.
+- **Widgets :** KPI cards, objective progress bar, learning feedback prompt, Imperium handoff toast.
+- **Assets :** Vector emblem 48dp, Vector Halo Emblem final 64dp, Material Symbols `summarize`, `flag`, `check_circle`, `sync`.
+- **Etats :** Loading=session final summary skeleton ; Empty=no session entries still allows close with zero revenue warning ; Error=completion submit/fetch failure ; Offline=local completion draft pending banner ; Syncing=end session line and disabled submit ; Synced=returns VEC-01 plus `Imperium replanning...` toast ; Conflict=session already completed or revenue mismatch dialog.
+- **Backend deps :** `GET /api/vector/sessions/{session_id}/review`, `TBD POST /api/vector/sessions/{session_id}/complete` with `Idempotency-Key`, event `vector.session.completed`, optional backend handoff to `imperium.replan.requested`.
+- **Navigation :** opened from VEC-03 `Terminer session`; success VEC-11 --> VEC-01 and VEC-11 --> IMPERIUM_REPLAN as backend/toast only.
+- **Tab S10 Ultra :** two-column: KPI summary left, review/feedback right 480dp; no oversized celebration in pressure-critical contexts.
+
+### 14.12 Vector Navigation Graph V1
+
+```mermaid
+flowchart TD
+  NAV[Vector top-level nav] --> VEC01[VEC-01 Dashboard]
+  IMP[Imperium VTC mission deep link] --> VEC02[VEC-02 Start Session]
+  VEC01 --> VEC02
+  VEC02 --> VEC03[VEC-03 Active Session]
+  VEC01 --> VEC03
+  VEC01 --> VEC04[VEC-04 Manual Revenue]
+  VEC01 --> VEC05[VEC-05 Manual Expense]
+  VEC01 --> VEC06[VEC-06 Screenshot Upload]
+  VEC01 --> VEC07[VEC-07 Where Should I Go]
+  VEC03 --> VEC04
+  VEC03 --> VEC05
+  VEC03 --> VEC06
+  VEC03 --> VEC07
+  VEC03 --> VEC10[VEC-10 Last Drop Zone]
+  VEC03 --> VEC11[VEC-11 Session Review]
+  VEC07 --> VEC08[VEC-08 Recommendation Detail]
+  VEC08 --> VEC09[VEC-09 Recommendation Feedback]
+  VEC09 --> VEC08
+  VEC10 --> VEC03
+  VEC11 --> VEC01
+  VEC11 --> IMPERIUM_REPLAN[Imperium replan backend handoff]
+```
+
+Transitions conditionnelles canoniques V1 :
+
+| Transition | Condition |
+|---|---|
+| VEC-02 --> VEC-03 | Backend confirms session start, or offline draft is clearly marked pending. |
+| VEC-03 --> VEC-07 | User asks for a recommendation; never automatic while typing. |
+| VEC-07 --> VEC-08 | User opens details or cached card explanation. |
+| VEC-08 --> VEC-09 | User explicitly records recommendation feedback. |
+| VEC-03 --> VEC-10 | User taps `Dépose effectuée`; GPS only prefills. |
+| VEC-03 --> VEC-11 | User taps `Terminer session`. |
+| VEC-11 --> IMPERIUM_REPLAN | Backend may request Imperium replan after completion; Vector only shows handoff state. |
+
+### 14.13 Vector Endpoint Matrix V1
+
+| Screen | Real endpoints | TBD endpoints |
+|---|---|---|
+| VEC-01 | none | `GET /api/vector/sessions/current`, `GET /api/vector/recommendations/latest`, `GET /api/vector/signals/operational` |
+| VEC-02 | none | `POST /api/vector/sessions` |
+| VEC-03 | none | `GET /api/vector/sessions/current`, `GET /api/vector/recommendations/latest`, `GET /api/vector/signals/operational`, `PATCH /api/vector/sessions/{session_id}` |
+| VEC-04 | `POST /api/vault/transactions` | `POST /api/vector/sessions/{session_id}/manual-revenue` |
+| VEC-05 | `POST /api/vault/transactions` | `POST /api/vector/sessions/{session_id}/manual-expense` |
+| VEC-06 | none | `POST /api/vector/screenshots` |
+| VEC-07 | none | `GET /api/vector/recommendations/latest`, `POST /api/vector/recommendations` |
+| VEC-08 | none | `GET /api/vector/recommendations/latest`, `GET /api/vector/recommendations/{recommendation_id}` |
+| VEC-09 | none | `POST /api/vector/recommendations/{recommendation_id}/feedback` |
+| VEC-10 | none | `POST /api/vector/sessions/{session_id}/drop-zone` |
+| VEC-11 | none | `GET /api/vector/sessions/{session_id}/review`, `POST /api/vector/sessions/{session_id}/complete` |
+
+Event mapping V1 : `vector.session.started`, `vector.session.completed`, `vector.manual.revenue.recorded`, `vector.manual.expense.recorded`, `vector.screenshot.uploaded`, `vector.zone.recommendation.requested`, `vector.last_drop_zone.recorded`, `vector.recommendation.feedback.recorded`.
+
+### 14.14 Vector Driving Mode Rules V1
+
+Driving mode is a UI safety mode, not a strategy engine.
+
+Activation:
+
+- Auto-on when active session exists and GPS speed is > 5 km/h for 5 seconds.
+- Auto-off when GPS speed is < 3 km/h for 60 seconds.
+- User toggle can force `Mode conduite` while session is active.
+- If GPS permission is missing, Vector stays in planning mode and shows a permission banner; it does not infer driving from Bolt or screen capture.
+
+Allowed in driving mode:
+
+- VEC-03 one main CTA `Où aller ?`.
+- VEC-07 one recommendation card with halo and timestamp.
+- VEC-08 read-only compact explanation.
+- Voice-first quick feedback if already opened by the user.
+
+Restricted in driving mode:
+
+- Long text input in VEC-04/05/09.
+- Screenshot upload file selection in VEC-06.
+- Multi-card dashboards, sidebars, and dense lists.
+- Any UI that could imply Bolt automation.
+
+Fallback behavior:
+
+- Mutations remain allowed only through explicit user confirmation.
+- Disabled actions show a short `Mode conduite` reason and optional Voice Button.
+- Offline/stale recommendation state is more visually important than halo color.
+- Cached or stale data never uses the same visual treatment as `synced`.
+
+---
+
 ## 9. RESPONSIVE STRATEGY
 
 ### 9.1 Breakpoints

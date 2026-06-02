@@ -7,6 +7,7 @@ DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 
 IMPERIUM_SCREEN_IDS = [f"IMP-{number:02d}" for number in range(1, 15)]
 VAULT_SCREEN_IDS = [f"VAU-{number:02d}" for number in range(1, 13)]
+VECTOR_SCREEN_IDS = [f"VEC-{number:02d}" for number in range(1, 12)]
 SOURCE_DOCS = [
     "07_ANDROID_APP_RESPONSIBILITIES.md",
     "24_DAY_FINISHED_WORKFLOW.md",
@@ -22,6 +23,12 @@ VAULT_SOURCE_DOCS = [
     "37_GEMINI_VISION_PROMPTS.md",
     "42_VAULT_LOGIC_DETAIL.md",
 ]
+VECTOR_SOURCE_DOCS = [
+    "01_SIGNAL_VARIABLES_DICTIONARY.md",
+    "07_ANDROID_APP_RESPONSIBILITIES.md",
+    "33_VECTOR_LOGIC_DETAIL.md",
+    "37_GEMINI_VISION_PROMPTS.md",
+]
 
 
 def _design_system_text() -> str:
@@ -33,6 +40,11 @@ def _vault_screen_section(text: str, screen_id: str) -> str:
     return text.split(marker, maxsplit=1)[1].split("\n### 13.", maxsplit=1)[0]
 
 
+def _vector_screen_section(text: str, screen_id: str) -> str:
+    marker = next(line for line in text.splitlines() if line.startswith("### 14.") and f"`{screen_id}`" in line)
+    return text.split(marker, maxsplit=1)[1].split("\n### 14.", maxsplit=1)[0]
+
+
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
@@ -41,6 +53,12 @@ def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> N
 
 def test_vault_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in VAULT_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
+
+    assert missing == []
+
+
+def test_vector_screen_source_docs_are_available_in_audited_docs_master() -> None:
+    missing = [doc_name for doc_name in VECTOR_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
     assert missing == []
 
@@ -182,3 +200,85 @@ def test_design_system_instantiates_vault_screen_contracts_and_high_risk_decisio
         "transaction removal uses reversal",
     ):
         assert required in text
+
+
+def test_design_system_maps_all_11_vector_screens_with_stable_ids() -> None:
+    text = _design_system_text()
+
+    assert "## 14. VECTOR SCREEN ARCHITECTURE MAPPING V1" in text
+    assert "### 14.0 Vector Product Decisions V1" in text
+    assert "### 14.12 Vector Navigation Graph V1" in text
+    assert "### 14.13 Vector Endpoint Matrix V1" in text
+    assert "### 14.14 Vector Driving Mode Rules V1" in text
+
+    for screen_id in VECTOR_SCREEN_IDS:
+        assert "### 14." in text
+        assert screen_id in text
+        assert f"`{screen_id}`" in text
+
+    for stable_id in (
+        "VEC.DASH.MAIN",
+        "VEC.SESSION.START",
+        "VEC.SESSION.ACTIVE",
+        "VEC.REVENUE.MANUAL",
+        "VEC.EXPENSE.MANUAL",
+        "VEC.SCREENSHOT.UPLOAD",
+        "VEC.RECO.REQUEST",
+        "VEC.RECO.DETAIL",
+        "VEC.RECO.FEEDBACK",
+        "VEC.DROP.CONFIRM",
+        "VEC.SESSION.REVIEW",
+    ):
+        assert stable_id in text
+
+
+def test_design_system_instantiates_vector_contracts_and_driving_decisions() -> None:
+    text = _design_system_text()
+
+    for screen_id in VECTOR_SCREEN_IDS:
+        section = _vector_screen_section(text, screen_id)
+        for required_label in (
+            "**Composants :**",
+            "**Données affichées :**",
+            "**Widgets :**",
+            "**Assets :**",
+            "**Etats :**",
+            "**Backend deps :**",
+            "**Navigation :**",
+            "**Tab S10 Ultra :**",
+        ):
+            assert required_label in section
+
+        for state in ("Loading", "Empty", "Error", "Offline", "Syncing", "Synced", "Conflict"):
+            assert state in section
+
+    for required in (
+        "VEC-06 Screenshot Upload is V1 upload-only",
+        "Bolt OCR remains V2",
+        "Recommendation cache TTL is 15 minutes",
+        "stale after 30 minutes",
+        "Driving mode activates when GPS speed is > 5 km/h",
+        "Manual revenue and expense are Vector shortcuts to Vault transactions",
+        "Last drop zone is user-triggered from VEC-03",
+        "smart fuel is V2 in UI",
+        "Rail/event/traffic banners are hosted by VEC-01 and VEC-03",
+        "Vector Halo Emblem",
+        "Driving Mode Indicator",
+        "Cached Recommendation Card",
+        "Confidence Breakdown Component",
+        "Screenshot Upload Surface",
+        "/api/vector/sessions/current",
+        "TBD POST /api/vector/sessions",
+        "TBD POST /api/vector/recommendations",
+        "VEC-03 --> VEC-07",
+        "VEC-11 --> IMPERIUM_REPLAN",
+    ):
+        assert required in text
+
+
+def test_vector_halo_dictionary_matches_design_system_states() -> None:
+    dictionary_text = (DOCS_ROOT / "01_SIGNAL_VARIABLES_DICTIONARY.md").read_text(encoding="utf-8")
+    halo_line = next(line for line in dictionary_text.splitlines() if line.startswith("| recommendation_halo_state |"))
+
+    for halo_state in ("white", "green", "yellow", "red"):
+        assert halo_state in halo_line
