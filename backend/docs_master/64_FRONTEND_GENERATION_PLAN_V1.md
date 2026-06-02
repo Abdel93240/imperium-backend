@@ -96,8 +96,10 @@ Exemple Imperium Dashboard :
 
 ```json
 {
-  "screen": "IMP-01",
-  "fixture_name": "dashboard_with_active_mission",
+  "screen_id": "IMP-01",
+  "route_id": "IMP.DASH.MAIN",
+  "screen": "IMP.DASH.MAIN",
+  "fixture_name": "dashboard_mock_v1",
   "sync_state": "mock",
   "active_mission": {
     "id": "mock-mission-001",
@@ -122,8 +124,10 @@ Exemple état vide Mission Active :
 
 ```json
 {
-  "screen": "IMP-02",
-  "fixture_name": "mission_active_empty",
+  "screen_id": "IMP-02",
+  "route_id": "IMP.MISSION.ACTIVE",
+  "screen": "IMP.MISSION.ACTIVE",
+  "fixture_name": "mission_active_empty_v1",
   "sync_state": "mock",
   "active_mission": null,
   "empty_state": {
@@ -137,8 +141,10 @@ Exemple erreur contrôlée :
 
 ```json
 {
-  "screen": "IMP-04",
-  "fixture_name": "weekly_review_error",
+  "screen_id": "IMP-04",
+  "route_id": "IMP.WR.SUMMARY",
+  "screen": "IMP.WR.SUMMARY",
+  "fixture_name": "weekly_review_error_v1",
   "sync_state": "mock",
   "error_state": {
     "code": "MOCK_WEEKLY_REVIEW_UNAVAILABLE",

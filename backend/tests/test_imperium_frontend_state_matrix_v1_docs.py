@@ -61,6 +61,22 @@ def test_imperium_frontend_state_matrix_v1_has_required_sections_in_order() -> N
     assert positions == sorted(positions)
 
 
+def test_imperium_frontend_state_matrix_v1_locks_canonical_top_level_routes() -> None:
+    routes = _section(_state_matrix_text(), "2. Screen Routing Canonical IDs")
+
+    for screen, screen_id, route_id, path in (
+        ("Dashboard", "IMP-01", "IMP.DASH.MAIN", "imperium/dashboard"),
+        ("Mission Active", "IMP-02", "IMP.MISSION.ACTIVE", "imperium/missions/active"),
+        ("Inbox", "IMP-03", "IMP.INBOX.MAIN", "imperium/inbox"),
+        ("Weekly Review", "IMP-04", "IMP.WR.SUMMARY", "imperium/weekly-review"),
+        ("History", "IMP-05", "IMP.HISTORY.MAIN", "imperium/history"),
+        ("Settings", "IMP-06", "IMP.SETTINGS.CORE", "imperium/settings"),
+    ):
+        assert f"| {screen} | `{screen_id}` | `{route_id}` | `{path}` | Yes |" in routes
+
+    assert "IMP.MISSION.DETAIL" not in routes
+
+
 @pytest.mark.parametrize(
     (
         "heading",
@@ -211,6 +227,14 @@ def test_imperium_frontend_state_matrix_v1_locks_global_state_rules() -> None:
         "Un etat partiellement sync doit montrer ce qui est deja valide",
     ):
         assert required in rules
+
+
+def test_imperium_frontend_state_matrix_v1_locks_empty_state_ctas() -> None:
+    weekly = _section(_state_matrix_text(), "6. Weekly Review")
+    settings = _section(_state_matrix_text(), "8. Settings")
+
+    assert "CTA `Back to Dashboard`" in weekly
+    assert "CTA `Use mock defaults`" in settings
 
 
 def test_imperium_frontend_state_matrix_v1_locks_checklist_and_readiness_matrix() -> None:

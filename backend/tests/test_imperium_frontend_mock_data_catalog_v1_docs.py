@@ -62,26 +62,30 @@ def test_imperium_frontend_mock_data_catalog_v1_has_required_sections_in_order()
 
 
 @pytest.mark.parametrize(
-    ("heading", "mock_object_name", "screen_id", "linked_widget"),
+    ("heading", "mock_object_name", "screen_id", "route_id", "screen_name", "linked_widget"),
     [
-        ("2.1 Dashboard", "dashboard_mock_v1", "IMP.DASH.MAIN", "Daily Focus Card"),
-        ("2.2 Mission Active", "mission_active_mock_v1", "IMP.MISSION.ACTIVE", "Mission Header"),
-        ("2.3 Inbox", "inbox_mock_v1", "IMP.INBOX.MAIN", "Conversation List"),
-        ("2.4 Weekly Review", "weekly_review_mock_v1", "IMP.WR.SUMMARY", "Weekly Summary"),
-        ("2.5 History", "history_mock_v1", "IMP.HISTORY.MAIN", "Timeline"),
-        ("2.6 Settings", "settings_mock_v1", "IMP.SETTINGS.CORE", "User"),
+        ("2.1 Dashboard", "dashboard_mock_v1", "IMP-01", "IMP.DASH.MAIN", "Dashboard", "Daily Focus Card"),
+        ("2.2 Mission Active", "mission_active_mock_v1", "IMP-02", "IMP.MISSION.ACTIVE", "Mission Active", "Mission Header"),
+        ("2.3 Inbox", "inbox_mock_v1", "IMP-03", "IMP.INBOX.MAIN", "Inbox", "Conversation List"),
+        ("2.4 Weekly Review", "weekly_review_mock_v1", "IMP-04", "IMP.WR.SUMMARY", "Weekly Review", "Weekly Summary"),
+        ("2.5 History", "history_mock_v1", "IMP-05", "IMP.HISTORY.MAIN", "History", "Timeline"),
+        ("2.6 Settings", "settings_mock_v1", "IMP-06", "IMP.SETTINGS.CORE", "Settings", "User"),
     ],
 )
 def test_imperium_frontend_mock_data_catalog_v1_locks_each_screen_catalog_entry(
     heading: str,
     mock_object_name: str,
     screen_id: str,
+    route_id: str,
+    screen_name: str,
     linked_widget: str,
 ) -> None:
     screen = _section(_mock_catalog_text(), heading)
 
     assert f"Mock object name | `{mock_object_name}`" in screen
-    assert f'"screen": "{screen_id}"' in screen
+    assert f'"screen_id": "{screen_id}"' in screen
+    assert f'"route_id": "{route_id}"' in screen
+    assert f'"screen": "{screen_name}"' in screen
     assert linked_widget in screen
     assert "Linked states (67)" in screen
     assert "Linked widgets (65)" in screen
@@ -90,7 +94,9 @@ def test_imperium_frontend_mock_data_catalog_v1_locks_each_screen_catalog_entry(
     assert "Variant links" in screen
 
     payload = _json_block(screen)
-    assert payload["screen"] == screen_id
+    assert payload["screen_id"] == screen_id
+    assert payload["route_id"] == route_id
+    assert payload["screen"] == screen_name
     assert payload["mock_object_name"] == mock_object_name
     assert payload["sync_state"] == "mock"
     assert "generated_at" in payload
@@ -128,8 +134,47 @@ def test_imperium_frontend_mock_data_catalog_v1_locks_json_examples_and_global_r
         payload = _json_block(_section(text, heading))
         assert isinstance(payload, dict)
         assert payload["sync_state"] == "mock"
+        assert payload["screen_id"].startswith("IMP-0")
+        assert payload["route_id"].startswith("IMP.")
         assert payload["mock_object_name"].endswith("_v1")
         assert re.fullmatch(r"20\d{2}-\d{2}-\d{2}T.*Z", payload["generated_at"]) is not None
+
+
+def test_imperium_frontend_mock_data_catalog_v1_locks_required_mock_fields() -> None:
+    text = _mock_catalog_text()
+
+    dashboard = _json_block(_section(text, "2.1 Dashboard"))
+    assert dashboard["screen_id"] == "IMP-01"
+    assert dashboard["route_id"] == "IMP.DASH.MAIN"
+    assert dashboard["mock_object_name"] == "dashboard_mock_v1"
+    assert dashboard["quick_actions"]
+    for action in dashboard["quick_actions"]:
+        assert {"id", "label", "target_route", "style"}.issubset(action)
+        assert action["id"].startswith("mock-")
+
+    mission = _json_block(_section(text, "2.2 Mission Active"))
+    assert mission["mission"]["description"]
+    assert mission["mission"]["expected_outcome"]
+    assert {"status", "last_saved_at", "pending_note_id"} == set(mission["note_save_state"])
+
+    weekly = _json_block(_section(text, "2.4 Weekly Review"))
+    for suggestion in weekly["improvement_suggestions"]:
+        assert suggestion["rationale"]
+
+    history = _json_block(_section(text, "2.5 History"))
+    for event in history["events"]:
+        assert event["source"]
+        assert event["linked_route"]
+
+    for required_field in (
+        "`mission.description`",
+        "`mission.expected_outcome`",
+        "`note_save_state.status`",
+        "`improvement_suggestions[].rationale`",
+        "`events[].source`",
+        "`events[].linked_route`",
+    ):
+        assert required_field in text
 
 
 def test_imperium_frontend_mock_data_catalog_v1_locks_variants_and_readiness() -> None:
@@ -183,4 +228,3 @@ def test_imperium_frontend_mock_data_catalog_v1_locks_variants_and_readiness() -
         "| Settings | READY |",
     ):
         assert row in readiness
-

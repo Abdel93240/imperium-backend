@@ -39,8 +39,8 @@ Une seule mission active peut etre visible a la fois.
 
 - Start Route: `IMP.DASH.MAIN`
 - Target Route: `IMP.MISSION.ACTIVE`
-- Allowed Actions: ouvrir la mission active, lire le resume, ouvrir le detail documente, ajouter une note, modifier le statut.
-- Exit Conditions: retour vers Dashboard, fermeture du detail, ou retour explicite vers la mission active.
+- Allowed Actions: ouvrir la mission active, lire le contexte complet, ajouter une note, modifier le statut.
+- Exit Conditions: retour vers Dashboard ou poursuite explicite de la mission active.
 
 ### 2.3 Access inbox
 
@@ -80,30 +80,23 @@ Les actions suivantes sont documentees comme flows officiels.
 - Start Route: `IMP.MISSION.ACTIVE`
 - Target Route: `IMP.MISSION.ACTIVE`
 - Allowed Actions: voir le titre, le statut, la priorite, la deadline et le contexte de la mission.
-- Exit Conditions: retour vers Dashboard ou ouverture du detail documente.
+- Exit Conditions: retour vers Dashboard ou poursuite de la mission active.
 
-### 3.2 Open detail
-
-- Start Route: `IMP.MISSION.ACTIVE`
-- Target Route: `IMP.MISSION.DETAIL`
-- Allowed Actions: ouvrir le detail read-only documente, lire la description, revenir au contexte de la mission active.
-- Exit Conditions: detail ferme ou retour vers la mission active.
-
-### 3.3 Modify status
+### 3.2 Modify status
 
 - Start Route: `IMP.MISSION.ACTIVE`
 - Target Route: `IMP.MISSION.ACTIVE`
 - Allowed Actions: marquer la mission complete, fail, replan ou annuler la modification.
 - Exit Conditions: statut confirme par le flow documente ou modification abandonnee.
 
-### 3.4 Add note
+### 3.3 Add note
 
 - Start Route: `IMP.MISSION.ACTIVE`
 - Target Route: `IMP.MISSION.ACTIVE`
 - Allowed Actions: ecrire une note, enregistrer un brouillon, enregistrer une note vocale documentee.
 - Exit Conditions: note ajoutee, brouillon abandonne, ou retour vers Dashboard.
 
-### 3.5 Return dashboard
+### 3.4 Return dashboard
 
 - Start Route: `IMP.MISSION.ACTIVE`
 - Target Route: `IMP.DASH.MAIN`
@@ -242,7 +235,7 @@ Note: `Target Route` peut etre identique a `Start Route` quand le flow reste dan
 | Flow | Start Route | Target Route | Allowed Actions | Exit Conditions |
 |---|---|---|---|---|
 | Open app | `APP_LAUNCH` | `IMP.DASH.MAIN` | Ouvrir l app et afficher le Dashboard. | Dashboard visible et destinations documentees disponibles. |
-| Consult active mission | `IMP.DASH.MAIN` | `IMP.MISSION.ACTIVE` | Voir la mission, ouvrir le detail documente, modifier le statut, ajouter une note. | Retour Dashboard, detail ferme, ou mission active continuee. |
+| Consult active mission | `IMP.DASH.MAIN` | `IMP.MISSION.ACTIVE` | Voir la mission, modifier le statut, ajouter une note. | Retour Dashboard ou mission active continuee. |
 | Access inbox | `IMP.DASH.MAIN` | `IMP.INBOX.MAIN` | Ouvrir Inbox, rechercher, filtrer, selectionner une conversation. | Retour Dashboard ou selection terminee. |
 | Access history | `IMP.DASH.MAIN` | `IMP.HISTORY.MAIN` | Ouvrir History, rechercher, filtrer, consulter un detail. | Retour Dashboard ou detail consulte. |
 | Access settings | `IMP.DASH.MAIN` | `IMP.SETTINGS.CORE` | Ouvrir Settings, naviguer entre sections, modifier des preferences. | Retour Dashboard ou section terminee. |
@@ -250,7 +243,6 @@ Note: `Target Route` peut etre identique a `Start Route` quand le flow reste dan
 
 Related canonical routes inherited from 65 stay valid when explicitly documented there:
 
-- `IMP.MISSION.DETAIL`
 - `IMP.WR.READ_ONLY`
 - `IMP.WR.INTERACTIVE`
 - `IMP.PLAN.HISTORY`

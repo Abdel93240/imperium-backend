@@ -6,10 +6,15 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT / "docs_master"
 SCREEN_SPEC_PATH = DOCS_ROOT / "65_IMPERIUM_FRONTEND_SCREEN_SPEC_V1.md"
+COMPONENT_CATALOG_PATH = DOCS_ROOT / "62_DESIGN_SYSTEM_COMPONENT_CATALOG.md"
 
 
 def _screen_spec_text() -> str:
     return SCREEN_SPEC_PATH.read_text(encoding="utf-8")
+
+
+def _component_catalog_text() -> str:
+    return COMPONENT_CATALOG_PATH.read_text(encoding="utf-8")
 
 
 def _section(text: str, heading: str) -> str:
@@ -86,8 +91,31 @@ def test_imperium_frontend_screen_spec_v1_locks_global_rules_and_allowed_compone
         "MissionFocusCard",
         "ChatMessageBubble",
         "ImperiumTimeline",
+        "ImperiumOfflineState",
+        "ImperiumKpiBlock",
     ):
         assert required in rules
+
+    assert "KPIBlock" not in rules
+
+
+def test_imperium_frontend_screen_spec_v1_allowed_foundation_components_exist_in_62() -> None:
+    rules = _section(_screen_spec_text(), "2. Regles globales")
+    catalog = _component_catalog_text()
+
+    allowed_block = rules.split("### 2.3 Composants autorises", maxsplit=1)[1].split(
+        "### 2.4 Layout global",
+        maxsplit=1,
+    )[0]
+    component_names = set()
+    for raw_line in allowed_block.splitlines():
+        if not raw_line.startswith("|") or "`" not in raw_line:
+            continue
+        component_names.update(part for index, part in enumerate(raw_line.split("`")) if index % 2 == 1)
+
+    composite_components = {"MissionFocusCard", "ChatMessageBubble"}
+    for component_name in sorted(component_names - composite_components):
+        assert component_name in catalog
 
 
 @pytest.mark.parametrize(
@@ -200,7 +228,10 @@ def test_imperium_frontend_screen_spec_v1_dashboard_screen_is_fully_specified() 
         "Quick Actions",
         "Weekly Progress",
         "Imperium Status",
-        '"fixture_name": "dashboard_with_active_mission"',
+        '"fixture_name": "dashboard_mock_v1"',
+        '"screen_id": "IMP-01"',
+        '"route_id": "IMP.DASH.MAIN"',
+        '"quick_actions"',
         "Loading state",
         "Empty state",
         "Error state",
@@ -215,20 +246,26 @@ def test_imperium_frontend_screen_spec_v1_mission_active_screen_is_fully_specifi
 
     for required in (
         "Route ID | `IMP.MISSION.ACTIVE`",
-        "Related canonical deep link | `IMP.MISSION.DETAIL`",
-        "not top-level navigation",
+        "Screen ID source | `IMP-02`",
+        "Type | Top-level route",
         "Mission Header",
         "Mission Description",
         "Progress Block",
         "Decision Buttons",
         "Notes Area",
-        '"fixture_name": "mission_active_with_progress"',
+        '"fixture_name": "mission_active_mock_v1"',
+        '"screen_id": "IMP-02"',
+        '"route_id": "IMP.MISSION.ACTIVE"',
+        "note_save_state",
         "GET /api/imperium/missions/active",
         "POST /api/imperium/missions/{mission_id}/complete",
         "POST /api/imperium/missions/{mission_id}/fail",
+        "FUTURE TBD POST /api/imperium/replans/request",
         "DoD",
     ):
         assert required in mission
+
+    assert "IMP.MISSION.DETAIL" not in mission
 
 
 def test_imperium_frontend_screen_spec_v1_inbox_screen_is_fully_specified() -> None:
@@ -242,7 +279,7 @@ def test_imperium_frontend_screen_spec_v1_inbox_screen_is_fully_specified() -> N
         "Search",
         "Convert to mission",
         "never active directly",
-        '"fixture_name": "inbox_with_conversations"',
+        '"fixture_name": "inbox_mock_v1"',
         "TBD GET /api/imperium/inbox/items",
         "TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal",
         "DoD",
@@ -262,7 +299,9 @@ def test_imperium_frontend_screen_spec_v1_weekly_review_screen_is_fully_specifie
         "Statistics",
         "Start interactive review",
         "never locale",
-        '"fixture_name": "weekly_review_ready"',
+        '"fixture_name": "weekly_review_mock_v1"',
+        '"rationale"',
+        "CTA `Back to Dashboard`",
         "GET /api/imperium/weekly-review/state",
         "POST /api/imperium/weekly-review/launch",
         "DoD",
@@ -281,7 +320,9 @@ def test_imperium_frontend_screen_spec_v1_history_screen_is_fully_specified() ->
         "Filters",
         "History Detail Card",
         "read-only",
-        '"fixture_name": "history_with_timeline"',
+        '"fixture_name": "history_mock_v1"',
+        '"source"',
+        '"linked_route"',
         "GET /api/imperium/missions/history",
         "TBD GET /api/imperium/history/events",
         "DoD",
@@ -301,7 +342,7 @@ def test_imperium_frontend_screen_spec_v1_settings_screen_is_fully_specified() -
         "Security",
         "Advanced",
         "Security ne montre aucun token",
-        '"fixture_name": "settings_default_mock"',
+        '"fixture_name": "settings_mock_v1"',
         "GET /api/imperium/frontend/app-manifest",
         "TBD PATCH /api/imperium/settings",
         "DoD",
@@ -329,12 +370,72 @@ def test_imperium_frontend_screen_spec_v1_locks_navigation_contract() -> None:
         "Back Navigation",
         "Deep Links",
         "Stable Route IDs",
-        "Telephone GO 65 bottom navigation contains exactly five visible items",
+        "Telephone GO 65 bottom navigation contains exactly six visible items",
         "Tablet GO 65 sidebar contains exactly six visible items",
-        "`IMP.MISSION.ACTIVE` is never shown as a bottom navigation item",
+        "| 2 | Mission Active | `IMP.MISSION.ACTIVE` |",
         "No other deep link is allowed in GO 65",
     ):
         assert required in navigation
+
+    assert "IMP.MISSION.DETAIL" not in navigation
+
+
+def test_imperium_frontend_screen_spec_v1_locks_canonical_screen_ids_and_six_item_nav() -> None:
+    text = _screen_spec_text()
+    expected = (
+        ("3. Dashboard Screen", "IMP-01", "IMP.DASH.MAIN"),
+        ("4. Mission Active Screen", "IMP-02", "IMP.MISSION.ACTIVE"),
+        ("5. Inbox Screen", "IMP-03", "IMP.INBOX.MAIN"),
+        ("6. Weekly Review Screen", "IMP-04", "IMP.WR.SUMMARY"),
+        ("7. History Screen", "IMP-05", "IMP.HISTORY.MAIN"),
+        ("8. Settings Screen", "IMP-06", "IMP.SETTINGS.CORE"),
+    )
+
+    for heading_name, screen_id, route_id in expected:
+        screen = _screen_section(text, heading_name)
+        assert f"Screen ID source | `{screen_id}`" in screen
+        assert f"Route ID | `{route_id}`" in screen
+
+    navigation = _section(text, "9. Navigation Contract")
+    for label, screen_id, route_id in (
+        ("Dashboard", "IMP-01", "IMP.DASH.MAIN"),
+        ("Mission Active", "IMP-02", "IMP.MISSION.ACTIVE"),
+        ("Inbox", "IMP-03", "IMP.INBOX.MAIN"),
+        ("Weekly Review", "IMP-04", "IMP.WR.SUMMARY"),
+        ("History", "IMP-05", "IMP.HISTORY.MAIN"),
+        ("Settings", "IMP-06", "IMP.SETTINGS.CORE"),
+    ):
+        assert f"| {label} | `{screen_id}` | `{route_id}` |" in navigation
+
+    for order, label, route_id in (
+        (1, "Dashboard", "IMP.DASH.MAIN"),
+        (2, "Mission Active", "IMP.MISSION.ACTIVE"),
+        (3, "Inbox", "IMP.INBOX.MAIN"),
+        (4, "Weekly Review", "IMP.WR.SUMMARY"),
+        (5, "History", "IMP.HISTORY.MAIN"),
+        (6, "Settings", "IMP.SETTINGS.CORE"),
+    ):
+        assert f"| {order} | {label} | `{route_id}`" in navigation
+
+
+def test_frontend_foundation_docs_v1_remove_mission_detail_and_legacy_fixture_names() -> None:
+    forbidden_terms = (
+        "IMP.MISSION.DETAIL",
+        "dashboard_with_active_mission",
+        "mission_active_with_progress",
+        "inbox_with_conversations",
+        "weekly_review_ready",
+        "history_with_timeline",
+        "settings_default_mock",
+    )
+
+    for doc_number in range(62, 70):
+        matches = sorted(DOCS_ROOT.glob(f"{doc_number}_*.md"))
+        assert matches, f"missing docs_master/{doc_number}_*.md"
+        for path in matches:
+            text = path.read_text(encoding="utf-8")
+            for forbidden_term in forbidden_terms:
+                assert forbidden_term not in text, f"{forbidden_term} found in {path.name}"
 
 
 def test_imperium_frontend_screen_spec_v1_locks_mock_data_contract_for_all_screens() -> None:
@@ -351,11 +452,17 @@ def test_imperium_frontend_screen_spec_v1_locks_mock_data_contract_for_all_scree
         assert forbidden_backend_use in mocks
 
     for fixture in (
+        '"screen_id": "IMP-01"',
         '"screen": "IMP.DASH.MAIN"',
+        '"screen_id": "IMP-02"',
         '"screen": "IMP.MISSION.ACTIVE"',
+        '"screen_id": "IMP-03"',
         '"screen": "IMP.INBOX.MAIN"',
+        '"screen_id": "IMP-04"',
         '"screen": "IMP.WR.SUMMARY"',
+        '"screen_id": "IMP-05"',
         '"screen": "IMP.HISTORY.MAIN"',
+        '"screen_id": "IMP-06"',
         '"screen": "IMP.SETTINGS.CORE"',
         '"sync_state": "mock"',
     ):
@@ -377,7 +484,7 @@ def test_imperium_frontend_screen_spec_v1_locks_screen_validation_checklist() ->
         "Error state",
         "Mock data fonctionnelle",
         "Dashboard must show no more than one active mission",
-        "Mission Active must never be top-level bottom navigation",
+        "Mission Active must be present in top-level bottom navigation and sidebar as `IMP-02`",
         "Inbox convert-to-mission action must remain backend-validated",
         "Weekly Review must never finalize locally",
         "History must remain read-only",

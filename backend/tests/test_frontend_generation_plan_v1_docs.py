@@ -149,12 +149,18 @@ def test_frontend_generation_plan_v1_defines_mock_data_without_real_backend_conn
         assert forbidden_backend_use in mocks
 
     for json_fixture in (
-        '"screen": "IMP-01"',
-        '"fixture_name": "dashboard_with_active_mission"',
-        '"screen": "IMP-02"',
-        '"fixture_name": "mission_active_empty"',
-        '"screen": "IMP-04"',
-        '"fixture_name": "weekly_review_error"',
+        '"screen_id": "IMP-01"',
+        '"route_id": "IMP.DASH.MAIN"',
+        '"screen": "IMP.DASH.MAIN"',
+        '"fixture_name": "dashboard_mock_v1"',
+        '"screen_id": "IMP-02"',
+        '"route_id": "IMP.MISSION.ACTIVE"',
+        '"screen": "IMP.MISSION.ACTIVE"',
+        '"fixture_name": "mission_active_empty_v1"',
+        '"screen_id": "IMP-04"',
+        '"route_id": "IMP.WR.SUMMARY"',
+        '"screen": "IMP.WR.SUMMARY"',
+        '"fixture_name": "weekly_review_error_v1"',
         '"sync_state": "mock"',
     ):
         assert json_fixture in mocks

@@ -54,99 +54,105 @@ Le mapping suit strictement cette chaine :
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.DASH.MAIN` |
+| Screen ID | `IMP-01` |
+| Route ID | `IMP.DASH.MAIN` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `dashboard_with_active_mission` / `dashboard_mock_v1` |
+| Mock source 68 | `dashboard_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| Daily Focus Card | `daily_focus.label`, `daily_focus.reason`, date visible, contexte de priorite | `dashboard_with_active_mission` / `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
-| Active Mission Card | `active_mission.id`, `active_mission.title`, `active_mission.status`, `active_mission.priority`, `active_mission.deadline` | `dashboard_with_active_mission` / `dashboard_mock_v1` | `GET /api/imperium/missions/active` | None | GET | `Ready state` | No branch now |
-| Priority Card | `priority.label`, `priority.reason`, signal de priorite du moment | `dashboard_with_active_mission` / `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
-| Quick Actions | libelles d actions visibles seulement, aucune decision canonique locale | `dashboard_with_active_mission` / `dashboard_mock_v1` | `POST /api/imperium/day/finish`, `POST /api/imperium/replans/request` | None | POST | `Ready state` | No branch now |
-| Weekly Progress | `weekly_progress.missions_done`, `weekly_progress.missions_failed`, `weekly_progress.completion_percent` | `dashboard_with_active_mission` / `dashboard_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
-| Imperium Status | `imperium_status.mode`, `imperium_status.backend_connected`, `imperium_status.cache_age_minutes` | `dashboard_with_active_mission` / `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
+| Daily Focus Card | `daily_focus.label`, `daily_focus.reason`, date visible, contexte de priorite | `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
+| Active Mission Card | `active_mission.id`, `active_mission.title`, `active_mission.status`, `active_mission.priority`, `active_mission.deadline` | `dashboard_mock_v1` | `GET /api/imperium/missions/active` | None | GET | `Ready state` | No branch now |
+| Priority Card | `priority.label`, `priority.reason`, signal de priorite du moment | `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
+| Quick Actions | `quick_actions[].id`, `quick_actions[].label`, `quick_actions[].target_route`, `quick_actions[].style`, aucune decision canonique locale | `dashboard_mock_v1` | `POST /api/imperium/day/finish` | `FUTURE TBD POST /api/imperium/replans/request` | POST | `Ready state` | No branch now |
+| Weekly Progress | `weekly_progress.missions_done`, `weekly_progress.missions_failed`, `weekly_progress.completion_percent` | `dashboard_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Imperium Status | `imperium_status.mode`, `imperium_status.backend_connected`, `imperium_status.cache_age_minutes` | `dashboard_mock_v1` | `GET /api/imperium/dashboard` | None | GET | `Ready state` | No branch now |
 
 ### 3.2 Mission Active
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.MISSION.ACTIVE` |
+| Screen ID | `IMP-02` |
+| Route ID | `IMP.MISSION.ACTIVE` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `mission_active_with_progress` / `mission_active_mock_v1` |
+| Mock source 68 | `mission_active_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| Mission Header | `mission.id`, `mission.title`, `mission.status`, `mission.priority`, `mission.deadline` | `mission_active_with_progress` / `mission_active_mock_v1` | `GET /api/imperium/missions/active` | None | GET | `Ready state` | No branch now |
-| Mission Description | `mission.description`, `mission.reason`, `mission.expected_outcome` | `mission_active_with_progress` / `mission_active_mock_v1` | `GET /api/imperium/missions/{mission_id}` | None | GET | `Ready state` | No branch now |
-| Progress Block | `progress.current_step`, `progress.percent`, `progress.time_remaining_minutes` | `mission_active_with_progress` / `mission_active_mock_v1` | `GET /api/imperium/missions/{mission_id}` | None | GET | `Ready state` | No branch now |
-| Decision Buttons | `Complete`, `Fail`, `Replan`, `Back` labels only | `mission_active_with_progress` / `mission_active_mock_v1` | `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail` | `FUTURE TBD POST /api/imperium/missions/{mission_id}/notes` | POST | `Ready state` | No branch now |
-| Notes Area | `notes[].id`, `notes[].text`, `notes[].created_at` | `mission_active_with_progress` / `mission_active_mock_v1` | `POST /api/imperium/missions/{mission_id}/notes` | `FUTURE TBD POST /api/imperium/missions/{mission_id}/notes` | POST | `Ready state` | No branch now |
+| Mission Header | `mission.id`, `mission.title`, `mission.status`, `mission.priority`, `mission.deadline` | `mission_active_mock_v1` | `GET /api/imperium/missions/active` | None | GET | `Ready state` | No branch now |
+| Mission Description | `mission.description`, `mission.reason`, `mission.expected_outcome` | `mission_active_mock_v1` | `GET /api/imperium/missions/{mission_id}` | None | GET | `Ready state` | No branch now |
+| Progress Block | `progress.current_step`, `progress.percent`, `progress.time_remaining_minutes` | `mission_active_mock_v1` | `GET /api/imperium/missions/{mission_id}` | None | GET | `Ready state` | No branch now |
+| Decision Buttons | `Complete`, `Fail`, `Replan`, `Back` labels only | `mission_active_mock_v1` | `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail` | `FUTURE TBD POST /api/imperium/replans/request` | POST | `Ready state` | No branch now |
+| Notes Area | `notes[].id`, `notes[].text`, `notes[].created_at`, `note_save_state.status`, `note_save_state.last_saved_at`, `note_save_state.pending_note_id` | `mission_active_mock_v1` | None | `FUTURE TBD POST /api/imperium/missions/{mission_id}/notes` | POST | `Ready state` | No branch now |
 
 ### 3.3 Inbox
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.INBOX.MAIN` |
+| Screen ID | `IMP-03` |
+| Route ID | `IMP.INBOX.MAIN` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `inbox_with_conversations` / `inbox_mock_v1` |
+| Mock source 68 | `inbox_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| Search | `filters.query`, result count, clear action | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
-| Filters | `filters.active` with `all`, `voice`, `notes`, `missions`, `unprocessed` | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
-| Conversation List | `conversations[].id`, `conversations[].title`, `conversations[].source`, `conversations[].status`, `conversations[].latest_message`, `conversations[].updated_at` | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
-| Message Preview | selected conversation detail, linked intention, sender label if present | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}` | `FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}` | GET | `Ready state` | No branch now |
-| Add voice note | draft input, transcription preview only | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD POST /api/imperium/voice/transcriptions` | `FUTURE TBD POST /api/imperium/voice/transcriptions` | POST | `Ready state` | No branch now |
-| Convert to mission | conversion proposal label only, no local mission creation | `inbox_with_conversations` / `inbox_mock_v1` | `FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal` | `FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal` | POST | `Ready state` | No branch now |
+| Search | `filters.query`, result count, clear action | `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
+| Filters | `filters.active` with `all`, `voice`, `notes`, `missions`, `unprocessed` | `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
+| Conversation List | `conversations[].id`, `conversations[].title`, `conversations[].source`, `conversations[].status`, `conversations[].latest_message`, `conversations[].updated_at` | `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/items` | `FUTURE TBD GET /api/imperium/inbox/items` | GET | `Ready state` | No branch now |
+| Message Preview | selected conversation detail, linked intention, sender label if present | `inbox_mock_v1` | `FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}` | `FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}` | GET | `Ready state` | No branch now |
+| Add voice note | draft input, transcription preview only | `inbox_mock_v1` | `FUTURE TBD POST /api/imperium/voice/transcriptions` | `FUTURE TBD POST /api/imperium/voice/transcriptions` | POST | `Ready state` | No branch now |
+| Convert to mission | conversion proposal label only, no local mission creation | `inbox_mock_v1` | `FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal` | `FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal` | POST | `Ready state` | No branch now |
 
 ### 3.4 Weekly Review
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.WR.SUMMARY` |
+| Screen ID | `IMP-04` |
+| Route ID | `IMP.WR.SUMMARY` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `weekly_review_ready` / `weekly_review_mock_v1` |
+| Mock source 68 | `weekly_review_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| Weekly Summary | `week.start`, `week.end`, `week.status`, `summary` | `weekly_review_ready` / `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
-| Wins | `wins[].id`, `wins[].title`, `wins[].source`, `wins[].date` | `weekly_review_ready` / `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
-| Failures | `failures[].id`, `failures[].title`, `failures[].reason`, `failures[].linked_mission_id` | `weekly_review_ready` / `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
-| Improvement Suggestions | `improvement_suggestions[].id`, `improvement_suggestions[].text`, `improvement_suggestions[].confidence` | `weekly_review_ready` / `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
-| Statistics | `statistics.missions_done`, `statistics.missions_failed`, `statistics.completion_percent`, `statistics.weekly_profit_eur` | `weekly_review_ready` / `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Weekly Summary | `week.start`, `week.end`, `week.status`, `summary` | `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Wins | `wins[].id`, `wins[].title`, `wins[].source`, `wins[].date` | `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Failures | `failures[].id`, `failures[].title`, `failures[].reason`, `failures[].linked_mission_id` | `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Improvement Suggestions | `improvement_suggestions[].id`, `improvement_suggestions[].text`, `improvement_suggestions[].rationale`, `improvement_suggestions[].confidence` | `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
+| Statistics | `statistics.missions_done`, `statistics.missions_failed`, `statistics.completion_percent`, `statistics.weekly_profit_eur` | `weekly_review_mock_v1` | `GET /api/imperium/weekly-review/state` | None | GET | `Ready state` | No branch now |
 
 ### 3.5 History
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.HISTORY.MAIN` |
+| Screen ID | `IMP-05` |
+| Route ID | `IMP.HISTORY.MAIN` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `history_with_timeline` / `history_mock_v1` |
+| Mock source 68 | `history_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| Timeline | `events[].id`, `events[].type`, `events[].title`, `events[].status`, `events[].occurred_at` | `history_with_timeline` / `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
-| Search | `filters.query`, query count, result narrowing only | `history_with_timeline` / `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
-| Filters | `filters.active` and filter chips | `history_with_timeline` / `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
-| History Detail Card | selected event details, `detail_hint`, linked mission if present | `history_with_timeline` / `history_mock_v1` | `FUTURE TBD GET /api/imperium/history/events` | `FUTURE TBD GET /api/imperium/history/events` | GET | `Ready state` | No branch now |
+| Timeline | `events[].id`, `events[].type`, `events[].title`, `events[].status`, `events[].occurred_at` | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
+| Search | `filters.query`, query count, result narrowing only | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
+| Filters | `filters.active` and filter chips | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
+| History Detail Card | selected event details, `events[].source`, `events[].linked_route`, linked mission if present | `history_mock_v1` | `FUTURE TBD GET /api/imperium/history/events` | `FUTURE TBD GET /api/imperium/history/events` | GET | `Ready state` | No branch now |
 
 ### 3.6 Settings
 
 | Field | Value |
 |---|---|
-| Screen ID | `IMP.SETTINGS.CORE` |
+| Screen ID | `IMP-06` |
+| Route ID | `IMP.SETTINGS.CORE` |
 | UI state (67) | `Ready state` |
-| Mock source 68 | `settings_default_mock` / `settings_mock_v1` |
+| Mock source 68 | `settings_mock_v1` |
 
 | Widget | Donnees affichees | Mock source 68 | Endpoint futur pressenti | Endpoint a creer plus tard si absent | Methode HTTP | Etat UI 67 | Branching now |
 |---|---|---|---|---|---|---|---|
-| User | `user.display_name`, `user.timezone`, `user.language` | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
-| Theme | `theme.mode`, `theme.accent` | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
-| Notifications | `notifications.morning_check_in`, `notifications.mission_reminders`, `notifications.weekly_review` | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
-| Integrations | `integrations.n8n`, `integrations.postgresql`, `integrations.ai_router` | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
-| Security | `security.auth_state`, `security.session_status`, redacted only | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
-| Advanced | `advanced.priority_rules_link`, `advanced.cache_mode` | `settings_default_mock` / `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | `FUTURE TBD PATCH /api/imperium/settings` | PATCH | `Ready state` | No branch now |
+| User | `user.display_name`, `user.timezone`, `user.language` | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
+| Theme | `theme.mode`, `theme.accent` | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
+| Notifications | `notifications.morning_check_in`, `notifications.mission_reminders`, `notifications.weekly_review` | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
+| Integrations | `integrations.n8n`, `integrations.postgresql`, `integrations.ai_router` | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
+| Security | `security.auth_state`, `security.session_status`, redacted only | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | None | GET | `Ready state` | No branch now |
+| Advanced | `advanced.priority_rules_link`, `advanced.cache_mode` | `settings_mock_v1` | `GET /api/imperium/frontend/app-manifest` | `FUTURE TBD PATCH /api/imperium/settings` | PATCH | `Ready state` | No branch now |
 
 ## 4. Widget to Data Contract
 
@@ -162,33 +168,33 @@ Le mapping suit strictement cette chaine :
 
 | Screen | Widget | Canonical fields | Mock reference |
 |---|---|---|---|
-| Dashboard | Daily Focus Card | `daily_focus.label`, `daily_focus.reason` | `dashboard_with_active_mission` |
-| Dashboard | Active Mission Card | `active_mission.id`, `active_mission.title`, `active_mission.status`, `active_mission.priority`, `active_mission.deadline` | `dashboard_with_active_mission` |
-| Dashboard | Priority Card | `priority.label`, `priority.reason` | `dashboard_with_active_mission` |
-| Dashboard | Quick Actions | action labels only, no canonical mutation | `dashboard_with_active_mission` |
-| Dashboard | Weekly Progress | `weekly_progress.missions_done`, `weekly_progress.missions_failed`, `weekly_progress.completion_percent` | `dashboard_with_active_mission` |
-| Dashboard | Imperium Status | `imperium_status.mode`, `imperium_status.backend_connected`, `imperium_status.cache_age_minutes` | `dashboard_with_active_mission` |
-| Mission Active | Mission Header | `mission.id`, `mission.title`, `mission.status`, `mission.priority`, `mission.deadline` | `mission_active_with_progress` |
-| Mission Active | Mission Description | `mission.description`, `mission.reason`, `mission.expected_outcome` | `mission_active_with_progress` |
-| Mission Active | Progress Block | `progress.current_step`, `progress.percent`, `progress.time_remaining_minutes` | `mission_active_with_progress` |
-| Mission Active | Notes Area | `notes[].id`, `notes[].text`, `notes[].created_at` | `mission_active_with_progress` |
-| Inbox | Search | `filters.query` | `inbox_with_conversations` |
-| Inbox | Filters | `filters.active` | `inbox_with_conversations` |
-| Inbox | Conversation List | `conversations[].id`, `conversations[].title`, `conversations[].source`, `conversations[].status`, `conversations[].latest_message`, `conversations[].updated_at` | `inbox_with_conversations` |
-| Inbox | Message Preview | selected conversation projection only | `inbox_with_conversations` |
-| Weekly Review | Weekly Summary | `week.start`, `week.end`, `week.status`, `summary` | `weekly_review_ready` |
-| Weekly Review | Wins | `wins[].id`, `wins[].title`, `wins[].source`, `wins[].date` | `weekly_review_ready` |
-| Weekly Review | Failures | `failures[].id`, `failures[].title`, `failures[].reason`, `failures[].linked_mission_id` | `weekly_review_ready` |
-| Weekly Review | Improvement Suggestions | `improvement_suggestions[].id`, `improvement_suggestions[].text`, `improvement_suggestions[].confidence` | `weekly_review_ready` |
-| Weekly Review | Statistics | `statistics.missions_done`, `statistics.missions_failed`, `statistics.completion_percent`, `statistics.weekly_profit_eur` | `weekly_review_ready` |
-| History | Timeline | `events[].id`, `events[].type`, `events[].title`, `events[].status`, `events[].occurred_at` | `history_with_timeline` |
-| History | History Detail Card | selected event projection only | `history_with_timeline` |
-| Settings | User | `user.display_name`, `user.timezone`, `user.language` | `settings_default_mock` |
-| Settings | Theme | `theme.mode`, `theme.accent` | `settings_default_mock` |
-| Settings | Notifications | `notifications.morning_check_in`, `notifications.mission_reminders`, `notifications.weekly_review` | `settings_default_mock` |
-| Settings | Integrations | `integrations.n8n`, `integrations.postgresql`, `integrations.ai_router` | `settings_default_mock` |
-| Settings | Security | `security.auth_state`, `security.session_status` | `settings_default_mock` |
-| Settings | Advanced | `advanced.priority_rules_link`, `advanced.cache_mode` | `settings_default_mock` |
+| Dashboard | Daily Focus Card | `daily_focus.label`, `daily_focus.reason` | `dashboard_mock_v1` |
+| Dashboard | Active Mission Card | `active_mission.id`, `active_mission.title`, `active_mission.status`, `active_mission.priority`, `active_mission.deadline` | `dashboard_mock_v1` |
+| Dashboard | Priority Card | `priority.label`, `priority.reason` | `dashboard_mock_v1` |
+| Dashboard | Quick Actions | `quick_actions[].id`, `quick_actions[].label`, `quick_actions[].target_route`, `quick_actions[].style` | `dashboard_mock_v1` |
+| Dashboard | Weekly Progress | `weekly_progress.missions_done`, `weekly_progress.missions_failed`, `weekly_progress.completion_percent` | `dashboard_mock_v1` |
+| Dashboard | Imperium Status | `imperium_status.mode`, `imperium_status.backend_connected`, `imperium_status.cache_age_minutes` | `dashboard_mock_v1` |
+| Mission Active | Mission Header | `mission.id`, `mission.title`, `mission.status`, `mission.priority`, `mission.deadline` | `mission_active_mock_v1` |
+| Mission Active | Mission Description | `mission.description`, `mission.reason`, `mission.expected_outcome` | `mission_active_mock_v1` |
+| Mission Active | Progress Block | `progress.current_step`, `progress.percent`, `progress.time_remaining_minutes` | `mission_active_mock_v1` |
+| Mission Active | Notes Area | `notes[].id`, `notes[].text`, `notes[].created_at`, `note_save_state.status` | `mission_active_mock_v1` |
+| Inbox | Search | `filters.query` | `inbox_mock_v1` |
+| Inbox | Filters | `filters.active` | `inbox_mock_v1` |
+| Inbox | Conversation List | `conversations[].id`, `conversations[].title`, `conversations[].source`, `conversations[].status`, `conversations[].latest_message`, `conversations[].updated_at` | `inbox_mock_v1` |
+| Inbox | Message Preview | selected conversation projection only | `inbox_mock_v1` |
+| Weekly Review | Weekly Summary | `week.start`, `week.end`, `week.status`, `summary` | `weekly_review_mock_v1` |
+| Weekly Review | Wins | `wins[].id`, `wins[].title`, `wins[].source`, `wins[].date` | `weekly_review_mock_v1` |
+| Weekly Review | Failures | `failures[].id`, `failures[].title`, `failures[].reason`, `failures[].linked_mission_id` | `weekly_review_mock_v1` |
+| Weekly Review | Improvement Suggestions | `improvement_suggestions[].id`, `improvement_suggestions[].text`, `improvement_suggestions[].rationale`, `improvement_suggestions[].confidence` | `weekly_review_mock_v1` |
+| Weekly Review | Statistics | `statistics.missions_done`, `statistics.missions_failed`, `statistics.completion_percent`, `statistics.weekly_profit_eur` | `weekly_review_mock_v1` |
+| History | Timeline | `events[].id`, `events[].type`, `events[].title`, `events[].status`, `events[].occurred_at` | `history_mock_v1` |
+| History | History Detail Card | `events[].source`, `events[].linked_route`, selected event projection only | `history_mock_v1` |
+| Settings | User | `user.display_name`, `user.timezone`, `user.language` | `settings_mock_v1` |
+| Settings | Theme | `theme.mode`, `theme.accent` | `settings_mock_v1` |
+| Settings | Notifications | `notifications.morning_check_in`, `notifications.mission_reminders`, `notifications.weekly_review` | `settings_mock_v1` |
+| Settings | Integrations | `integrations.n8n`, `integrations.postgresql`, `integrations.ai_router` | `settings_mock_v1` |
+| Settings | Security | `security.auth_state`, `security.session_status` | `settings_mock_v1` |
+| Settings | Advanced | `advanced.priority_rules_link`, `advanced.cache_mode` | `settings_mock_v1` |
 
 ## 5. Missing Backend Contracts
 
@@ -197,6 +203,8 @@ Ils restent marques `FUTURE` et ne doivent pas etre branches maintenant.
 
 | Screen | Missing backend contract | Status | Method |
 |---|---|---|---|
+| Dashboard | `FUTURE TBD POST /api/imperium/replans/request` | Missing | POST |
+| Mission Active | `FUTURE TBD POST /api/imperium/replans/request` | Missing | POST |
 | Mission Active | `FUTURE TBD POST /api/imperium/missions/{mission_id}/notes` | Missing | POST |
 | Inbox | `FUTURE TBD GET /api/imperium/inbox/items` | Missing | GET |
 | Inbox | `FUTURE TBD POST /api/imperium/inbox/items` | Missing | POST |

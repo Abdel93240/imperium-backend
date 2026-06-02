@@ -31,7 +31,8 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 - Chaque mock a un `mock_object_name` stable.
 - Chaque item identifiable utilise un ID stable qui commence par `mock-`.
-- Les `screen` utilisent les IDs canoniques de `65` et `67`.
+- Les `screen_id` utilisent les IDs canoniques de `65` et `67`.
+- Les `route_id` utilisent les Route IDs canoniques de `65` et `67`.
 - Les dates sont ISO uniquement.
 - Les textes restent courts et mobiles.
 - Les nombres restent coherents entre eux.
@@ -75,7 +76,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.DASH.MAIN",
+  "screen_id": "IMP-01",
+  "route_id": "IMP.DASH.MAIN",
+  "screen": "Dashboard",
   "mock_object_name": "dashboard_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T07:30:00Z",
@@ -99,6 +102,34 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
     "missions_failed": 2,
     "completion_percent": 72
   },
+  "quick_actions": [
+    {
+      "id": "mock-action-open-mission",
+      "label": "Open Mission Active",
+      "target_route": "IMP.MISSION.ACTIVE",
+      "style": "primary"
+    },
+    {
+      "id": "mock-action-add-inbox-note",
+      "label": "Add Inbox Note",
+      "target_route": "IMP.INBOX.MAIN",
+      "style": "secondary"
+    },
+    {
+      "id": "mock-action-request-replan",
+      "label": "Request Replan",
+      "target_route": null,
+      "style": "secondary",
+      "mock_effect": "snackbar_only"
+    },
+    {
+      "id": "mock-action-finish-day",
+      "label": "Finish Day",
+      "target_route": null,
+      "style": "ghost",
+      "mock_effect": "snackbar_only"
+    }
+  ],
   "imperium_status": {
     "mode": "mock",
     "backend_connected": false,
@@ -111,7 +142,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.DASH.MAIN`. |
+| `screen_id` | Must be `IMP-01`. |
+| `route_id` | Must be `IMP.DASH.MAIN`. |
+| `screen` | Must be `Dashboard`. |
 | `mock_object_name` | Must be `dashboard_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
@@ -127,6 +160,10 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 | `weekly_progress.missions_done` | Integer. |
 | `weekly_progress.missions_failed` | Integer. |
 | `weekly_progress.completion_percent` | Integer between 0 and 100. |
+| `quick_actions[].id` | Stable `mock-` ID. |
+| `quick_actions[].label` | Short visible action label. |
+| `quick_actions[].target_route` | Canonical route ID or null for snackbar-only mock action. |
+| `quick_actions[].style` | `primary`, `secondary`, or `ghost`. |
 | `imperium_status.mode` | Must be `mock`. |
 | `imperium_status.backend_connected` | Boolean. |
 | `imperium_status.cache_age_minutes` | Non-negative integer. |
@@ -158,13 +195,17 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.MISSION.ACTIVE",
+  "screen_id": "IMP-02",
+  "route_id": "IMP.MISSION.ACTIVE",
+  "screen": "Mission Active",
   "mock_object_name": "mission_active_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T08:15:00Z",
   "mission": {
     "id": "mock-mission-001",
     "title": "Finish weekly financial review",
+    "description": "Check income, expenses and weekly profit before planning sadaqa.",
+    "expected_outcome": "Weekly profit reviewed and ready for weekly review.",
     "status": "active",
     "priority": "high",
     "deadline": "2026-06-02T18:00:00Z",
@@ -179,9 +220,15 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
     {
       "id": "mock-note-001",
       "text": "Check fuel expenses after shift.",
-      "created_at": "2026-06-02T08:10:00Z"
+      "created_at": "2026-06-02T08:10:00Z",
+      "source": "text"
     }
-  ]
+  ],
+  "note_save_state": {
+    "status": "idle",
+    "last_saved_at": null,
+    "pending_note_id": null
+  }
 }
 ```
 
@@ -189,12 +236,16 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.MISSION.ACTIVE`. |
+| `screen_id` | Must be `IMP-02`. |
+| `route_id` | Must be `IMP.MISSION.ACTIVE`. |
+| `screen` | Must be `Mission Active`. |
 | `mock_object_name` | Must be `mission_active_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
 | `mission.id` | Stable `mock-` ID. |
 | `mission.title` | Short mission title. |
+| `mission.description` | Mission Description block text. |
+| `mission.expected_outcome` | Required outcome for the Mission Description block. |
 | `mission.status` | `active` in READY mock. |
 | `mission.priority` | Coherent priority label. |
 | `mission.deadline` | ISO timestamp. |
@@ -204,11 +255,12 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 | `notes[].id` | Stable `mock-` ID. |
 | `notes[].text` | Short note. |
 | `notes[].created_at` | ISO timestamp. |
+| `note_save_state.status` | `idle`, `saving`, `saved`, `failed`, or `pending`. |
+| `note_save_state.last_saved_at` | ISO timestamp or null. |
+| `note_save_state.pending_note_id` | Stable `mock-` ID or null. |
 
 #### Optional fields
 
-- `mission.description`
-- `mission.expected_outcome`
 - `mission.source`
 - `progress.blocked_reason`
 - `notes[].source`
@@ -232,7 +284,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.INBOX.MAIN",
+  "screen_id": "IMP-03",
+  "route_id": "IMP.INBOX.MAIN",
+  "screen": "Inbox",
   "mock_object_name": "inbox_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T09:30:00Z",
@@ -258,7 +312,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.INBOX.MAIN`. |
+| `screen_id` | Must be `IMP-03`. |
+| `route_id` | Must be `IMP.INBOX.MAIN`. |
+| `screen` | Must be `Inbox`. |
 | `mock_object_name` | Must be `inbox_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
@@ -298,7 +354,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.WR.SUMMARY",
+  "screen_id": "IMP-04",
+  "route_id": "IMP.WR.SUMMARY",
+  "screen": "Weekly Review",
   "mock_object_name": "weekly_review_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T10:00:00Z",
@@ -328,6 +386,7 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
     {
       "id": "mock-suggestion-001",
       "text": "Use voice notes immediately after shifts.",
+      "rationale": "Voice capture lowers friction after long VTC shifts and preserves useful data for the backend brain.",
       "confidence": "medium"
     }
   ],
@@ -344,7 +403,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.WR.SUMMARY`. |
+| `screen_id` | Must be `IMP-04`. |
+| `route_id` | Must be `IMP.WR.SUMMARY`. |
+| `screen` | Must be `Weekly Review`. |
 | `mock_object_name` | Must be `weekly_review_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
@@ -359,6 +420,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 | `failures[].id` | Stable `mock-` ID. |
 | `failures[].title` | Short failure title. |
 | `failures[].reason` | Short reason. |
+| `improvement_suggestions[].id` | Stable `mock-` ID. |
+| `improvement_suggestions[].text` | Short suggestion text. |
+| `improvement_suggestions[].rationale` | Short explanation of why the suggestion matters. |
 | `statistics.missions_done` | Integer. |
 | `statistics.missions_failed` | Integer. |
 | `statistics.completion_percent` | Integer between 0 and 100. |
@@ -390,7 +454,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.HISTORY.MAIN",
+  "screen_id": "IMP-05",
+  "route_id": "IMP.HISTORY.MAIN",
+  "screen": "History",
   "mock_object_name": "history_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T10:30:00Z",
@@ -405,7 +471,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
       "title": "Weekly income check completed",
       "status": "completed",
       "occurred_at": "2026-06-01T20:15:00Z",
-      "linked_mission_id": "mock-mission-010"
+      "source": "mission",
+      "linked_mission_id": "mock-mission-010",
+      "linked_route": "IMP.HISTORY.MAIN"
     },
     {
       "id": "mock-history-002",
@@ -413,7 +481,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
       "title": "Evening review skipped",
       "status": "failed",
       "reason": "Fatigue after VTC shift",
-      "occurred_at": "2026-05-31T22:40:00Z"
+      "occurred_at": "2026-05-31T22:40:00Z",
+      "source": "mission",
+      "linked_route": "IMP.HISTORY.MAIN"
     }
   ],
   "selected_event_id": "mock-history-001"
@@ -424,7 +494,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.HISTORY.MAIN`. |
+| `screen_id` | Must be `IMP-05`. |
+| `route_id` | Must be `IMP.HISTORY.MAIN`. |
+| `screen` | Must be `History`. |
 | `mock_object_name` | Must be `history_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
@@ -435,13 +507,14 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 | `events[].title` | Short title. |
 | `events[].status` | Stable status label. |
 | `events[].occurred_at` | ISO timestamp. |
+| `events[].source` | Source family for the History Detail Card. |
+| `events[].linked_route` | Canonical route used by the History Detail Card. |
 | `selected_event_id` | Must match an item ID when present. |
 
 #### Optional fields
 
 - `events[].reason`
 - `events[].linked_mission_id`
-- `events[].source`
 - `detail_hint`
 
 #### Variant links
@@ -463,7 +536,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ```json
 {
-  "screen": "IMP.SETTINGS.CORE",
+  "screen_id": "IMP-06",
+  "route_id": "IMP.SETTINGS.CORE",
+  "screen": "Settings",
   "mock_object_name": "settings_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T10:45:00Z",
@@ -501,7 +576,9 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 | Field | Notes |
 |---|---|
-| `screen` | Must be `IMP.SETTINGS.CORE`. |
+| `screen_id` | Must be `IMP-06`. |
+| `route_id` | Must be `IMP.SETTINGS.CORE`. |
+| `screen` | Must be `Settings`. |
 | `mock_object_name` | Must be `settings_mock_v1`. |
 | `sync_state` | Must be `mock`. |
 | `generated_at` | ISO timestamp. |
@@ -538,7 +615,7 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 
 ## 3. Empty/Error/Offline Variants
 
-Les variants ci-dessous gardent le meme contrat de base, le meme `screen`, le meme `mock_object_name` canonique par famille et les memes regles de securite.
+Les variants ci-dessous gardent le meme contrat de base, le meme `screen_id`, le meme `route_id`, le meme `mock_object_name` canonique par famille et les memes regles de securite.
 Ils changent uniquement l etat visuel ou la disponibilite des donnees.
 Empty variant, Error variant et Offline variant sont documentes pour chaque ecran.
 

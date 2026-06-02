@@ -24,14 +24,14 @@ Imperium reste une interface du cerveau backend. Les ecrans affichent, expliquen
 
 ## 2. Screen Routing Canonical IDs
 
-| Screen | Route ID | Route path | Top-level |
-|---|---|---|---|
-| Dashboard | `IMP.DASH.MAIN` | `imperium/dashboard` | Yes |
-| Mission Active | `IMP.MISSION.ACTIVE` | `imperium/missions/active` | Yes |
-| Inbox | `IMP.INBOX.MAIN` | `imperium/inbox` | Yes |
-| Weekly Review | `IMP.WR.SUMMARY` | `imperium/weekly-review` | Yes |
-| History | `IMP.HISTORY.MAIN` | `imperium/history` | Yes |
-| Settings | `IMP.SETTINGS.CORE` | `imperium/settings` | Yes |
+| Screen | Screen ID | Route ID | Route path | Top-level |
+|---|---|---|---|---|
+| Dashboard | `IMP-01` | `IMP.DASH.MAIN` | `imperium/dashboard` | Yes |
+| Mission Active | `IMP-02` | `IMP.MISSION.ACTIVE` | `imperium/missions/active` | Yes |
+| Inbox | `IMP-03` | `IMP.INBOX.MAIN` | `imperium/inbox` | Yes |
+| Weekly Review | `IMP-04` | `IMP.WR.SUMMARY` | `imperium/weekly-review` | Yes |
+| History | `IMP-05` | `IMP.HISTORY.MAIN` | `imperium/history` | Yes |
+| Settings | `IMP-06` | `IMP.SETTINGS.CORE` | `imperium/settings` | Yes |
 
 ## 3. Dashboard
 
@@ -75,7 +75,7 @@ Imperium reste une interface du cerveau backend. Les ecrans affichent, expliquen
 
 | State | User actions allowed | Visible components | Expected user message | Transition vers autres etats |
 |---|---|---|---|---|
-| Ready state | Mark complete, mark fail, request replan, add note, add voice note, back to Dashboard, open detail if documented. | Mission header, description, progress block, decision buttons, notes area, sync chip. | `Une seule mission active doit rester visible.` | Can move to Loading on refresh, Error on data failure, Offline on connectivity loss, or remain Ready after note updates. |
+| Ready state | Mark complete, mark fail, request replan, add note, add voice note, back to Dashboard. | Mission header, description, progress block, decision buttons, notes area, sync chip. | `Une seule mission active doit rester visible.` | Can move to Loading on refresh, Error on data failure, Offline on connectivity loss, or remain Ready after note updates. |
 | Loading state | Back only, or cancel pending interaction if supported locally. | Header skeleton, progress skeleton, disabled decision buttons, notes skeleton. | `Chargement de la mission active.` | Returns to Ready when the mission is fetched, Error on fetch failure, Offline on disconnect. |
 | Empty state | Back to Dashboard, open Inbox. | Empty state card, helper text, back action, no create mission CTA. | `No active mission.` | Moves to Ready when the backend confirms a mission, or to Loading on retry. |
 | Error state | Retry, back, open Dashboard. | Error state card, retry action, back action, sync chip. | `Mission active indisponible.` | Can transition to Loading after retry or to Offline if the device is disconnected. |
@@ -131,7 +131,7 @@ Imperium reste une interface du cerveau backend. Les ecrans affichent, expliquen
 |---|---|---|---|---|
 | Ready state | Read summary, inspect wins, inspect failures, open suggestions, return to Dashboard. | Summary card, wins block, failures block, recommendation card, statistics panel, sync chip. | `La semaine est lisible et exploitable.` | Can move to Loading on refresh, Partial sync if statistics arrive progressively, Offline on disconnect. |
 | Loading state | Back navigation only. | Summary skeleton, statistics skeleton, recommendation skeleton, sync chip. | `Chargement de la weekly review.` | Returns to Ready when the weekly data arrives, Error on failure, Offline if the device is disconnected. |
-| Empty state | Return to Dashboard, open guidance if available. | Empty state card, helper text, back action. | `Aucune weekly review disponible pour le moment.` | Can move to Ready when the weekly review is generated, or Loading on retry. |
+| Empty state | Back to Dashboard. | Empty state card, helper text, CTA `Back to Dashboard`. | `Aucune weekly review disponible pour le moment.` | Can move to Ready when the weekly review is generated, or Loading on retry. |
 | Error state | Retry, back, open Dashboard. | Error state card, retry action, sync chip. | `Weekly Review indisponible.` | Can transition to Loading after retry, or Offline if connectivity is lost. |
 | Offline state | Read cached summary, open already cached blocks, back. | Offline banner, cached summary, stale labels, sync chip. | `Mode hors ligne: weekly review en cache.` | Can move to Partial sync if some metrics refresh later, then to Ready when sync finishes. |
 | Partial sync state | Read what is already synced, wait for remaining statistics, no destructive action. | Mixed summary blocks, syncing chip, stale badges. | `Les statistiques se synchronisent encore.` | Returns to Ready when all review blocks are synced, or Error if a block fails critically. |
@@ -184,7 +184,7 @@ Imperium reste une interface du cerveau backend. Les ecrans affichent, expliquen
 |---|---|---|---|---|
 | Ready state | Open sections, edit allowed preferences, view sync status, return to Dashboard. | Section list, preference cards, sync chip, caution banners if needed. | `Les preferences sont disponibles.` | Can move to Loading on refresh, Offline when settings are cached only, Partial sync when some preferences are still syncing. |
 | Loading state | Back navigation only. | Section skeleton, preference skeleton, sync chip. | `Chargement des parametres.` | Returns to Ready when data is loaded, Error on failure, Offline on disconnect. |
-| Empty state | Return to Dashboard, open help copy if provided. | Empty state card, helper text, no fake settings sections. | `Aucun parametre configurable pour le moment.` | Can move to Ready when preferences are available, or Loading on retry. |
+| Empty state | Use mock defaults. | Empty state card, helper text, CTA `Use mock defaults`, no fake settings sections. | `Aucun parametre configurable pour le moment.` | Can move to Ready when preferences are available, or Loading on retry. |
 | Error state | Retry, back, open Dashboard. | Error state card, retry action, sync chip. | `Parametres indisponibles.` | Can transition to Loading after retry or Offline if the device is disconnected. |
 | Offline state | Read cached settings, adjust local non-destructive UI state, back. | Offline banner, cached sections, stale labels, sync chip. | `Mode hors ligne: parametres en cache.` | Can move to Partial sync when pending preference writes later flush, then to Ready when complete. |
 | Partial sync state | Read already-synced preferences, wait for pending saves, do not duplicate changes. | Mixed preference cards, syncing chip, pending save badges. | `Certaines preferences se synchronisent encore.` | Returns to Ready when sync completes, or Error if one preference write fails critically. |
@@ -238,4 +238,3 @@ Imperium reste une interface du cerveau backend. Les ecrans affichent, expliquen
 | Weekly Review | READY |
 | History | READY |
 | Settings | READY |
-

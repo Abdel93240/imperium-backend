@@ -140,13 +140,18 @@ def test_frontend_architecture_navigation_uses_v1_routes_stable_ids_and_surface_
         "Dialogs",
         "Bottom sheets",
         "Deep links",
-        "`IMP.MISSION.DETAIL` non compté comme `IMP-15`",
+        "`IMP.MISSION.ACTIVE` pour la mission active unique",
+        "Navigation Imperium V1 permanente",
     ):
         assert required in navigation
 
     for screen_id in (
         "IMP-01",
-        "IMP-07",
+        "IMP-02",
+        "IMP-03",
+        "IMP-04",
+        "IMP-05",
+        "IMP-06",
         "VAU-01",
         "VAU-12",
         "VEC-03",
@@ -154,6 +159,8 @@ def test_frontend_architecture_navigation_uses_v1_routes_stable_ids_and_surface_
         "PAT-11",
     ):
         assert screen_id in navigation
+
+    assert "IMP.MISSION.DETAIL" not in navigation
 
 
 def test_frontend_architecture_state_network_cache_and_sync_are_offline_aware() -> None:
@@ -203,7 +210,7 @@ def test_frontend_architecture_lists_feature_modules_with_screens_viewmodels_rep
     features = _section(_architecture_text(), "9. Feature Modules")
 
     expected_screen_ranges = {
-        "feature_imperium": [f"IMP-{number:02d}" for number in range(1, 15)],
+        "feature_imperium": [f"IMP-{number:02d}" for number in range(1, 7)],
         "feature_vault": [f"VAU-{number:02d}" for number in range(1, 13)],
         "feature_vector": [f"VEC-{number:02d}" for number in range(1, 12)],
         "feature_pulse": [f"PUL-{number:02d}" for number in range(1, 15)],
@@ -219,6 +226,11 @@ def test_frontend_architecture_lists_feature_modules_with_screens_viewmodels_rep
         "ViewModels",
         "Repositories",
         "Navigation",
+        "Mission Active",
+        "Inbox",
+        "Weekly Review",
+        "History",
+        "Settings",
         "no Bolt automation path",
         "Vault settings deep link to `PAT-11d`",
         "Path fasting constraints",

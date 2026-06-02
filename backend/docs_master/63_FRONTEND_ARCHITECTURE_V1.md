@@ -319,13 +319,24 @@ Tablet landscape utilise `ImperiumSidebar`. Téléphone utilise `ImperiumBottomN
 
 Destinations top-level V1 :
 
-- Imperium : `IMP-01`, `IMP-07`, `IMP-09`, `IMP-10`, `IMP-14`.
+- Imperium : `IMP-01` Dashboard, `IMP-02` Mission Active, `IMP-03` Inbox, `IMP-04` Weekly Review, `IMP-05` History, `IMP-06` Settings.
 - Vault : `VAU-01`, `VAU-07`, `VAU-09`, `VAU-12`.
 - Vector : `VEC-01`, avec session active `VEC-03` accessible depuis dashboard ou deep link.
 - Pulse : `PUL-01`, `PUL-10`, `PUL-11`, `PUL-12`, `PUL-14`.
 - Path : `PAT-01`, `PAT-09`, `PAT-10`, `PAT-11`.
 
 Les tabs secondaires restent internes à une feature et ne deviennent pas destinations root.
+
+Navigation Imperium V1 permanente :
+
+| Order | Label | Screen ID | Route ID |
+|---|---|---|---|
+| 1 | Dashboard | `IMP-01` | `IMP.DASH.MAIN` |
+| 2 | Mission Active | `IMP-02` | `IMP.MISSION.ACTIVE` |
+| 3 | Inbox | `IMP-03` | `IMP.INBOX.MAIN` |
+| 4 | Weekly Review | `IMP-04` | `IMP.WR.SUMMARY` |
+| 5 | History | `IMP-05` | `IMP.HISTORY.MAIN` |
+| 6 | Settings | `IMP-06` | `IMP.SETTINGS.CORE` |
 
 ### 4.3 Dialogs
 
@@ -356,7 +367,7 @@ Tablette :
 
 Deep links V1 autorisés :
 
-- mission detail `IMP.MISSION.DETAIL` non compté comme `IMP-15` ;
+- Mission Active `IMP.MISSION.ACTIVE` pour la mission active unique, sans route detail V1 separee ;
 - Vault transaction detail/edit `VAU-08` ;
 - Vector recommendation detail `VEC-08` ;
 - Pulse handoffs vers stock ou replan prompts ;
@@ -634,43 +645,38 @@ Le frontend ne merge pas silencieusement une mission, transaction, prière, règ
 Screens V1 :
 
 - `IMP-01` Dashboard ;
-- `IMP-02` Morning Check-In ;
-- `IMP-03` Mission Outcome ;
-- `IMP-04` Day Finished ;
-- `IMP-05` Replan Validation ;
-- `IMP-06` Add Manual Mission ;
-- `IMP-07` Plan History ;
-- `IMP-08` Chatbot ;
-- `IMP-09` Decisions Log ;
-- `IMP-10` Weekly Review List ;
-- `IMP-11` Weekly Review Read-only ;
-- `IMP-12` WR Interactive ;
-- `IMP-13` Priority Rules ;
-- `IMP-14` Settings.
+- `IMP-02` Mission Active ;
+- `IMP-03` Inbox ;
+- `IMP-04` Weekly Review ;
+- `IMP-05` History ;
+- `IMP-06` Settings.
+
+Les anciens ecrans Imperium comme Morning Check-In, Mission Outcome, Day Finished, Replan Validation et Add Manual Mission ne sont pas des destinations top-level V1. Ils restent hors generation V1 tant qu'un contrat backend/frontend explicite ne les reactive pas.
 
 ViewModels :
 
 - `ImperiumDashboardViewModel` ;
-- `MissionOutcomeViewModel` ;
-- `DailyPlanViewModel` ;
+- `ImperiumMissionActiveViewModel` ;
+- `ImperiumInboxViewModel` ;
 - `WeeklyReviewViewModel` ;
-- `PriorityRulesViewModel` ;
+- `ImperiumHistoryViewModel` ;
 - `ImperiumSettingsViewModel`.
 
 Repositories :
 
 - `ImperiumRepository` ;
 - `MissionRepository` ;
-- `DailyPlanRepository` ;
+- `ImperiumInboxRepository` ;
 - `WeeklyReviewRepository` ;
-- `DecisionFrameworkRepository`.
+- `ImperiumHistoryRepository`.
 
 Navigation :
 
 - top-level sidebar/bottom destination dashboard ;
-- settings/priorities nested graph ;
-- mission detail deep link non compté comme écran V1 ;
-- replan surfaces ouvertes seulement depuis triggers backend ou actions utilisateur.
+- top-level sidebar/bottom destinations Mission Active, Inbox, Weekly Review, History et Settings ;
+- settings/priorities nested graph futur seulement si documente ;
+- aucune route detail mission separee en V1 ;
+- replan surfaces futures ouvertes seulement depuis triggers backend ou actions utilisateur documentees.
 
 ### 9.2 `feature_vault/`
 

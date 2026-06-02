@@ -70,9 +70,9 @@ Les ecrans GO 65 utilisent uniquement :
 | Selection | `ImperiumSegmentedControl`, `ImperiumFilterChip`, `ImperiumToggle`. |
 | Feedback | `ImperiumSnackbar`, `ImperiumBanner`, `ImperiumAlertDialog`, `SyncStateChip`. |
 | Containers | `ImperiumCard`, `ImperiumInteractiveCard`, `ImperiumSectionHeader`, `ImperiumContextPanel`. |
-| States | `ImperiumLoadingState`, `ImperiumEmptyState`, `ImperiumErrorState`, `ImperiumSkeleton`. |
+| States | `ImperiumLoadingState`, `ImperiumEmptyState`, `ImperiumErrorState`, `ImperiumOfflineState`, `ImperiumSkeleton`. |
 | Data | `ImperiumMetricCard`, `ImperiumKpiBlock`, `ImperiumProgressBar`, `ImperiumProgressRing`, `ImperiumTimeline`, `ImperiumListItem`, `ImperiumStatusChip`. |
-| Composite | `MissionFocusCard`, `KPIBlock`, `ChatMessageBubble`. |
+| Composite | `MissionFocusCard`, `ImperiumKpiBlock`, `ChatMessageBubble`. |
 
 ### 2.4 Layout global
 
@@ -165,19 +165,21 @@ Ordre telephone, une seule colonne :
 
 | Action | UI | Effet Phase 1/2 | Backend Phase 3 future |
 |---|---|---|---|
-| Ouvrir mission active | Primary sur `Active Mission Card` | navigue vers `IMP.MISSION.ACTIVE` avec mock id. | lecture active mission puis detail. |
+| Ouvrir mission active | Primary sur `Active Mission Card` | navigue vers `IMP.MISSION.ACTIVE` avec mock id. | lecture active mission confirmee par backend. |
 | Ajouter note inbox | Secondary dans `Quick Actions` | navigue vers `IMP.INBOX.MAIN` avec champ vide. | creation inbox item backend-validee. |
 | Demander replan | Secondary dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.REPLAN.VALIDATE` si proposition backend existe. |
 | Finish day | Ghost dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.DAY.FINISH`. |
 
 ### 3.7 Mock data
 
-Fixture locale : `dashboard_with_active_mission`.
+Fixture locale canonique : `dashboard_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-01",
+  "route_id": "IMP.DASH.MAIN",
   "screen": "IMP.DASH.MAIN",
-  "fixture_name": "dashboard_with_active_mission",
+  "fixture_name": "dashboard_mock_v1",
   "sync_state": "mock",
   "generated_at": "2026-06-02T07:30:00Z",
   "daily_focus": {
@@ -202,6 +204,34 @@ Fixture locale : `dashboard_with_active_mission`.
     "missions_failed": 2,
     "completion_percent": 72
   },
+  "quick_actions": [
+    {
+      "id": "mock-action-open-mission",
+      "label": "Open Mission Active",
+      "target_route": "IMP.MISSION.ACTIVE",
+      "style": "primary"
+    },
+    {
+      "id": "mock-action-add-inbox-note",
+      "label": "Add Inbox Note",
+      "target_route": "IMP.INBOX.MAIN",
+      "style": "secondary"
+    },
+    {
+      "id": "mock-action-request-replan",
+      "label": "Request Replan",
+      "target_route": null,
+      "style": "secondary",
+      "mock_effect": "snackbar_only"
+    },
+    {
+      "id": "mock-action-finish-day",
+      "label": "Finish Day",
+      "target_route": null,
+      "style": "ghost",
+      "mock_effect": "snackbar_only"
+    }
+  ],
   "imperium_status": {
     "mode": "mock",
     "backend_connected": false,
@@ -224,7 +254,7 @@ Fixture locale : `dashboard_with_active_mission`.
 - `GET /api/imperium/missions/active`
 - `GET /api/imperium/weekly-review/state`
 - `POST /api/imperium/day/finish`
-- `TBD POST /api/imperium/replans/request`
+- `FUTURE TBD POST /api/imperium/replans/request`
 
 Ces endpoints ne sont pas branches dans GO 65.
 
@@ -246,12 +276,12 @@ Ces endpoints ne sont pas branches dans GO 65.
 | Champ | Valeur |
 |---|---|
 | Route ID | `IMP.MISSION.ACTIVE` |
-| Related canonical deep link | `IMP.MISSION.DETAIL` |
+| Screen ID source | `IMP-02` |
 | Route path | `imperium/missions/active` |
 | Titre visible | `Mission active` |
-| Type | Detail route, not top-level navigation |
+| Type | Top-level route |
 
-`IMP.MISSION.ACTIVE` est le detail de la mission active unique pour la generation GO 65. Il ne cree pas un nouvel onglet top-level et ne compte pas comme `IMP-15`.
+`IMP.MISSION.ACTIVE` est la destination top-level V1 de la mission active unique. La route detail mission separee est supprimee de la V1 et ne doit pas etre generee.
 
 ### 4.2 Objectif metier
 
@@ -261,7 +291,7 @@ Permettre a l'utilisateur de comprendre la mission active, agir dessus et enregi
 
 | Zone | Specification |
 |---|---|
-| Sidebar | Presente si l'ecran est ouvert depuis top-level, destination Dashboard active. |
+| Sidebar | Presente avec destination Mission Active active. |
 | Main column | Max 880dp, mission detail pleine largeur. |
 | Context panel | 320dp, progress block et sync state. |
 
@@ -307,12 +337,14 @@ Ordre telephone :
 
 ### 4.7 Mock data
 
-Fixture locale : `mission_active_with_progress`.
+Fixture locale canonique : `mission_active_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-02",
+  "route_id": "IMP.MISSION.ACTIVE",
   "screen": "IMP.MISSION.ACTIVE",
-  "fixture_name": "mission_active_with_progress",
+  "fixture_name": "mission_active_mock_v1",
   "sync_state": "mock",
   "mission": {
     "id": "mock-mission-001",
@@ -333,9 +365,15 @@ Fixture locale : `mission_active_with_progress`.
     {
       "id": "mock-note-001",
       "text": "Need to verify Bolt fuel expenses.",
-      "created_at": "2026-06-02T08:10:00Z"
+      "created_at": "2026-06-02T08:10:00Z",
+      "source": "text"
     }
-  ]
+  ],
+  "note_save_state": {
+    "status": "idle",
+    "last_saved_at": null,
+    "pending_note_id": null
+  }
 }
 ```
 
@@ -354,12 +392,12 @@ Fixture locale : `mission_active_with_progress`.
 - `POST /api/imperium/missions/{mission_id}/complete`
 - `POST /api/imperium/missions/{mission_id}/fail`
 - `TBD POST /api/imperium/missions/{mission_id}/notes`
-- `TBD POST /api/imperium/replans/request`
+- `FUTURE TBD POST /api/imperium/replans/request`
 
 ### 4.10 DoD
 
-- Route detail non top-level.
-- Back navigation vers Dashboard.
+- Route top-level visible dans la navigation Imperium V1.
+- Navigation vers Dashboard disponible via sidebar/bottom nav.
 - Mission header, description, progress, buttons et notes visibles.
 - Fail demande une raison visuelle avant mock submit.
 - Empty state ne cree pas de mission active localement.
@@ -373,9 +411,10 @@ Fixture locale : `mission_active_with_progress`.
 | Champ | Valeur |
 |---|---|
 | Route ID | `IMP.INBOX.MAIN` |
+| Screen ID source | `IMP-03` |
 | Route path | `imperium/inbox` |
 | Titre visible | `Inbox` |
-| Type | Top-level generation screen, not added to permanent V1 bottom nav until product validation |
+| Type | Top-level route |
 
 ### 5.2 Objectif metier
 
@@ -385,7 +424,7 @@ Capturer et consulter les entrees utilisateur rapides : notes, messages, idees, 
 
 | Zone | Specification |
 |---|---|
-| Sidebar | Dashboard, Mission, Inbox, Weekly Review, History, Settings for GO 65 preview only. |
+| Sidebar | Dashboard, Mission Active, Inbox, Weekly Review, History, Settings. |
 | Main column | Max 880dp, conversation list. |
 | Context panel | 360dp, selected message preview/detail. |
 
@@ -429,12 +468,14 @@ Ordre telephone :
 
 ### 5.7 Mock data
 
-Fixture locale : `inbox_with_conversations`.
+Fixture locale canonique : `inbox_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-03",
+  "route_id": "IMP.INBOX.MAIN",
   "screen": "IMP.INBOX.MAIN",
-  "fixture_name": "inbox_with_conversations",
+  "fixture_name": "inbox_mock_v1",
   "sync_state": "mock",
   "filters": {
     "active": "all",
@@ -495,9 +536,10 @@ Fixture locale : `inbox_with_conversations`.
 |---|---|
 | Route ID | `IMP.WR.SUMMARY` |
 | Related canonical routes | `IMP.WR.LIST`, `IMP.WR.READ_ONLY`, `IMP.WR.INTERACTIVE` |
+| Screen ID source | `IMP-04` |
 | Route path | `imperium/weekly-review` |
 | Titre visible | `Weekly Review` |
-| Type | Top-level generation screen backed by weekly review V1 routes |
+| Type | Top-level route |
 
 ### 6.2 Objectif metier
 
@@ -551,12 +593,14 @@ Ordre telephone :
 
 ### 6.7 Mock data
 
-Fixture locale : `weekly_review_ready`.
+Fixture locale canonique : `weekly_review_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-04",
+  "route_id": "IMP.WR.SUMMARY",
   "screen": "IMP.WR.SUMMARY",
-  "fixture_name": "weekly_review_ready",
+  "fixture_name": "weekly_review_mock_v1",
   "sync_state": "mock",
   "week": {
     "start": "2026-05-25",
@@ -584,6 +628,7 @@ Fixture locale : `weekly_review_ready`.
     {
       "id": "mock-suggestion-001",
       "text": "Use voice notes immediately after VTC shifts.",
+      "rationale": "The user often finishes VTC shifts tired, so voice capture lowers friction while preserving data quality.",
       "confidence": "medium"
     }
   ],
@@ -601,7 +646,7 @@ Fixture locale : `weekly_review_ready`.
 | State | Specification |
 |---|---|
 | Loading | Summary skeleton, metric skeletons, list skeletons. |
-| Empty | `ImperiumEmptyState`: title `No weekly review yet`, CTA `Start mock review`. |
+| Empty | `ImperiumEmptyState`: title `No weekly review yet`, CTA `Back to Dashboard`. |
 | Error | `ImperiumErrorState`: title `Weekly review unavailable`, retry visual only. |
 
 ### 6.9 Future endpoints
@@ -629,9 +674,10 @@ Fixture locale : `weekly_review_ready`.
 |---|---|
 | Route ID | `IMP.HISTORY.MAIN` |
 | Related canonical route | `IMP.PLAN.HISTORY` |
+| Screen ID source | `IMP-05` |
 | Route path | `imperium/history` |
 | Titre visible | `History` |
-| Type | Top-level generation screen backed by plan history V1 |
+| Type | Top-level route |
 
 ### 7.2 Objectif metier
 
@@ -680,16 +726,18 @@ Ordre telephone :
 | Search history | search field | filters fixture. | server/local cache query. |
 | Filter history | chips | filters fixture. | query params/cache filter. |
 | Select event | timeline item | shows detail card. | fetch event/detail read model if needed. |
-| Open linked mission | ghost/detail link | navigates mock to mission active only if active mock id matches. | deep link `IMP.MISSION.DETAIL`. |
+| Open linked mission | ghost/detail link | navigates mock to Mission Active only if the linked mission is the active mock id. | `IMP.MISSION.ACTIVE` if backend confirms active mission context. |
 
 ### 7.7 Mock data
 
-Fixture locale : `history_with_timeline`.
+Fixture locale canonique : `history_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-05",
+  "route_id": "IMP.HISTORY.MAIN",
   "screen": "IMP.HISTORY.MAIN",
-  "fixture_name": "history_with_timeline",
+  "fixture_name": "history_mock_v1",
   "sync_state": "mock",
   "filters": {
     "active": "all",
@@ -702,7 +750,9 @@ Fixture locale : `history_with_timeline`.
       "title": "Weekly income check completed",
       "status": "completed",
       "occurred_at": "2026-06-01T20:15:00Z",
-      "linked_mission_id": "mock-mission-010"
+      "source": "mission",
+      "linked_mission_id": "mock-mission-010",
+      "linked_route": "IMP.HISTORY.MAIN"
     },
     {
       "id": "mock-history-002",
@@ -710,7 +760,9 @@ Fixture locale : `history_with_timeline`.
       "title": "Evening review skipped",
       "status": "failed",
       "reason": "Fatigue after VTC shift",
-      "occurred_at": "2026-05-31T22:40:00Z"
+      "occurred_at": "2026-05-31T22:40:00Z",
+      "source": "mission",
+      "linked_route": "IMP.HISTORY.MAIN"
     }
   ],
   "selected_event_id": "mock-history-001"
@@ -748,7 +800,7 @@ Fixture locale : `history_with_timeline`.
 | Champ | Valeur |
 |---|---|
 | Route ID | `IMP.SETTINGS.CORE` |
-| Screen ID source | `IMP-14` |
+| Screen ID source | `IMP-06` |
 | Route path | `imperium/settings` |
 | Titre visible | `Settings` |
 | Type | Top-level route |
@@ -807,12 +859,14 @@ Ordre telephone :
 
 ### 8.7 Mock data
 
-Fixture locale : `settings_default_mock`.
+Fixture locale canonique : `settings_mock_v1`.
 
 ```json
 {
+  "screen_id": "IMP-06",
+  "route_id": "IMP.SETTINGS.CORE",
   "screen": "IMP.SETTINGS.CORE",
-  "fixture_name": "settings_default_mock",
+  "fixture_name": "settings_mock_v1",
   "sync_state": "mock",
   "user": {
     "display_name": "Imperium User",
@@ -872,14 +926,14 @@ Fixture locale : `settings_default_mock`.
 
 ### 9.1 Stable Route IDs
 
-| Screen | Stable Route ID | Path | Navigation exposure |
-|---|---|---|---|
-| Dashboard | `IMP.DASH.MAIN` | `imperium/dashboard` | Top-level. |
-| Mission Active | `IMP.MISSION.ACTIVE` | `imperium/missions/active` | Detail route, not top-level. |
-| Inbox | `IMP.INBOX.MAIN` | `imperium/inbox` | GO 65 preview route; not permanent V1 nav until product validation. |
-| Weekly Review | `IMP.WR.SUMMARY` | `imperium/weekly-review` | GO 65 preview route backed by WR V1 routes. |
-| History | `IMP.HISTORY.MAIN` | `imperium/history` | GO 65 preview route backed by plan history V1. |
-| Settings | `IMP.SETTINGS.CORE` | `imperium/settings` | Top-level. |
+| Screen | Screen ID | Stable Route ID | Path | Navigation exposure |
+|---|---|---|---|---|
+| Dashboard | `IMP-01` | `IMP.DASH.MAIN` | `imperium/dashboard` | Top-level. |
+| Mission Active | `IMP-02` | `IMP.MISSION.ACTIVE` | `imperium/missions/active` | Top-level. |
+| Inbox | `IMP-03` | `IMP.INBOX.MAIN` | `imperium/inbox` | Top-level. |
+| Weekly Review | `IMP-04` | `IMP.WR.SUMMARY` | `imperium/weekly-review` | Top-level. |
+| History | `IMP-05` | `IMP.HISTORY.MAIN` | `imperium/history` | Top-level. |
+| Settings | `IMP-06` | `IMP.SETTINGS.CORE` | `imperium/settings` | Top-level. |
 
 Existing canonical related routes remain valid:
 
@@ -888,24 +942,22 @@ Existing canonical related routes remain valid:
 - `IMP.WR.READ_ONLY`
 - `IMP.WR.INTERACTIVE`
 - `IMP.SETTINGS.PRIORITIES`
-- `IMP.MISSION.DETAIL`
 - `IMP.MISSION.OUTCOME`
 - `IMP.REPLAN.VALIDATE`
 - `IMP.DAY.FINISH`
 
 ### 9.2 Bottom Navigation
 
-Telephone GO 65 bottom navigation contains exactly five visible items in this order:
+Telephone GO 65 bottom navigation contains exactly six visible items in this order:
 
 | Order | Label | Route ID | Icon intent |
 |---|---|---|---|
-| 1 | Home | `IMP.DASH.MAIN` | dashboard/home. |
-| 2 | Inbox | `IMP.INBOX.MAIN` | inbox/message. |
-| 3 | Review | `IMP.WR.SUMMARY` | weekly review. |
-| 4 | History | `IMP.HISTORY.MAIN` | timeline/history. |
-| 5 | Settings | `IMP.SETTINGS.CORE` | settings. |
-
-`IMP.MISSION.ACTIVE` is never shown as a bottom navigation item. It opens from Dashboard or a deep link.
+| 1 | Dashboard | `IMP.DASH.MAIN` | dashboard/home. |
+| 2 | Mission Active | `IMP.MISSION.ACTIVE` | active mission. |
+| 3 | Inbox | `IMP.INBOX.MAIN` | inbox/message. |
+| 4 | Weekly Review | `IMP.WR.SUMMARY` | weekly review. |
+| 5 | History | `IMP.HISTORY.MAIN` | timeline/history. |
+| 6 | Settings | `IMP.SETTINGS.CORE` | settings. |
 
 ### 9.3 Sidebar Navigation
 
@@ -914,7 +966,7 @@ Tablet GO 65 sidebar contains exactly six visible items in this order:
 | Order | Label | Route ID |
 |---|---|---|
 | 1 | Dashboard | `IMP.DASH.MAIN` |
-| 2 | Mission | `IMP.MISSION.ACTIVE` |
+| 2 | Mission Active | `IMP.MISSION.ACTIVE` |
 | 3 | Inbox | `IMP.INBOX.MAIN` |
 | 4 | Weekly Review | `IMP.WR.SUMMARY` |
 | 5 | History | `IMP.HISTORY.MAIN` |
@@ -951,7 +1003,7 @@ Deep links are allowed only for existing resource-oriented routes:
 
 | Deep link | Target |
 |---|---|
-| `imperium://mission/{mission_id}` | `IMP.MISSION.DETAIL`; if `{mission_id}` equals active mock mission, may render `IMP.MISSION.ACTIVE`. |
+| `imperium://mission/active` | `IMP.MISSION.ACTIVE`. |
 | `imperium://weekly-review/{session_id}` | `IMP.WR.READ_ONLY`. |
 | `imperium://settings/priorities` | `IMP.SETTINGS.PRIORITIES`. |
 
@@ -968,15 +1020,17 @@ Mock data is documentary and local-only:
 - no pgvector ;
 - no canonical AI decision ;
 - every fixture includes `sync_state: "mock"` ;
-- every fixture includes `screen` and `fixture_name` ;
+- every fixture includes `screen_id`, `route_id`, `screen` and `fixture_name` ;
 - fixture IDs start with `mock-`.
 
 ### 10.1 Dashboard
 
 ```json
 {
+  "screen_id": "IMP-01",
+  "route_id": "IMP.DASH.MAIN",
   "screen": "IMP.DASH.MAIN",
-  "fixture_name": "dashboard_empty",
+  "fixture_name": "dashboard_empty_v1",
   "sync_state": "mock",
   "active_mission": null,
   "daily_focus": {
@@ -995,8 +1049,10 @@ Mock data is documentary and local-only:
 
 ```json
 {
+  "screen_id": "IMP-02",
+  "route_id": "IMP.MISSION.ACTIVE",
   "screen": "IMP.MISSION.ACTIVE",
-  "fixture_name": "mission_active_empty",
+  "fixture_name": "mission_active_empty_v1",
   "sync_state": "mock",
   "mission": null,
   "empty_state": {
@@ -1010,8 +1066,10 @@ Mock data is documentary and local-only:
 
 ```json
 {
+  "screen_id": "IMP-03",
+  "route_id": "IMP.INBOX.MAIN",
   "screen": "IMP.INBOX.MAIN",
-  "fixture_name": "inbox_empty",
+  "fixture_name": "inbox_empty_v1",
   "sync_state": "mock",
   "filters": {
     "active": "all",
@@ -1025,8 +1083,10 @@ Mock data is documentary and local-only:
 
 ```json
 {
+  "screen_id": "IMP-04",
+  "route_id": "IMP.WR.SUMMARY",
   "screen": "IMP.WR.SUMMARY",
-  "fixture_name": "weekly_review_empty",
+  "fixture_name": "weekly_review_empty_v1",
   "sync_state": "mock",
   "week": {
     "start": "2026-05-25",
@@ -1049,8 +1109,10 @@ Mock data is documentary and local-only:
 
 ```json
 {
+  "screen_id": "IMP-05",
+  "route_id": "IMP.HISTORY.MAIN",
   "screen": "IMP.HISTORY.MAIN",
-  "fixture_name": "history_empty",
+  "fixture_name": "history_empty_v1",
   "sync_state": "mock",
   "filters": {
     "active": "all",
@@ -1064,8 +1126,10 @@ Mock data is documentary and local-only:
 
 ```json
 {
+  "screen_id": "IMP-06",
+  "route_id": "IMP.SETTINGS.CORE",
   "screen": "IMP.SETTINGS.CORE",
-  "fixture_name": "settings_loading_mock",
+  "fixture_name": "settings_empty_v1",
   "sync_state": "mock",
   "sections": [
     "user",
@@ -1096,7 +1160,7 @@ Every screen must pass every item before Phase 3 backend wiring.
 Additional validation rules:
 
 - Dashboard must show no more than one active mission.
-- Mission Active must never be top-level bottom navigation.
+- Mission Active must be present in top-level bottom navigation and sidebar as `IMP-02`, without creating any second active mission.
 - Inbox convert-to-mission action must remain backend-validated.
 - Weekly Review must never finalize locally.
 - History must remain read-only.

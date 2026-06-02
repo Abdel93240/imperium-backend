@@ -73,15 +73,15 @@ def test_imperium_user_flows_v1_locks_dashboard_and_mission_transitions() -> Non
 
     for required in (
         "See mission",
-        "Open detail",
         "Modify status",
         "Add note",
         "Return dashboard",
-        "IMP.MISSION.DETAIL",
         "complete, fail, replan",
         "seule mission active",
     ):
         assert required in mission
+
+    assert "IMP.MISSION.DETAIL" not in mission
 
 
 def test_imperium_user_flows_v1_locks_inbox_weekly_history_and_settings_flows() -> None:
@@ -144,13 +144,14 @@ def test_imperium_user_flows_v1_navigation_contract_locks_routes_and_transitions
         "| Access history | `IMP.DASH.MAIN` | `IMP.HISTORY.MAIN` |",
         "| Access settings | `IMP.DASH.MAIN` | `IMP.SETTINGS.CORE` |",
         "| Access weekly review | `IMP.DASH.MAIN` | `IMP.WR.SUMMARY` |",
-        "`IMP.MISSION.DETAIL`",
         "`IMP.WR.READ_ONLY`",
         "`IMP.WR.INTERACTIVE`",
         "`IMP.PLAN.HISTORY`",
         "`IMP.SETTINGS.PRIORITIES`",
     ):
         assert required in contract
+
+    assert "IMP.MISSION.DETAIL" not in contract
 
 
 def test_imperium_user_flows_v1_locks_forbidden_flows_checklist_and_readiness() -> None:

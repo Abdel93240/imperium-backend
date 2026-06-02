@@ -69,6 +69,7 @@ def test_imperium_frontend_api_mapping_v1_has_required_sections_in_order() -> No
     (
         "heading",
         "screen_id",
+        "route_id",
         "mock_source",
         "required_widget",
         "required_endpoint",
@@ -76,43 +77,49 @@ def test_imperium_frontend_api_mapping_v1_has_required_sections_in_order() -> No
     [
         (
             "3.1 Dashboard",
+            "IMP-01",
             "IMP.DASH.MAIN",
-            "dashboard_with_active_mission",
+            "dashboard_mock_v1",
             "Daily Focus Card",
             "GET /api/imperium/dashboard",
         ),
         (
             "3.2 Mission Active",
+            "IMP-02",
             "IMP.MISSION.ACTIVE",
-            "mission_active_with_progress",
+            "mission_active_mock_v1",
             "Mission Header",
             "GET /api/imperium/missions/active",
         ),
         (
             "3.3 Inbox",
+            "IMP-03",
             "IMP.INBOX.MAIN",
-            "inbox_with_conversations",
+            "inbox_mock_v1",
             "Conversation List",
             "FUTURE TBD GET /api/imperium/inbox/items",
         ),
         (
             "3.4 Weekly Review",
+            "IMP-04",
             "IMP.WR.SUMMARY",
-            "weekly_review_ready",
+            "weekly_review_mock_v1",
             "Weekly Summary",
             "GET /api/imperium/weekly-review/state",
         ),
         (
             "3.5 History",
+            "IMP-05",
             "IMP.HISTORY.MAIN",
-            "history_with_timeline",
+            "history_mock_v1",
             "Timeline",
             "GET /api/imperium/missions/history",
         ),
         (
             "3.6 Settings",
+            "IMP-06",
             "IMP.SETTINGS.CORE",
-            "settings_default_mock",
+            "settings_mock_v1",
             "User",
             "GET /api/imperium/frontend/app-manifest",
         ),
@@ -121,13 +128,15 @@ def test_imperium_frontend_api_mapping_v1_has_required_sections_in_order() -> No
 def test_imperium_frontend_api_mapping_v1_locks_each_screen_mapping(
     heading: str,
     screen_id: str,
+    route_id: str,
     mock_source: str,
     required_widget: str,
     required_endpoint: str,
 ) -> None:
     screen = _subsection(_section(_api_mapping_text(), "3. Screen to API Mapping"), heading)
 
-    assert screen_id in screen
+    assert f"Screen ID | `{screen_id}`" in screen
+    assert f"Route ID | `{route_id}`" in screen
     assert mock_source in screen
     assert required_widget in screen
     assert required_endpoint in screen
@@ -167,19 +176,34 @@ def test_imperium_frontend_api_mapping_v1_locks_widget_to_data_contracts() -> No
         "active_mission.id",
         "priority.label",
         "weekly_progress.completion_percent",
+        "quick_actions[].target_route",
         "mission.description",
+        "mission.expected_outcome",
+        "note_save_state.status",
         "progress.current_step",
         "filters.query",
         "conversations[].latest_message",
         "week.start",
         "wins[].title",
+        "improvement_suggestions[].rationale",
         "events[].occurred_at",
+        "events[].linked_route",
         "user.display_name",
         "theme.accent",
         "security.auth_state",
         "advanced.priority_rules_link",
     ):
         assert required_field in contracts
+
+    for legacy_mock_name in (
+        "dashboard_with_active_mission",
+        "mission_active_with_progress",
+        "inbox_with_conversations",
+        "weekly_review_ready",
+        "history_with_timeline",
+        "settings_default_mock",
+    ):
+        assert legacy_mock_name not in contracts
 
 
 def test_imperium_frontend_api_mapping_v1_locks_missing_backend_contracts_and_no_wiring() -> None:
@@ -188,6 +212,7 @@ def test_imperium_frontend_api_mapping_v1_locks_missing_backend_contracts_and_no
 
     for required in (
         "FUTURE TBD POST /api/imperium/missions/{mission_id}/notes",
+        "FUTURE TBD POST /api/imperium/replans/request",
         "FUTURE TBD GET /api/imperium/inbox/items",
         "FUTURE TBD POST /api/imperium/inbox/items",
         "FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}",
