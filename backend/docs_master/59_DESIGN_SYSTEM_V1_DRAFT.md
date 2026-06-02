@@ -1156,6 +1156,316 @@ Fallback behavior:
 
 ---
 
+## 15. PULSE SCREEN ARCHITECTURE MAPPING V1
+
+Mapping écran Pulse ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Sources canoniques locales : docs `01`, `07`, `34`, `37`, `40`, `43`. Pulse collecte et explique ; il ne pose pas de diagnostic et ne remplace pas Imperium.
+
+### 15.0 Pulse Product Decisions V1
+
+| Décision | Règle V1 |
+|---|---|
+| Receipt scan | VAU-05 reste l'unique écran de validation receipt. Les lignes food créent un handoff Pulse backend non bloquant. |
+| PUL-03 scope | PUL-03 is independent from VAU-05 : c'est la confirmation post PUL-02 Add Meal, avec macros et décrément stock optionnel. |
+| Macros source | Meal macros V1 source is backend AI estimation : texte/voix/photo créent un draft via backend ; photo utilise Gemini `pulse.meal_photo_macros`; validation user obligatoire. |
+| Stock decrement | Stock decrement is user-confirmed and idempotent. Aucune ligne proposée par AI ne décrémente le stock avant validation utilisateur. |
+| Workout adaptation | Adaptation suggérée si énergie <= 3/10, fatigue high, pain >= 7, fasting actif avec intensité haute, ou équipement manquant. Elle n'est jamais forcée. |
+| Body photo | Body photo upload is disabled in V1. PUL-08 peut référencer une photo locale Android, mais aucune image corporelle n'est envoyée au backend. |
+| Medical consent | Medical documents require explicit consent before upload, extraction GPT-5.5 static override, and user validation before activation. |
+| Medical authority | Pulse ne pose pas de diagnostic ; les règles médicales actives sont des contraintes validées par l'utilisateur. |
+| Health score | Health score must never render without explanation, confidence, and positive/negative factors. |
+| Fasting hydration | Si `hydration_limits.daytime=false`, PUL-04 désactive les quick buttons pendant la fenêtre de jeûne et affiche la raison Path. |
+| Offline hydration | Hydration logs merge by idempotency key : même clé = déduplication ; clés distinctes = somme. |
+| Pain replan | Pain severity 8-10 opens an Imperium replan prompt. Replan seulement après confirmation utilisateur/backend. |
+| Cross-app handoffs | Pulse affiche toasts/banners de handoff ; Imperium, Vault et Path restent propriétaires de leurs décisions. |
+| Sub-screens | PUL-10b/11b/12b/14b-14e sont des états/detail panes internes V1, pas des écrans supplémentaires comptés. |
+
+Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`), Stock (`PUL-12`), Medical (`PUL-14`). Les autres écrans sont bottom sheets, dialogs, routes dédiées ou deep links contextuels.
+
+### 15.1 PUL-01 Pulse Dashboard (`PUL-01`)
+
+- **Screen name:** PUL-01 Pulse Dashboard.
+- **Type / slug :** `route`, `pulse/dashboard`, stable ID `PUL.DASH.MAIN`.
+- **Composants :** Top Bar Pulse, Sidebar/Bottom Nav, Health Score Display, Macros Estimation Card compact, Hydration Progress Ring, Workout Card, Expiring Soon Banner, Active Medical Rule Banner, action bar with Primary `Ajouter repas`, Secondary icon buttons hydration/workout/stock.
+- **Données affichées :** meals today, calories/protein/carbs/fat totals, hydration ml/target, workout_title/duration/intensity, recovery_state, health_score with confidence and factors, stock expiring soon, fasting banner, active medical rule summary, unresolved high pain banner.
+- **Widgets :** hydration ring, macros stack, workout du jour, health score factors, expiring stock count.
+- **Assets :** Pulse emblem 48dp, Material Symbols `restaurant`, `water_drop`, `fitness_center`, `monitor_heart`, `inventory_2`; no decorative hero.
+- **Etats :** Loading=dashboard skeleton cards ; Empty=0 meal/workout/hydration with quick action CTAs ; Error=read-model failure with retry ; Offline=cached dashboard timestamp banner ; Syncing=pending Pulse mutation line ; Synced=snackbar after backend-confirmed log ; Conflict=dashboard stale after mutation conflict opens source screen.
+- **Backend deps :** `TBD GET /api/pulse/dashboard`, `TBD GET /api/pulse/medical-rules/active`, optional event `pulse.medical_rule.activated`.
+- **Navigation :** entry from app nav `/pulse`; exits to PUL-02, PUL-04, PUL-05, PUL-07, PUL-08, PUL-09, PUL-10, PUL-11, PUL-12, PUL-14.
+- **Tab S10 Ultra :** 3 columns: Sidebar 240dp, dashboard max 1280dp, right panel 320dp for workout du jour + expiring stock + medical banner.
+
+### 15.2 PUL-02 Add Meal Bottom Sheet (`PUL-02`)
+
+- **Screen name:** PUL-02 Add Meal Bottom Sheet.
+- **Type / slug :** `bottom_sheet`, `pulse/meals/add`, stable ID `PUL.MEAL.ADD`.
+- **Composants :** Bottom Sheet L3, text input, Voice button, photo picker/camera action, meal time picker, Primary `Estimer`, Ghost `Annuler`, confidence placeholder.
+- **Données affichées :** meal description draft, transcript status, selected photo thumbnail, source `text|voice|photo`, fasting warning if outside eating window.
+- **Widgets :** voice recording chip, photo preview, AI estimating progress line.
+- **Assets :** Material Symbols `restaurant`, `mic`, `photo_camera`, `schedule`.
+- **Etats :** Loading=Whisper/Gemini/backend estimation spinner ; Empty=form untouched ; Error=transcription/photo/estimation failure with retry/manual macros option ; Offline=local meal draft allowed but estimation disabled unless cached ; Syncing=estimate request line ; Synced=opens PUL-03 with meal draft ; Conflict=duplicate draft idempotency dialog.
+- **Backend deps :** `TBD POST /api/pulse/meals/estimate` with `Idempotency-Key`, ai_task `pulse.meal_photo_macros`, Whisper/faster-whisper transcription.
+- **Navigation :** opened from PUL-01 or PUL-10; success PUL-02 --> PUL-03; cancel returns source.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard/meals tab.
+
+### 15.3 PUL-03 Meal Confirm & Stock Decrement (`PUL-03`)
+
+- **Screen name:** PUL-03 Meal Confirm & Stock Decrement.
+- **Type / slug :** `route`, `pulse/meals/{meal_draft_id}/confirm`, stable ID `PUL.MEAL.CONFIRM`.
+- **Composants :** Macros Estimation Card editable, Stock Decrement Draft Card list, confidence chips, low-confidence Warning banner, Primary `Valider le repas`, Secondary `Modifier`, Ghost `Annuler`.
+- **Données affichées :** meal draft, calories/protein/carbs/fat, confidence, warnings, proposed stock item matches, quantities/units, `stock_decrement_applied` state.
+- **Widgets :** macro numeric inputs, stock match checkboxes, insufficient-stock warning.
+- **Assets :** Material Symbols `restaurant`, `inventory_2`, `edit`, `warning`.
+- **Etats :** Loading=draft fetch skeleton ; Empty=draft missing redirects PUL-02 ; Error=invalid draft/stock validation failure ; Offline=read cached draft, confirmation queued with clear pending label ; Syncing=confirm write line ; Synced=returns source with meal logged snackbar and stock update toast ; Conflict=409 Idempotency-Key or stock version diff dialog.
+- **Backend deps :** `TBD GET /api/pulse/meals/{meal_draft_id}`, `TBD POST /api/pulse/meals/{meal_draft_id}/confirm` with `Idempotency-Key`, event `pulse.meal.logged`, event `pulse.food_stock.updated`.
+- **Navigation :** from PUL-02; success returns PUL-01 or PUL-10; stock item tap opens PUL-12 detail pane.
+- **Tab S10 Ultra :** two-column: macros/card editor left, stock decrement review right 480dp, sticky validation bar.
+
+### 15.4 PUL-04 Hydration Quick Log (`PUL-04`)
+
+- **Screen name:** PUL-04 Hydration Quick Log.
+- **Type / slug :** `bottom_sheet`, `pulse/hydration/quick-log`, stable ID `PUL.HYDRATION.QUICK_LOG`.
+- **Composants :** Bottom Sheet L3, Hydration Progress Ring, quick buttons `+250ml|+500ml|+1L`, timestamp row, fasting constraint banner.
+- **Données affichées :** hydration ml today, target, latest logs, fasting_active, hydration_limits, suhoor_time, iftar_time.
+- **Widgets :** hydration ring, quick amount buttons, Path fasting banner.
+- **Assets :** Material Symbols `water_drop`, `local_drink`, `schedule`, `mosque`.
+- **Etats :** Loading=hydration summary skeleton ; Empty=0ml today with quick buttons ; Error=write failure or fasting blocked reason ; Offline=local hydration draft banner ; Syncing=quick log line ; Synced=snackbar `Hydratation synced` ; Conflict=duplicate idempotency or impossible timestamp dialog.
+- **Backend deps :** `TBD GET /api/pulse/hydration-logs/today`, `TBD POST /api/pulse/hydration-logs` with `Idempotency-Key`, Path read model for fasting constraints.
+- **Navigation :** opened from PUL-01 or PUL-10/11 compact widgets; success returns source.
+- **Tab S10 Ultra :** right side-sheet 360-480dp; ring remains stable size 160dp.
+
+### 15.5 PUL-05 Add / Plan Workout (`PUL-05`)
+
+- **Screen name:** PUL-05 Add / Plan Workout.
+- **Type / slug :** `bottom_sheet`, `pulse/workouts/plan`, stable ID `PUL.WORKOUT.PLAN`.
+- **Composants :** Bottom Sheet L3, title input, duration stepper, intensity segmented control, exercise rows, equipment chips, schedule picker, Primary `Planifier`.
+- **Données affichées :** workout_title, workout_duration, workout_intensity, workout_exercises, available_equipment, recovery_state, fasting context.
+- **Widgets :** exercise picker, equipment chip group, intensity selector.
+- **Assets :** Material Symbols `fitness_center`, `schedule`, `timer`, `add`.
+- **Etats :** Loading=defaults/proposal loading ; Empty=form untouched ; Error=validation/equipment mismatch ; Offline=local workout draft pending ; Syncing=plan submit line ; Synced=returns PUL-11 with planned workout snackbar ; Conflict=duplicate planned workout dialog.
+- **Backend deps :** `TBD POST /api/pulse/workouts` with `Idempotency-Key`, `TBD POST /api/pulse/recommendations`.
+- **Navigation :** opened from PUL-01 or PUL-11; start-now success may open PUL-06.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to workouts tab.
+
+### 15.6 PUL-06 Workout Logging (`PUL-06`)
+
+- **Screen name:** PUL-06 Workout Logging.
+- **Type / slug :** `route`, `pulse/workouts/{workout_id}/log`, stable ID `PUL.WORKOUT.LOG`.
+- **Composants :** Workout Live Tracker, exercise cards, set/reps counters, rest timer, perceived intensity selector, skip reason bottom sheet, Primary `Terminer`.
+- **Données affichées :** workout plan, exercise progress, elapsed time, skipped sets, perceived intensity, offline pending state.
+- **Widgets :** rest timer, exercise progress, completion counter, skip reason chips.
+- **Assets :** Material Symbols `timer`, `check_circle`, `skip_next`, `fitness_center`.
+- **Etats :** Loading=workout hydration skeleton ; Empty=missing workout returns PUL-11 ; Error=log write failure keeps local workout active ; Offline=local workout continues with pending banner ; Syncing=completion submit line ; Synced=returns PUL-11/PUL-01 with completion snackbar ; Conflict=server completed/cancelled diff dialog.
+- **Backend deps :** `TBD GET /api/pulse/workouts/{workout_id}`, `TBD POST /api/pulse/workouts/{workout_id}/complete` with `Idempotency-Key`, event `pulse.workout.completed`, event `pulse.workout.skipped`.
+- **Navigation :** from PUL-05 or PUL-11; high pain opens PUL-09; finish may show Imperium handoff toast.
+- **Tab S10 Ultra :** central live tracker max 960dp, right 320dp for next exercise/rest timer; no dense dashboard.
+
+### 15.7 PUL-07 Workout Adaptation Proposal (`PUL-07`)
+
+- **Screen name:** PUL-07 Workout Adaptation Proposal.
+- **Type / slug :** `dialog`, `pulse/workouts/{workout_id}/adaptation`, stable ID `PUL.WORKOUT.ADAPT`.
+- **Composants :** Adaptation Proposal Card, before/after Workout Cards, reason banner, Primary `Accepter`, Secondary `Garder l'original`, Ghost `Plus tard`.
+- **Données affichées :** original workout, proposed workout, workout_adaptation_reason, fatigue_state, known_pain, fasting_active, confidence, Imperium replan handoff hint.
+- **Widgets :** before/after diff, reason chips, safety warning.
+- **Assets :** Material Symbols `change_circle`, `fitness_center`, `warning`, `sync`.
+- **Etats :** Loading=proposal generation spinner ; Empty=no proposal returns source ; Error=AI/backend failure keeps original workout ; Offline=proposal read-only, accept disabled ; Syncing=accept/reject submit line ; Synced=opens PUL-06 or returns PUL-11 with `Imperium replanning...` toast ; Conflict=stale proposal dialog.
+- **Backend deps :** `TBD POST /api/pulse/workouts/{workout_id}/adaptation/accept` with `Idempotency-Key`, `TBD POST /api/pulse/workouts/{workout_id}/adaptation/reject` with `Idempotency-Key`, event `pulse.workout.adaptation.accepted`.
+- **Navigation :** opened from PUL-01/PUL-06/PUL-11 or Imperium morning context; accept PUL-07 --> PUL-06 or PUL-11; backend may handoff to IMPERIUM_REPLAN.
+- **Tab S10 Ultra :** centered Dialog max 720dp; before/after cards side-by-side.
+
+### 15.8 PUL-08 Body Snapshot Entry (`PUL-08`)
+
+- **Screen name:** PUL-08 Body Snapshot Entry.
+- **Type / slug :** `route`, `pulse/body-snapshots/new`, stable ID `PUL.BODY.SNAPSHOT`.
+- **Composants :** number inputs, measurement grid, local photo picker disabled-for-upload notice, Body Snapshot Comparison, Date Picker, Primary `Enregistrer`.
+- **Données affichées :** biological_profile_current_weight, target weight context, measurements, previous snapshot delta, local-only photo reference state.
+- **Widgets :** weight delta display, measurement rows, local privacy banner.
+- **Assets :** Material Symbols `monitor_weight`, `straighten`, `photo_camera`, `lock`.
+- **Etats :** Loading=previous snapshot skeleton ; Empty=form untouched ; Error=invalid numeric/photo policy violation ; Offline=local numeric draft pending, no remote photo upload ; Syncing=snapshot submit line ; Synced=returns PUL-01 with snapshot snackbar ; Conflict=same-date snapshot diff dialog.
+- **Backend deps :** `TBD POST /api/pulse/body-snapshots` with `Idempotency-Key`, event `pulse.body_snapshot.created`; no Gemini body photo task in V1.
+- **Navigation :** from PUL-01 or PUL-10/11 progress links; success returns source.
+- **Tab S10 Ultra :** two-column form + comparison panel; local photo never occupies a decorative hero.
+
+### 15.9 PUL-09 Pain Log Entry (`PUL-09`)
+
+- **Screen name:** PUL-09 Pain Log Entry.
+- **Type / slug :** `bottom_sheet`, `pulse/pain-logs/new`, stable ID `PUL.PAIN.LOG`.
+- **Composants :** Pain Body Diagram, severity slider 0-10, limitation TextField with Voice button, workout impact toggle, Primary `Enregistrer`, high-severity replan prompt.
+- **Données affichées :** known_pain, injuries, mobility_limitations, selected body zone, severity, notes, linked workout/mission when present.
+- **Widgets :** body zone selector, severity slider, voice transcript chip, Imperium replan prompt.
+- **Assets :** Material Symbols `healing`, `personal_injury`, `mic`, `sync_problem`.
+- **Etats :** Loading=known constraints loading ; Empty=form untouched ; Error=severity/body zone validation or transcription failure ; Offline=local pain draft pending, replan deferred ; Syncing=pain log submit line ; Synced=snackbar and severity 8-10 prompt ; Conflict=duplicate/stale linked workout dialog.
+- **Backend deps :** `TBD POST /api/pulse/pain-logs` with `Idempotency-Key`, optional `TBD POST /api/imperium/replan-requests`, event `pulse.pain.logged`.
+- **Navigation :** from PUL-01, PUL-06, PUL-11, or Imperium morning check-in deep link; severity 8-10 may open IMPERIUM_REPLAN prompt after sync.
+- **Tab S10 Ultra :** right side-sheet 480dp with body diagram left and form right when space allows.
+
+### 15.10 PUL-10 Meals Tab (`PUL-10`)
+
+- **Screen name:** PUL-10 Meals Tab.
+- **Type / slug :** `tab`, `pulse/meals`, stable ID `PUL.MEALS.LIST`.
+- **Composants :** Top Bar, Filter Chip Bar, meal history list, Macros Estimation Card aggregate, Health Score Display nutrition factors, suggestion CTA, inline Meal Detail pane.
+- **Données affichées :** meals list, daily/weekly macros, confidence, corrections, source, nutrition-related health score factors, recommendation status.
+- **Widgets :** weekly macros chart, meal row confidence chips, suggestion AI card.
+- **Assets :** empty-state illustration when no meal exists, Material Symbols `restaurant`, `insights`, `add`.
+- **Etats :** Loading=list skeleton ; Empty=no meals with add meal CTA, distinct from no filter results ; Error=list/recommendation fetch failure ; Offline=cached meals banner ; Syncing=pending meal row indicators ; Synced=refresh snackbar ; Conflict=row conflict opens PUL-03/detail diff.
+- **Backend deps :** `TBD GET /api/pulse/meals`, `TBD POST /api/pulse/recommendations` with `Idempotency-Key`, event `pulse.recommendation.requested`.
+- **Navigation :** top-level Pulse tab; add opens PUL-02; row opens inline detail/edit; suggestion request stays in tab.
+- **Tab S10 Ultra :** list/detail split: list max 880dp, right 320dp detail or nutrition factors.
+
+### 15.11 PUL-11 Workouts Tab (`PUL-11`)
+
+- **Screen name:** PUL-11 Workouts Tab.
+- **Type / slug :** `tab`, `pulse/workouts`, stable ID `PUL.WORKOUTS.LIST`.
+- **Composants :** Top Bar, Workout Card for today, history list, recovery widget, adaptation banner, add/plan action, inline Workout Detail pane.
+- **Données affichées :** today's workout, workout history, recovery_state, fatigue_state, adaptation eligibility, completed/skipped status.
+- **Widgets :** workout du jour, recovery display, history streak, adaptation proposal entry.
+- **Assets :** empty-state illustration, Material Symbols `fitness_center`, `health_and_safety`, `add`, `change_circle`.
+- **Etats :** Loading=workout/recovery skeleton ; Empty=no planned workout with plan CTA ; Error=workout fetch/adaptation failure ; Offline=cached workouts read-only except queued completion ; Syncing=pending workout row indicators ; Synced=refresh snackbar ; Conflict=completed/cancelled server diff.
+- **Backend deps :** `TBD GET /api/pulse/workouts`, `TBD GET /api/pulse/recovery-state`, `TBD POST /api/pulse/recommendations`.
+- **Navigation :** top-level Pulse tab; plan opens PUL-05; start opens PUL-06; adaptation opens PUL-07; pain opens PUL-09.
+- **Tab S10 Ultra :** list/detail split with right 320dp recovery and selected workout detail.
+
+### 15.12 PUL-12 Stock Tab (`PUL-12`)
+
+- **Screen name:** PUL-12 Stock Tab.
+- **Type / slug :** `tab`, `pulse/stock`, stable ID `PUL.STOCK.LIST`.
+- **Composants :** Top Bar, Stock Item Row list, Expiring Soon Banner, category filters, Vault handoff badge, add manual side-sheet, scan CTA.
+- **Données affichées :** stock_item_name, stock_quantity/unit, stock_expiry_type/date, category, confidence, source, pending Vault handoff count, expiring soon list.
+- **Widgets :** category stats, expiring soon banner, handoff badge, stock item detail pane.
+- **Assets :** empty-state illustration, Material Symbols `inventory_2`, `kitchen`, `event`, `warning`, `photo_camera`.
+- **Etats :** Loading=stock skeleton rows ; Empty=no stock with add/scan CTA, distinct from filter empty ; Error=stock fetch/update failure ; Offline=cached stock read-only plus queued local edits ; Syncing=pending row indicators ; Synced=snackbar after update ; Conflict=stock quantity/version diff dialog.
+- **Backend deps :** `TBD GET /api/pulse/food-stock`, `TBD POST /api/pulse/food-stock`, `TBD PATCH /api/pulse/food-stock/{stock_item_id}`, `TBD POST /api/pulse/food-stock/drafts/confirm`.
+- **Navigation :** top-level Pulse tab; PUL-12 --> PUL-13 via scan CTA; item opens detail/edit pane; Vault VAU-05 may deep link to PUL-12 with handoff badge.
+- **Tab S10 Ultra :** list/detail split: stock list max 880dp, right 320dp selected item/expiring soon/handoff summary.
+
+### 15.13 PUL-13 Scan Pantry / Fridge (`PUL-13`)
+
+- **Screen name:** PUL-13 Scan Pantry / Fridge.
+- **Type / slug :** `route`, `pulse/stock/scan`, stable ID `PUL.STOCK.SCAN`.
+- **Composants :** Camera Capture Surface, review draft list, Stock Item Row diff, confidence chips, warnings list, Primary `Valider le stock`, Secondary `Reprendre`.
+- **Données affichées :** pantry photo, Gemini `pulse.kitchen_inventory_photo` result, name_fr/category/estimated_quantity/unit/expiry_visible/confidence, existing stock diff.
+- **Widgets :** image quality helper, inventory diff, confidence badge, low-confidence per-item warning.
+- **Assets :** Material Symbols `photo_camera`, `kitchen`, `add_box`, `warning`.
+- **Etats :** Loading=camera/Gemini scan pending ; Empty=0 item detected with retry/manual add CTA ; Error=camera permission/Gemini fail/invalid JSON ; Offline=camera can capture local photo but AI disabled banner ; Syncing=scan validate write line ; Synced=returns PUL-12 with stock update snackbar ; Conflict=scan already validated or stock version diff.
+- **Backend deps :** `TBD POST /api/pulse/food-stock/scan` with `Idempotency-Key`, `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` with `Idempotency-Key`, ai_task `pulse.kitchen_inventory_photo`.
+- **Navigation :** from PUL-12; validation returns PUL-12; retry stays PUL-13.
+- **Tab S10 Ultra :** fullscreen camera/review route: preview left 50%, diff review right 50%, no second receipt validation.
+
+### 15.14 PUL-14 Medical Tab (`PUL-14`)
+
+- **Screen name:** PUL-14 Medical Tab.
+- **Type / slug :** `tab`, `pulse/medical`, stable ID `PUL.MEDICAL.LIST`.
+- **Composants :** Top Bar, Medical Document Row list, Active Medical Rule Banner/List, consent upload form, extraction progress row, document detail pane, rule validation checklist.
+- **Données affichées :** medical documents, document_type, upload/extraction status, confidence, warnings, active rule count, source document, rule expiry, retention_delete_after, consent status.
+- **Widgets :** consent gate, extraction progress, active medical rule banner, document detail, validation checklist.
+- **Assets :** Material Symbols `medical_information`, `bloodtype`, `description`, `upload_file`, `verified_user`; no decorative medical hero.
+- **Etats :** Loading=documents/rules skeleton ; Empty=no document with consent upload CTA and disclaimer ; Error=upload/extraction/unsupported document failure ; Offline=medical upload disabled, cached read-only rules ; Syncing=upload/extraction validation line ; Synced=document uploaded or rule activated snackbar ; Conflict=rule already activated/deleted source dialog.
+- **Backend deps :** `TBD GET /api/pulse/medical-documents`, `TBD POST /api/pulse/medical-documents` with `Idempotency-Key`, `TBD GET /api/pulse/medical-rules/active`, `TBD POST /api/pulse/medical-rules/{rule_id}/activate` with `Idempotency-Key`, ai_task `pulse.medical_document_extract` using GPT-5.5 static override.
+- **Navigation :** top-level Pulse tab; upload/detail/progress/rule validation are inline panes; PUL-14 --> IMPERIUM_REPLAN as backend/toast handoff only after validated `pulse.medical_rule.activated`.
+- **Tab S10 Ultra :** list/detail split: document/rule list max 880dp, right 320dp detail/consent/progress pane.
+
+### 15.15 Pulse Navigation Graph V1
+
+```mermaid
+flowchart TD
+  NAV[Pulse top-level nav] --> PUL01[PUL-01 Dashboard]
+  NAV --> PUL10[PUL-10 Meals]
+  NAV --> PUL11[PUL-11 Workouts]
+  NAV --> PUL12[PUL-12 Stock]
+  NAV --> PUL14[PUL-14 Medical]
+  PUL01 --> PUL02[PUL-02 Add Meal]
+  PUL02 --> PUL03[PUL-03 Meal Confirm]
+  PUL03 --> PUL01
+  PUL01 --> PUL04[PUL-04 Hydration]
+  PUL01 --> PUL05[PUL-05 Plan Workout]
+  PUL05 --> PUL06[PUL-06 Workout Log]
+  PUL11 --> PUL05
+  PUL11 --> PUL06
+  PUL11 --> PUL07[PUL-07 Workout Adaptation]
+  PUL06 --> PUL09[PUL-09 Pain Log]
+  PUL07 --> PUL06
+  PUL01 --> PUL08[PUL-08 Body Snapshot]
+  PUL01 --> PUL09
+  PUL10 --> PUL02
+  PUL12 --> PUL13[PUL-13 Scan Pantry]
+  PUL13 --> PUL12
+  VAU05[VAU-05 Receipt Review] --> PULSE_HANDOFF[Pulse stock backend handoff]
+  PULSE_HANDOFF --> PUL12
+  PATH_FASTING[Path fasting constraints] --> PUL01
+  PATH_FASTING --> PUL04
+  PUL07 --> IMPERIUM_REPLAN[Imperium replan backend handoff]
+  PUL09 --> IMPERIUM_REPLAN
+  PUL14 --> IMPERIUM_REPLAN
+```
+
+Transitions conditionnelles canoniques V1 :
+
+| Transition | Condition |
+|---|---|
+| PUL-02 --> PUL-03 | Backend returns meal estimate draft; user validation is required. |
+| PUL-03 --> PUL-01 | Meal confirmation succeeds or is queued with clear pending state. |
+| PUL-04 blocked | Path fasting window disables quick buttons when `hydration_limits.daytime=false`. |
+| PUL-07 --> IMPERIUM_REPLAN | Backend accepts adaptation and decides whether Imperium replan is needed. |
+| PUL-09 --> IMPERIUM_REPLAN | Pain severity 8-10 after sync prompts user for Imperium replan. |
+| PUL-12 --> PUL-13 | User chooses pantry/fridge scan; not triggered by Vault receipt scan. |
+| PUL-14 --> IMPERIUM_REPLAN | User validates a medical rule and backend emits `pulse.medical_rule.activated`. |
+
+### 15.16 Pulse Endpoint Matrix V1
+
+| Screen | Real endpoints | TBD endpoints |
+|---|---|---|
+| PUL-01 | none | `GET /api/pulse/dashboard`, `GET /api/pulse/medical-rules/active` |
+| PUL-02 | none | `POST /api/pulse/meals/estimate` |
+| PUL-03 | none | `GET /api/pulse/meals/{meal_draft_id}`, `POST /api/pulse/meals/{meal_draft_id}/confirm` |
+| PUL-04 | none | `GET /api/pulse/hydration-logs/today`, `POST /api/pulse/hydration-logs` |
+| PUL-05 | none | `POST /api/pulse/workouts`, `POST /api/pulse/recommendations` |
+| PUL-06 | none | `GET /api/pulse/workouts/{workout_id}`, `POST /api/pulse/workouts/{workout_id}/complete` |
+| PUL-07 | none | `POST /api/pulse/workouts/{workout_id}/adaptation/accept`, `POST /api/pulse/workouts/{workout_id}/adaptation/reject` |
+| PUL-08 | none | `POST /api/pulse/body-snapshots` |
+| PUL-09 | none | `POST /api/pulse/pain-logs`, `POST /api/imperium/replan-requests` |
+| PUL-10 | none | `GET /api/pulse/meals`, `POST /api/pulse/recommendations` |
+| PUL-11 | none | `GET /api/pulse/workouts`, `GET /api/pulse/recovery-state`, `POST /api/pulse/recommendations` |
+| PUL-12 | none | `GET /api/pulse/food-stock`, `POST /api/pulse/food-stock`, `PATCH /api/pulse/food-stock/{stock_item_id}`, `POST /api/pulse/food-stock/drafts/confirm` |
+| PUL-13 | none | `POST /api/pulse/food-stock/scan`, `POST /api/pulse/food-stock/scans/{scan_id}/validate` |
+| PUL-14 | none | `GET /api/pulse/medical-documents`, `POST /api/pulse/medical-documents`, `GET /api/pulse/medical-rules/active`, `POST /api/pulse/medical-rules/{rule_id}/activate` |
+
+All mutation endpoints require `Idempotency-Key`. Endpoint names are canonical UI contracts but remain `TBD` until backend patches implement them.
+
+### 15.17 Pulse-specific composed patterns
+
+| Pattern | Composition V1 | Ecrans |
+|---|---|---|
+| **Macros Estimation Card** | Calories/protein/carbs/fat JetBrains Mono, source chip, confidence chip, warnings, inline edit; never Success before user confirmation. | PUL-01, PUL-03, PUL-10 |
+| **Stock Item Row** | Name, category, quantity/unit JetBrains Mono, expiry chip `DLC|DDM`, source/confidence chip, trailing edit icon. | PUL-03, PUL-12, PUL-13 |
+| **Expiring Soon Banner** | Warning/Error banner for close/expired DLC with top 3 items and link to filtered stock. | PUL-01, PUL-12 |
+| **Hydration Progress Ring** | Fixed 160dp ring, total ml, target, quick buttons, fasting disabled state. | PUL-01, PUL-04 |
+| **Workout Card** | Title, duration, intensity, exercises count, equipment chips, start/adapt actions. | PUL-01, PUL-07, PUL-11 |
+| **Workout Live Tracker** | Current exercise, set/reps counters, rest timer, skip reason, finish action. | PUL-06 |
+| **Adaptation Proposal Card** | Before/after workout diff, reason chips, confidence, accept/reject actions. | PUL-07 |
+| **Body Snapshot Comparison** | Current vs previous weight/measurement deltas, local-only photo privacy notice. | PUL-08 |
+| **Pain Body Diagram** | Body zone selector, severity slider 0-10, high severity prompt, no diagnostic language. | PUL-09 |
+| **Medical Document Row** | Type, date, extraction status, confidence, warnings, derived rules count, retention date. | PUL-14 |
+| **Active Medical Rule Banner** | Validated rule text, severity, source document deep link, expiry, Imperium handoff state. | PUL-01, PUL-14 |
+| **Health Score Display** | Score N/100 only with confidence and positive/negative factors; hidden when explanation missing. | PUL-01, PUL-10 |
+| **Pulse Handoff Toast** | Non-authoritative toast for Vault/Imperium handoffs; never confirms backend success by itself. | PUL-03, PUL-07, PUL-12, PUL-14 |
+| **Suggestion AI Card** | User-requested suggestion, confidence, explanation, `pulse.recommendation.requested` source. | PUL-10, PUL-11, PUL-12 |
+
+### 15.18 Health Data Privacy Policy V1
+
+Pulse handles high and very-high privacy data. V1 rules:
+
+- Medical documents require explicit consent per upload and cite RGPD article 9.
+- PUL-14 displays `Pulse ne pose pas de diagnostic` before upload and near extracted rules.
+- GPT-5.5 static override is used for medical extraction; Qwen cannot activate medical rules.
+- Raw medical document retention defaults to 90 days and user deletion must revoke derived active rules.
+- Medical rules stay inactive until user validation before activation.
+- Body photo upload is disabled in V1; no backend URI, Gemini task, or vector memory storage.
+- Pain notes and medical summaries are redacted from logs and stored only through authenticated endpoints.
+- Active rules can appear on PUL-01 only as validated constraints with source and expiry.
+- Wearable signals are optional and never absolute truth.
+- Pulse recommendations remain support; Imperium remains the command center.
+
+---
+
 ## 9. RESPONSIVE STRATEGY
 
 ### 9.1 Breakpoints

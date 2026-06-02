@@ -8,6 +8,7 @@ DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 IMPERIUM_SCREEN_IDS = [f"IMP-{number:02d}" for number in range(1, 15)]
 VAULT_SCREEN_IDS = [f"VAU-{number:02d}" for number in range(1, 13)]
 VECTOR_SCREEN_IDS = [f"VEC-{number:02d}" for number in range(1, 12)]
+PULSE_SCREEN_IDS = [f"PUL-{number:02d}" for number in range(1, 15)]
 SOURCE_DOCS = [
     "07_ANDROID_APP_RESPONSIBILITIES.md",
     "24_DAY_FINISHED_WORKFLOW.md",
@@ -29,6 +30,13 @@ VECTOR_SOURCE_DOCS = [
     "33_VECTOR_LOGIC_DETAIL.md",
     "37_GEMINI_VISION_PROMPTS.md",
 ]
+PULSE_SOURCE_DOCS = [
+    "01_SIGNAL_VARIABLES_DICTIONARY.md",
+    "07_ANDROID_APP_RESPONSIBILITIES.md",
+    "34_PULSE_MEDICAL_FEED_AI.md",
+    "37_GEMINI_VISION_PROMPTS.md",
+    "40_PULSE_LOGIC_DETAIL.md",
+]
 
 
 def _design_system_text() -> str:
@@ -45,6 +53,11 @@ def _vector_screen_section(text: str, screen_id: str) -> str:
     return text.split(marker, maxsplit=1)[1].split("\n### 14.", maxsplit=1)[0]
 
 
+def _pulse_screen_section(text: str, screen_id: str) -> str:
+    marker = next(line for line in text.splitlines() if line.startswith("### 15.") and f"`{screen_id}`" in line)
+    return text.split(marker, maxsplit=1)[1].split("\n### 15.", maxsplit=1)[0]
+
+
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
@@ -59,6 +72,12 @@ def test_vault_screen_source_docs_are_available_in_audited_docs_master() -> None
 
 def test_vector_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in VECTOR_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
+
+    assert missing == []
+
+
+def test_pulse_screen_source_docs_are_available_in_audited_docs_master() -> None:
+    missing = [doc_name for doc_name in PULSE_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
     assert missing == []
 
@@ -282,3 +301,115 @@ def test_vector_halo_dictionary_matches_design_system_states() -> None:
 
     for halo_state in ("white", "green", "yellow", "red"):
         assert halo_state in halo_line
+
+
+def test_design_system_maps_all_14_pulse_screens_with_stable_ids() -> None:
+    text = _design_system_text()
+
+    assert "## 15. PULSE SCREEN ARCHITECTURE MAPPING V1" in text
+    assert "### 15.0 Pulse Product Decisions V1" in text
+    assert "### 15.15 Pulse Navigation Graph V1" in text
+    assert "### 15.16 Pulse Endpoint Matrix V1" in text
+    assert "### 15.17 Pulse-specific composed patterns" in text
+    assert "### 15.18 Health Data Privacy Policy V1" in text
+
+    for screen_id in PULSE_SCREEN_IDS:
+        assert "### 15." in text
+        assert screen_id in text
+        assert f"`{screen_id}`" in text
+
+    for stable_id in (
+        "PUL.DASH.MAIN",
+        "PUL.MEAL.ADD",
+        "PUL.MEAL.CONFIRM",
+        "PUL.HYDRATION.QUICK_LOG",
+        "PUL.WORKOUT.PLAN",
+        "PUL.WORKOUT.LOG",
+        "PUL.WORKOUT.ADAPT",
+        "PUL.BODY.SNAPSHOT",
+        "PUL.PAIN.LOG",
+        "PUL.MEALS.LIST",
+        "PUL.WORKOUTS.LIST",
+        "PUL.STOCK.LIST",
+        "PUL.STOCK.SCAN",
+        "PUL.MEDICAL.LIST",
+    ):
+        assert stable_id in text
+
+
+def test_design_system_instantiates_pulse_contracts_and_health_guardrails() -> None:
+    text = _design_system_text()
+
+    for screen_id in PULSE_SCREEN_IDS:
+        section = _pulse_screen_section(text, screen_id)
+        for required_label in (
+            "**Composants :**",
+            "**Données affichées :**",
+            "**Widgets :**",
+            "**Assets :**",
+            "**Etats :**",
+            "**Backend deps :**",
+            "**Navigation :**",
+            "**Tab S10 Ultra :**",
+        ):
+            assert required_label in section
+
+        for state in ("Loading", "Empty", "Error", "Offline", "Syncing", "Synced", "Conflict"):
+            assert state in section
+
+    for required in (
+        "PUL-03 is independent from VAU-05",
+        "Meal macros V1 source is backend AI estimation",
+        "Stock decrement is user-confirmed and idempotent",
+        "Body photo upload is disabled in V1",
+        "Medical documents require explicit consent",
+        "Health score must never render without explanation",
+        "Hydration logs merge by idempotency key",
+        "Pain severity 8-10 opens an Imperium replan prompt",
+        "Macros Estimation Card",
+        "Stock Item Row",
+        "Hydration Progress Ring",
+        "Workout Live Tracker",
+        "Adaptation Proposal Card",
+        "Pain Body Diagram",
+        "Medical Document Row",
+        "Active Medical Rule Banner",
+        "TBD POST /api/pulse/meals/estimate",
+        "TBD POST /api/pulse/meals/{meal_draft_id}/confirm",
+        "TBD POST /api/pulse/hydration-logs",
+        "TBD POST /api/pulse/workouts/{workout_id}/adaptation/accept",
+        "TBD POST /api/pulse/medical-documents",
+        "PUL-12 --> PUL-13",
+        "PUL-14 --> IMPERIUM_REPLAN",
+    ):
+        assert required in text
+
+
+def test_pulse_medical_and_logic_docs_define_required_v1_contracts() -> None:
+    logic_text = (DOCS_ROOT / "40_PULSE_LOGIC_DETAIL.md").read_text(encoding="utf-8")
+    medical_text = (DOCS_ROOT / "34_PULSE_MEDICAL_FEED_AI.md").read_text(encoding="utf-8")
+
+    for required in (
+        "## 6. Meals And Macros",
+        "## 7. Food Stock",
+        "## 8. Hydration",
+        "## 9. Workouts",
+        "## 10. Body Snapshot",
+        "## 14. Pain Log",
+        "## 15. Pulse UI Surface",
+        "Idempotency-Key",
+        "hydration sum merge",
+        "stock_decrement_applied",
+    ):
+        assert required in logic_text
+
+    for required in (
+        "GPT-5.5 static override",
+        "explicit consent",
+        "no diagnosis",
+        "raw medical document retention",
+        "user validation before activation",
+        "pulse.medical_rule.activated",
+        "RGPD article 9",
+    ):
+        assert required in medical_text
