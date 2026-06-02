@@ -6,6 +6,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT / "docs_master"
 DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 DESIGN_SYSTEM_TOKENS_KT_PATH = DOCS_ROOT / "60_DESIGN_SYSTEM_TOKENS_KT.md"
+DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH = DOCS_ROOT / "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md"
 APP_ROOT = BACKEND_ROOT / "app"
 
 IMPERIUM_ROUTE_PREFIXES = {
@@ -66,6 +67,10 @@ def _design_system_text() -> str:
 
 def _design_system_tokens_kt_text() -> str:
     return DESIGN_SYSTEM_TOKENS_KT_PATH.read_text(encoding="utf-8")
+
+
+def _design_system_composite_components_text() -> str:
+    return DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH.read_text(encoding="utf-8")
 
 
 def _numbered_heading_lines(text: str) -> list[str]:
@@ -305,6 +310,109 @@ def test_design_system_tokens_kt_spec_does_not_create_frontend_or_kotlin_runtime
         "No Kotlin runtime implementation yet",
         "No asset import",
         "No screen implementation",
+    ):
+        assert non_goal in text
+
+
+def test_design_system_composite_components_spec_exists_and_locks_dynamic_data_rule() -> None:
+    text = _design_system_composite_components_text()
+
+    assert DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH.exists()
+    assert "docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md" in text
+    assert "docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md" in text
+    assert "premium asset must not contain dynamic data" in text
+    assert "Un asset premium ne doit jamais contenir une donnée dynamique figée." in text
+
+    for taxonomy_item in (
+        "Static Asset",
+        "Decorative Shell",
+        "Dynamic Compose Component",
+        "Composite Component",
+        "Interactive Component",
+        "Animated Component",
+    ):
+        assert taxonomy_item in text
+
+
+def test_design_system_composite_components_spec_declares_required_rendering_rules() -> None:
+    text = _design_system_composite_components_text()
+    rules = _top_level_section(text, 3)
+
+    for required_rule in (
+        "Les textes sont rendus par Compose",
+        "Les montants sont rendus par Compose",
+        "Les dates, horaires et durées sont rendus par Compose",
+        "Les progress, rings, bars, gauges, remplissages et waveforms fonctionnelles sont rendus par Compose",
+        "Les boutons interactifs, sliders, toggles, menus, chips et actions sont rendus par Compose",
+        "Les états métier et sync",
+        "Accessibility is mandatory",
+    ):
+        assert required_rule in rules
+
+
+def test_design_system_composite_components_catalog_includes_required_dynamic_components() -> None:
+    text = _design_system_composite_components_text()
+
+    for component in (
+        "MissionFocusCard",
+        "DailyPlanCard",
+        "WeeklyReviewCard",
+        "AIRecommendationCard",
+        "KPIBlock",
+        "ChatMessageBubble",
+        "FinancialPressureCard",
+        "TransactionRow",
+        "ReceiptReviewCard",
+        "WalletBalanceCard",
+        "SavingsProgressRing",
+        "MonthlyReviewCard",
+        "VectorHalo",
+        "DemandRing",
+        "RecommendationCard",
+        "ZonePriorityCard",
+        "TrafficAlertPanel",
+        "SessionStatusCard",
+        "HydrationDrop",
+        "MacroProgressCard",
+        "WorkoutActivityCard",
+        "RecoveryRing",
+        "SleepScoreCard",
+        "BodyStatusWidget",
+    ):
+        assert component in text
+
+
+def test_design_system_composite_components_catalog_includes_path_components() -> None:
+    text = _design_system_composite_components_text()
+    path_catalog = _top_level_section(text, 8)
+
+    for component in (
+        "HijriDateCard",
+        "QuranAudioPlayer",
+        "TasbihCounter",
+        "PrayerStatusCard",
+        "FastingProgressCard",
+        "SadaqaProgressCard",
+    ):
+        assert component in path_catalog
+
+    assert "Prayer times" in path_catalog
+    assert "Vault weekly profit" in path_catalog
+
+
+def test_design_system_composite_components_spec_does_not_create_frontend_or_kotlin_runtime() -> None:
+    text = _design_system_composite_components_text()
+
+    assert not (BACKEND_ROOT / "android").exists()
+    assert not (BACKEND_ROOT / "frontend").exists()
+    assert list(BACKEND_ROOT.rglob("*.kt")) == []
+
+    for non_goal in (
+        "Ne pas créer Kotlin",
+        "Ne pas créer Android",
+        "Ne pas importer assets",
+        "Ne pas créer de frontend",
+        "Ne pas créer de vrai `.kt`",
     ):
         assert non_goal in text
 
