@@ -51,9 +51,11 @@ def test_frontend_generation_plan_v1_has_required_sections_in_order() -> None:
         "## 6. Design Validation Checklist",
         "## 7. Functional Validation Checklist",
         "## 8. Claude Design Pipeline",
-        "## 9. Definition of Done",
-        "## 10. Frontend Generation Readiness V1",
+        "## 9. Screen Completion Gate",
+        "## 10. Global Frontend Foundation Readiness V1",
         "## 11. Constraints",
+        "## 12. Definition of Done",
+        "## 13. Frontend Generation Readiness",
     ]
 
     positions = [text.index(heading) for heading in expected_headings]
@@ -186,11 +188,10 @@ def test_frontend_generation_plan_v1_locks_design_and_functional_validation_chec
         assert required in functional
 
 
-def test_frontend_generation_plan_v1_locks_claude_pipeline_definition_of_done_and_readiness() -> None:
+def test_frontend_generation_plan_v1_locks_claude_pipeline_and_foundation_readiness() -> None:
     text = _generation_plan_text()
     pipeline = _section(text, "8. Claude Design Pipeline")
-    done = _section(text, "9. Definition of Done")
-    readiness = _section(text, "10. Frontend Generation Readiness V1")
+    foundation_readiness = _section(text, "10. Global Frontend Foundation Readiness V1")
 
     for required in (
         "Prompt",
@@ -202,17 +203,6 @@ def test_frontend_generation_plan_v1_locks_claude_pipeline_definition_of_done_an
     ):
         assert required in pipeline
 
-    for required in (
-        "✓ UI validée",
-        "✓ Navigation validée",
-        "✓ Backend branché",
-        "✓ Loading state",
-        "✓ Empty state",
-        "✓ Error state",
-        "✓ Validation tablette",
-    ):
-        assert required in done
-
     for readiness_row in (
         "| Design System | READY |",
         "| Component Catalog | READY |",
@@ -221,7 +211,46 @@ def test_frontend_generation_plan_v1_locks_claude_pipeline_definition_of_done_an
         "| Generation Plan | READY |",
         "| Android Runtime | NOT STARTED |",
     ):
+        assert readiness_row in foundation_readiness
+
+
+def test_frontend_generation_plan_v1_locks_definition_of_done_without_backend_wiring() -> None:
+    done = _section(_generation_plan_text(), "12. Definition of Done")
+
+    for required in (
+        "✓ UI validée",
+        "✓ Navigation validée",
+        "✓ Responsive validé",
+        "✓ Loading validé",
+        "✓ Empty validé",
+        "✓ Error validé",
+        "✓ Mock data validée",
+    ):
+        assert required in done
+
+    for forbidden in (
+        "✓ Backend branché",
+        "Endpoint",
+        "API réelle",
+        "PostgreSQL",
+    ):
+        assert forbidden not in done
+
+
+def test_frontend_generation_plan_v1_locks_mandatory_screen_readiness_flags() -> None:
+    readiness = _section(_generation_plan_text(), "13. Frontend Generation Readiness")
+
+    for readiness_row in (
+        "| Dashboard | READY |",
+        "| Mission Active | READY |",
+        "| Inbox | READY |",
+        "| Weekly Review | READY |",
+        "| History | READY |",
+        "| Settings | READY |",
+    ):
         assert readiness_row in readiness
+
+    assert "| Screen | Status |" in readiness
 
 
 def test_frontend_generation_plan_v1_constraints_remain_documentation_only() -> None:

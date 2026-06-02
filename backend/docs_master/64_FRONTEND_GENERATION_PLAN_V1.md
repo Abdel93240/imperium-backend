@@ -205,23 +205,17 @@ Règles du pipeline :
 - Les corrections visuelles restent dans le worktree de l'écran.
 - Le merge ne doit pas inclure de backend wiring non validé.
 
-## 9. Definition of Done
+## 9. Screen Completion Gate
 
-Un écran est terminé uniquement si tous les critères suivants sont cochés :
+Un écran Imperium V1 ne peut pas être déclaré terminé par un générateur frontend tant que la Definition of Done canonique de la section 12 n'est pas entièrement cochée.
 
-| Critère | Required |
-|---|---|
-| ✓ UI validée | YES |
-| ✓ Navigation validée | YES |
-| ✓ Backend branché | YES |
-| ✓ Loading state | YES |
-| ✓ Empty state | YES |
-| ✓ Error state | YES |
-| ✓ Validation tablette | YES |
+Cette règle sépare volontairement :
 
-La Definition of Done ne s'applique pas à la Phase 1 seule. Un écran peut être visuellement validé sans être terminé.
+- la validation visuelle et mock-data, qui rend un écran prêt pour revue ;
+- le branchement backend futur, qui reste interdit tant que les phases précédentes ne sont pas validées ;
+- la complétion d'écran GO 64/65, qui reste documentaire et ne crée aucun runtime Android.
 
-## 10. Frontend Generation Readiness V1
+## 10. Global Frontend Foundation Readiness V1
 
 | Area | Status |
 |---|---|
@@ -245,6 +239,35 @@ Contraintes non négociables :
 - Aucun backend modifié.
 - Documentation uniquement.
 - Tests documentaires pytest verrouillant les sections clés.
+
+## 12. Definition of Done
+
+Un écran est terminé uniquement si tous les critères suivants sont cochés :
+
+| Critère | Required |
+|---|---|
+| ✓ UI validée | YES |
+| ✓ Navigation validée | YES |
+| ✓ Responsive validé | YES |
+| ✓ Loading validé | YES |
+| ✓ Empty validé | YES |
+| ✓ Error validé | YES |
+| ✓ Mock data validée | YES |
+
+La Definition of Done ne s'applique pas à la Phase 1 seule. Un écran peut être visuellement validé sans être terminé.
+
+## 13. Frontend Generation Readiness
+
+Tableau obligatoire pour la génération future des écrans Imperium GO 65 :
+
+| Screen | Status |
+|---|---|
+| Dashboard | READY |
+| Mission Active | READY |
+| Inbox | READY |
+| Weekly Review | READY |
+| History | READY |
+| Settings | READY |
 
 **Document version :** 1.0
 **Statut :** FRONTEND GENERATION PLAN V1 — ready for future screen generation, not implemented yet.

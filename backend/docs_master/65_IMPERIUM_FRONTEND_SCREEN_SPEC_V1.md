@@ -1082,6 +1082,8 @@ Mock data is documentary and local-only:
 
 Every screen must pass every item before Phase 3 backend wiring.
 
+### 11.1 Detailed Screen Checklist
+
 | Screen | Responsive tablette | Responsive telephone | Design System conforme | Component Catalog conforme | Navigation conforme | Loading state | Empty state | Error state | Mock data fonctionnelle |
 |---|---|---|---|---|---|---|---|---|---|
 | Dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -1099,6 +1101,22 @@ Additional validation rules:
 - Weekly Review must never finalize locally.
 - History must remain read-only.
 - Settings must never expose secrets or internal auth state.
+
+### 11.2 Canonical Definition of Done Checklist
+
+Each screen is done only when every canonical GO 64 criterion is validated:
+
+| Criterion | Required |
+|---|---|
+| UI validée | YES |
+| Navigation validée | YES |
+| Responsive validé | YES |
+| Loading validé | YES |
+| Empty validé | YES |
+| Error validé | YES |
+| Mock data validée | YES |
+
+This checklist is documentary only. It does not authorize Kotlin generation, Android runtime setup, Compose implementation, backend wiring, endpoint creation, model changes, schema changes or API contract changes.
 
 **Document version :** 1.0
 **Statut :** IMPERIUM FRONTEND SCREEN SPEC V1 — ready for future UI pure and mock-data generation, not backend wired.

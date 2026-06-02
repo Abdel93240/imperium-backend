@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = BACKEND_ROOT / "docs_master"
@@ -86,6 +88,101 @@ def test_imperium_frontend_screen_spec_v1_locks_global_rules_and_allowed_compone
         "ImperiumTimeline",
     ):
         assert required in rules
+
+
+@pytest.mark.parametrize(
+    ("heading", "route_id", "route_path", "required_widgets"),
+    [
+        (
+            "3. Dashboard Screen",
+            "IMP.DASH.MAIN",
+            "imperium/dashboard",
+            (
+                "Daily Focus Card",
+                "Active Mission Card",
+                "Priority Card",
+                "Quick Actions",
+                "Weekly Progress",
+                "Imperium Status",
+            ),
+        ),
+        (
+            "4. Mission Active Screen",
+            "IMP.MISSION.ACTIVE",
+            "imperium/missions/active",
+            (
+                "Mission Header",
+                "Mission Description",
+                "Progress Block",
+                "Decision Buttons",
+                "Notes Area",
+            ),
+        ),
+        (
+            "5. Inbox Screen",
+            "IMP.INBOX.MAIN",
+            "imperium/inbox",
+            (
+                "Conversation List",
+                "Message Preview",
+                "Filters",
+                "Search",
+            ),
+        ),
+        (
+            "6. Weekly Review Screen",
+            "IMP.WR.SUMMARY",
+            "imperium/weekly-review",
+            (
+                "Weekly Summary",
+                "Wins",
+                "Failures",
+                "Improvement Suggestions",
+                "Statistics",
+            ),
+        ),
+        (
+            "7. History Screen",
+            "IMP.HISTORY.MAIN",
+            "imperium/history",
+            (
+                "Timeline",
+                "Search",
+                "Filters",
+                "History Detail Card",
+            ),
+        ),
+        (
+            "8. Settings Screen",
+            "IMP.SETTINGS.CORE",
+            "imperium/settings",
+            (
+                "User",
+                "Theme",
+                "Notifications",
+                "Integrations",
+                "Security",
+                "Advanced",
+            ),
+        ),
+    ],
+)
+def test_imperium_frontend_screen_spec_v1_locks_each_screen_route_and_widgets(
+    heading: str,
+    route_id: str,
+    route_path: str,
+    required_widgets: tuple[str, ...],
+) -> None:
+    screen = _screen_section(_screen_spec_text(), heading)
+
+    assert f"Route ID | `{route_id}`" in screen
+    assert f"Route path | `{route_path}`" in screen
+    assert "Loading" in screen
+    assert "Empty" in screen
+    assert "Error" in screen
+
+    for widget in required_widgets:
+        assert widget in screen
 
 
 def test_imperium_frontend_screen_spec_v1_dashboard_screen_is_fully_specified() -> None:
@@ -269,6 +366,7 @@ def test_imperium_frontend_screen_spec_v1_locks_screen_validation_checklist() ->
     checklist = _section(_screen_spec_text(), "11. Screen Validation Checklist")
 
     for required in (
+        "Detailed Screen Checklist",
         "Responsive tablette",
         "Responsive telephone",
         "Design System conforme",
@@ -284,5 +382,20 @@ def test_imperium_frontend_screen_spec_v1_locks_screen_validation_checklist() ->
         "Weekly Review must never finalize locally",
         "History must remain read-only",
         "Settings must never expose secrets",
+        "Canonical Definition of Done Checklist",
+        "UI validée",
+        "Navigation validée",
+        "Responsive validé",
+        "Loading validé",
+        "Empty validé",
+        "Error validé",
+        "Mock data validée",
+        "does not authorize Kotlin generation",
+        "Android runtime setup",
+        "backend wiring",
+        "endpoint creation",
+        "model changes",
+        "schema changes",
+        "API contract changes",
     ):
         assert required in checklist
