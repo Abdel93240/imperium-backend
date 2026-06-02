@@ -151,16 +151,16 @@ def get_imperium_frontend_layout_metadata() -> ImperiumFrontendLayoutResponse:
     )
 
 
+def _theme_surface(key: str, purpose: str, token_suffix: str) -> ImperiumFrontendThemeSurface:
+    return ImperiumFrontendThemeSurface.model_validate(
+        {"key": key, "purpose": purpose, "token": f"surface.{token_suffix}"}
+    )
+
+
 IMPERIUM_FRONTEND_THEME_SURFACES: tuple[ImperiumFrontendThemeSurface, ...] = (
-    ImperiumFrontendThemeSurface.model_validate(
-        {"key": "base", "purpose": "Main application background.", "token": "surface.base"}
-    ),
-    ImperiumFrontendThemeSurface.model_validate(
-        {"key": "card", "purpose": "Primary content card surface.", "token": "surface.card"}
-    ),
-    ImperiumFrontendThemeSurface.model_validate(
-        {"key": "elevated", "purpose": "Elevated premium panel surface.", "token": "surface.elevated"}
-    ),
+    _theme_surface("base", "Main application background.", "base"),
+    _theme_surface("card", "Primary content card surface.", "card"),
+    _theme_surface("elevated", "Elevated premium panel surface.", "elevated"),
 )
 
 IMPERIUM_FRONTEND_THEME_SPACING: tuple[ImperiumFrontendThemeScaleItem, ...] = (

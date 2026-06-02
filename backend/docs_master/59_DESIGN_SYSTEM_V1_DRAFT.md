@@ -396,57 +396,245 @@ Chaque écran expose obligatoirement les 7 états :
 
 ---
 
-## 8. IMPERIUM GOLDEN PATH — COMPONENT MAPPING
+## 8. IMPERIUM SCREEN ARCHITECTURE MAPPING V1
 
-Mapping écran ↔ composants foundation ↔ assets. Cible : 7 écrans cœur du flow utilisateur Imperium V1.
+Mapping écran ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Cette section couvre les 14 écrans Imperium V1 issus de l'audit `2026-06-02_0519_audit.md` et des docs sources locales `07`, `24`, `26`, `29`, `32`, `43`.
 
-### 8.1 Morning Check-In
+Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affiche, collecte ou déclenche une action backend. Les endpoints marqués `TBD` doivent être créés dans un patch backend séparé avant implémentation UI.
 
-- **Composants :** Dialog ou écran modal fullscreen ; Display "Bonjour" ; H3 "Comment ça va ce matin ?" ; Input slider (énergie 0-10, custom) ; Input slider (heures de sommeil) ; Segmented Control (mood 5 emojis) ; Text Input multilignes (free text) ; Button Primary "Continuer" ; Button Ghost "Plus tard".
+### 8.0 Canonical Routing Typology
+
+| Type | Définition Compose V1 | Usage Imperium |
+|---|---|---|
+| `route` | Destination routée plein écran dans le graphe Compose. | Dashboard, Chatbot, Settings, vues read-only. |
+| `tab` | Destination top-level exposée par Sidebar/Bottom Nav ; ce n'est pas un enfant visuel du Dashboard. | Plan History, Decisions Log, Weekly Review List. |
+| `dialog` | Overlay modal centré ou fullscreen qui bloque le flux jusqu'à action user. | Morning Check-In, Replan, WR Interactive sur Tab. |
+| `bottom_sheet` | Overlay bas lié à un contexte existant. | Mission Outcome depuis une mission. |
+| `deep_link` | Route directe vers une ressource identifiée. | Mission detail read, Weekly Review final report. |
+
+### 8.1 IMP-01 Imperium Dashboard (`IMP-01`)
+
+- **Screen name:** IMP-01 Imperium Dashboard.
+- **Type / slug :** `route`, `imperium/dashboard`, stable ID `IMP.DASH.MAIN`.
+- **Composants :** Top Bar, Sidebar/Bottom Nav, card Current Focus Mission L2 avec bord Accent, Quick Stats cards, WR/Ghusl/Critical banners, Today's Plan mission list, primary action "Reprogrammer ma journée", chatbot input docked.
+- **Données affichées :** current focus mission, daily plan snapshot, quick stats, active banners, latest sync status.
+- **Widgets :** Next prayer countdown, Pressure score, Discipline streak.
+- **Assets :** Imperium emblem 48dp, Material Symbols status icons, no hero image.
+- **Etats :** Loading=skeleton mission/cards ; Empty=no active mission with CTA "Ajouter une mission" ; Error=dashboard read-model failure with retry ; Offline=cached dashboard banner ; Syncing=top sync line ; Synced=snackbar after confirmed mutation ; Conflict=server conflict banner and diff dialog.
+- **Backend deps :** `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active`.
+- **Navigation :** entry after auth/onboarding/morning check-in ; exits to IMP-02, IMP-03, IMP-05, IMP-06, IMP-07, IMP-08, IMP-09, IMP-10, IMP-14.
+- **Tab S10 Ultra :** 3 columns: Sidebar 240dp, main dashboard max 1280dp, chatbot/context panel 320dp.
+
+### 8.2 IMP-02 Morning Check-In Popup (`IMP-02`)
+
+- **Screen name:** IMP-02 Morning Check-In Popup.
+- **Type / slug :** `dialog`, `imperium/morning-check-in`, stable ID `IMP.CHECKIN.MORNING`.
+- **Composants :** fullscreen Dialog on phone or 720dp centered Dialog on Tab, Display greeting, energy slider, sleep slider, pain selector, mood segmented control, notes TextField, Primary "Continuer", Ghost "Plus tard".
+- **Données affichées :** existing morning check-in status, local date, current popup setting.
 - **Widgets :** none.
-- **Assets :** illustration hero 240×240 (variante day/dawn), emblème Imperium 48dp en top.
-- **États :** Loading (envoi backend), Synced (transition vers Dashboard).
+- **Assets :** dawn/day hero 240x240, Imperium emblem 48dp.
+- **Etats :** Loading=submit spinner ; Empty=input form untouched ; Error=validation/backend failure under fields and retry ; Offline=allow local pending draft banner ; Syncing=top line while sending ; Synced=close then route to IMP-05 or IMP-01 ; Conflict=existing check-in conflict dialog.
+- **Backend deps :** `TBD POST /api/imperium/morning-checkins`, current source doc table `imperium_morning_checkins`, replan task `imperium.day_replan`.
+- **Navigation :** opened by morning trigger before Dashboard ; continue can open IMP-05 when replan proposal exists, otherwise IMP-01 ; later closes to IMP-01.
+- **Tab S10 Ultra :** centered Dialog max 720dp, no right panel.
 
-### 8.2 Dashboard
+### 8.3 IMP-03 Mission Outcome Form (`IMP-03`)
 
-- **Composants :** Top Bar (Imperium logo + emblème, profil), Sidebar étendue (tab landscape) ou Bottom Nav (phone), Cards "Current focus mission" (Card L2 Accent border), Card "Quick stats" (KPI Display + Caption), Banners (WR available, Ghusl required, Critical), Section "Today's plan" (liste de Card mission), Section "Plan history" tab, Button Primary "Reprogrammer ma journée" (Accent gold, **seul accent gold de l'écran**), Chatbot input ancré bas.
-- **Widgets :** Next prayer countdown (mini-card), Pressure score (mini-card), Discipline streak (mini-card).
-- **Assets :** emblème Imperium, icônes Material Symbols pour status missions.
-- **États :** tous (cf. §7.7).
-
-### 8.3 Mission
-
-- **Composants :** Card hero (Card L2, H3 titre, Body Large description, Chips de priorité/category, Chip status `pending`/`active`), Section metadata (deadline, category, sub-tasks), Button Primary "Faite", Button Secondary "Ratée", Button Destructive (in confirm Dialog) "Annulée".
+- **Screen name:** IMP-03 Mission Outcome Form.
+- **Type / slug :** `bottom_sheet`, `imperium/mission/{mission_id}/outcome`, stable ID `IMP.MISSION.OUTCOME`.
+- **Composants :** Bottom Sheet L3, compact mission header, action state selector "Faite/Ratée/Annulée", reason TextField, Voice input, user-reported signal segmented control, Primary "Envoyer".
+- **Données affichées :** selected mission title/status/deadline, allowed transition, reason draft.
 - **Widgets :** none.
-- **Assets :** none (icônes système Material Symbols).
-- **États :** Loading (sync action), Synced, Failed (banner Error).
+- **Assets :** Material Symbols only.
+- **Etats :** Loading=transition submit spinner ; Empty=reason optional for done, required for failed/cancelled ; Error=invalid transition or backend failure ; Offline=pending local mutation banner ; Syncing=sheet action spinner ; Synced=sheet closes and Dashboard refreshes ; Conflict=mission already changed on server.
+- **Backend deps :** `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail`, `TBD POST /api/imperium/missions/{mission_id}/cancel`.
+- **Navigation :** opened from IMP-01 mission card or IMP.MISSION.DETAIL ; failed/cancelled can trigger IMP-05 ; done returns to IMP-01.
+- **Tab S10 Ultra :** right-side sheet 480dp or bottom sheet max 640dp anchored to mission context.
 
-### 8.4 Mission Outcome
+### 8.4 IMP-04 Day Finished Form (`IMP-04`)
 
-- **Bottom Sheet** déclenché par "Ratée" ou "Annulée" : Title H4 "Pourquoi ?", Input voice (priorité) OU Text multilignes, Segmented Control "user_reported_signals" (énergie/distraction/temps/autre), Button Primary "Envoyer" (déclenche hook replan).
-- **Composants :** Bottom Sheet L3, Input Voice, Text, Segmented.
+- **Screen name:** IMP-04 Day Finished Form.
+- **Type / slug :** `dialog`, `imperium/day-finished`, stable ID `IMP.DAY.FINISH`.
+- **Composants :** fullscreen Dialog, H1 "Bilan du jour", sliders energy/fatigue/sleep/stress, mood segmented control, TextFields main win/problem, Primary "Terminer la journée", Ghost "Plus tard".
+- **Données affichées :** current local date, latest plan completion summary, existing day review if already submitted.
+- **Widgets :** day completion counter, discipline today mini KPI.
+- **Assets :** end-of-day hero 240x240 only when first empty state is shown.
+- **Etats :** Loading=submit spinner ; Empty=form ready for today's review ; Error=day already finished or validation failure ; Offline=pending local review banner ; Syncing=sync line ; Synced=snackbar then IMP-01 ; Conflict=existing review conflict with server timestamp.
+- **Backend deps :** `POST /api/imperium/day/finish`, `GET /api/imperium/day/review/latest`.
+- **Navigation :** opened by Finish Day action on IMP-01 or notification ; closes to IMP-01.
+- **Tab S10 Ultra :** centered Dialog max 760dp, two-column sliders/text on landscape.
+
+### 8.5 IMP-05 Replan Validation Screen (`IMP-05`)
+
+- **Screen name:** IMP-05 Replan Validation Screen.
+- **Type / slug :** `dialog`, `imperium/replan/validation`, stable ID `IMP.REPLAN.VALIDATE`.
+- **Composants :** fullscreen modal, minimal Top Bar, Before/After plan columns, mission cards with delta badges, Info banner with model reason, Primary "Accepter", Secondary "Modifier", Ghost "Annuler".
+- **Données affichées :** previous plan, proposed plan, replan reason, replan source hook, confidence/status.
+- **Widgets :** none.
 - **Assets :** none.
+- **Etats :** Loading=replan in progress with spinner ; Empty=no proposal yet ; Error=replan failed dialog ; Offline=cannot validate new AI plan offline banner ; Syncing=acceptance pending line ; Synced=accepted plan snackbar ; Conflict=proposal stale against current plan.
+- **Backend deps :** `TBD GET /api/imperium/replans/{replan_event_id}`, `TBD POST /api/imperium/replans/{replan_event_id}/accept`, `POST /api/imperium/daily-plans/{plan_id}/activate` when proposal is materialized.
+- **Navigation :** from IMP-02, IMP-03, explicit Dashboard replan action, or hook banner ; accept goes IMP-01 ; cancel returns source screen.
+- **Tab S10 Ultra :** true two-column Before/After in main content, optional 320dp reason panel.
 
-### 8.5 Replan
+### 8.6 IMP-06 Add Manual Mission Form (`IMP-06`)
 
-- **Composants :** Dialog fullscreen modal (élévation L3), Top Bar minimal "Nouveau plan proposé", Section "Avant / Après" (deux colonnes Tab landscape, stacked phone), liste de Card mission (badges Δ "ajouté"/"déplacé"/"retiré"), Banner Info "Raison IA : …", Buttons : Primary "Accepter", Secondary "Modifier", Ghost "Annuler".
+- **Screen name:** IMP-06 Add Manual Mission Form.
+- **Type / slug :** `dialog`, `imperium/missions/new`, stable ID `IMP.MISSION.ADD_MANUAL`.
+- **Composants :** Dialog or fullscreen form, title TextField, description TextField, domain selector, priority_level stepper, deadline picker, category TextField, Primary "Ajouter", Ghost "Annuler".
+- **Données affichées :** empty mission draft, decision-score preview when available.
+- **Widgets :** priority preview score mini-card.
+- **Assets :** Material Symbols only.
+- **Etats :** Loading=create spinner ; Empty=blank draft ; Error=validation/backend failure ; Offline=local draft pending banner ; Syncing=submit line ; Synced=created snackbar ; Conflict=idempotency conflict or duplicate draft warning.
+- **Backend deps :** `POST /api/imperium/missions/backlog`, `GET /api/imperium/missions/backlog/decision-preview`, optional `POST /api/imperium/missions/backlog/{mission_id}/promote`.
+- **Navigation :** opened from IMP-01 "+ Mission manuelle" ; save returns to IMP-01 or IMP-07 depending source.
+- **Tab S10 Ultra :** centered Dialog max 720dp; preview score can use right contextual panel.
+
+### 8.7 IMP-07 Plan History Tab (`IMP-07`)
+
+- **Screen name:** IMP-07 Plan History Tab.
+- **Type / slug :** `tab`, `imperium/plan-history`, stable ID `IMP.PLAN.HISTORY`.
+- **Composants :** Top Bar, filter chips by date/status, read-only timeline list, daily plan cards, optional deep link to mission detail.
+- **Données affichées :** past daily plans, mission counts, plan state, created/activated/completed timestamps.
+- **Widgets :** weekly completion mini trend.
+- **Assets :** empty-state illustration 240x240 only when no history exists.
+- **Etats :** Loading=skeleton timeline ; Empty=no past plan with CTA Dashboard ; Error=history fetch failure ; Offline=cached history banner ; Syncing=refresh line ; Synced=refresh snackbar ; Conflict=not applicable for read-only, show conflict banner only if backend reports stale cache.
+- **Backend deps :** `GET /api/imperium/daily-plans/today`, `TBD GET /api/imperium/daily-plans/history`, fallback `GET /api/imperium/missions/history`.
+- **Navigation :** top-level Sidebar/Bottom Nav tab ; deep links to IMP.MISSION.DETAIL ; back returns previous top-level tab.
+- **Tab S10 Ultra :** main timeline max 1280dp, no right panel by default.
+
+### 8.8 IMP-08 Chatbot Conversation View (`IMP-08`)
+
+- **Screen name:** IMP-08 Chatbot Conversation View.
+- **Type / slug :** `route`, `imperium/chat`, stable ID `IMP.CHAT.CONVERSATION`.
+- **Composants :** Top Bar "Assistant", read-only provider chip, message list, timestamp captions, Text input, Voice button, Send button, Decisions Log banner.
+- **Données affichées :** messages, active route/model metadata, pending decisions, safe timestamps.
 - **Widgets :** none.
-- **Assets :** none.
-- **États :** Loading hero (spinner + "Sonnet 4.6 replanifie…"), Error (Dialog Error si replan failed).
+- **Assets :** Imperium AI emblem 24dp, user avatar 40dp.
+- **Etats :** Loading=typing indicator ; Empty=no conversation yet prompt ; Error=error bubble with retry ; Offline=input disabled except draft ; Syncing=send line ; Synced=message stored state ; Conflict=duplicate/idempotency conflict banner.
+- **Backend deps :** `TBD POST /api/imperium/chat/messages`, `TBD GET /api/imperium/chat/conversation`, AI task types `imperium.chat.routing`, `imperium.chat.sonnet_response`, `imperium.chat.opus_response`, `imperium.chat.web_response`.
+- **Navigation :** opened from Dashboard dock or direct route ; decisions link to IMP-09.
+- **Tab S10 Ultra :** full route when opened directly; docked 320dp right panel on IMP-01.
 
-### 8.6 Chatbot
+### 8.9 IMP-09 Decisions Log Tab (`IMP-09`)
 
-- **Composants :** Top Bar "Assistant" + chip de provider actif (Qwen/Sonnet/Opus), Liste messages (Body Large, surface alternée Surface / Surface Variant, timestamp Caption), Input Text + Button Voice + Button Send Primary, Banner Info pour Decisions Log.
-- **Widgets :** none.
-- **Assets :** emblème Imperium 24dp pour avatar AI ; avatar user 40dp.
-- **États :** Loading (typing indicator 3 dots), Error (message bubble Error).
+- **Screen name:** IMP-09 Decisions Log Tab.
+- **Type / slug :** `tab`, `imperium/decisions-log`, stable ID `IMP.DECISIONS.LOG`.
+- **Composants :** Top Bar, filters by source/status, decision cards, source conversation link, optional mission-created chip.
+- **Données affichées :** decision title, rationale summary, source chat result id, created_at, resulting action.
+- **Widgets :** decisions this week counter.
+- **Assets :** empty-state illustration 240x240 when no decisions exist.
+- **Etats :** Loading=skeleton cards ; Empty=no decisions logged ; Error=fetch failure ; Offline=cached log banner ; Syncing=refresh line ; Synced=refresh snackbar ; Conflict=read-only stale cache banner.
+- **Backend deps :** `TBD GET /api/imperium/decisions-log`, source table/result type `imperium.chat.*_response`.
+- **Navigation :** top-level Sidebar/Bottom Nav tab ; can deep link back to IMP-08 conversation context.
+- **Tab S10 Ultra :** list/detail split: decisions list main, selected rationale in optional 320dp panel.
 
-### 8.7 Weekly Review
+### 8.10 IMP-10 Weekly Review List (`IMP-10`)
 
-- **Composants :** Top Bar "Weekly Review", Stepper horizontal (sections guidées doc 47), Section principale en Card (H3 question, Body Large contexte, Input adapté par section), Button Primary "Suivant", Button Ghost "Sauter", Banner Info pour initial summary, Bottom Sheet draft/final candidate.
-- **Widgets :** sparkline trends (Compose Canvas custom, taille 64dp height).
-- **Assets :** illustration hero 240×240 en intro, emblème Imperium.
-- **États :** Loading (read-model fetch), `can_answer`/`is_waiting_for_ai` states (doc 32) → Banner status synchro.
+- **Screen name:** IMP-10 Weekly Review List.
+- **Type / slug :** `tab`, `imperium/weekly-reviews`, stable ID `IMP.WR.LIST`.
+- **Composants :** Top Bar, WR readiness banner, stored report list cards, status chips, pagination controls.
+- **Données affichées :** stored/approved weekly reviews, week range, title, summary, status, stored_at.
+- **Widgets :** weekly streak count, latest WR status chip.
+- **Assets :** WR list empty-state illustration 240x240.
+- **Etats :** Loading=skeleton list ; Empty=no stored weekly review ; Error=history fetch failure ; Offline=cached list banner ; Syncing=refresh line ; Synced=refresh snackbar ; Conflict=read-only stale cache banner.
+- **Backend deps :** `GET /api/imperium/weekly-review/history`, `GET /api/imperium/weekly-review/final-reports/stored`, `GET /api/imperium/weekly-review/state`.
+- **Navigation :** top-level Sidebar/Bottom Nav tab ; item tap opens IMP-11 ; active banner opens IMP-12.
+- **Tab S10 Ultra :** list/detail split allowed; detail preview in 320dp panel only after selection.
+
+### 8.11 IMP-11 Weekly Review Read-only View (`IMP-11`)
+
+- **Screen name:** IMP-11 Weekly Review Read-only View.
+- **Type / slug :** `deep_link`, `imperium/weekly-reviews/{session_id}`, stable ID `IMP.WR.READ_ONLY`.
+- **Composants :** Top Bar, title/summary card, deterministic sections, metrics cards, decisions/memory candidate preview links, Markdown export action.
+- **Données affichées :** sanitized final report read model, sections, questions answered, week range, report status.
+- **Widgets :** sparkline trends 64dp height when report payload contains trend data.
+- **Assets :** Imperium emblem, no hero after report is stored.
+- **Etats :** Loading=report skeleton ; Empty=report missing for session ; Error=404/403/fetch failure ; Offline=cached final report banner ; Syncing=export/read refresh line ; Synced=export snackbar ; Conflict=not mutable, show stale final-report warning only.
+- **Backend deps :** `GET /api/imperium/weekly-review/{session_id}/final-report`, `GET /api/imperium/weekly-review/{session_id}/final-report/markdown`, `GET /api/imperium/weekly-review/final-reports/{report_id}`.
+- **Navigation :** from IMP-10 list or IMP-12 after validation/storage ; back returns IMP-10.
+- **Tab S10 Ultra :** report content max 960dp, optional right panel for memory candidate preview.
+
+### 8.12 IMP-12 Weekly Review Interactive Popup (`IMP-12`)
+
+- **Screen name:** IMP-12 Weekly Review Interactive Popup.
+- **Type / slug :** `dialog`, `imperium/weekly-review/current/interactive`, stable ID `IMP.WR.INTERACTIVE`.
+- **Composants :** fullscreen Dialog on phone, large modal on Tab, conversation timeline, latest assistant prompt card, answer Text/Voice input, allowed action buttons rendered from backend, draft/final bottom sheet.
+- **Données affichées :** current WR session, conversation snapshot, allowed_actions, `can_answer`, `is_waiting_for_ai`, draft_review_state.
+- **Widgets :** WR progress step indicator.
+- **Assets :** WR intro hero 240x240, Imperium emblem.
+- **Etats :** Loading=conversation fetch ; Empty=ready session not launched ; Error=failed/closed session or endpoint failure ; Offline=read cached only, mutations disabled ; Syncing=polling/waiting line ; Synced=answer/action stored snackbar ; Conflict=409 duplicate/stale draft dialog.
+- **Backend deps :** `GET /api/imperium/weekly-review/current`, `POST /api/imperium/weekly-review/launch`, `GET /api/imperium/weekly-review/{session_id}/conversation`, `POST /api/imperium/weekly-review/{session_id}/chat/messages`, `POST /api/imperium/weekly-review/{session_id}/chat/confirm-no-more-input`, `POST /api/imperium/weekly-review/{session_id}/draft/approve`, `POST /api/imperium/weekly-review/{session_id}/draft/store`.
+- **Navigation :** from IMP-01/IMP-10 WR banner ; after stored final report route to IMP-11 ; cancel returns source.
+- **Tab S10 Ultra :** modal max 1040dp with timeline left and draft/action panel right; not a bottom sheet on Tab.
+
+### 8.13 IMP-13 Priority Rules Settings (`IMP-13`)
+
+- **Screen name:** IMP-13 Priority Rules Settings.
+- **Type / slug :** `route`, `imperium/settings/priorities`, stable ID `IMP.SETTINGS.PRIORITIES`.
+- **Composants :** Top Bar, draggable priority list, rank labels, read-only Decision Framework schema help, Primary "Enregistrer", Secondary "Réinitialiser".
+- **Données affichées :** canonical priority order, rank_order, priority keys/labels, deprecated legacy warning.
+- **Widgets :** priority count and last updated status chip.
+- **Assets :** Material Symbols only.
+- **Etats :** Loading=priorities skeleton ; Empty=initialize defaults CTA ; Error=duplicate rank/key or fetch failure ; Offline=editing disabled with cached values ; Syncing=save line ; Synced=saved snackbar ; Conflict=idempotency or concurrent update diff dialog.
+- **Backend deps :** `GET /api/imperium/decision-framework/priorities`, `POST /api/imperium/decision-framework/priorities`, legacy read `GET /api/imperium/priority-rules`.
+- **Navigation :** from IMP-14 Settings ; save/back returns IMP-14.
+- **Tab S10 Ultra :** two columns: draggable list left, explanation/audit panel right.
+
+### 8.14 IMP-14 Imperium Settings Core (`IMP-14`)
+
+- **Screen name:** IMP-14 Imperium Settings (core).
+- **Type / slug :** `route`, `imperium/settings`, stable ID `IMP.SETTINGS.CORE`.
+- **Composants :** Top Bar, sections Morning popup, Replan policy, Chat retention, Discipline weights, links to Priority Rules, toggles, number steppers, safe reset confirmation dialogs.
+- **Données affichées :** morning_popup_time/enabled, debounce_minutes, replan_on_mission_failure, chat retention days, composite_weights.
+- **Widgets :** settings completion badge, sync status chip.
+- **Assets :** Material Symbols only.
+- **Etats :** Loading=settings skeleton ; Empty=defaults not initialized CTA ; Error=validation/fetch failure ; Offline=cached settings read-only banner ; Syncing=save line ; Synced=saved snackbar ; Conflict=server settings changed diff dialog.
+- **Backend deps :** `TBD GET /api/imperium/settings`, `TBD PATCH /api/imperium/settings`, `GET /api/imperium/frontend/app-manifest` for static frontend metadata.
+- **Navigation :** top-level Sidebar/Bottom Nav item ; Priority Rules row opens IMP-13.
+- **Tab S10 Ultra :** settings sections in two-column grid, no nested card inside card.
+
+### 8.15 Imperium Navigation Graph V1
+
+```mermaid
+flowchart TD
+  AUTH[Auth / Onboarding transverse] --> IMP01[IMP-01 Dashboard]
+  IMP01 --> IMP02[IMP-02 Morning Check-In]
+  IMP02 --> IMP05[IMP-05 Replan Validation]
+  IMP02 --> IMP01
+  IMP01 --> IMP03[IMP-03 Mission Outcome]
+  IMP03 --> IMP05
+  IMP03 --> IMP01
+  IMP01 --> IMP04[IMP-04 Day Finished]
+  IMP04 --> IMP01
+  IMP01 --> IMP05
+  IMP05 --> IMP01
+  IMP01 --> IMP06[IMP-06 Add Manual Mission]
+  IMP06 --> IMP01
+  IMP01 --> IMP08[IMP-08 Chatbot]
+  IMP08 --> IMP09[IMP-09 Decisions Log]
+  IMP01 --> IMP07[IMP-07 Plan History]
+  IMP01 --> IMP10[IMP-10 Weekly Review List]
+  IMP10 --> IMP11[IMP-11 Weekly Review Read-only]
+  IMP01 --> IMP12[IMP-12 WR Interactive]
+  IMP10 --> IMP12
+  IMP12 --> IMP11
+  IMP01 --> IMP14[IMP-14 Settings]
+  IMP14 --> IMP13[IMP-13 Priority Rules]
+  IMP13 --> IMP14
+```
+
+Transitions conditionnelles canoniques V1 :
+
+| Transition | Condition |
+|---|---|
+| IMP-02 --> IMP-05 | Morning Check-In validé et proposition de replan disponible. |
+| IMP-03 --> IMP-05 | Mission ratée/annulée et hook replan accepté par le backend. |
+| IMP-12 --> IMP-11 | Weekly Review approuvée puis stockée/affichable en read-only. |
+
+Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP-01`), Plan History (`IMP-07`), Decisions Log (`IMP-09`), Weekly Reviews (`IMP-10`), Settings (`IMP-14`). `Mon OS personnel` is excluded from V1 navigation because doc 54 marks System Health Dashboard as V3.
+
+Mission detail is not IMP-15 in V1. `IMP.MISSION.DETAIL` is a deep_link read surface backed by `GET /api/imperium/missions/{mission_id}` and may reuse the Mission card components; it is not counted as one of the 14 Imperium V1 screens until product explicitly promotes it.
 
 ---
 
@@ -482,7 +670,7 @@ Layout canonique Tab S10 Ultra landscape :
 └────────┴──────────────────────────────────────────┴──────────────┘
 ```
 
-- **Colonne gauche (Sidebar 240dp) :** navigation primaire (Imperium tabs : Dashboard, Plan history, Decisions log, Settings).
+- **Colonne gauche (Sidebar 240dp) :** navigation primaire Imperium V1 : Dashboard, Plan History, Decisions Log, Weekly Reviews, Settings. `Mon OS personnel` reste V3 et n'apparait pas dans la Sidebar V1.
 - **Colonne centrale (flex, max 1280dp) :** contenu principal.
 - **Colonne droite (320dp, optionnelle) :** panneau contextuel persistant (ex: chatbot dock sur Dashboard, side panel HUD Vector).
 
