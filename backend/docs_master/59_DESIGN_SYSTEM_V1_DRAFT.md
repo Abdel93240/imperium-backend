@@ -1466,6 +1466,280 @@ Pulse handles high and very-high privacy data. V1 rules:
 
 ---
 
+## 16. PATH SCREEN ARCHITECTURE MAPPING V1
+
+Mapping écran Path ↔ composants foundation ↔ assets ↔ états ↔ navigation ↔ dépendances backend. Sources canoniques locales : docs `01`, `07`, `41`, `42`, `43`, `59`. Path collecte des actions explicites et affiche des signaux de discipline spirituelle ; il ne produit pas de jugement religieux.
+
+### 16.0 Path Product Decisions V1
+
+| Décision | Règle V1 |
+|---|---|
+| Prayer scope | V1 tracks the five obligatory prayers only: Fajr, Dhuhr, Asr, Maghrib, Isha. Sunnah/Witr/Duha/Tahajjud are V2 routine candidates. |
+| Prayer wording | UI uses operational wording such as `Non marquee comme accomplie`; silence never creates missed-prayer discipline impact. |
+| MAWAQIT source | Mosque reality first: default registered MAWAQIT mosque wins; cache 30 days; stale warning after 48h; fallback calculation if unavailable. |
+| Calculation fallback | Offline calculation uses Adhan-equivalent backend, default `MuslimWorldLeague`, default Asr rule `Shafi`; user can change calc method and madhhab in PAT-11. |
+| Fasting intention | Ramadan/white days can suggest preparation but never auto-start a fast; PAT-05 user confirmation is mandatory. |
+| Ghusl handoff | PAT-04 activation is user-confirmed and emits Imperium replan handoff; Path never infers ghusl requirement. |
+| Sadaqa ownership | sadaqa percentage is Path-owned. Vault VAU-12 remains read-only and deep-links to PAT-11d. |
+| Sadaqa carry behavior | Partial donations roll remaining carry forward; overpayment clears oldest carry first and never renders negative spiritual debt. |
+| Path-Vault donation | PAT-03 creates a Path donation then automatic Vault personal expense handoff category `Sadaqa`; Vault failure becomes visible pending handoff. |
+| Path-Pulse fasting | PAT-05 pushes `hydration_limits.daytime=false` to Pulse only after backend confirmation and shows a Path handoff toast. |
+| Religious privacy | Religious data uses privacy gate before external GPT/Claude/Gemini calls; mosque patterns, ghusl addresses, sadaqa destination and GPS are redacted from logs. |
+| Offline merge | Prayer uses explicit conflict review; adhkar increments merge sum by idempotency key; Quran regression requires confirmation; ghusl/fasting mutations sync in order. |
+| Qibla and Hijri | Hijri date and white days are dashboard/fasting context; Qibla is informational and asks sensor permission only on user action. |
+| Voice input | Whisper/faster-whisper can support PAT-03 notes and PAT-06 counting, but tactile/manual input remains canonical when confidence is low. |
+| Sub-screens | PAT-06b, PAT-07b, PAT-09b, PAT-10b, PAT-11b/c/d/e/f are internal panes/dialogs and do not increase the V1 screen count. |
+
+Top-level Path V1 : Dashboard (`PAT-01`), Prayers (`PAT-02`), Sadaqa (`PAT-03`), Ghusl (`PAT-04`, `PAT-10`), Fasting (`PAT-05`), Adhkar (`PAT-06`), Quran (`PAT-07`), Mosques (`PAT-08`, `PAT-09`), Settings (`PAT-11`).
+
+### 16.1 PAT-01 Path Dashboard (`PAT-01`)
+
+- **Screen name:** PAT-01 Path Dashboard.
+- **Type / slug :** `route`, `path/dashboard`, stable ID `PAT.DASH.MAIN`.
+- **Composants :** Top Bar Path, Sidebar/Bottom Nav, Next Prayer Countdown Card, Prayer Times List Row stack, Sadaqa Target Card, fasting status banner, adhkar progress card, Quran Progress Card compact, Hijri Date Display, Qibla Direction Compass compact, Path Handoff Toast host.
+- **Données affichées :** next_prayer_name/time, full_prayer_times, prayer_countdown_seconds, prayer_source, mawaqit_data_quality, fasting_active/type, suhoor_time, iftar_time, hydration_limits, hijri_date, white_days_active, qibla_direction_degrees, quran_last_validated_point, adhkar_completed_count/target, sadaqa_weekly_target, sadaqa_remaining_carry, ghusl_required, ghusl_mission_id.
+- **Widgets :** next prayer countdown, 5-prayer status list, sadaqa carry banner, fasting/Pulse hydration handoff banner, adhkar progress, Quran continuation, qibla shortcut.
+- **Assets :** Path emblem 48dp, Material Symbols `mosque`, `schedule`, `volunteer_activism`, `no_food`, `event_repeat`, `menu_book`, `compass_calibration`.
+- **Etats :** Loading=dashboard skeleton with prayer cards ; Empty=no mosque/city configured CTA PAT-11/PAT-09, no invented prayer times ; Error=MAWAQIT and calculation unavailable with retry/config CTA ; Offline=cached times timestamp and pending mutation banner ; Syncing=pending Path writes line ; Synced=snackbar after confirmed mutation ; Conflict=opens source action conflict sheet.
+- **Backend deps :** `TBD GET /api/path/dashboard`, `TBD GET /api/path/prayer-times/today`, `TBD GET /api/path/sadaqa/summary`, `TBD GET /api/path/calendar/hijri`, `TBD GET /api/path/qibla`.
+- **Navigation :** entry from app nav `/path`; exits to PAT-02, PAT-03, PAT-04, PAT-05, PAT-06, PAT-07, PAT-08, PAT-09, PAT-10, PAT-11; receives VAU-12 --> PAT-11 handoff banner return.
+- **Tab S10 Ultra :** 3 columns: Sidebar 240dp, dashboard max 1280dp, right panel 320dp for Next Prayer Countdown + Sadaqa Target + Quran continuation.
+
+### 16.2 PAT-02 Prayer Mark Action (`PAT-02`)
+
+- **Screen name:** PAT-02 Prayer Mark Action.
+- **Type / slug :** `bottom_sheet`, `path/prayers/{prayer_slug}/mark`, stable ID `PAT.PRAYER.MARK`.
+- **Composants :** Bottom Sheet L3, Prayer Mark Action Card, segmented outcome `Accomplie|Non marquee|Effacer`, source chip MAWAQIT/calculation, prayer time row, optional note field, Primary `Valider`, Ghost `Annuler`.
+- **Données affichées :** prayer_slug, prayer display name, scheduled time, source, previous status, prayed_at correction, mawaqit_data_quality, discipline-impact explanation.
+- **Widgets :** prayer status segmented control, timestamp picker, post-prayer adhkar suggestion link.
+- **Assets :** Material Symbols `check_circle`, `radio_button_unchecked`, `undo`, `mosque`, `event_repeat`.
+- **Etats :** Loading=prayer status loading ; Empty=invalid prayer slug closes to PAT-01 ; Error=future non-marked attempt or validation failure ; Offline=local explicit mark queued ; Syncing=submit line ; Synced=returns PAT-01 and may suggest PAT-06 ; Conflict=different server/local status review.
+- **Backend deps :** `TBD POST /api/path/prayers/{prayer_slug}/mark` with `Idempotency-Key`, event `path.prayer.logged`, event `path.prayer.not_marked`.
+- **Navigation :** opened from PAT-01 prayer row or notification; success returns PAT-01; accomplished can open PAT-06 post-prayer routine.
+- **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard; keyboard-safe with fixed action bar.
+
+### 16.3 PAT-03 Sadaqa Donation Form (`PAT-03`)
+
+- **Screen name:** PAT-03 Sadaqa Donation Form.
+- **Type / slug :** `bottom_sheet`, `path/sadaqa/donate`, stable ID `PAT.SADAQA.DONATE`.
+- **Composants :** Bottom Sheet L3, Money Input, Sadaqa Target Card preview, destination input/dropdown, Date Picker, Voice button for optional note, Vault handoff status row, Primary `J'ai donne`, Ghost `Annuler`.
+- **Données affichées :** sadaqa_weekly_target, effective_weekly_target, sadaqa_remaining_carry, amount draft, destination, optional note, date, allocation preview, Vault personal expense pending/synced state.
+- **Widgets :** money input, carry remaining preview, overpayment explanation, multi-week allocation preview, voice transcript chip.
+- **Assets :** Material Symbols `volunteer_activism`, `payments`, `account_balance_wallet`, `mic`, `sync_problem`.
+- **Etats :** Loading=sadaqa summary loading ; Empty=form untouched with target summary ; Error=invalid amount or Vault handoff failure displayed as pending retry ; Offline=donation draft queued, Vault handoff pending ; Syncing=Path donation + Vault handoff line ; Synced=returns PAT-01 with donation and Vault transaction toast ; Conflict=duplicate idempotency or changed carry preview.
+- **Backend deps :** `TBD GET /api/path/sadaqa/summary`, `TBD POST /api/path/sadaqa/donations` with `Idempotency-Key`, `TBD GET /api/path/sadaqa/donations`, Vault handoff `TBD POST /api/vault/transactions`, event `path.sadaqa.recorded`.
+- **Navigation :** opened from PAT-01 sadaqa card, Imperium suggestion, or PAT-11d; success returns source and updates carry banner.
+- **Tab S10 Ultra :** right side-sheet 480dp; target/carry preview remains sticky above form.
+
+### 16.4 PAT-04 Ghusl Required Toggle (`PAT-04`)
+
+- **Screen name:** PAT-04 Ghusl Required Toggle.
+- **Type / slug :** `bottom_sheet`, `path/ghusl/required`, stable ID `PAT.GHUSL.REQUIRED`.
+- **Composants :** Bottom Sheet L3, Ghusl Required Toggle Card, timestamp row, nearest Ghusl Address Row, Imperium replan banner, Primary `Activer`, Secondary `Marquer termine`, Ghost `Annuler`.
+- **Données affichées :** ghusl_required, ghusl_required_since, ghusl_mission_id, registered_ghusl_addresses, nearest/default address, Imperium handoff state.
+- **Widgets :** manual activation switch, completion action, nearest address shortcut, mission-created banner.
+- **Assets :** Material Symbols `shower`, `bathtub`, `home`, `mosque`, `sync`.
+- **Etats :** Loading=ghusl state loading ; Empty=no address with PAT-10 CTA but activation still allowed ; Error=activation/completion validation or Imperium handoff failure ; Offline=ordered activation/completion queued ; Syncing=Path write + Imperium replan handoff line ; Synced=PAT-01 banner updated ; Conflict=server completed vs local activation review.
+- **Backend deps :** `TBD POST /api/path/ghusl/activate` with `Idempotency-Key`, `TBD POST /api/path/ghusl/complete` with `Idempotency-Key`, `TBD POST /api/imperium/replan-requests`, event `path.ghusl.required`, event `path.ghusl.completed`.
+- **Navigation :** opened from PAT-01 banner/quick action or PAT-10 address context; can deep link PAT-10; success returns PAT-01.
+- **Tab S10 Ultra :** right side-sheet 480dp with address preview and handoff state below action card.
+
+### 16.5 PAT-05 Fasting Start / End Action (`PAT-05`)
+
+- **Screen name:** PAT-05 Fasting Start / End Action.
+- **Type / slug :** `bottom_sheet`, `path/fasting/action`, stable ID `PAT.FASTING.ACTION`.
+- **Composants :** Bottom Sheet L3, Fasting Start/End Card, fasting type selector, suhoor/iftar countdown, intention confirmation checkbox, break confirmation dialog, Pulse handoff toast, Primary contextual action.
+- **Données affichées :** fasting_active, fasting_type, suhoor_time, iftar_time, hydration_limits, lunar_month, white_days_active, source prayer times, Pulse handoff state.
+- **Widgets :** type chips, suhoor/iftar countdown, active fast timeline, break reason optional text, Pulse hydration preview.
+- **Assets :** Material Symbols `no_food`, `restaurant_menu`, `nightlight`, `water_drop`, `mosque`.
+- **Etats :** Loading=fasting context loading ; Empty=no active fast with suggested types ; Error=invalid transition or missing prayer-time source ; Offline=ordered start/end/break queued and Pulse handoff pending ; Syncing=fasting write + Pulse constraint line ; Synced=PAT-01 and PUL-04 reflect constraint ; Conflict=server active state differs from local action.
+- **Backend deps :** `TBD POST /api/path/fasting/start` with `Idempotency-Key`, `TBD POST /api/path/fasting/end` with `Idempotency-Key`, `TBD POST /api/path/fasting/break` with `Idempotency-Key`, event `path.fasting.started`, event `path.fasting.ended`, event `path.fasting.broken`.
+- **Navigation :** opened from PAT-01 fasting/white-days banner; success returns PAT-01; break may open Imperium replan prompt.
+- **Tab S10 Ultra :** right side-sheet 480dp; countdown and active-state action stay visible while scrolling.
+
+### 16.6 PAT-06 Adhkar Counter (`PAT-06`)
+
+- **Screen name:** PAT-06 Adhkar Counter.
+- **Type / slug :** `route`, `path/adhkar/{routine_id}`, stable ID `PAT.ADHKAR.COUNTER`.
+- **Composants :** Adhkar Counter Widget, Routine selector, Arabic text block Noto Naskh Arabic, transliteration/translation toggle, large fixed tap target, Voice button, target progress, reset confirmation, PAT-06b routine config drawer.
+- **Données affichées :** adhkar_routine_id, adhkar_type, adhkar_target_count, adhkar_completed_count, text_ar, transliteration, translation, voice confidence, last_sync_state.
+- **Widgets :** large +1 counter, progress ring/bar, routine tabs, voice-count transcript chip, target reached banner.
+- **Assets :** Material Symbols `add_circle`, `event_repeat`, `mic`, `done_all`, Noto Naskh Arabic.
+- **Etats :** Loading=routine loading ; Empty=no routine configured with PAT-11e CTA ; Error=increment/reset/voice transcription failure ; Offline=increments queued locally ; Syncing=pending increment count line ; Synced=progress snackbar ; Conflict=reset vs queued increments review.
+- **Backend deps :** `TBD GET /api/path/adhkar/routines`, `TBD POST /api/path/adhkar/routines/{routine_id}/increment` with `Idempotency-Key`, `TBD POST /api/path/adhkar/routines/{routine_id}/reset` with `Idempotency-Key`, Whisper/faster-whisper for optional voice.
+- **Navigation :** from PAT-01 adhkar widget or PAT-02 post-prayer suggestion; PAT-06b/PAT-11e for routine edits; returns PAT-01.
+- **Tab S10 Ultra :** fullscreen focus route max 960dp center, right 320dp for routine list/progress; fixed counter size prevents layout shift.
+
+### 16.7 PAT-07 Quran Progress Update (`PAT-07`)
+
+- **Screen name:** PAT-07 Quran Progress Update.
+- **Type / slug :** `bottom_sheet`, `path/quran/progress`, stable ID `PAT.QURAN.PROGRESS`.
+- **Composants :** Quran Progress Card, page Number Input, PAT-07b Surah/Juz/Page Picker, daily objective row, regression confirmation dialog, Primary `Valider`.
+- **Données affichées :** quran_page, quran_juz, quran_hizb, quran_surah, quran_last_validated_point, quran_daily_objective, normalized continuation preview.
+- **Widgets :** page input 1-604, juz/hizb/surah preview, daily objective stepper, Khatm milestone banner.
+- **Assets :** Material Symbols `menu_book`, `format_list_numbered`, `flag`, Noto Naskh Arabic for surah display.
+- **Etats :** Loading=continuation loading ; Empty=first run page 1 with objective CTA ; Error=page out of range or mapping failure ; Offline=progress draft queued ; Syncing=progress submit line ; Synced=PAT-01 Quran card updates ; Conflict=server ahead or local regression confirmation.
+- **Backend deps :** `TBD GET /api/path/quran/continuation`, `TBD POST /api/path/quran/progress` with `Idempotency-Key`, `TBD PATCH /api/path/quran/objective` with `Idempotency-Key`.
+- **Navigation :** opened from PAT-01 Quran card or PAT-11 settings objective row; success returns source.
+- **Tab S10 Ultra :** right side-sheet 480dp; picker can expand to centered dialog max 720dp.
+
+### 16.8 PAT-08 Mosque Detail / MAWAQIT View (`PAT-08`)
+
+- **Screen name:** PAT-08 Mosque Detail / MAWAQIT View.
+- **Type / slug :** `route`, `path/mosques/{mosque_id}`, stable ID `PAT.MOSQUE.DETAIL`.
+- **Composants :** Mosque MAWAQIT Detail, 5 Prayer Times List Row, data quality badge, sync timestamp row, default mosque action, Qibla Direction Compass, fallback calculation banner.
+- **Données affichées :** mosque name/address, mawaqit_id, mawaqit_prayer_times, mawaqit_data_quality, sync date, distance when permission exists, qibla_direction_degrees, fallback calculation times.
+- **Widgets :** mosque identity header, exact prayer times, data quality chip, refresh action, default toggle, qibla widget.
+- **Assets :** Material Symbols `mosque`, `place`, `sync`, `warning`, `compass_calibration`.
+- **Etats :** Loading=mosque/times loading ; Empty=mosque missing returns PAT-09 ; Error=MAWAQIT 404/down with fallback calculation display ; Offline=cached mosque/times with timestamp ; Syncing=manual refresh line ; Synced=refresh snackbar ; Conflict=mosque deleted or default changed elsewhere.
+- **Backend deps :** `TBD GET /api/path/mosques/{mosque_id}`, `TBD GET /api/path/mosques/{mosque_id}/prayer-times`, `TBD POST /api/path/mosques/{mosque_id}/sync` with `Idempotency-Key`.
+- **Navigation :** from PAT-01 mosque chip or PAT-09 row; back PAT-09/PAT-01; default action updates PAT-09.
+- **Tab S10 Ultra :** list/detail compatible with PAT-09: center prayer times, right 320dp mosque metadata + qibla + sync.
+
+### 16.9 PAT-09 Registered Mosques Management (`PAT-09`)
+
+- **Screen name:** PAT-09 Registered Mosques Management.
+- **Type / slug :** `tab`, `path/mosques`, stable ID `PAT.MOSQUES.MANAGE`.
+- **Composants :** Top Bar Path, Registered Mosque Row list, add mosque PAT-09b side-sheet, MAWAQIT search by name/GPS, nearby suggestion row, default flag, sync state chip.
+- **Données affichées :** registered mosques, mawaqit_id, name/address, default flag, distance, sync state, nearby_mosque_id suggestions, data quality.
+- **Widgets :** mosque list/detail split, search field, nearby suggestion CTA, default mosque chip, manual refresh action.
+- **Assets :** empty-state illustration 240x240, Material Symbols `mosque`, `add_location`, `my_location`, `sync`.
+- **Etats :** Loading=registered mosques/search loading ; Empty=no registered mosque with add/search CTA ; Error=MAWAQIT search/provider failure with manual city fallback ; Offline=cached registered mosques read-only plus queued edits ; Syncing=pending mosque mutation line ; Synced=mosque saved/refreshed snackbar ; Conflict=default mosque edited elsewhere.
+- **Backend deps :** `TBD GET /api/path/mosques`, `TBD POST /api/path/mosques` with `Idempotency-Key`, `TBD PATCH /api/path/mosques/{mosque_id}` with `Idempotency-Key`, `TBD DELETE /api/path/mosques/{mosque_id}` with `Idempotency-Key`, `TBD GET /api/path/mawaqit/search`.
+- **Navigation :** top-level Path tab or PAT-11 settings; row opens PAT-08; add opens PAT-09b; success can return PAT-01.
+- **Tab S10 Ultra :** list/detail split: list max 880dp, right 320dp selected mosque/PAT-08 preview.
+
+### 16.10 PAT-10 Registered Ghusl Addresses (`PAT-10`)
+
+- **Screen name:** PAT-10 Registered Ghusl Addresses.
+- **Type / slug :** `tab`, `path/ghusl-addresses`, stable ID `PAT.GHUSL.ADDRESSES`.
+- **Composants :** Top Bar Path, Ghusl Address Row list, PAT-10b add/edit side-sheet, type selector `home|mosque|gym|work|other`, GPS/manual address controls, default flag.
+- **Données affichées :** registered_ghusl_addresses, label, type, address_text, optional distance, default flag, sync state, privacy notice.
+- **Widgets :** address row, default chip, GPS permission prompt, manual address input, edit/delete actions.
+- **Assets :** empty-state illustration 240x240, Material Symbols `home`, `mosque`, `fitness_center`, `work`, `add_location`, `lock`.
+- **Etats :** Loading=address loading ; Empty=no address with add CTA ; Error=GPS denied/reverse-geocode failure with manual entry fallback ; Offline=cached addresses plus queued edits ; Syncing=pending address mutation line ; Synced=address saved snackbar ; Conflict=version diff/default changed elsewhere.
+- **Backend deps :** `TBD GET /api/path/ghusl-addresses`, `TBD POST /api/path/ghusl-addresses` with `Idempotency-Key`, `TBD PATCH /api/path/ghusl-addresses/{address_id}` with `Idempotency-Key`, `TBD DELETE /api/path/ghusl-addresses/{address_id}` with `Idempotency-Key`.
+- **Navigation :** from PAT-11 settings or PAT-04 nearest-address row; success returns source; selected address can reopen PAT-04.
+- **Tab S10 Ultra :** list/detail split with right 320dp selected address/edit privacy panel.
+
+### 16.11 PAT-11 Path Settings (`PAT-11`)
+
+- **Screen name:** PAT-11 Path Settings.
+- **Type / slug :** `tab`, `path/settings`, stable ID `PAT.SETTINGS.CORE`.
+- **Composants :** Top Bar Path, settings sections, Calc Method Selector Row PAT-11b, Madhhab Selector Row PAT-11c, Sadaqa% Stepper PAT-11d, Adhkar Routine Row manager PAT-11e, City / Location Selector PAT-11f, links to PAT-09/PAT-10, privacy gate rows, reminder settings.
+- **Données affichées :** prayer_source, calc_method, madhhab, city/location, sadaqa_percentage, weekly change limit state, adhkar routines config, quran_daily_objective, reminder settings, privacy gate settings.
+- **Widgets :** sadaqa stepper 1%-20%, calc method dropdown, madhhab selector, city selector, registered mosque/address shortcuts, routine manager list.
+- **Assets :** Material Symbols `settings`, `tune`, `mosque`, `volunteer_activism`, `event_repeat`, `location_on`, `privacy_tip`.
+- **Etats :** Loading=settings skeleton ; Empty=first-run defaults not initialized CTA ; Error=save failure or invalid sadaqa percentage ; Offline=cached settings read-only plus queued line edits ; Syncing=settings save row ; Synced=snackbar after setting save/recompute ; Conflict=server setting changed confirmation.
+- **Backend deps :** `TBD GET /api/path/settings`, `TBD PATCH /api/path/settings` with `Idempotency-Key`, `TBD GET /api/path/settings/sadaqa`, `TBD PATCH /api/path/settings/sadaqa` with `Idempotency-Key`, `TBD GET /api/path/privacy-gate`.
+- **Navigation :** top-level Path settings; rows open PAT-09, PAT-10, PAT-11b/c/d/e/f; VAU-12 --> PAT-11d; save returns VAU-12 only when launched from Vault.
+- **Tab S10 Ultra :** two-column settings: left Religious/prayer/location, right Sadaqa/routines/privacy, detail pane 320dp for selected setting.
+
+### 16.12 Path Navigation Graph V1
+
+```mermaid
+flowchart TD
+  NAV[Path top-level nav] --> PAT01[PAT-01 Dashboard]
+  NAV --> PAT09[PAT-09 Mosques]
+  NAV --> PAT10[PAT-10 Ghusl Addresses]
+  NAV --> PAT11[PAT-11 Settings]
+  PAT01 --> PAT02[PAT-02 Prayer Mark]
+  PAT02 --> PAT01
+  PAT02 --> PAT06[PAT-06 Adhkar Counter]
+  PAT01 --> PAT03[PAT-03 Sadaqa Donation]
+  PAT03 --> VAULT_HANDOFF[Vault personal expense handoff]
+  VAULT_HANDOFF --> PAT01
+  PAT01 --> PAT04[PAT-04 Ghusl Required]
+  PAT04 --> IMPERIUM_REPLAN[Imperium replan backend handoff]
+  PAT04 --> PAT10
+  PAT01 --> PAT05[PAT-05 Fasting Action]
+  PAT05 --> PULSE_FASTING[Pulse hydration constraints]
+  PAT05 --> IMPERIUM_REPLAN
+  PAT01 --> PAT06
+  PAT01 --> PAT07[PAT-07 Quran Progress]
+  PAT01 --> PAT08[PAT-08 Mosque Detail]
+  PAT09 --> PAT08
+  PAT09 --> PAT09B[PAT-09b Add Mosque]
+  PAT10 --> PAT10B[PAT-10b Add Ghusl Address]
+  PAT11 --> PAT09
+  PAT11 --> PAT10
+  PAT11 --> PAT11B[PAT-11b Calc Method]
+  PAT11 --> PAT11C[PAT-11c Madhhab]
+  PAT11 --> PAT11D[PAT-11d Sadaqa Percent]
+  PAT11 --> PAT11E[PAT-11e Adhkar Routines]
+  PAT11 --> PAT11F[PAT-11f City Location]
+  VAU12[VAU-12 Vault Settings] --> PAT11D
+```
+
+Transitions conditionnelles canoniques V1 :
+
+| Transition | Condition |
+|---|---|
+| PAT-02 --> PAT-06 | User marked prayer accomplished and chooses post-prayer adhkar suggestion. |
+| PAT-03 --> VAULT_HANDOFF | Path donation saved; Vault transaction category `Sadaqa` created or pending retry. |
+| PAT-04 --> IMPERIUM_REPLAN | User activates or completes ghusl state and backend accepts event. |
+| PAT-05 --> PULSE_FASTING | Fasting start/end/break accepted and hydration constraints changed. |
+| VAU-12 --> PAT-11d | User wants to change sadaqa percentage; Path owns the setting. |
+| PAT-09 --> PAT-08 | User selects a registered mosque or newly registered mosque. |
+
+### 16.13 Path Endpoint Matrix V1
+
+| Screen | Real endpoints | TBD endpoints |
+|---|---|---|
+| PAT-01 | none | `GET /api/path/dashboard`, `GET /api/path/prayer-times/today`, `GET /api/path/sadaqa/summary`, `GET /api/path/calendar/hijri`, `GET /api/path/qibla` |
+| PAT-02 | none | `POST /api/path/prayers/{prayer_slug}/mark` |
+| PAT-03 | none | `GET /api/path/sadaqa/summary`, `POST /api/path/sadaqa/donations`, `GET /api/path/sadaqa/donations`, `POST /api/vault/transactions` |
+| PAT-04 | none | `POST /api/path/ghusl/activate`, `POST /api/path/ghusl/complete`, `POST /api/imperium/replan-requests` |
+| PAT-05 | none | `POST /api/path/fasting/start`, `POST /api/path/fasting/end`, `POST /api/path/fasting/break` |
+| PAT-06 | none | `GET /api/path/adhkar/routines`, `POST /api/path/adhkar/routines`, `PATCH /api/path/adhkar/routines/{routine_id}`, `DELETE /api/path/adhkar/routines/{routine_id}`, `POST /api/path/adhkar/routines/{routine_id}/increment`, `POST /api/path/adhkar/routines/{routine_id}/reset` |
+| PAT-07 | none | `GET /api/path/quran/continuation`, `POST /api/path/quran/progress`, `PATCH /api/path/quran/objective` |
+| PAT-08 | none | `GET /api/path/mosques/{mosque_id}`, `GET /api/path/mosques/{mosque_id}/prayer-times`, `POST /api/path/mosques/{mosque_id}/sync` |
+| PAT-09 | none | `GET /api/path/mosques`, `POST /api/path/mosques`, `PATCH /api/path/mosques/{mosque_id}`, `DELETE /api/path/mosques/{mosque_id}`, `GET /api/path/mawaqit/search` |
+| PAT-10 | none | `GET /api/path/ghusl-addresses`, `POST /api/path/ghusl-addresses`, `PATCH /api/path/ghusl-addresses/{address_id}`, `DELETE /api/path/ghusl-addresses/{address_id}` |
+| PAT-11 | none | `GET /api/path/settings`, `PATCH /api/path/settings`, `GET /api/path/settings/sadaqa`, `PATCH /api/path/settings/sadaqa`, `GET /api/path/privacy-gate` |
+| Cross-app | none | `GET /api/vault/weekly-profit/current`, `POST /api/imperium/replan-requests`, `GET /api/pulse/fasting-constraints` |
+
+All mutation endpoints require `Idempotency-Key`. Endpoint names are canonical UI contracts but remain `TBD` until backend patches implement them.
+
+### 16.14 Path-specific composed patterns
+
+| Pattern | Composition V1 | Ecrans |
+|---|---|---|
+| **Next Prayer Countdown Card** | Prayer name, time, live countdown JetBrains Mono, source badge, quality warning, fixed height. | PAT-01 |
+| **Prayer Times List Row** | 5 obligatory prayers, time, status `pending|accomplished|not_marked|upcoming`, source icon. | PAT-01, PAT-08 |
+| **Prayer Mark Action Card** | Outcome segmented control, timestamp correction, source context, non-judgmental wording. | PAT-02 |
+| **Sadaqa Target Card** | Weekly target, effective target, given amount, remaining carry, next weekly compute. | PAT-01, PAT-03 |
+| **Sadaqa Donation Form** | Money Input, destination, date, note/voice, allocation preview, Vault handoff state. | PAT-03 |
+| **Ghusl Required Toggle Card** | Manual activation/completion, timestamp, nearest address, Imperium handoff banner. | PAT-04 |
+| **Ghusl Address Row** | Label, type, optional distance, default chip, privacy lock, edit/delete. | PAT-04, PAT-10 |
+| **Fasting Start/End Card** | Type selector, suhoor/iftar countdown, intention confirmation, Pulse hydration preview. | PAT-05 |
+| **Adhkar Counter Widget** | Large +1 target, progress, Noto Naskh Arabic text, voice confidence, reset. | PAT-06 |
+| **Adhkar Routine Row** | Type, target, completed today, schedule trigger, edit/reorder. | PAT-06, PAT-11 |
+| **Quran Progress Card** | Page input, juz/hizb/surah preview, objective, regression confirmation. | PAT-01, PAT-07 |
+| **Mosque MAWAQIT Detail** | Mosque identity, 5 exact times, sync date, data quality, fallback warning. | PAT-08 |
+| **Registered Mosque Row** | Name, address, MAWAQIT id, distance, default flag, sync state. | PAT-09 |
+| **Hijri Date Display** | Hijri date, lunar month, white-days flag, source/confidence. | PAT-01, PAT-05 |
+| **Qibla Direction Compass** | Degrees, compass permission state, sensor unavailable fallback. | PAT-01, PAT-08 |
+| **Calc Method Selector Row** | Method enum, source explanation, recompute warning, no religious ruling language. | PAT-11 |
+| **Madhhab Selector Row** | Madhhab enum, Asr calculation effect, user-owned setting. | PAT-11 |
+| **Sadaqa% Stepper** | 1%-20%, default 5%, weekly change confirmation, source-of-truth indicator. | PAT-11 |
+| **Path Handoff Toast** | Non-authoritative toast for Imperium/Vault/Pulse handoffs; pending/failure visible. | PAT-01, PAT-03, PAT-04, PAT-05 |
+
+### 16.15 Religious Data Privacy Policy V1
+
+Path handles high and very-high privacy data. V1 rules:
+
+- Religious data privacy policy cites RGPD article 9 by analogy for worship and donation data.
+- `sadaqa_destination`, `sadaqa_donation_amount`, `ghusl_required`, `ghusl_addresses`, mosque attendance patterns, precise GPS, and donation receipt text are redacted from logs.
+- External GPT/Claude/Gemini calls require a privacy gate and minimum necessary payload. Default Path classification/routing remains local Qwen where possible.
+- Donation receipts are local-only in V1 unless the user explicitly uploads for OCR; OCR goes through privacy gate.
+- Vector memory receives summary-only fields where doc 01 permits it; no raw mosque pattern, raw address, or raw charity destination is embedded.
+- Error messages never expose sensitive religious details.
+- Delete/export workflows must include Path records and linked Vault transaction references; Vault immutability uses reversal/anonymized linkage rather than silent deletion.
+- UI copy must avoid presenting discipline signals, sadaqa carry, or prayer non-marking as religious rulings.
+
+---
+
 ## 9. RESPONSIVE STRATEGY
 
 ### 9.1 Breakpoints

@@ -9,6 +9,7 @@ IMPERIUM_SCREEN_IDS = [f"IMP-{number:02d}" for number in range(1, 15)]
 VAULT_SCREEN_IDS = [f"VAU-{number:02d}" for number in range(1, 13)]
 VECTOR_SCREEN_IDS = [f"VEC-{number:02d}" for number in range(1, 12)]
 PULSE_SCREEN_IDS = [f"PUL-{number:02d}" for number in range(1, 15)]
+PATH_SCREEN_IDS = [f"PAT-{number:02d}" for number in range(1, 12)]
 SOURCE_DOCS = [
     "07_ANDROID_APP_RESPONSIBILITIES.md",
     "24_DAY_FINISHED_WORKFLOW.md",
@@ -37,6 +38,13 @@ PULSE_SOURCE_DOCS = [
     "37_GEMINI_VISION_PROMPTS.md",
     "40_PULSE_LOGIC_DETAIL.md",
 ]
+PATH_SOURCE_DOCS = [
+    "01_SIGNAL_VARIABLES_DICTIONARY.md",
+    "07_ANDROID_APP_RESPONSIBILITIES.md",
+    "41_PATH_LOGIC_DETAIL.md",
+    "42_VAULT_LOGIC_DETAIL.md",
+    "43_IMPERIUM_LOGIC_DETAIL.md",
+]
 
 
 def _design_system_text() -> str:
@@ -56,6 +64,11 @@ def _vector_screen_section(text: str, screen_id: str) -> str:
 def _pulse_screen_section(text: str, screen_id: str) -> str:
     marker = next(line for line in text.splitlines() if line.startswith("### 15.") and f"`{screen_id}`" in line)
     return text.split(marker, maxsplit=1)[1].split("\n### 15.", maxsplit=1)[0]
+
+
+def _path_screen_section(text: str, screen_id: str) -> str:
+    marker = next(line for line in text.splitlines() if line.startswith("### 16.") and f"`{screen_id}`" in line)
+    return text.split(marker, maxsplit=1)[1].split("\n### 16.", maxsplit=1)[0]
 
 
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:
@@ -78,6 +91,12 @@ def test_vector_screen_source_docs_are_available_in_audited_docs_master() -> Non
 
 def test_pulse_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in PULSE_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
+
+    assert missing == []
+
+
+def test_path_screen_source_docs_are_available_in_audited_docs_master() -> None:
+    missing = [doc_name for doc_name in PATH_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
     assert missing == []
 
@@ -413,3 +432,124 @@ def test_pulse_medical_and_logic_docs_define_required_v1_contracts() -> None:
         "RGPD article 9",
     ):
         assert required in medical_text
+
+
+def test_design_system_maps_all_11_path_screens_with_stable_ids() -> None:
+    text = _design_system_text()
+
+    assert "## 16. PATH SCREEN ARCHITECTURE MAPPING V1" in text
+    assert "### 16.0 Path Product Decisions V1" in text
+    assert "### 16.12 Path Navigation Graph V1" in text
+    assert "### 16.13 Path Endpoint Matrix V1" in text
+    assert "### 16.14 Path-specific composed patterns" in text
+    assert "### 16.15 Religious Data Privacy Policy V1" in text
+
+    for screen_id in PATH_SCREEN_IDS:
+        assert "### 16." in text
+        assert screen_id in text
+        assert f"`{screen_id}`" in text
+
+    for stable_id in (
+        "PAT.DASH.MAIN",
+        "PAT.PRAYER.MARK",
+        "PAT.SADAQA.DONATE",
+        "PAT.GHUSL.REQUIRED",
+        "PAT.FASTING.ACTION",
+        "PAT.ADHKAR.COUNTER",
+        "PAT.QURAN.PROGRESS",
+        "PAT.MOSQUE.DETAIL",
+        "PAT.MOSQUES.MANAGE",
+        "PAT.GHUSL.ADDRESSES",
+        "PAT.SETTINGS.CORE",
+    ):
+        assert stable_id in text
+
+
+def test_design_system_instantiates_path_contracts_and_religious_guardrails() -> None:
+    text = _design_system_text()
+
+    for screen_id in PATH_SCREEN_IDS:
+        section = _path_screen_section(text, screen_id)
+        for required_label in (
+            "**Composants :**",
+            "**Données affichées :**",
+            "**Widgets :**",
+            "**Assets :**",
+            "**Etats :**",
+            "**Backend deps :**",
+            "**Navigation :**",
+            "**Tab S10 Ultra :**",
+        ):
+            assert required_label in section
+
+        for state in ("Loading", "Empty", "Error", "Offline", "Syncing", "Synced", "Conflict"):
+            assert state in section
+
+    for required in (
+        "V1 tracks the five obligatory prayers only",
+        "Mosque reality first",
+        "cache 30 days",
+        "default `MuslimWorldLeague`",
+        "default Asr rule `Shafi`",
+        "PAT-05 user confirmation is mandatory",
+        "sadaqa percentage is Path-owned",
+        "Partial donations roll remaining carry forward",
+        "Vault personal expense handoff category `Sadaqa`",
+        "Religious data privacy policy cites RGPD article 9",
+        "Prayer uses explicit conflict review",
+        "adhkar increments merge sum by idempotency key",
+        "PAT-06b, PAT-07b, PAT-09b, PAT-10b, PAT-11b/c/d/e/f",
+        "Next Prayer Countdown Card",
+        "Prayer Mark Action Card",
+        "Sadaqa Target Card",
+        "Ghusl Required Toggle Card",
+        "Fasting Start/End Card",
+        "Adhkar Counter Widget",
+        "Quran Progress Card",
+        "Mosque MAWAQIT Detail",
+        "Registered Mosque Row",
+        "Qibla Direction Compass",
+        "Sadaqa% Stepper",
+        "TBD POST /api/path/prayers/{prayer_slug}/mark",
+        "TBD POST /api/path/sadaqa/donations",
+        "TBD POST /api/path/ghusl/activate",
+        "TBD POST /api/path/fasting/start",
+        "TBD POST /api/path/adhkar/routines/{routine_id}/increment",
+        "TBD POST /api/path/quran/progress",
+        "TBD GET /api/path/mawaqit/search",
+        "VAU-12 --> PAT-11d",
+        "PAT-04 --> IMPERIUM_REPLAN",
+        "PAT-05 --> PULSE_FASTING",
+    ):
+        assert required in text
+
+
+def test_path_logic_doc_defines_required_v1_contracts_and_privacy_rules() -> None:
+    logic_text = (DOCS_ROOT / "41_PATH_LOGIC_DETAIL.md").read_text(encoding="utf-8")
+
+    for required in (
+        "## 4. Prayer Times, MAWAQIT, And Calculation Engine",
+        "## 5. Prayer Marking Logic",
+        "## 6. Fasting Logic",
+        "## 7. Sadaqa Logic",
+        "## 8. Ghusl Logic",
+        "## 9. Adhkar Routines",
+        "## 10. Quran Progress",
+        "## 13. Religious Data Privacy Policy",
+        "## 15. UI Surface",
+        "Fajr, Dhuhr, Asr, Maghrib, Isha",
+        "All mutation endpoints require `Idempotency-Key`",
+        "MuslimWorldLeague",
+        "Shafi",
+        "sadaqa_weekly_target = max(vault_weekly_business_profit, 0) * sadaqa_percentage",
+        "Partial donation leaves remaining carry",
+        "Vault personal expense handoff with category `Sadaqa`",
+        "Ghusl requirement is never inferred",
+        "A fast starts only when the user confirms PAT-05",
+        "Distinct increment keys use merge sum",
+        "A lower page than the last validated point requires confirmation",
+        "privacy gate",
+        "PAT-06b Adhkar Routine Configuration",
+        "PAT-11f City / Location Selector",
+    ):
+        assert required in logic_text
