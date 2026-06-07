@@ -1378,3 +1378,218 @@ VS QWEN (previous plan):
 **Document version:** 2.0
 **Status:** Vector V1 cold-start with rules + V2 ML transition
 **Last updated:** 2026-05-17
+
+---
+
+## 17. Surge Capture & Correlation
+
+### 16.1 Why surge data matters (the latency insight)
+
+Bolt surge multipliers are displayed on the in-app map, but the displayed value
+carries a **latency**. The multiplier shown at time T is the one captured by a
+driver who was already positioned 2-3 minutes earlier — not by the driver who
+arrives now. The trigger event (RER outage, rush hour onset, match ending,
+sudden rain) reaches the zone before the surge color updates on the map.
+
+```text
+EVENT (e.g. RER B breakdown at 18:12)
+        ↓ (latency 2-3 min)
+SURGE appears on map at ~18:15 (×2.5 northern suburbs)
+        ↓
+Drivers already there at 18:12 catch the best fares.
+Drivers seeing ×2.5 at 18:15 are already late.
+```
+
+**The strategic value is prediction:** if Vector can anticipate a surge from its
+trigger event *before* it appears on the map, the driver positions ahead of the
+crowd. Capturing surge history correlated to events is what makes that prediction
+possible over time.
+
+### 16.2 Why manual capture, not continuous capture
+
+Automatic periodic screenshots were rejected for two concrete reasons:
+
+```text
+1. SCREEN CONTEXT
+   Most of the time the driver is on the GPS app (Waze/Maps), NOT on Bolt.
+   Automatic capture would mostly grab GPS screens, home screen, noise.
+
+2. ZOOM LEVEL
+   When Bolt is open, it is zoomed on the driver's exact position.
+   The valuable view is the WIDE view (surrounding surge zones + multipliers),
+   which only the driver knows when to show.
+```
+
+Manual capture, triggered by the driver, guarantees that every capture is taken
+(a) while Bolt is open, (b) in wide view, (c) when surge is actually worth
+recording. Zero useless data, only high-quality signal. This mirrors the proven
+pattern already used for GPS/lane selection.
+
+### 16.3 Capture mechanism: floating overlay
+
+```text
+SETTINGS:
+  "Mode apprentissage majoration" toggle (off by default).
+
+WHEN ENABLED:
+  A floating bubble (Android SYSTEM_ALERT_WINDOW overlay, same tech as the
+  Messenger chat-head bubble) stays on top of all apps.
+
+ON TAP:
+  → instant screenshot of the current screen
+  → stored with capture timestamp (no GPS — see §16.5)
+  → driver returns to driving immediately (zero friction)
+
+WHEN DISABLED:
+  Bubble disappears, no capture possible.
+```
+
+The driver taps the bubble only when the Bolt wide-view map shows a surge worth
+recording. One tap, no form, no interruption to driving.
+
+### 16.4 Deferred OCR extraction (Gemini)
+
+Capture stores only the raw image + timestamp on the spot. Interpretation is
+**deferred** and done at rest, following the same model as the Bolt history
+import (§7): capture → Gemini OCR → user review → clean data.
+
+```text
+AT REST (evening, or batch validation session):
+  Each surge screenshot → Gemini Vision
+  → reads the ENTIRE map: every surge zone + its multiplier
+  → produces structured JSON per zone
+
+  User reviews the extraction (corrects OCR errors)
+  → confirmed data written to surge tables
+```
+
+Gemini extraction target (whole-map reading):
+
+```text
+For each visible surge zone on the captured map:
+  - zone label / approximate area (postal code or named area if legible)
+  - surge multiplier (e.g. 1.5, 2.0, 2.5)
+  - surge color (maps to intensity if number not legible)
+  - relative position / extent if determinable
+```
+
+### 16.5 What is captured (and what is not)
+
+```text
+✅ Captured:
+   - raw screenshot (Bolt wide-view surge map)
+   - capture timestamp (the correlation key)
+
+❌ NOT captured:
+   - GPS position
+     Reason: for a WIDE-view surge map, the driver's exact position adds nothing.
+     The map itself shows the zones; GPS could even mislead (driver is "here"
+     but the relevant surge is 3km away). Timestamp alone is the correlation key.
+```
+
+### 16.6 Storage
+
+```sql
+-- Raw surge captures (manual, via overlay)
+CREATE TABLE vector_surge_captures (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  captured_at        TIMESTAMPTZ NOT NULL,        -- correlation key
+  screenshot_uri     TEXT NOT NULL,               -- encrypted at rest
+  platform           VARCHAR(16) NOT NULL DEFAULT 'bolt',
+  ocr_status         VARCHAR(24) NOT NULL DEFAULT 'pending',
+                     -- pending | extracted | needs_review | validated | failed
+  gemini_raw         JSONB NULL,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Per-zone surge readings extracted from a capture (after OCR + validation)
+CREATE TABLE vector_surge_zone_readings (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  capture_id         UUID NOT NULL REFERENCES vector_surge_captures(id) ON DELETE CASCADE,
+  user_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  captured_at        TIMESTAMPTZ NOT NULL,        -- denormalized for fast querying
+  zone_label         VARCHAR(64) NULL,            -- postal code or named area
+  surge_multiplier   NUMERIC(4,2) NULL,           -- e.g. 2.50
+  surge_color        VARCHAR(24) NULL,            -- fallback if number illegible
+  confidence         NUMERIC(3,2) NULL,
+  user_validated     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX vector_surge_zone_readings_time_idx
+ON vector_surge_zone_readings (captured_at DESC);
+
+CREATE INDEX vector_surge_zone_readings_zone_idx
+ON vector_surge_zone_readings (zone_label, captured_at DESC);
+```
+
+### 16.7 How surge data feeds the scoring
+
+The surge history serves **two distinct purposes**, both downstream of the
+CatBoost architecture (not a replacement for it):
+
+```text
+PURPOSE A — Enrich existing ride-scoring features (§5)
+  The §5.1 feature surge_multiplier already exists at ride-offer time.
+  Surge history adds richer derived features:
+    - zone_surge_recent_avg        (avg multiplier in this zone, last N min)
+    - zone_surge_trend             (rising / flat / falling over last 10 min)
+    - zone_surge_at_similar_time   (historical surge for this zone/time-block)
+
+PURPOSE B — Feed a future surge-PREDICTION model (separate from ride scoring)
+  Correlating captured surge (timestamped) with trigger events lets Vector
+  learn to anticipate surge BEFORE it appears on the map (the §16.1 insight).
+  This is a separate modeling track; surge captures are its training data.
+```
+
+### 16.8 Event correlation
+
+The capture timestamp is the join key to external trigger events:
+
+```text
+Surge reading (captured_at = 18:14, northern suburbs, ×2.5)
+        ⨝ on time window
+External events around 18:12-18:14:
+  - RER B disruption active        (doc 5.6 ratp_disruption_rer_active)
+  - rush hour (evening peak)
+  - weather (rain onset)
+  - nearby event ending
+
+→ Over many captures, Vector learns which events precede which surges,
+  in which zones, with what delay → predictive positioning.
+```
+
+The external-signal features needed here already align with §5.6
+(transport disruptions, events, weather). The surge captures provide the
+**labels** (what actually surged, where, when) that those event features
+predict.
+
+### 16.9 V1 vs later
+
+```text
+V1 (now):
+  - overlay capture + timestamp
+  - deferred Gemini OCR (whole map) + user validation
+  - store surge zone readings
+  - expose enrichment features (Purpose A) to CatBoost as data accumulates
+
+LATER:
+  - dedicated surge-prediction model (Purpose B)
+  - real-time event ingestion for live anticipation
+  - automatic zone-label normalization
+```
+
+---
+
+### 17.1 Feature reference (to add in §5)
+
+> Dans la sous-section **§5.6 External signals (V2 — to add)**, sous le bloc
+> `TRANSPORT DISRUPTIONS` / `EVENTS`, ajouter la note suivante :
+
+```text
+SURGE HISTORY (from manual captures — see §16):
+├─ zone_surge_recent_avg        — avg surge multiplier in zone, last N min
+├─ zone_surge_trend             — rising | flat | falling (last 10 min)
+└─ zone_surge_at_similar_time   — historical surge for this zone + time_block
+```

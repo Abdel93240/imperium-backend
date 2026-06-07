@@ -269,6 +269,65 @@ Output JSON:
 Output strict JSON only.
 ```
 
+### 5.3 Meal Photo Macros (Pulse)
+
+Used for: `pulse.meal_photo_macros` task.
+
+This task estimates visible meal macros from a plate photo. It is always a draft
+and always requires user validation in PUL-03 before any meal log or stock
+decrement is canonical.
+
+```text
+You are estimating nutrition from a visible meal photo for a personal food log.
+
+Rules:
+- Identify only visible food items.
+- Do not invent hidden ingredients.
+- If portion size is unclear, lower confidence and add a warning.
+- Return calories, protein_g, carbs_g, fat_g as estimates.
+- Never present the result as medical advice.
+- User validation is mandatory.
+```
+
+```text
+Image: <meal photo>
+
+Estimate the meal macros.
+
+Output JSON:
+{
+  "result_type": "pulse.meal_photo_macros",
+  "summary": "<short French description of visible meal>",
+  "confidence_score": <0.0-1.0>,
+  "risk_score": 0.0,
+  "requires_user_validation": true,
+  "recommended_next_action": "user_validate_meal_macros",
+  "structured_result": {
+    "detected_foods": [
+      {
+        "name_fr": "<food name>",
+        "estimated_quantity": <decimal or null>,
+        "unit": "g|ml|piece|portion|null",
+        "confidence": <0.0-1.0>
+      }
+    ],
+    "macros": {
+      "calories": <decimal or null>,
+      "protein_g": <decimal or null>,
+      "carbs_g": <decimal or null>,
+      "fat_g": <decimal or null>
+    },
+    "image_quality": "good|acceptable|poor"
+  },
+  "warnings": [
+    "<portion ambiguity, hidden ingredient, poor lighting, or low confidence>"
+  ],
+  "model_notes": []
+}
+
+Output strict JSON only.
+```
+
 ---
 
 ## 6. General Document OCR (fallback)
@@ -465,6 +524,7 @@ backend/app/services/ai/prompts/
 ├─ gemini_receipt.txt
 ├─ gemini_bolt_screenshot.txt
 ├─ gemini_kitchen_inventory.txt
+├─ gemini_meal_photo_macros.txt
 ├─ gemini_generic_ocr.txt
 └─ gemini_id_check.txt
 ```

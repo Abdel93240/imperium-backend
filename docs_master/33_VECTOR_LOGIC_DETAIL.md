@@ -1,4 +1,4 @@
-# 33 — Vector Logic Detail
+# 33 - Vector Logic Detail
 
 Vector is the VTC profitability intelligence layer.
 
