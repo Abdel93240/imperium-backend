@@ -592,7 +592,7 @@ Rules:
 ```text
 quran_progression table:
   user_id (unique), last_validated_page, last_validated_at,
-  daily_objective, current_streak_days
+  daily_objective
 ```
 
 Endpoint contracts:
@@ -891,8 +891,7 @@ CREATE TABLE quran_progression (
   user_id               UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   last_validated_page   INTEGER,
   last_validated_at     TIMESTAMPTZ,
-  daily_objective       VARCHAR(64),
-  current_streak_days   INTEGER NOT NULL DEFAULT 0
+  daily_objective       VARCHAR(64)
 );
 
 CREATE TABLE path_weekly_sadaqa_state (

@@ -173,7 +173,6 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 - `active_mission.description`
 - `active_mission.reason`
 - `active_mission.expected_outcome`
-- `weekly_progress.streak_days`
 - `imperium_status.note`
 
 #### Variant links

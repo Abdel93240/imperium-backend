@@ -386,7 +386,7 @@ Règles :
 
 | Type | Quand utiliser | Format |
 |---|---|---|
-| **Asset premium V1** (généré) | Emblèmes app, badges de succès rares, hero d'écrans clés (Morning Check-In, Weekly Review intro, end-of-day Bilan, milestones). Réservés aux moments à charge émotionnelle. | SVG vectoriel ou WebP @1x/2x/3x. Lottie autorisé uniquement pour milestones (≤2 par écran). |
+| **Asset premium V1** (généré) | Emblèmes app, hero d'écrans clés (Morning Check-In, Weekly Review intro, end-of-day Bilan). Réservés aux moments à charge émotionnelle. | SVG vectoriel ou WebP @1x/2x/3x. Lottie autorisé uniquement pour les hero d'écrans clés (≤2 par écran). |
 | **Material Symbols** (système) | Toutes actions courantes, navigation, états (`check`, `error`, `close`, `more_vert`, `play_arrow`…). Le set "Outlined" est canonique V1. | Material Symbols Outlined, weight 400, grade 0, optical size auto. |
 | **Illustrations** | Empty states sémantiquement riches (ex: "Pas encore de check-in du matin"), error states bloquants. | SVG ou WebP, dimension fixe 240×240dp. Pas plus de 1 illustration visible à la fois. |
 
@@ -739,7 +739,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Type / slug :** `route`, `imperium/dashboard`, stable ID `IMP.DASH.MAIN`.
 - **Composants :** Top Bar, Sidebar/Bottom Nav, card Current Focus Mission L2 avec bord Accent, Quick Stats cards, WR/Ghusl/Critical banners, Today's Plan mission list, primary action "Reprogrammer ma journée", chatbot input docked.
 - **Données affichées :** current focus mission, daily plan snapshot, quick stats, active banners, latest sync status.
-- **Widgets :** Next prayer countdown, Pressure score, Discipline streak.
+- **Widgets :** Next prayer countdown, Pressure score.
 - **Assets :** Imperium emblem 48dp, Material Symbols status icons, no hero image.
 - **Etats :** Loading=skeleton mission/cards ; Empty=no active mission with CTA "Ajouter une mission" ; Error=dashboard read-model failure with retry ; Offline=cached dashboard banner ; Syncing=top sync line ; Synced=snackbar after confirmed mutation ; Conflict=server conflict banner and diff dialog.
 - **Backend deps :** `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active`.
@@ -856,7 +856,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Type / slug :** `tab`, `imperium/weekly-reviews`, stable ID `IMP.WR.LIST`.
 - **Composants :** Top Bar, WR readiness banner, stored report list cards, status chips, pagination controls.
 - **Données affichées :** stored/approved weekly reviews, week range, title, summary, status, stored_at.
-- **Widgets :** weekly streak count, latest WR status chip.
+- **Widgets :** latest WR status chip.
 - **Assets :** WR list empty-state illustration 240x240.
 - **Etats :** Loading=skeleton list ; Empty=no stored weekly review ; Error=history fetch failure ; Offline=cached list banner ; Syncing=refresh line ; Synced=refresh snackbar ; Conflict=read-only stale cache banner.
 - **Backend deps :** `GET /api/imperium/weekly-review/history`, `GET /api/imperium/weekly-review/final-reports/stored`, `GET /api/imperium/weekly-review/state`.
@@ -1667,7 +1667,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Type / slug :** `tab`, `pulse/workouts`, stable ID `PUL.WORKOUTS.LIST`.
 - **Composants :** Top Bar, Workout Card for today, history list, recovery widget, adaptation banner, add/plan action, inline Workout Detail pane.
 - **Données affichées :** today's workout, workout history, recovery_state, fatigue_state, adaptation eligibility, completed/skipped status.
-- **Widgets :** workout du jour, recovery display, history streak, adaptation proposal entry.
+- **Widgets :** workout du jour, recovery display, adaptation proposal entry.
 - **Assets :** empty-state illustration, Material Symbols `fitness_center`, `health_and_safety`, `add`, `change_circle`.
 - **Etats :** Loading=workout/recovery skeleton ; Empty=no planned workout with plan CTA ; Error=workout fetch/adaptation failure ; Offline=cached workouts read-only except queued completion ; Syncing=pending workout row indicators ; Synced=refresh snackbar ; Conflict=completed/cancelled server diff.
 - **Backend deps :** `TBD GET /api/pulse/workouts`, `TBD GET /api/pulse/recovery-state`, `TBD POST /api/pulse/recommendations`.
