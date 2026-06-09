@@ -149,16 +149,38 @@ Les 15 trous remontés par l'audit automatisé, triés par catégorie et statut 
 
 **Ambiguïtés "un ou deux assets" (à décider, impact génération) :**
 - #9 Imperium emblem 48dp vs AI emblem 24dp → à trancher (1 marque ou 2 ?).
+  → RÉSOLU : DEUX assets distincts. Logo Imperium (48dp, identité de l'app) ET
+  badge IA séparé (24dp, marqueur des interventions de l'IA). Deux assets à
+  générer.
 - #12 / #15 banners Decisions Log / Info réutilisés → probablement le même
   `Banner Info frame`, à confirmer.
+  → RÉSOLU : un seul Banner Info frame réutilisé partout. Asset partagé
+  (scope app, `_shared/`).
 - #5 set mood (Morning Check-In) → à créer/choisir (doc 43 dit emoji, doc 59
   interdit emoji comme icône).
+  → RÉSOLU : set mood CUSTOM à générer (icônes d'humeur sur-mesure). Pas
+  d'emoji, pas de Material Symbols. Nombre de niveaux d'humeur à préciser au
+  moment de la génération.
 - #10 pictogramme "decision" → à fixer.
+  → RÉSOLU : Material Symbol gavel. Rien à générer (set système).
 
 **Sous-spécifications (à étoffer) :**
 - #3 focus emblem, #4 hero ornament, #6 delta badge, #8 chatbot provider chips,
   #11 conflict illustration, #14 Day Finished hero → à préciser au fil de la
   spécification des écrans.
+  → #3 RÉSOLU : PAS d'emblème. Label texte seul (Execution / Waiting / Focus).
+  Rien à générer.
+  → #4 RÉSOLU : PAS d'ornement décoratif. La hero se distingue uniquement par sa
+  taille. Rien à générer.
+  → #5 Day Finished RÉSOLU : couvert par le set mood CUSTOM à générer
+  (Morning Check-In / Day Finished).
+  → #11 RÉSOLU : PAS d'illustration. Un état conflit textuel/simple suffit.
+  Rien à générer.
+
+Principe directeur retenu par l'utilisateur : Ligne épurée — on ne génère du
+custom que lorsque la valeur le justifie (logo, badge IA, set mood) ; sinon
+Material Symbols système ou simplification. Évite l'explosion du nombre
+d'assets.
 
 ---
 
@@ -195,4 +217,4 @@ Les 15 trous remontés par l'audit automatisé, triés par catégorie et statut 
 
 **Document version:** 1.0 (volet 2 — couche frontend)
 **Statut :** audit consigné, corrections en attente de validation
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-09
