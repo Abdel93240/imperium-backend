@@ -2,8 +2,9 @@ import re
 from pathlib import Path
 
 
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT / "docs_master"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BACKEND_ROOT = REPO_ROOT / "backend"
+DOCS_ROOT = REPO_ROOT / "docs_master"
 DESIGN_SYSTEM_PATH = DOCS_ROOT / "59_DESIGN_SYSTEM_V1_DRAFT.md"
 DESIGN_SYSTEM_TOKENS_KT_PATH = DOCS_ROOT / "60_DESIGN_SYSTEM_TOKENS_KT.md"
 DESIGN_SYSTEM_COMPOSITE_COMPONENTS_PATH = DOCS_ROOT / "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md"
@@ -21,7 +22,24 @@ IMPERIUM_ROUTE_PREFIXES = {
     APP_ROOT / "api/v1/routes/imperium_home.py": "/api/imperium",
 }
 
-IMPERIUM_SCREEN_IDS = [f"IMP-{number:02d}" for number in range(1, 15)]
+IMPERIUM_ROUTE_IDS = [
+    "IMP.DASH.MAIN",
+    "IMP.OPERATIONS.MAIN",
+    "IMP.HISTORY.MAIN",
+    "IMP.CHECKIN.MORNING",
+    "IMP.MISSION.OUTCOME",
+    "IMP.DAY.FINISH",
+    "IMP.REPLAN.VALIDATE",
+    "IMP.MISSION.ADD_MANUAL",
+    "IMP.PLAN.HISTORY",
+    "IMP.CHAT.CONVERSATION",
+    "IMP.DECISIONS.LOG",
+    "IMP.WR.LIST",
+    "IMP.WR.READ_ONLY",
+    "IMP.WR.INTERACTIVE",
+    "IMP.SETTINGS.PRIORITIES",
+    "IMP.SETTINGS.CORE",
+]
 VAULT_SCREEN_IDS = [f"VAU-{number:02d}" for number in range(1, 13)]
 VECTOR_SCREEN_IDS = [f"VEC-{number:02d}" for number in range(1, 12)]
 PULSE_SCREEN_IDS = [f"PUL-{number:02d}" for number in range(1, 15)]
@@ -818,7 +836,7 @@ def test_path_screen_source_docs_are_available_in_audited_docs_master() -> None:
     assert missing == []
 
 
-def test_design_system_maps_all_14_imperium_screens_with_stable_ids() -> None:
+def test_design_system_maps_imperium_surfaces_with_route_ids() -> None:
     text = _design_system_text()
 
     assert "## 12. IMPERIUM SCREEN ARCHITECTURE MAPPING V1" in text
@@ -826,14 +844,15 @@ def test_design_system_maps_all_14_imperium_screens_with_stable_ids() -> None:
     assert "### 12.16 Imperium Navigation Graph V1" in text
     assert "### 12.17 Imperium Endpoint Matrix V1" in text
 
-    for screen_id in IMPERIUM_SCREEN_IDS:
+    for route_id in IMPERIUM_ROUTE_IDS:
         assert "### 12." in text
-        assert screen_id in text
-        assert f"`{screen_id}`" in text
+        assert route_id in text
+        assert f"`{route_id}`" in text
 
-    assert "IMP-10 Weekly Review List" in text
-    assert "IMP-11 Weekly Review Read-only View" in text
-    assert "IMP-12 Weekly Review Interactive Popup" in text
+    assert "Weekly Review List (`IMP.WR.LIST`)" in text
+    assert "Weekly Review Read-only View (`IMP.WR.READ_ONLY`)" in text
+    assert "Weekly Review Interactive Popup (`IMP.WR.INTERACTIVE`)" in text
+    assert "IMP-" not in text
 
 
 def test_design_system_declares_screen_types_navigation_and_backend_dependencies() -> None:
@@ -862,16 +881,21 @@ def test_design_system_declares_screen_types_navigation_and_backend_dependencies
     ):
         assert required in text
 
-    assert "IMP-02 --> IMP-05" in text
-    assert "IMP-03 --> IMP-05" in text
-    assert "IMP-12 --> IMP-11" in text
+    assert "`IMP.CHECKIN.MORNING` --> `IMP.REPLAN.VALIDATE`" in text
+    assert "`IMP.MISSION.OUTCOME` --> `IMP.REPLAN.VALIDATE`" in text
+    assert "`IMP.WR.INTERACTIVE` --> `IMP.WR.READ_ONLY`" in text
 
 
 def test_design_system_instantiates_states_widgets_assets_and_tablet_layout_per_screen() -> None:
     text = _design_system_text()
 
-    for screen_id in IMPERIUM_SCREEN_IDS:
-        section = _screen_section(text, screen_id)
+    surface_route_ids = [
+        route_id
+        for route_id in IMPERIUM_ROUTE_IDS
+        if route_id not in {"IMP.OPERATIONS.MAIN", "IMP.HISTORY.MAIN", "IMP.MISSION.ACTIVE"}
+    ]
+    for route_id in surface_route_ids:
+        section = _screen_section(text, route_id)
         for required_label in (
             "**Composants :**",
             "**Widgets :**",
@@ -894,7 +918,8 @@ def test_design_system_resolves_audit_ambiguities_without_adding_os_personnel_v1
     assert "Mon OS personnel" in imperium_decisions
     assert "V3" in imperium_decisions
     assert "is explicitly excluded from V1 navigation" in imperium_decisions
-    assert "Mission detail is not IMP-15 in V1" in imperium_decisions
+    assert "Top-level V1" in imperium_decisions
+    assert "`IMP.DASH.MAIN`, `IMP.OPERATIONS.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`" in imperium_decisions
     assert "IMP.MISSION.DETAIL" in imperium_decisions
     assert "non une entrée top-level navigation" in imperium_decisions
 
@@ -912,13 +937,13 @@ def test_design_system_adds_imperium_product_decisions_and_endpoint_matrix() -> 
         assert required in text
 
     for required in (
-        "IMP-01",
+        "IMP.DASH.MAIN",
         "`GET /api/imperium/dashboard`",
-        "IMP-05",
+        "IMP.REPLAN.VALIDATE",
         "`POST /api/imperium/day/plan/{plan_id}/activate`",
-        "IMP-12",
+        "IMP.WR.INTERACTIVE",
         "`GET /api/imperium/weekly-review/current`",
-        "IMP-14",
+        "IMP.SETTINGS.CORE",
         "`GET /api/imperium/frontend/app-manifest`",
     ):
         assert required in endpoint_matrix
