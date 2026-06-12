@@ -160,7 +160,7 @@ The AI layer follows docs 30 and 31.
 ### 6.1 Official V1 router
 
 ```text
-Official local router / classifier: Qwen 2.5 7B Instruct
+Official local router / classifier: Qwen 32B
 Runtime target: Ollama/Qwen in Docker
 Network target: same Docker network as n8n and imperium-api
 ```
@@ -700,7 +700,7 @@ For Codex / Claude Code:
 4. Services write only their owned domain tables.
 5. Events are append-only audit/coordination records.
 6. ai_tasks and ai_results are the official AI work ledger.
-7. Qwen 2.5 7B Instruct is the official V1 local router.
+7. Qwen 32B is the official V1 local router.
 8. Ollama/Qwen runs in Docker on the same network as n8n and imperium-api.
 9. n8n orchestrates triggers and workflows, but owns no truth.
 10. n8n sends all results back to backend internal endpoints.

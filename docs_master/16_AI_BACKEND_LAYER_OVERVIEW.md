@@ -44,9 +44,9 @@ Read this before implementing any AI-related backend code.
 │  - workflows    │                │ + pgvector         │
 └─────┬───────────┘                └────────────────────┘
       │
-      ├─ Qwen 2.5 7B (local Ollama)
+      ├─ Qwen 32B (local, GPU-served on V100 / qwen3:32b)
       ├─ Whisper local (faster-whisper)
-      ├─ Claude Haiku/Sonnet/Opus (cloud API)
+      ├─ Claude Sonnet/Opus (cloud API)
       ├─ GPT-5.5 (cloud API)
       └─ Gemini (cloud API)
 ```
@@ -88,7 +88,7 @@ Every AI interaction in the system flows through these tables, whatever the sour
    (decides which model to call)
         ↓
 6. CHOSEN MODEL EXECUTES
-   (Haiku, Sonnet, Opus, GPT-5.5, Gemini, or Qwen itself)
+   (Sonnet, Opus, GPT-5.5, Gemini, or Qwen itself)
         ↓
 7. n8n POSTS CALLBACK TO BACKEND
    (signed HMAC + timestamp + idempotency)
@@ -167,7 +167,7 @@ trigger → fetch context (backend API)
 
 ```text
 Ollama/Qwen in Docker on the VPS:
-└─ Model: qwen2.5:7b-instruct-q5_K_M (~6 GB RAM)
+└─ Model: qwen3:32b (Q4_K_M, ~20-24 GB VRAM on V100)
    Endpoint: internal Docker network only, for example http://ollama:11434/api/generate
    Network: same internal Docker network as n8n, and reachable by backend through internal networking
    Public exposure: forbidden
@@ -320,9 +320,8 @@ When n8n calls Qwen for routing, it provides:
   },
   "available_models": [
     "qwen-local",
-    "haiku-4.5",
     "sonnet-4.6",
-    "opus-4.7",
+    "opus-4.8",
     "gpt-5.5",
     "gemini"
   ]
@@ -343,7 +342,7 @@ Qwen returns:
     "sensitivity": 5,
     "cost_justification": 7
   },
-  "selected_model": "opus-4.7",
+  "selected_model": "opus-4.8",
   "reason": "Multi-domain weekly synthesis, deep reasoning needed",
   "confidence": 0.82,
   "needs_clarification": false,
@@ -362,7 +361,7 @@ Vision (image present)         → Gemini
 Audio                          → Whisper local
 Web fresh data                 → GPT-5.5 + web
 Medical reports                → GPT-5.5
-WR analysis                    → Opus 4.7
+WR re-planning                 → Fable 5
 Backend deterministic          → no AI
 ```
 
@@ -405,7 +404,7 @@ User sees: "Service IA temporairement indisponible"
 ### 12.2 Qwen unavailable
 
 ```text
-n8n falls back to Haiku 4.5 for routing decisions
+n8n falls back to Sonnet 4.6 for routing decisions
 (more expensive but usable)
 Logged as fallback event
 User experience unchanged
@@ -414,7 +413,7 @@ Fallback is gated by token caps (see Section 12.6)
 
 ### 12.6 Token caps for fallback (mandatory)
 
-When Qwen is unavailable and the system falls back to Haiku 4.5 (or any cloud model used as substitute), three independent caps apply:
+When Qwen is unavailable and the system falls back to Sonnet 4.6 (or any cloud model used as substitute), three independent caps apply:
 
 ```text
 Cap 1 — Per-task hard limit:
@@ -492,7 +491,7 @@ Every AI call must produce:
 ```text
 ai_task.created_at
 ai_task.routing_model        (qwen-local)
-ai_task.selected_model       (opus-4.7)
+ai_task.selected_model       (opus-4.8)
 ai_result.input_tokens
 ai_result.output_tokens
 ai_result.estimated_cost_eur

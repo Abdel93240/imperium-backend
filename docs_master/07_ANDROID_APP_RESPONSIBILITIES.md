@@ -81,6 +81,7 @@ Imperium must provide:
 - current mission view
 - finish mission action
 - failure reason input
+- start day button
 - finish day button
 - replan with AI request
 - daily planning visibility

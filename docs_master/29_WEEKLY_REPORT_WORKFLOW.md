@@ -1,5 +1,11 @@
 # 29 - Weekly Report Workflow
 
+> ⚠️ NAMING — do not confuse:
+> - This doc (29) = **Weekly Report**: a deterministic, read-only report
+>   (no AI, no n8n, no writes).
+> - Doc 32 = **Weekly Review (WR)**: the interactive AI conversation.
+> "Report" and "Review" are two different objects. WR always means Weekly Review.
+
 ## Scope
 
 Imperium Weekly Report V1 is a deterministic read-only report.

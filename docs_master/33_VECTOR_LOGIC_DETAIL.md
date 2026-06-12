@@ -59,7 +59,9 @@ Vector can use:
 - scheduled rides;
 - fuel/autonomy only when it affects VTC execution;
 - historical session outcomes;
-- user feedback on recommendation quality.
+- user feedback on recommendation quality;
+- **weather** — source: **Open-Meteo** (free, no key, Météo-France AROME model, city-level via coordinates, ~15-min granularity), complemented by **Météo-France department weather alerts** for extreme events. Weather is a **demand signal** (rain/snow → higher demand, higher prices);
+- **surge / majoration** — current and recent surge multiplier as a demand & profitability signal. Detailed mechanism (manual capture, OCR, correlation, derived features) lives in **doc 57 §16-17**; doc 33 only references it.
 
 ## 4. Ride Offer Score
 
@@ -76,15 +78,20 @@ profitability_score = hourly_rate_estimate
 
 The result is advisory only.
 
-Possible outputs:
+The ride-offer evaluation (accept-a-ride feature) is **binary**. There are only two real actions when working: take it or don't.
 
 ```text
-strong_accept
-accept
-neutral
-risky
-reject
+CatBoost ride verdict → 2 outcomes only:
+  PROFITABLE     → GREEN halo + "take it" sound
+  NOT PROFITABLE → RED halo  + "leave it" sound
+(WHITE halo + sound = assistant active / online — not a ride verdict)
 ```
+
+- Weather and surge feed the score (as inputs, see §3).
+- Output is a **signal only**: halo + sound. **No natural-language explanation in real time.** Goal: speed and efficiency while driving, zero friction, zero text.
+- The score still includes the existing economics (hourly_rate_estimate, dead_return_penalty, pickup_waste_penalty, traffic_risk_penalty, strategic_zone_bonus, event_or_airport_bonus) — but its **user-facing output** is the binary halo/sound, not a label list.
+
+Note: this is the accept-a-ride feature ONLY. **Zone recommendation (§5) is a separate, already-documented feature and is unchanged** — it keeps its short textual reason (the driver is not mid-ride when repositioning, so a brief reason is useful there).
 
 ## 5. Zone Recommendation
 
@@ -113,9 +120,15 @@ Example:
 
 ## 6. Qwen Role in Vector
 
+The split is strict:
+
+- **Ride classification/scoring = CatBoost only** (the ML metric model). Qwen does NOT classify rides and does NOT verbalize the verdict in real time.
+- Natural-language commentary about rides exists **only after the fact**, in the **Vector report inside the Weekly Review** (built on recorded history), never during live work.
+- Qwen keeps its non-scoring micro-roles where they make sense off the critical driving path — but not ride scoring and not live ride explanations.
+
 Qwen can be called often because Vector needs frequent micro-decisions.
 
-Qwen tasks:
+Qwen tasks (off the critical driving path):
 
 - classify user feedback;
 - summarize why a zone is attractive;
@@ -140,17 +153,10 @@ Routine VTC micro-decisions should stay local and cheap.
 
 ## 8. Learning Loop
 
-Vector learns from VTC outcome data:
-
-- recommendation shown;
-- user action;
-- real result;
-- actual waiting time;
-- actual route time;
-- actual revenue;
-- user correction.
-
-Bad recommendations are valuable if the user gives a clear reason.
+- **CatBoost learns on the OBJECTIVE hourly revenue** = ride earning ÷ **total mobilized time** (approach + wait + ride + estimated return), computed **to the minute** (not in ¼h/½h blocks, which distort short VTC rides).
+- **CatBoost does NOT learn on accepted/refused outcome.** A refusal is polluted by fatigue, end-of-day, mood — learning on it would corrupt the profitability model.
+- **Refusals ARE recorded** — they are valuable BEHAVIORAL data for the brain (not for CatBoost training). Example: in the Weekly Review the brain can flag "Vector judged these rides profitable, yet you refused many — why?", and cross it with other signals (missed missions, etc.) as a **mental-load / burnout indicator**.
+- **WR refinement loop (supervised):** the binary verdict is intentionally imprecise at cold start; the user does not blindly follow it. The Weekly Review analyzes the **gap between CatBoost verdicts and the user's actual decisions** and produces refinement data CatBoost can use to sharpen its business logic. So: CatBoost learns directly on hourly revenue, AND the brain (via WR) prepares supervised corrections from the verdict-vs-decision gap. Raw refusals are never learned directly.
 
 ## 9. Compliance
 

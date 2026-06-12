@@ -463,6 +463,11 @@ EVENTS:
 ├─ event_ending_within_60min       — BOOL (Rule R6)
 └─ event_type                      — 'concert'|'sport'|'theater'|'club'
 
+SURGE HISTORY (from manual captures — see §16):
+├─ zone_surge_recent_avg        — avg surge multiplier in zone, last N min
+├─ zone_surge_trend             — rising | flat | falling (last 10 min)
+└─ zone_surge_at_similar_time   — historical surge for this zone + time_block
+
 TRAFFIC:
 ├─ idf_traffic_level               — 1-5 from TomTom
 └─ pickup_zone_traffic_jam         — BOOL local jam
@@ -1582,10 +1587,11 @@ LATER:
 
 ---
 
-### 17.1 Feature reference (to add in §5)
+### 17.1 Feature reference (applied in §5.6)
 
-> Dans la sous-section **§5.6 External signals (V2 — to add)**, sous le bloc
-> `TRANSPORT DISRUPTIONS` / `EVENTS`, ajouter la note suivante :
+> RÉSOLU (Patch 33-A) : dans la sous-section **§5.6 External signals (V2 — to
+> add)**, sous le bloc `TRANSPORT DISRUPTIONS` / `EVENTS`, la note suivante a
+> été ajoutée :
 
 ```text
 SURGE HISTORY (from manual captures — see §16):

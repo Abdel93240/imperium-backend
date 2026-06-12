@@ -83,7 +83,7 @@ interpretation and rule drafting are routed to GPT-5.5 static override.
 ✅ Better at producing structured rules from medical content
 ```
 
-Opus 4.7 is reserved for the WR analysis (deep reasoning across domains).
+Fable 5 is reserved for the WR re-planning (deep reasoning across domains).
 GPT-5.5 is the right tool for medical-to-rules transformation.
 
 ---

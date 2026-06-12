@@ -29,6 +29,11 @@ Vector cannot:
 - make health or personal life decisions;
 - adjust recommendations based on fatigue, mood, family pressure, or global daily objective.
 
+> Vector logic (ride scoring, learning loop, halos, CatBoost/Qwen split, weather,
+> surge) is owned by **doc 33** (and the ML detail by **doc 57**). This document
+> only fixes MVP scope/phasing. For any logic detail, see doc 33 — do not
+> duplicate it here.
+
 ## 3. V1 Functional Scope
 
 ### 3.1 Ride Offer Evaluation
@@ -70,28 +75,13 @@ The answer is based on VTC profitability signals only:
 
 ### 3.3 Session Learning
 
-Vector learns from:
-
-- accepted/refused ride outcome;
-- actual trip duration;
-- real waiting time;
-- real return time;
-- final session revenue;
-- user feedback on wrong recommendations.
+Session learning is in V1 scope. The learning-loop logic (what CatBoost learns, what is recorded but not learned) is owned by **doc 33 §8** — see doc 33.
 
 It does not learn personal fatigue or emotional state. Those belong to Imperium/Pulse.
 
 ## 4. Role of Qwen
 
-Qwen may be called frequently by Vector for lightweight VTC reasoning, classification, and explanation.
-
-Examples:
-
-- classify a ride as good, risky, or bad;
-- explain a dead-return risk;
-- summarize a disruption impact;
-- compare two zones;
-- detect whether a user correction is valid learning data.
+The CatBoost/Qwen split (CatBoost scores rides; Qwen keeps non-scoring micro-roles off the critical driving path; no real-time ride explanations) is owned by **doc 33 §6** — see doc 33.
 
 For high-impact or ambiguous strategic cases, the AI routing policy can escalate to a stronger model, but the result remains advisory.
 

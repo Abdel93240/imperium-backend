@@ -1,0 +1,693 @@
+# Imperium docs catalog — structured index (parsable + human-readable)
+#
+# WHY: docs are numbered chronologically (creation order), not thematically.
+# This catalog adds a thematic/logical layer WITHOUT renaming files (which would
+# break ~700 cross-references). Files keep their stable NN_ / FNN_ names; this
+# catalog gives the logical view (category, order-within-category, status,
+# version, source-of-truth, dependencies).
+#
+# RELATION TO OTHER META DOCS:
+#   00_DOCS_MASTER_INDEX.md  -> narrative "why" (decisions, cleanup history). Prose.
+#   _CATALOG.yaml (this file) -> structured "what/where" (classification, status). Parsable.
+#   99_REGLES_NOMENCLATURE_DOCS.md -> naming rules (NN_ architecture vs FNN_ features).
+#
+# STATUS values:
+#   up_to_date      -> reviewed and current
+#   needs_alignment -> known to carry stale content (e.g. old model hierarchy)
+#   to_review       -> not yet reviewed in the current pass
+#   deprecated      -> superseded, kept for history
+#
+# FAMILY values: architecture | feature | meta
+#
+# MAINTENANCE: every new doc must get an entry here. Keep status accurate.
+# During the full re-read, each doc moves from to_review to its real status.
+
+meta:
+  total_docs: 89
+  last_updated: "2026-06-11"
+  categories: [vision, ai, backend, infra, workflow, security, app:imperium, app:vector, app:vault, app:pulse, app:path, frontend, design, feature, meta, ops]
+  source_of_truth_notes:
+    - "Doc 30 owns AI routing + scoring (/200). Other docs reference, never redefine."
+    - "Doc 32 owns WR business logic. Doc 41 §14 owns The Path Hijri calendar."
+
+docs:
+
+  # ---- VISION / RULES ----
+  - file: "00_VISION_GLOBALE.md"
+    number: 0
+    title: "Vision globale"
+    family: architecture
+    categories: [vision]
+    status: to_review
+
+  - file: "00_DOCS_MASTER_INDEX.md"
+    number: 0
+    title: "Docs Master Index (narrative)"
+    family: meta
+    categories: [meta]
+    status: needs_alignment
+    notes: "Prose index; carries stale model language (Qwen-only/Ollama/Opus). Dust off during re-read."
+
+  - file: "08_NON_NEGOTIABLE_RULES.md"
+    number: 8
+    title: "Non-Negotiable Rules"
+    family: architecture
+    categories: [vision]
+    status: to_review
+
+  # ---- AI ----
+  - file: "02_AI_ROUTING_POLICY.md"
+    number: 2
+    title: "AI Routing Policy (DEPRECATED)"
+    family: architecture
+    categories: [ai]
+    status: deprecated
+    notes: "Superseded; points to 30/31/32."
+
+  - file: "03_MODEL_STRATEGY.md"
+    number: 3
+    title: "Model Strategy"
+    family: architecture
+    categories: [ai]
+    status: needs_alignment
+    notes: "Old model hierarchy (Haiku/Opus 4.7/Qwen 7B). Align on doc 30."
+
+  - file: "16_AI_BACKEND_LAYER_OVERVIEW.md"
+    number: 16
+    title: "AI Backend Layer Overview"
+    family: architecture
+    categories: [ai, backend]
+    status: needs_alignment
+
+  - file: "30_AI_ROUTING_AND_SCORING_POLICY.md"
+    number: 30
+    title: "AI Routing & Scoring Policy"
+    family: architecture
+    categories: [ai]
+    status: up_to_date
+    version: v1
+    source_of_truth_for: ["model routing", "scoring /200", "shared dialogue engine"]
+    depends_on: [31, 32]
+    last_reviewed: "2026-06-10"
+    notes: "Full rewrite. Canonical routing source."
+
+  - file: "31_AI_TASKS_AND_RESULTS_CONTRACT.md"
+    number: 31
+    title: "AI Tasks & Results Contract"
+    family: architecture
+    categories: [ai, backend]
+    status: needs_alignment
+    depends_on: [30]
+
+  - file: "34_PULSE_MEDICAL_FEED_AI.md"
+    number: 34
+    title: "Pulse Medical Feed AI"
+    family: architecture
+    categories: [ai, app:pulse]
+    status: needs_alignment
+
+  - file: "35_QWEN_SETUP_AND_PROMPTS.md"
+    number: 35
+    title: "Qwen Setup & Prompts"
+    family: architecture
+    categories: [ai]
+    status: needs_alignment
+    notes: "Qwen 7B -> 32B; deployment (Ollama vs vLLM on V100) to confirm."
+
+  - file: "36_PROMPTS_CLOUD_AI.md"
+    number: 36
+    title: "Prompts Cloud AI"
+    family: architecture
+    categories: [ai]
+    status: needs_alignment
+
+  - file: "37_GEMINI_VISION_PROMPTS.md"
+    number: 37
+    title: "Gemini Vision Prompts"
+    family: architecture
+    categories: [ai]
+    status: to_review
+
+  - file: "38_VECTORIZATION_PIPELINE.md"
+    number: 38
+    title: "Vectorization Pipeline"
+    family: architecture
+    categories: [ai, backend]
+    status: to_review
+    notes: "Embedding V1 = bge-m3 local default (privacy)."
+
+  - file: "39_WRS_VECTOR_LEARNING_LOOP.md"
+    number: 39
+    title: "WR Vector Learning Loop"
+    family: architecture
+    categories: [ai]
+    status: to_review
+
+  - file: "44_BRAIN_UNIFIED_LOGIC.md"
+    number: 44
+    title: "Brain Unified Logic"
+    family: architecture
+    categories: [ai]
+    status: needs_alignment
+    notes: "Central brain doc; align on doc 30 hierarchy."
+
+  - file: "52_AI_DECISION_FRAMEWORK.md"
+    number: 52
+    title: "AI Decision Framework"
+    family: architecture
+    categories: [ai]
+    status: needs_alignment
+
+  - file: "57_VECTOR_RIDE_SCORING_ML.md"
+    number: 57
+    title: "Vector Ride Scoring ML"
+    family: architecture
+    categories: [ai, app:vector]
+    status: needs_alignment
+    notes: "CatBoost (was LightGBM). Distinct from /200 routing score."
+
+  # ---- BACKEND / INFRA ----
+  - file: "01_SIGNAL_VARIABLES_DICTIONARY.md"
+    number: 1
+    title: "Signal Variables Dictionary"
+    family: architecture
+    categories: [backend]
+    status: to_review
+
+  - file: "04_MVP_BACKEND_CONTRACTS.md"
+    number: 4
+    title: "MVP Backend Contracts"
+    family: architecture
+    categories: [backend]
+    status: to_review
+
+  - file: "05_DATABASE_SCHEMA.md"
+    number: 5
+    title: "Database Schema"
+    family: architecture
+    categories: [backend]
+    status: to_review
+
+  - file: "15_SERVICE_ARCHITECTURE_MAP.md"
+    number: 15
+    title: "Service Architecture Map"
+    family: architecture
+    categories: [backend, infra]
+    status: to_review
+
+  - file: "17_HOSTINGER_POSTGRES_DEPLOYMENT.md"
+    number: 17
+    title: "Hostinger Postgres Deployment"
+    family: architecture
+    categories: [infra]
+    status: to_review
+
+  - file: "19_IMPERIUM_API_DOCKER_DEPLOYMENT.md"
+    number: 19
+    title: "Imperium API Docker Deployment"
+    family: architecture
+    categories: [infra]
+    status: to_review
+
+  - file: "20_BACKUP_RECOVERY_PLAN.md"
+    number: 20
+    title: "Backup Recovery Plan"
+    family: architecture
+    categories: [infra]
+    status: to_review
+
+  - file: "21_DB_RUNTIME_ROLE_HARDENING.md"
+    number: 21
+    title: "DB Runtime Role Hardening"
+    family: architecture
+    categories: [infra, security]
+    status: to_review
+
+  - file: "22_BACKUP_EXECUTION_LAYER.md"
+    number: 22
+    title: "Backup Execution Layer"
+    family: architecture
+    categories: [infra]
+    status: to_review
+
+  - file: "23_REFRESH_TOKEN_LIFECYCLE.md"
+    number: 23
+    title: "Refresh Token Lifecycle"
+    family: architecture
+    categories: [backend, security]
+    status: to_review
+
+  - file: "54_SYSTEM_HEALTH_DASHBOARD.md"
+    number: 54
+    title: "System Health Dashboard"
+    family: architecture
+    categories: [infra, ops]
+    status: to_review
+
+  # ---- WORKFLOWS / N8N ----
+  - file: "06_N8N_WORKFLOWS.md"
+    number: 6
+    title: "n8n Workflows"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "18_N8N_SMOKE_TEST.md"
+    number: 18
+    title: "n8n Smoke Test"
+    family: architecture
+    categories: [workflow, ops]
+    status: to_review
+
+  - file: "24_DAY_FINISHED_WORKFLOW.md"
+    number: 24
+    title: "Day Finished Workflow"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "25_CURRENT_MISSION_WORKFLOW.md"
+    number: 25
+    title: "Current Mission Workflow"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "26_PRIORITY_RULES_WORKFLOW.md"
+    number: 26
+    title: "Priority Rules Workflow"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "27_VAULT_TRANSACTIONS_WORKFLOW.md"
+    number: 27
+    title: "Vault Transactions Workflow"
+    family: architecture
+    categories: [workflow, app:vault]
+    status: to_review
+
+  - file: "28_DAILY_PLAN_WORKFLOW.md"
+    number: 28
+    title: "Daily Plan Workflow"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "29_WEEKLY_REPORT_WORKFLOW.md"
+    number: 29
+    title: "Weekly Report Workflow (read-only)"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+    notes: "Old read-only report; relation to WR interactive (doc 32) to clarify."
+
+  - file: "32_WR_INTERACTIVE_WORKFLOW.md"
+    number: 32
+    title: "WR Interactive Workflow"
+    family: architecture
+    categories: [workflow, ai]
+    status: up_to_date
+    version: v1
+    source_of_truth_for: ["weekly review business logic"]
+    depends_on: [30, 31]
+    last_reviewed: "2026-06-11"
+    notes: "Aligned via Patch 6M-6P (rolling planning, calendar V1, routing via doc 30)."
+
+  - file: "45_N8N_RESPONSIBILITY_MATRIX.md"
+    number: 45
+    title: "n8n Responsibility Matrix"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  - file: "53_SUBMISSIONS_OVERLAY_TASKS.md"
+    number: 53
+    title: "Submissions Overlay Tasks"
+    family: architecture
+    categories: [workflow]
+    status: to_review
+
+  # ---- SECURITY / POLICY ----
+  - file: "09_PGVECTOR_MEMORY_POLICY.md"
+    number: 9
+    title: "pgvector Memory Policy"
+    family: architecture
+    categories: [ai, security]
+    status: to_review
+
+  - file: "10_RAW_MEDIA_RETENTION_POLICY.md"
+    number: 10
+    title: "Raw Media Retention Policy"
+    family: architecture
+    categories: [security]
+    status: to_review
+
+  - file: "14_OFFLINE_CLIENT_AUTHORITY.md"
+    number: 14
+    title: "Offline Client Authority"
+    family: architecture
+    categories: [backend, security]
+    status: to_review
+
+  # ---- APP: VECTOR ----
+  - file: "13_VECTOR_MVP_PHASE_DECISION.md"
+    number: 13
+    title: "Vector MVP Phase Decision"
+    family: architecture
+    categories: [app:vector]
+    status: to_review
+
+  - file: "33_VECTOR_LOGIC_DETAIL.md"
+    number: 33
+    title: "Vector Logic Detail"
+    family: architecture
+    categories: [app:vector]
+    status: to_review
+
+  - file: "46_VECTOR_FUEL_SMART_TRACKING.md"
+    number: 46
+    title: "Vector Fuel Smart Tracking"
+    family: architecture
+    categories: [app:vector]
+    status: to_review
+
+  - file: "48_VECTOR_MUSIC_SHAKER.md"
+    number: 48
+    title: "Vector Music Shaker"
+    family: architecture
+    categories: [app:vector]
+    status: needs_alignment
+
+  - file: "55_VECTOR_HUD_FINAL_INTERFACE.md"
+    number: 55
+    title: "Vector HUD Final Interface"
+    family: architecture
+    categories: [app:vector, frontend]
+    status: needs_alignment
+    version: v6
+    notes: "GPS final interface. Valhalla=CPU (not GPU); modest server suffices for IDF/single-user."
+
+  - file: "58_DOC_57_INTEGRATION_PATCHES.md"
+    number: 58
+    title: "Doc 57 Integration Patches"
+    family: architecture
+    categories: [app:vector, ai]
+    status: needs_alignment
+
+  # ---- APP: VAULT ----
+  - file: "42_VAULT_LOGIC_DETAIL.md"
+    number: 42
+    title: "Vault Logic Detail"
+    family: architecture
+    categories: [app:vault]
+    status: needs_alignment
+
+  - file: "11_FINANCIAL_PRESSURE_FORMULA.md"
+    number: 11
+    title: "Financial Pressure Formula"
+    family: architecture
+    categories: [app:vault, app:imperium]
+    status: to_review
+
+  # ---- APP: PULSE ----
+  - file: "40_PULSE_LOGIC_DETAIL.md"
+    number: 40
+    title: "Pulse Logic Detail"
+    family: architecture
+    categories: [app:pulse]
+    status: needs_alignment
+
+  # ---- APP: PATH ----
+  - file: "41_PATH_LOGIC_DETAIL.md"
+    number: 41
+    title: "The Path Logic Detail"
+    family: architecture
+    categories: [app:path]
+    status: up_to_date
+    version: v1
+    source_of_truth_for: ["the path business logic", "hijri calendar"]
+    last_reviewed: "2026-06-11"
+    notes: "Aligned via Patch 41-A (Hijri calendar V3 + §15 routing fix + §16.1)."
+
+  - file: "49_PATH_YOUTUBE_CHANNELS.md"
+    number: 49
+    title: "Path YouTube Channels"
+    family: architecture
+    categories: [app:path]
+    status: to_review
+
+  - file: "50_PATH_DARS_KNOWLEDGE_BASE.md"
+    number: 50
+    title: "Path Dars Knowledge Base"
+    family: architecture
+    categories: [app:path, ai]
+    status: needs_alignment
+
+  # ---- APP: IMPERIUM ----
+  - file: "12_DAILY_OBJECTIVE_PERIOD_LOGIC.md"
+    number: 12
+    title: "Daily Objective Period Logic"
+    family: architecture
+    categories: [app:imperium]
+    status: to_review
+
+  - file: "43_IMPERIUM_LOGIC_DETAIL.md"
+    number: 43
+    title: "Imperium Logic Detail"
+    family: architecture
+    categories: [app:imperium]
+    status: needs_alignment
+
+  - file: "71_IMPERIUM_OPERATIONS_TAB.md"
+    number: 71
+    title: "Imperium Operations Tab"
+    family: architecture
+    categories: [app:imperium, frontend]
+    status: up_to_date
+    last_reviewed: "2026-06-09"
+    notes: "Operations tab (provisional name). Route IMP.OPERATIONS.MAIN."
+
+  - file: "70_KNOWLEDGE_INBOX.md"
+    number: 70
+    title: "Knowledge Inbox (Nourrir l'IA)"
+    family: architecture
+    categories: [app:imperium, ai]
+    status: up_to_date
+    last_reviewed: "2026-06-09"
+
+  # ---- ORCHESTRATOR ----
+  - file: "56_AUTONOMOUS_CODING_ORCHESTRATOR.md"
+    number: 56
+    title: "Autonomous Coding Orchestrator"
+    family: architecture
+    categories: [ops, ai]
+    status: needs_alignment
+
+  # ---- FRONTEND / DESIGN ----
+  - file: "07_ANDROID_APP_RESPONSIBILITIES.md"
+    number: 7
+    title: "Android App Responsibilities"
+    family: architecture
+    categories: [frontend]
+    status: to_review
+
+  - file: "59_DESIGN_SYSTEM_V1_DRAFT.md"
+    number: 59
+    title: "Design System V1 Draft"
+    family: architecture
+    categories: [design, frontend]
+    status: needs_alignment
+    notes: "Asset rules (premium asset must not contain dynamic data)."
+
+  - file: "60_DESIGN_SYSTEM_TOKENS_KT.md"
+    number: 60
+    title: "Design System Tokens (KT)"
+    family: architecture
+    categories: [design, frontend]
+    status: to_review
+
+  - file: "61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md"
+    number: 61
+    title: "Design System Composite Components"
+    family: architecture
+    categories: [design, frontend]
+    status: to_review
+    source_of_truth_for: ["asset taxonomy", "composite components"]
+
+  - file: "62_DESIGN_SYSTEM_COMPONENT_CATALOG.md"
+    number: 62
+    title: "Design System Component Catalog"
+    family: architecture
+    categories: [design, frontend]
+    status: to_review
+    source_of_truth_for: ["compose component token contracts"]
+
+  - file: "63_FRONTEND_ARCHITECTURE_V1.md"
+    number: 63
+    title: "Frontend Architecture V1"
+    family: architecture
+    categories: [frontend]
+    status: to_review
+
+  - file: "64_FRONTEND_GENERATION_PLAN_V1.md"
+    number: 64
+    title: "Frontend Generation Plan V1"
+    family: architecture
+    categories: [frontend, design]
+    status: needs_alignment
+    notes: "§4 lists obsolete Inbox/WR screens (Fable audit). Align on 4 top-level."
+
+  - file: "65_IMPERIUM_FRONTEND_SCREEN_SPEC_V1.md"
+    number: 65
+    title: "Imperium Frontend Screen Spec V1"
+    family: architecture
+    categories: [frontend, app:imperium]
+    status: up_to_date
+    last_reviewed: "2026-06-09"
+
+  - file: "66_IMPERIUM_USER_FLOWS_V1.md"
+    number: 66
+    title: "Imperium User Flows V1"
+    family: architecture
+    categories: [frontend, app:imperium]
+    status: to_review
+
+  - file: "67_FRONTEND_STATE_MATRIX_V1.md"
+    number: 67
+    title: "Frontend State Matrix V1"
+    family: architecture
+    categories: [frontend]
+    status: to_review
+
+  - file: "68_FRONTEND_MOCK_DATA_CATALOG_V1.md"
+    number: 68
+    title: "Frontend Mock Data Catalog V1"
+    family: architecture
+    categories: [frontend]
+    status: to_review
+
+  - file: "69_FRONTEND_API_MAPPING_V1.md"
+    number: 69
+    title: "Frontend API Mapping V1"
+    family: architecture
+    categories: [frontend, backend]
+    status: to_review
+
+  # ---- META ----
+  - file: "99_AUDIT_COHERENCE_DOCS.md"
+    number: 99
+    title: "Audit Cohérence Docs"
+    family: meta
+    categories: [meta]
+    status: up_to_date
+    notes: "Holds the model-alignment backlog entry."
+
+  - file: "99_AUDIT_COHERENCE_FRONTEND.md"
+    number: 99
+    title: "Audit Cohérence Frontend"
+    family: meta
+    categories: [meta, frontend]
+    status: up_to_date
+
+  - file: "99_REGLES_NOMENCLATURE_DOCS.md"
+    number: 99
+    title: "Règles Nomenclature Docs"
+    family: meta
+    categories: [meta]
+    status: up_to_date
+    source_of_truth_for: ["doc naming rules"]
+
+  - file: "AGENTS.md"
+    number: null
+    title: "Agents"
+    family: meta
+    categories: [meta, ai, ops]
+    status: needs_alignment
+
+  - file: "REVIEW_FINDINGS.md"
+    number: null
+    title: "Review Findings"
+    family: meta
+    categories: [meta]
+    status: to_review
+
+  # ---- FEATURES (FNN) ----
+  - file: "F01_USER_OBJECTIVES.md"
+    number: 1
+    title: "User Objectives"
+    family: feature
+    categories: [feature, app:imperium]
+    status: needs_alignment
+
+  - file: "F02_GENERATEUR_DEVIS.md"
+    number: 2
+    title: "Générateur Devis"
+    family: feature
+    categories: [feature]
+    status: to_review
+
+  - file: "F03_SCANNER_COMPOSITION.md"
+    number: 3
+    title: "Scanner Composition"
+    family: feature
+    categories: [feature, app:pulse]
+    status: to_review
+
+  - file: "F04_DEFI_RELIGIEUX.md"
+    number: 4
+    title: "Défi Religieux"
+    family: feature
+    categories: [feature, app:path]
+    status: to_review
+
+  - file: "F05_ENTRAINEMENT_MENTAL.md"
+    number: 5
+    title: "Entraînement Mental"
+    family: feature
+    categories: [feature]
+    status: to_review
+
+  - file: "F06_DOSSIER_PROJET.md"
+    number: 6
+    title: "Dossier Projet"
+    family: feature
+    categories: [feature, app:imperium]
+    status: to_review
+    notes: "Future enrichment of the Operations/project module."
+
+  - file: "F07_VIDEO_VTC.md"
+    number: 7
+    title: "Vidéo VTC"
+    family: feature
+    categories: [feature, app:vector]
+    status: to_review
+
+  - file: "F08_DOSSIER_MEDICAL.md"
+    number: 8
+    title: "Dossier Médical"
+    family: feature
+    categories: [feature, app:pulse]
+    status: to_review
+
+  - file: "F09_KILL_SWITCH.md"
+    number: 9
+    title: "Kill Switch"
+    family: feature
+    categories: [feature, security]
+    status: to_review
+
+  - file: "F10_TOPOLOGIE_INFRA.md"
+    number: 10
+    title: "Topologie Infra"
+    family: feature
+    categories: [feature, infra]
+    status: to_review
+
+  - file: "F12_PIPELINE_DESIGN.md"
+    number: 12
+    title: "Pipeline Design"
+    family: feature
+    categories: [feature, design, ops]
+    status: to_review
+    notes: "F11 absent (gap in FNN sequence)."

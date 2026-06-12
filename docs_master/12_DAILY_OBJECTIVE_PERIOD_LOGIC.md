@@ -57,6 +57,11 @@ The operational day starts when user starts the day.
 The operational day ends when user presses Finish Day.
 ```
 
+An operational day can therefore last MORE than 24 hours (it is bounded by
+start→finish, never by a midnight reset). This is not a problem: it simply means
+following days may be shorter (e.g. a 6-hour day after a long one). The
+ecosystem reasons in operational days, not calendar days.
+
 Late-night VTC handling:
 - a VTC session finishing at `03:30` may belong to the previous operational day if the day session is still open
 - revenue, mission outcomes, fatigue, and daily snapshot attach to the open operational day

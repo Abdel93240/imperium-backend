@@ -53,7 +53,7 @@ networks:
 After container start:
 
 ```bash
-docker exec -it imperium-ollama ollama pull qwen2.5:7b-instruct
+docker exec -it imperium-ollama ollama pull qwen3:32b
 ```
 
 If another exact Qwen tag is selected later, document the tag and keep one official production tag in the deployment notes.
@@ -70,7 +70,7 @@ Payload shape:
 
 ```json
 {
-  "model": "qwen2.5:7b-instruct",
+  "model": "qwen3:32b",
   "stream": false,
   "messages": [
     {"role": "system", "content": "You are Imperium's local AI router. Return strict JSON only."},
@@ -90,7 +90,7 @@ Qwen may decide:
 - whether clarification is needed;
 - which model should handle the task;
 - whether the task is safe to process locally;
-- whether to escalate to Haiku, Sonnet, Opus, GPT, Gemini Vision, Whisper, or deterministic backend logic.
+- whether to escalate to Sonnet, Opus, Fable, GPT, Gemini Vision, Whisper, or deterministic backend logic.
 
 Qwen must not:
 
@@ -122,11 +122,10 @@ Qwen must not:
 Doc 30 is the source of truth.
 
 ```text
-0–59    -> Qwen
-60–99   -> Claude Haiku
-100–139 -> Claude Sonnet
-140–169 -> Claude Opus
-170–200 -> strongest model + explicit guardrail
+0–99    -> Qwen 32B local
+100–139 -> Claude Sonnet 4.6
+140–179 -> Claude Opus 4.8
+180–200 -> critical mechanic (doc 30 §5.6 / Patch 30-B)
 ```
 
 Qwen must not override hard-coded special routing rules such as medical files, image OCR, audio transcription, or compliance-sensitive workflows.

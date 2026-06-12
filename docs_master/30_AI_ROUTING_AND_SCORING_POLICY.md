@@ -210,12 +210,13 @@ Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, dis
 
 Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the one recurring task that reliably meets the three conditions. Everything else escalates to Opus or below.
 
-### 3.8 GPT-5.5 — domain specialist (health + fresh data)
+### 3.8 GPT-5.5 — domain specialist (health + finance + fresh data)
 
-Role: specialist for health/Pulse and for fresh data / web research / verification / complex multimodal analysis.
+Role: specialist for health/Pulse, **financial reasoning (Vault domain)**, and for fresh data / web research / verification / complex multimodal analysis.
 
 Use for:
 - health: weight/nutrition/recovery calculations and medical-feed analysis (Pulse). GPT-5.5 is the de facto "owner" of Pulse reasoning.
+- **finance: analysis and advice over Vault data (budgets, cash-flow, financial pressure, project cost reasoning). GPT-5.5 is the de facto "owner" of financial reasoning. This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.**
 - fresh data: recent events around Paris (Vector — concerts, salons, sports), web retrieval, market comparison, regulatory research.
 - generating actionable rules from sensitive or complex documents.
 
@@ -318,11 +319,59 @@ Dynamic routing applies only if no static rule (§7) already forces a model. Hai
 | 0–99 | Qwen 32B local | Execute locally |
 | 100–139 | Sonnet 4.6 | Balanced reasoning |
 | 140–179 | Opus 4.8 | Deep analysis |
-| 180–200 | Opus 4.8 + guard | Critical analysis, possible user-validation gate or second opinion |
+| 180–200 | **Critical mechanic (see below)** | Critical analysis |
+
+#### Critical tier (180–200) — two-step mechanic
+
+A score ≥180/200 is extremely rare (it requires a task that is simultaneously very complex, long, ambiguous, high-consequence and sensitive). When it happens, the gravity of the decision justifies the cost — we do not pinch pennies on Anthropic credits at this level. But a high score from Qwen may itself be a hallucination, so it must be independently verified before the heavy machinery runs.
+
+**Step 1 — Independent re-scoring (anti-hallucination).**
+The 180+ score was produced by Qwen (local scorer), which can hallucinate an inflated score. Before engaging the heavy machinery, **GPT-5.5** (a different provider, hallucination-resistant, and with no stake in the execution) receives the situation + the scoring table (§5.2/5.3) and **re-evaluates the score**.
+- If GPT-5.5 lowers it below 180 → re-route to the band actually warranted (140–179 Opus 4.8, etc.). No heavy orchestration.
+- If GPT-5.5 confirms ≥180 → Step 2.
+
+**Step 2 — Free orchestration by Opus (gravity confirmed).**
+Opus 4.8 is given the capability profiles of Fable 5 and GPT-5.5 and is left to **direct freely**: handle it itself, delegate, or combine. No cap on each model's depth of reasoning. At this gravity, cost is not a constraint.
+
+**Anti-loop breaker (circuit breaker).**
+The real failure mode at this tier is not a single weak model — it is models relaying to each other indefinitely (hollow back-and-forth, everyone "thinking" without converging). To prevent it without throttling intelligence:
+- A counter bounds the number of **hand-offs between models** (≈3–4 relays max for one critical task).
+- Each model may reason as deeply as it wants on its own turn (depth NOT capped).
+- If the relay cap is reached without resolution → **Opus must produce the final answer itself, with no further delegation.** The breaker cuts the hollow loop; it does not limit thinking depth.
+
+(The hand-off counter is a design rule; its backend implementation is tracked in the backlog.)
 
 **Fable 5 is not reached by raw score alone.** It is engaged only when the three-fold condition (long AND complex AND high-stakes/durable) is met — in practice through a static rule (§7), e.g. the Weekly Review re-planning step. A high score routes to Opus 4.8; Fable is a deliberate, rule-driven choice, never a reflex of the score.
 
-### 5.7 Automatic escalation
+### 5.7 Emergency Mode (user-triggered)
+
+Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model. Urgency and difficulty are different dimensions: an emergency can be simple-but-urgent (needs a FAST answer — local/Sonnet) or complex-and-grave (warrants Opus, or the §5.6 critical mechanic with Fable). Forcing the heaviest model on every emergency would be counter-productive: Opus/Fable reason deeply and are slower, while urgency often needs speed. The §5.2 "speed tolerance (inverted)" criterion already pushes urgent tasks toward the fast tier. So Emergency Mode raises priority and lifts the cost barrier, but lets normal scoring still pick the RIGHT model by the task's real nature.
+
+**Trigger**
+- The user signals an emergency through the chatbot (e.g. "I have an emergency").
+- The AI asks for **explicit confirmation** ("activate Emergency Mode?") to prevent accidental activation.
+- On confirmation → Emergency Mode ON for the current handling.
+
+**What the mode changes (behavior)**
+1. **Max priority** — the task jumps ahead of everything; it interrupts/preempts other in-flight processing.
+2. **Cost barrier lifted** — as in the §5.6 critical tier, we do not pinch pennies; upgrading to a stronger model is allowed without cost retention.
+3. **Fast context collection** — the AI immediately asks "explain what is happening" to scope the situation quickly, then acts.
+
+**What the mode does NOT change (model choice stays nature-driven)**
+- Normal §5 scoring still decides the model by the task's real nature:
+  - simple + urgent → fast answer (Qwen 32B / Sonnet 4.6); no time wasted;
+  - complex + grave → escalate (Opus 4.8, or the §5.6 critical mechanic with Fable 5 if the re-scored gravity reaches ≥180).
+- Emergency Mode **never forces** the heaviest model. It lifts the cost barrier and sets priority; speed stays king when the task is simple. This is consistent with the inverted speed-tolerance criterion (§5.2): urgency biases toward fast execution, not toward maximal depth.
+
+**Exit**
+- Emergency Mode applies to the current emergency handling and ends when resolved (or when the user cancels it). It is not a persistent global state.
+
+**Cross-references**
+- §5.2 — speed tolerance (inverted): urgency biases toward fast tiers; Emergency Mode honors this rather than overriding it.
+- §5.6 — if the emergency is genuinely critical (re-scored ≥180), the critical mechanic (GPT-5.5 re-score → Opus orchestration → anti-loop breaker) applies as usual; Emergency Mode simply guarantees priority and no cost retention.
+- §1.6 — Emergency Mode is an explicit, user-confirmed action, so it satisfies the "no expensive cloud call without explicit user action" rule by design.
+
+### 5.8 Automatic escalation
 
 Even with a low score, escalate if:
 - Qwen confidence is low
@@ -338,7 +387,7 @@ If consequences ≥ 8 and ambiguity ≥ 7    → minimum Sonnet 4.6
 If consequences ≥ 9 and sensitivity ≥ 8  → Opus 4.8 or GPT-5.5 (depending on specialty)
 ```
 
-### 5.8 Automatic downgrade
+### 5.9 Automatic downgrade
 
 Downgrade to a cheaper model if: the score is low, the request is repetitive, a similar response already exists in memory, the task is pure formatting, the output has no consequences, or latency must be very short.
 
@@ -370,7 +419,7 @@ Trigger: Tuesday 20:00 banner → user clicks → session starts.
 
 **Phase 2 — Relevant questions + conversation.** The hard part: detecting the real issues, asking pertinent (non-generic) questions, sustaining a dialogue where the user can push back ("why did you insist on the prefecture when I had three months and the garage was more urgent?"). Conductor = Qwen 32B by default; demanding turns escalate to Opus 4.8. Domain turns consult specialists (health → GPT-5.5) in the background.
 
-**Phase 3 — Rolling 4-week re-planning.** All of the above is summarized, vectorized, and integrated with prior plans, vectorized history, and the **calendar**, to refine the next 4 weeks. The WR is a rolling window: 4 weeks behind, 4 weeks ahead. If a prior plan still holds, it is left unchanged; otherwise the AI re-plans, and may adjust every week ahead of it. **This step is forced to Fable 5 by a hard rule** (§7.6): it is long, complex, and high-stakes/durable — the one recurring task meeting all three conditions. It "lays the rails" the Qwen 32B then follows day to day, so the heavy model is not called by reflex during the week.
+**Phase 3 — Rolling 4-week re-planning.** All of the above is summarized, vectorized, and integrated with prior plans, vectorized history, and the **calendar**, to refine the next 4 weeks. The WR is a rolling window: 4 weeks behind, 4 weeks ahead. If a prior plan still holds, it is left unchanged; otherwise the AI re-plans, and may adjust every week ahead of it. **This step is forced to Fable 5 by a hard rule** (§7.8): it is long, complex, and high-stakes/durable — the one recurring task meeting all three conditions. It "lays the rails" the Qwen 32B then follows day to day, so the heavy model is not called by reflex during the week.
 
 **Projects in the WR.** Projects are seen **only as decisions to evaluate** — e.g. the timing of activating a project versus the user's state ("you activated this heavy, slow-return project in a week you were exhausted; wouldn't a higher-energy month suit it better?"). The WR does not manage, plan, or break down projects. That belongs to the project module (§8).
 
@@ -385,6 +434,8 @@ Same engine as the WR, different framing: **open, on-demand dialogue** with no i
 ## 7. Static Pre-Scoring Rules (Overrides)
 
 Some tasks bypass dynamic scoring entirely. They have a forced model or a forced path.
+
+Note — Emergency Mode (§5.7) is NOT a static rule: it raises priority and lifts the cost barrier, but never forces a model. Model choice stays nature-driven via normal scoring (see §5.7).
 
 ### 7.1 Vision / OCR
 ```text
@@ -410,18 +461,35 @@ Health calculation or medical analysis → GPT-5.5
 ```
 GPT-5.5 owns Pulse reasoning (weight/nutrition/recovery, medical-feed). Qwen must not produce a critical health analysis alone.
 
-### 7.5 Vector ride scoring
+### 7.5 Finance / Vault reasoning
+```text
+Financial analysis or advice (not mere display) → GPT-5.5
+```
+Triggered when the brain reasons over financial data — typically inside the Imperium chatbot or the Weekly Review (budget/cash-flow analysis, financial pressure, project cost evaluation). NOT triggered by Vault simply displaying a balance or by deterministic backend computation (those stay app/backend). The distinction is **display vs reasoning**: showing a number is not analysing it. Qwen must not produce a critical financial analysis alone. GPT-5.5 must surface its reasoning and signal uncertainty rather than fabricate values.
+
+### 7.6 Morning "AI advice" cards
+The advice module present on each app dashboard is routed by app, by required depth — not as a special case but via normal domain routing:
+```text
+Imperium → fine advice  → brain (Opus 4.8 / scoring by depth)
+Pulse    → fine advice  → GPT-5.5 (health, §7.4)
+Vault    → fine advice  → GPT-5.5 (finance, §7.5)
+Vector   → plain advice → Qwen 32B local (no finesse needed)
+Path     → reformulation only → Qwen 32B local
+```
+**Path religious advice — hard rule.** For the religious advice, the AI does NOT generate and does NOT freely select content. Qwen 32B picks one entry at random from a DEDICATED, closed list of pre-written, validated advice (`base_advice`, to be created in the Path docs) and only reformulates/presents it. This base is DISTINCT from the Dars knowledge base (doc 50): the AI must never extract or interpret religious content from the Dars (or any broad corpus) at will. On religion, the AI presents pre-validated content; it never invents or cherry-picks. (`base_advice` does not exist yet — see backlog.)
+
+### 7.7 Vector ride scoring
 ```text
 Ride opportunity scoring → CatBoost (business ML, not an LLM, not the cloud)
 ```
 
-### 7.6 Weekly Review re-planning
+### 7.8 Weekly Review re-planning
 ```text
 WR Phase 3 (rolling 4-week re-planning) → Fable 5 (forced)
 ```
 The one recurring task meeting long + complex + high-stakes/durable. Fable's own safeguard reroutes high-risk topics to Opus 4.8.
 
-### 7.7 Deterministic backend decision
+### 7.9 Deterministic backend decision
 ```text
 CRUD, DB read, health check, dashboard snapshot, deterministic summary → Backend only
 ```

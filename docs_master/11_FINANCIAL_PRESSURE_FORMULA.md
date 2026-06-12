@@ -36,7 +36,48 @@ Reason:
 
 Monthly view may exist for strategic reporting. Daily operational decisions use weekly pressure.
 
+## Recurring-Expenses List (User Truth)
+
+There is a user-maintained **recurring-expenses list**, shown on the Vault dashboard, 100% editable by the user. It is the **source of truth** for declared obligations. The AI READS it and never judges whether a declared expense is "required" — the user already decided that by putting it in the list.
+
+Each entry has:
+- `label` (dénomination)
+- `recurrence` (weekly / monthly / quarterly / yearly …)
+- `amount` (prix)
+- `category` (dropdown: family, work, … with an "Other" option that opens a free text box for exceptional cases)
+- `payment_day_of_month` — the day the payment is actually due
+
+Because the list is user-owned truth, no AI classification applies to its entries. They are required, period.
+
+## Two Distinct Uses of Expenses: Smoothed Objective vs Real Pressure
+
+These are different notions and must not be conflated.
+
+- **Smoothed objective (how much to EARN).** Recurring expenses are *smoothed* across the period to tell the AI the earning rhythm the user must sustain (e.g. a 200€/month school fee informs a ~50€/week earning target). This is a TARGET, used to set daily/weekly earning goals.
+- **Real pressure (what the user actually HAS).** Financial pressure is NOT computed on the smoothed theoretical figure. It is computed on the user's **real money** in the Vault wallets, confronted with what must actually go out (via `payment_day_of_month`). Pressure is anchored in reality, never in a provision that may not exist.
+
+This avoids both a false sense of security and double-counting.
+
+## Classification Scoring — ONLY for Expenses NOT in the List
+
+The recurring-expenses list covers the *known*. But unplanned/exceptional expenses appear that the user did not pre-declare. For THOSE (and only those), a scoring guides the AI to classify them as *required* vs *deferrable* — so the AI is guided, never left to invent freely.
+
+```text
+If expense ∈ recurring-expenses list → REQUIRED (user truth, no scoring).
+Else → classification scoring:
+  + vital nature (housing, food, health, children's school) → strong "required"
+  + legal/contractual consequence if unpaid (leasing, taxes, fines) → required
+  + due inside the operational window → required
+  + deferrable without consequence → deferrable
+```
+
+**Hard rule:** vital categories (housing, food, health, children's schooling, legal obligations) can NEVER be classified deferrable by the AI alone. The scoring guides ambiguous cases; it cannot downgrade a vital expense.
+
+This couples cleanly with doc 30: financial reasoning is GPT-5.5's domain, and GPT-5.5 must surface its reasoning / flag uncertainty rather than fabricate a classification.
+
 ## Core Inputs
+
+The user-maintained recurring-expenses list (see above) is a first-class input source.
 
 Required V1 inputs:
 - `current_week_income`
@@ -53,12 +94,14 @@ Required V1 inputs:
 - `daily_comfortable_target`
 - `daily_optimal_target`
 
-Optional inputs:
+Conditional required inputs (these feed `conditional_required_expenses`; sourced from the recurring-expenses list, each carrying its `payment_day_of_month`):
 - `family_exceptional_expense`
 - `school_payment_due`
 - `rent_proximity`
 - `leasing_payment_proximity`
 - `urgent_maintenance_cost`
+
+`available_liquidity` = CB wallet (`current_bank_available_balance`) + cash wallet (`current_wallet_available_cash`), crypto excluded — all three wallets being Vault dashboard wallets.
 
 ## Output
 
@@ -103,16 +146,22 @@ No AI weighting in V1.
 
 ## Step 1 - Available Liquidity
 
+Available liquidity is the sum of the **stable** Vault wallets:
+
 ```text
 available_liquidity =
-  current_wallet_available_cash
-  + current_bank_available_balance
+  current_bank_available_balance    # CB wallet
+  + current_wallet_available_cash   # cash wallet
 ```
 
 Rules:
 - include only money actually available
 - do not count expected future income as available
 - do not count uncertain payments as available
+
+The **crypto wallet is EXCLUDED** from survival pressure. Rationale: crypto is volatile and not instantly/cost-free liquidatable; counting it would inflate perceived safety. Crypto is displayed separately in Vault as a **mobilizable reserve** (a last-resort cushion), but it does not enter the pressure calculation. Needing to sell crypto to cover an obligation is itself a tension signal, not a "safe" state.
+
+(If the user ever wants to explicitly mobilize crypto, that is a deliberate user action, not an automatic inclusion.)
 
 ## Step 2 - Required Money This Week
 
@@ -122,13 +171,15 @@ required_money_this_week =
   + upcoming_required_expenses
   + overdue_expenses
   + fuel_required_next_days
-  + optional_required_expenses
+  + conditional_required_expenses    # (was optional_required_expenses)
 ```
+
+Definition: `conditional_required_expenses` are required expenses that do **not** occur every week but ARE required when they fall due (e.g. monthly school fee, quarterly tax). They come FROM the recurring-expenses list — not from any AI judgment. "Conditional" = conditional on timing, never on importance.
 
 Where:
 
 ```text
-optional_required_expenses =
+conditional_required_expenses =
   family_exceptional_expense
   + school_payment_due
   + urgent_maintenance_cost
@@ -704,4 +755,7 @@ TODO:
 - exact confidence formula
 - exact handling of postponed expenses in future weeks
 - exact table name for pressure snapshots
+- exact smoothing window and how `payment_day_of_month` maps a monthly/quarterly expense onto real-pressure timing
+- exact scoring weights for the out-of-list classification grid
+- whether/how an explicit "mobilize crypto" user action feeds a secondary pressure view
 

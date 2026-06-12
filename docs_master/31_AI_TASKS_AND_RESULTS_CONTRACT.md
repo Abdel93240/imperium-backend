@@ -254,7 +254,7 @@ No Opus, GPT, Claude, Gemini, frontend, n8n AI Agent, or real n8n workflow wirin
 
 ### Qwen role
 
-Qwen 2.5 7B Instruct is the V1 local router/scorer/classifier/preparer.
+Qwen 32B is the V1 local router/scorer/classifier/preparer.
 
 Qwen may:
 
@@ -280,7 +280,7 @@ Optional settings:
 ```text
 QWEN_ENABLED=false
 QWEN_BASE_URL=
-QWEN_MODEL=qwen2.5:7b-instruct
+QWEN_MODEL=qwen3:32b
 QWEN_REQUEST_TIMEOUT_SECONDS=60
 QWEN_DRY_RUN=true
 ```
@@ -916,7 +916,7 @@ Rule:
 
 ### 2.2 User-triggered AI calls
 
-No expensive AI cloud call (Haiku / Sonnet / Opus / GPT / Gemini) without explicit user action or a deterministic schedule the user has opted into.
+No expensive AI cloud call (Sonnet / Opus / Fable / GPT / Gemini) without explicit user action or a deterministic schedule the user has opted into.
 
 Pattern:
 
@@ -992,7 +992,7 @@ Official decision:
 
 > The n8n AI Agent is excluded. Qwen handles routing, classification, adaptive questions, and triage.
 
-### 3.4 Qwen 2.5 7B Instruct (local)
+### 3.4 Qwen 32B (local)
 
 Qwen is the operational AI router.
 
@@ -1019,9 +1019,8 @@ Qwen cannot:
 Possible external models:
 
 - GPT-5.5
-- Claude Haiku 4.5
 - Claude Sonnet 4.6
-- Claude Opus 4.7
+- Claude Opus 4.8
 - Gemini (vision)
 - Whisper / faster-whisper for audio
 - future specialized models
@@ -1039,7 +1038,7 @@ They return structured results. The backend decides what is stored.
 
 ### 3.6 External model privacy rule
 
-When a task is routed to an external cloud model such as GPT, Claude, Opus, Sonnet, Haiku or Gemini, the backend/Qwen context package must be minimized and anonymized before the cloud call.
+When a task is routed to an external cloud model such as GPT, Claude, Opus, Sonnet, Fable or Gemini, the backend/Qwen context package must be minimized and anonymized before the cloud call.
 
 External models receive a complete task summary, but not direct identity data. The package should remove or generalize:
 
@@ -1174,8 +1173,8 @@ trigger_type              VARCHAR(32) (button|schedule|db_event|external|email|m
 status                    VARCHAR(32) (see statuses below)
 difficulty_score          INTEGER NULL  (computed by Qwen, 0..200)
 score_breakdown           JSONB NULL    (per-criterion scores)
-routing_model             VARCHAR(64)   (e.g. qwen-2.5-7b)
-selected_model            VARCHAR(64)   (e.g. opus-4.7)
+routing_model             VARCHAR(64)   (e.g. qwen3:32b)
+selected_model            VARCHAR(64)   (e.g. opus-4.8)
 fallback_model            VARCHAR(64) NULL
 requires_user_validation  BOOLEAN NOT NULL DEFAULT FALSE
 idempotency_key           VARCHAR(128) NOT NULL
@@ -1617,15 +1616,14 @@ Special speed rule:
 
 ## 17. V1 Routing Thresholds
 
-This is the **canonical V1 thresholds** (aligned with doc 30):
+This is the **canonical V1 thresholds** (aligned with doc 30): doc 30 is the source of truth; see §5.6 for the critical-tier mechanic.
 
 | Score `/200` | Recommended model | Role |
 |---:|---|---|
-| 0–59 | Qwen local | Execute locally |
-| 60–99 | Haiku 4.5 | Lightweight cloud |
+| 0–99 | Qwen 32B local | Execute locally |
 | 100–139 | Sonnet 4.6 | Balanced reasoning |
-| 140–169 | Opus 4.7 | Deep analysis |
-| 170–200 | Opus 4.7 + guard | Critical analysis, validation gate |
+| 140–179 | Opus 4.8 | Deep analysis |
+| 180–200 | Critical mechanic (doc 30 §5.6 / Patch 30-B) | GPT-5.5 re-score → Opus orchestration |
 
 These thresholds are adjustable after observing costs and results, but only with explicit decision (not silently).
 
@@ -1840,7 +1838,7 @@ Goal:
 
 ```text
 n8n AI Agent       : excluded
-Qwen 2.5 7B        : official local router/scorer
+Qwen 32B           : official local router/scorer
 n8n                : orchestrator only
 backend            : sole canonical writer
 imperium_core      : canonical storage
@@ -1895,7 +1893,7 @@ Replace mock Qwen calls in workflows with real local calls.
 
 ### Step 5 — Wire premium models
 
-Add Haiku / Sonnet / Opus / GPT-5.5 / Gemini progressively.
+Add Sonnet / Opus / Fable / GPT-5.5 / Gemini progressively.
 
 Log every call with cost, latency, and routing reason.
 

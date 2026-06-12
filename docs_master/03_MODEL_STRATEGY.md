@@ -10,10 +10,10 @@ The official model strategy is now defined in:
 Key model decisions for V1:
 
 ```text
-🟢 Qwen 2.5 7B Instruct (local) — primary router/scorer
-🟡 Claude Haiku 4.5            — lightweight cloud
+🟢 Qwen 32B (local)            — primary router/scorer
 🟠 Claude Sonnet 4.6           — balanced reasoning
-🟣 Claude Opus 4.7             — premium strategic (WR analysis)
+🟣 Claude Opus 4.8             — premium strategic
+⭐ Claude Fable 5              — top tier, WR re-planning / long+complex+durable
 🟢 GPT-5.5                     — web research + medical
 🔵 Gemini                      — vision/OCR
 🎤 Whisper local               — transcription
