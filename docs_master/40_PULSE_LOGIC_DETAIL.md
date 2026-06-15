@@ -738,25 +738,60 @@ override Imperium mission priority without backend validation.
 ### 18.1 Task types
 
 ```text
-pulse.meal_estimate              - estimate calories/macros from text
-pulse.meal_photo_macros          - estimate macros from meal photo (Gemini)
-pulse.meal_suggestion            - propose meal from stock + goals
-pulse.training_adjustment        - adapt workout to current state
-pulse.medical_document_extract   - delegated to GPT-5.5 (doc 34)
-pulse.kitchen_inventory_photo    - parse fridge/pantry image (Gemini)
-pulse.weekly_review_contribution - feeds the WR (Opus via doc 32)
+pulse.meal_estimate            - estimate calories/macros from text (Qwen local)
+pulse.meal_photo_macros        - macros from meal photo (Gemini vision)
+pulse.kitchen_inventory_photo  - parse fridge/pantry image (Gemini vision)
+pulse.recipe_web_lookup        - find a recipe on the web for the catalogue
+                                 (Qwen local + web tool; NO diet cross-check at
+                                 add-time; escalate GPT-5.5 only if needed)
+pulse.diet_weekly_program      - week's recipes + shopping list + cook mission,
+                                 crossing goals+stock+catalogue (GPT-5.5, on WR)
+pulse.workout_create           - create the training program, conversational
+                                 (GPT-5.5 health, user-validated)
+pulse.workout_revision_monthly - monthly global revision + phase transitions
+                                 (GPT-5.5 health, user-validated)
+pulse.training_adjustment      - daily workout adaptation: Qwen self-scores its
+                                 ability → adapts locally OR escalates GPT-5.5
+pulse.pain_interpretation      - interpret a pain log (zone/severity/impact);
+                                 Qwen → adapt / escalate GPT-5.5 / critical
+                                 mechanism if scored critical (doc 30 §5.6)
+pulse.hydration_target         - personalized hydration range (part of the health
+                                 program frame, GPT-5.5)
+pulse.medical_document_extract - delegated to GPT-5.5 (doc 34)
+pulse.weekly_review_contribution - feeds the WR (per doc 32; model per doc 30 WR
+                                 rule — currently Fable 5 for WR re-planning, or
+                                 Opus 4.8 if Fable unavailable)
 ```
 
 ### 18.2 Routing distribution
 
 ```text
-Daily ops (88%):    Qwen local
-Quick adapts (8%):  Haiku 4.5
-Weekly plans (2%):  Sonnet 4.6
-Receipt OCR (1%):   Gemini
-Medical (0.5%):     GPT-5.5 (static override)
-WR (0.5%):          Opus 4.7 (via WR workflow)
+Daily ops / daily adaptation : Qwen 32B local   (the large majority — free, local)
+  (incl. training_adjustment, pain_interpretation first pass, meal_estimate,
+   recipe_web_lookup)
+Vision (meal/pantry photos)  : Gemini
+Deterministic plumbing       : backend hard rules, CPU, NO model
+  (OCR receipt → stock, stock decrement, hydration buttons dual-effect, fasting
+   window interactions, offline dedup)
+Health programming (grouped, rare) : GPT-5.5
+  (workout_create, workout_revision_monthly, hydration_target, diet_weekly_program,
+   medical_document_extract, escalations from Qwen)
+Critical mechanism (very rare) : Qwen score ≥180 → GPT-5.5 re-score → Opus 4.8
+                                 orchestration (doc 30 §5.6 / Patch 30-B)
+WR contribution : per doc 32 + doc 30 WR rule (Fable 5 for re-planning, Opus 4.8
+                  fallback while Fable is unavailable)
 ```
+
+Note: percentages intentionally dropped — they were invented and misleading. The
+real split is principled: Qwen local handles the everyday; GPT-5.5 is reserved for
+health reasoning, creation, and the grouped weekly program; hard rules handle
+deterministic plumbing; Gemini handles vision. No CatBoost in Pulse.
+
+Cross-references:
+- Model hierarchy & thresholds: doc 30 (canonical).
+- Workout block: §13 + Patch 40-A. Nutrition/batch cooking: Patch 40-B.
+- Pain: §16 + Patch 40-C. Hydration: §12 + Patch 40-E.
+- Brain/ownership: doc 44 (apps display; brain reads/writes common memory).
 
 ---
 
