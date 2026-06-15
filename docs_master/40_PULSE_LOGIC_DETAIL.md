@@ -109,7 +109,8 @@ FLOW:
 
 3. Pulse READS this data via shared backend
    → uses energy_score for workout adaptation
-   → uses sleep_hours for recovery calculation
+   → sleep_hours feeds the PERSONALIZED recovery evaluation (GPT-5.5 frame / Qwen
+     day-to-day), NOT a hard-coded calculation. (see §13.4)
 
 4. Pulse does NOT consume Vector signals.
    Pulse does NOT consume Vault signals (except food expenses, see §15.3).
@@ -402,7 +403,8 @@ Qwen called when user asks "what should I eat?"
 
 ## 12. Hydration
 
-PUL-04 supports quick buttons: `+250ml`, `+500ml`, `+1L`.
+PUL-04 supports quick buttons: `+250ml`, `+500ml`, `+1L`, plus chatbot input
+("j'ai bu un litre").
 
 ```text
 TBD POST /api/pulse/hydration-logs
@@ -412,9 +414,26 @@ Headers: Idempotency-Key
 Payload stores `amount_ml`, `logged_at`, `source`, and Path constraint context.
 
 ```text
-target_liters_per_day:
-  - default: 3.5L (per medical rule baseline)
-  - overridden by active medical rules
+Hydration target is a PERSONALIZED RANGE computed by GPT-5.5 from the user's data
+(weight, height, sex, activity — VTC + workouts —, climate, etc.). Not a fixed
+number.
+
+Three levels (displayed as a filling water-drop gauge):
+  - MINIMUM   : the floor to reach
+  - GOOD      : the healthy zone
+  - VERY GOOD : the optimal fill
+The drop fills as the user logs intake; the level reached maps to min/good/very
+good. The range is refreshed with the health program (creation / monthly revision,
+see §13). Active medical rules may override.
+```
+
+```text
+A quick-add button simultaneously:
+  1. advances hydration (fills the drop gauge toward the personalized range)
+  2. decrements the water stock (e.g. +500ml logged → 500ml removed from the
+     water item in Pulse stock)
+So one tap covers both intake tracking and stock decrement — no separate manual
+water-stock accounting.
 ```
 
 If `fasting_active = true` and `hydration_limits.daytime = false`, the buttons
