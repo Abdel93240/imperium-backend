@@ -157,7 +157,7 @@ Pulse V1 may emit:
 | `pulse.workout.skipped` | Workout skipped with reason | Imperium may replan if workout was central. |
 | `pulse.workout.adaptation.accepted` | User accepts adaptation proposal | Backend may emit Imperium replan request. |
 | `pulse.body_snapshot.created` | User confirms body snapshot | Photo binary is local-only in V1. |
-| `pulse.pain.logged` | Pain log confirmed | Severity 8-10 opens a user-confirmed Imperium replan prompt. |
+| `pulse.pain.logged` | Pain log confirmed | Pain data is interpreted by Qwen; escalation follows model scoring, not a hard severity threshold. |
 | `pulse.recommendation.requested` | User asks for Pulse suggestion | Backend routes model; UI displays explanation. |
 | `pulse.medical_rule.activated` | Medical rule validated (doc 34) | Imperium may trigger replan. |
 
@@ -177,7 +177,7 @@ Pulse has many same-day mutations, so V1 uses type-specific conflict handling:
 | Workout completion | Continue local workout log | Server completed/cancelled conflict opens user diff; no silent overwrite. |
 | Workout adaptation | Queue accept/reject only if proposal id matches | Stale proposal is rejected with conflict. |
 | Body snapshot | Queue numeric fields; photo remains local-only V1 | Same date conflict opens diff, latest is not auto-won. |
-| Pain log | Queue with severity and notes | Severity 8-10 triggers replan prompt after successful sync, debounced once per pain log. |
+| Pain log | Queue with zone, severity, impact, and notes | Sync stores data; Qwen interpretation/escalation is not a hard offline threshold. |
 | Stock update | Queue line-level update | Quantity is patched with version; negative stock requires explicit user override. |
 | Medical rule | Offline upload disabled in V1 | Rules activate only after doc 34 validation flow. |
 
@@ -194,7 +194,7 @@ Pulse dashboard combines today-only operational signals:
 - stock expiring soon
 - active fasting constraints from Path
 - active medical rules summary from doc 34
-- high-severity pain banner when unresolved
+- unresolved pain banner when Qwen interpretation marks it relevant
 
 **Health score must never render without explanation.** If factors are missing,
 the score card is hidden and an incomplete-data banner is shown.
@@ -207,7 +207,7 @@ the score card is hidden and an incomplete-data banner is shown.
 
 Supported V1 inputs:
 
-- text description
+- chatbot text description (primary natural-language path)
 - voice note transcribed by Whisper/faster-whisper
 - meal photo processed by Gemini prompt `pulse.meal_photo_macros`
 
@@ -220,7 +220,7 @@ The draft contains:
 | `description` | User text/transcript or image summary. |
 | `macros` | calories, protein_g, carbs_g, fat_g. |
 | `confidence` | `low\|medium\|high` or decimal normalized by backend. |
-| `source` | `text\|voice\|photo\|manual`. |
+| `source` | `chatbot\|text\|voice\|photo\|manual`. |
 | `requires_user_validation` | Always true for AI-estimated macros. |
 | `warnings` | Low confidence, missing quantity, image quality, or unusual estimate. |
 
@@ -358,6 +358,7 @@ Cross-module links:
 | Manual add/edit | PUL-12 Stock Tab opens stock item edit/add surface. |
 | Vault receipt handoff | VAU-05 validates receipt; backend creates Pulse draft/stock update without second receipt UI. |
 | Pantry scan | PUL-13 uses Gemini task `pulse.kitchen_inventory_photo`; user validates diff. |
+| Chatbot | User declares stock in natural language ("j'ai acheté 2kg de riz"); backend updates stock. |
 | Meal decrement | PUL-03 confirmed stock lines decrement quantities. |
 
 ### 11.2 Stock item fields (V1)
@@ -618,7 +619,7 @@ Pulse EMITS events Imperium subscribes to:
   - pulse.workout.completed (Imperium logs success)
   - pulse.workout.skipped (Imperium notes failure reason)
   - pulse.medical_rule.activated (Imperium may trigger replan)
-  - pulse.pain.logged severity 8-10 (Imperium replan prompt)
+  - pulse.pain.logged (data the brain interprets; no hard severity threshold)
 ```
 
 ### 15.2 With Path
@@ -663,24 +664,34 @@ The only indirect link: Imperium uses both for daily planning.
 
 ## 16. Pain Log (PUL-09)
 
-Captures: body zone, severity 0-10, pain type if known, limitation notes, voice
-note transcript if used, current workout impact.
+Pain is CAPTURED via the chatbot (conversational): body zone, severity 0-10,
+type if known, limitation notes, current workout impact. (No "voice note
+transcript" mechanism.)
 
 ```text
 TBD POST /api/pulse/pain-logs
 Headers: Idempotency-Key
 ```
 
-Severity rules:
-
 ```text
-- 0-3:  normal log
-- 4-7:  Warning and optional workout adaptation prompt
-- 8-10: Error banner and user-confirmed Imperium replan prompt
+The pain log is DATA, an INPUT for Qwen in workout adaptation (§13.3). Qwen
+interprets the real situation (zone + severity + type + impact on SPECIFIC
+exercises) and, per its own scoring:
+  - adapts locally if within reach, OR
+  - escalates to GPT-5.5 (health) if it looks medically serious, OR
+  - if the scored gravity is critical (>=180/200), the critical mechanism
+    (doc 30 §5.6 / Patch 30-B: GPT-5.5 re-score -> Opus orchestration) engages.
+
+A high severity NATURALLY raises Qwen's score (error consequences + health
+sensitivity) -> a deserved escalation, NOT a mechanical threshold.
+
+NO hard safety net: the probability that Qwen misses an EXPLICIT "9/10" signal is
+near nil (gravity is stated in clear, not inferred). The ultimate fallback is the
+user triggering Emergency Mode manually via the chatbot (Patch 30-C).
 ```
 
-Pulse does not diagnose. Pain logs are constraints for planning and workout
-safety only.
+Pulse does not diagnose (doc 36 §2.4, nuanced). Pain logs are constraints for
+planning and workout safety.
 
 ---
 
