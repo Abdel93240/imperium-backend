@@ -404,42 +404,47 @@ LEVEL 2 — On-demand "Voir pourquoi"
 
 ---
 
-## 15. Integration With Other Modules
+## 15. Reads & Events via Common Memory
 
 ### 15.1 With Path
 
 ```text
-Vault EMITS to Path:
-  - weekly_business_profit (Monday after computation)
-  - sadaqa basis available
+Vault writes weekly_business_profit into its own tables; Path READS this
+sadaqa basis from common memory (read-only).
 
-Vault RECEIVES from Path:
-  - sadaqa_donations (logged as personal expense in Vault)
+When a sadaqa donation is confirmed (Path side), the BACKEND writes the
+corresponding expense into the Vault domain (category Sadaqa). There is no
+direct Path→Vault transfer; it is a backend rule writing the owner's table.
 ```
 
 ### 15.2 With Pulse
 
 ```text
-Vault RECEIVES from Pulse:
-  - food purchases parsed from receipts (auto-create Vault expenses)
+On receipt validation (VAU-05), the BACKEND writes the food expense into the
+Vault tables (Vault remains the owner) AND writes a stock update into the Pulse
+domain. No app pushes a write into Vault — it is a deterministic brain rule.
+The receipt produces TWO separate backend writes (Vault expense + Pulse stock),
+each into its own domain table. Not a Vault↔Pulse dialogue.
 ```
 
 ### 15.3 With Vector
 
 ```text
-Vault PROVIDES context to Vector indirectly:
+Vector may READ fuel-expense history from common memory; no direct channel.
   - VTC revenue tracking
   - Fuel expense history → smart fuel knowledge
   
-Vault RECEIVES from Vector:
-  - VTC session revenue (auto-logged business income)
-  - Fuel events (manual entry confirmed)
+At the end of a VTC session, the BACKEND (Vault service) writes the confirmed
+income into the Vault tables. Vector only writes its own operational tables; it
+never creates a Vault transaction. Fuel expenses likewise are written by the
+backend into the Vault domain.
 ```
 
 ### 15.4 With Imperium
 
 ```text
-Vault PROVIDES to Imperium:
+Imperium READS Vault summaries from common memory (allowed §10) to size the
+objective and pressure:
   - pressure_score (daily)
   - week_balance (daily)
   - upcoming_expenses_alert

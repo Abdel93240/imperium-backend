@@ -512,7 +512,7 @@ Rules:
 ### 10.2 Imperium reception
 
 ```text
-Imperium subscribes to event: path.ghusl.required
+Imperium READS the backend event path.ghusl.required and triggers a replan.
 
 On reception:
   1. Creates a mission: "Faire le ghusl avant {next_prayer}"
@@ -728,12 +728,12 @@ Cost per month: < 0.50 €
 
 ---
 
-## 16. Integration With Other Modules
+## 16. Reads & Events via Common Memory
 
 ### 16.1 With Imperium
 
 ```text
-Path EMITS events Imperium subscribes to:
+The backend emits append-only events; Imperium READS them:
   - path.ghusl.required     → Imperium AI replan
   - path.ghusl.completed    → Imperium marks mission done
   - path.prayer.not_marked  → Imperium logs discipline impact
@@ -744,24 +744,21 @@ Path EMITS events Imperium subscribes to:
 ### 16.2 With Vault
 
 ```text
-Path READS from Vault:
-  - weekly_business_profit (for sadaqa target)
+Path READS weekly_business_profit from common memory (read-only) to compute
+the sadaqa target.
 
-Path EMITS to Vault:
-  - confirmed sadaqa donations (logged as personal expense, category Sadaqa)
-  - Path owns percentage/target/carry; Vault exposes percentage read-only
+When the user confirms a sadaqa donation, the BACKEND records the action on the
+Path side (owner of sadaqa state) AND the Vault service writes the matching
+expense (category Sadaqa). Two backend writes by rule, not a Path→Vault send.
+Path owns percentage/target/carry; Vault exposes percentage read-only.
 ```
 
 ### 16.3 With Pulse
 
 ```text
-Path EMITS to Pulse:
-  - fasting_active
-  - fasting_type
-  - fasting_window (suhoor, iftar)
-  - hydration_limits
-
-Pulse reads these to adapt meal/workout/hydration logic.
+Path writes its fasting state into its own tables (common memory). Pulse READS
+that state from common memory to adapt meals / workout / hydration. There is no
+direct Path-to-Pulse channel, consistent with doc 40 §15.2.
 ```
 
 ### 16.4 With Vector
@@ -1095,7 +1092,7 @@ Changes vs the former §15:
 
 ### 16.1-ADD — Path → Imperium: religious calendar events
 
-Add to the "Path EMITS events Imperium subscribes to" list (§16.1):
+Add to the backend append-only events that Imperium READS (§16.1):
 
 ```text
   - path.calendar.date_predicted   → Imperium shows duplicated candidate (J / J+1)

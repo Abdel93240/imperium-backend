@@ -424,12 +424,16 @@ All calls tracked precisely in ai_call_logs.
 
 ---
 
-## 12. Integration With Other Modules
+## 12. Reads & Events via Common Memory
 
 ### 12.1 Imperium IS the consumer of all events
 
 ```text
-Imperium SUBSCRIBES to:
+Imperium READS the backend append-only events (§9) and reacts (replan, log).
+The dotted names are BRAIN events, not app-to-app sends. Imperium is the
+display surface that reads and renders; it does not receive pushes from apps.
+
+Event names:
   - path.ghusl.required        → trigger replan
   - path.ghusl.completed       → mark mission done
   - path.prayer.missed         → discipline score impact

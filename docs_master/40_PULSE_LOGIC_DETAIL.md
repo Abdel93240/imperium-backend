@@ -624,7 +624,7 @@ view, no AI processing in V1.
 
 ---
 
-## 15. Integration With The Common Brain
+## 15. Reads & Events via Common Memory
 
 ⚠️ Terminology: modules do NOT exchange data with each other. Everything lives
 in the common brain's shared memory (PostgreSQL + pgvector on Hostinger). The

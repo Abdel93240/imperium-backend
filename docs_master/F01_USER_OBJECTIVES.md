@@ -534,11 +534,12 @@ The "Opus static override" applies because:
 
 ---
 
-## 14. Integration With Other Modules
+## 14. Reads & Events via Common Memory
 
 ### 14.1 Imperium
 
-Imperium subscribes to:
+The backend emits the event user_objective.app_empty; Imperium READS it and
+creates the mission.
 ```text
 - user_objective.app_empty (when an app has no validated objectives)
   → Imperium auto-creates "Define at least one objective for [app]" mission

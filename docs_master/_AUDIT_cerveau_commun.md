@@ -12,7 +12,7 @@
 L'écosystème est globalement décrit selon le bon modèle (cerveau commun + lecture
 de la mémoire partagée), mais plusieurs documents de domaine (40 Pulse, 41 Path,
 42 Vault, 43 Imperium) décrivent encore les apps comme des **acteurs qui
-s'échangent des données directement** (« X EMITS to Y », « Y RECEIVES from X »,
+s'échangent des données directement** (« X EMITS→Y », « Y RECEIVES←X »,
 « X subscribes to Y »). Cinq cas constituent des **écritures croisées / canaux
 app↔app** qui contredisent §9, §10 et §19 du doc 44 et doivent être reformulés en
 règles déterministes du backend écrivant la mémoire commune. Le reste relève de
@@ -31,7 +31,7 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 
 ### M1 — Pulse écrit dans le domaine Vault
 - **Fichier / section :** `42_VAULT_LOGIC_DETAIL.md` — §15.2 « With Pulse » — **lignes 423-424**
-- **Citation :** « Vault RECEIVES from Pulse: food purchases parsed from receipts (**auto-create Vault expenses**) »
+- **Citation :** « Vault RECEIVES←Pulse: food purchases parsed from receipts (**automatic Vault-expense creation**) »
 - **Pourquoi ça viole le doc 44 :** présente Pulse comme produisant/poussant des
   écritures dans `vault_transactions`, table **possédée par Vault**. Viole §10
   (« SEUL le service propriétaire écrit ses tables ») et §19 (« ❌ Apps writing to
@@ -44,7 +44,7 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 
 ### M2 — Vector écrit dans le domaine Vault
 - **Fichier / section :** `42_VAULT_LOGIC_DETAIL.md` — §15.3 « With Vector » — **lignes 434-436**
-- **Citation :** « Vault RECEIVES from Vector: VTC session revenue (**auto-logged business income**) … Fuel events »
+- **Citation :** « Vault RECEIVES←Vector: VTC session revenue (**business income logged automatically**) … Fuel events »
 - **Pourquoi ça viole le doc 44 :** décrit Vector écrivant des revenus dans Vault.
   Viole §10/§19. Le doc 44 §18 est explicite : « Vault may receive confirmed
   income **only through an allowed backend flow** ».
@@ -54,7 +54,7 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 
 ### M3 — Path écrit une dépense dans le domaine Vault
 - **Fichier / section :** `41_PATH_LOGIC_DETAIL.md` — §16.2 « With Vault » — **lignes 707-708**
-- **Citation :** « **Path EMITS to Vault:** confirmed sadaqa donations (**logged as personal expense**, category Sadaqa) »
+- **Citation :** « **Path EMITS→Vault:** confirmed sadaqa donations (**logged as personal expense**, category Sadaqa) »
 - **Pourquoi ça viole le doc 44 :** Path pousse une écriture (dépense) dans le
   registre financier de Vault. Viole §10/§19.
 - **Reformulation suggérée :** « Quand l'utilisateur confirme un don de sadaqa, le
@@ -64,7 +64,7 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 
 ### M4 — Réciproque de M3, vue côté Vault
 - **Fichier / section :** `42_VAULT_LOGIC_DETAIL.md` — §15.1 « With Path » — **lignes 416-417**
-- **Citation :** « Vault RECEIVES from Path: sadaqa_donations (**logged as personal expense in Vault**) »
+- **Citation :** « Vault RECEIVES←Path: sadaqa_donations (**logged as personal expense in Vault**) »
 - **Pourquoi ça viole le doc 44 :** même écriture croisée que M3, décrite depuis
   Vault. À corriger conjointement avec M3.
 - **Reformulation suggérée :** « Le backend écrit la dépense Sadaqa dans Vault
@@ -73,11 +73,11 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 
 ### M5 — Canal direct Path→Pulse (push d'état entre apps)
 - **Fichier / section :** `41_PATH_LOGIC_DETAIL.md` — §16.3 « With Pulse » — **lignes 715-721**
-- **Citation :** « **Path EMITS to Pulse:** fasting_active / fasting_type / fasting_window / hydration_limits … Pulse reads these to adapt… »
+- **Citation :** « **Path EMITS→Pulse:** fasting_active / fasting_type / fasting_window / hydration_limits … Pulse reads these to adapt… »
 - **Pourquoi ça viole le doc 44 :** décrit un canal direct Path→Pulse (§9 « No
   Inter-App Communication Layer », §19 « ❌ app-to-app HTTP calls »). Contredit en
   plus le doc 40 §15.2 qui décrit **correctement** « Pulse READS from Path » la
-  même donnée. Le sens « EMITS to » est de trop.
+  même donnée. Le sens « EMITS→ » est de trop.
 - **Reformulation suggérée :** « Path écrit son état de jeûne dans ses propres
   tables (mémoire commune). Pulse **lit** cet état depuis la mémoire commune pour
   adapter repas/entraînement/hydratation. » (supprimer la formulation « Path EMITS
@@ -104,9 +104,9 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 | m7 | `41_PATH_LOGIC_DETAIL.md` §16.2 | 704 | « **Path READS from Vault:** weekly_business_profit » | « Path lit le profit hebdo (lecture seule) pour calculer la cible sadaqa. » |
 | m8 | `41_PATH_LOGIC_DETAIL.md` §10.2 | 472 | « **Imperium subscribes to event:** path.ghusl.required » | « Imperium lit l'événement backend path.ghusl.required et déclenche un replan. » |
 | m9 | `41_PATH_LOGIC_DETAIL.md` §16.1-ADD | 1055 | « Add to the “**Path EMITS events Imperium subscribes to**” list » | Même reformulation que m6 (événements backend lus par Imperium). |
-| m10 | `42_VAULT_LOGIC_DETAIL.md` §15.1 | 412 | « **Vault EMITS to Path:** weekly_business_profit, sadaqa basis available » | « Vault écrit le profit hebdo dans ses tables ; Path **lit** cette base sadaqa (lecture seule). » |
+| m10 | `42_VAULT_LOGIC_DETAIL.md` §15.1 | 412 | « **Vault EMITS→Path:** weekly_business_profit, sadaqa basis available » | « Vault écrit le profit hebdo dans ses tables ; Path **lit** cette base sadaqa (lecture seule). » |
 | m11 | `42_VAULT_LOGIC_DETAIL.md` §15.3 | 430 | « **Vault PROVIDES context to Vector indirectly** » | « Vector peut lire l'historique de dépenses carburant (mémoire commune) ; pas de canal direct. » |
-| m12 | `42_VAULT_LOGIC_DETAIL.md` §15.4 | 442 | « **Vault PROVIDES to Imperium:** pressure_score, week_balance… » | « Imperium **lit** les résumés Vault (autorisé §10) pour dimensionner l'objectif et la pression. » |
+| m12 | `42_VAULT_LOGIC_DETAIL.md` §15.4 | 442 | « **Vault PROVIDES→Imperium:** pressure_score, week_balance… » | « Imperium **lit** les résumés Vault (autorisé §10) pour dimensionner l'objectif et la pression. » |
 | m13 | `F01_USER_OBJECTIVES.md` §14.1 | 541-544 | « **Imperium subscribes to:** user_objective.app_empty » | « Le backend émet l'événement user_objective.app_empty ; Imperium le lit et crée la mission. » |
 
 ---
@@ -145,11 +145,11 @@ Aucune. (Pas de faille de sécurité ; il s'agit d'incohérences documentaires.)
 ## Recommandations prioritaires
 
 1. **Corriger les 3 écritures croisées financières (M1, M2, M3/M4)** dans `42_VAULT`
-   §15.2/§15.3/§15.1 et `41_PATH` §16.2 : reformuler tout « RECEIVES from / EMITS to »
+   §15.2/§15.3/§15.1 et `41_PATH` §16.2 : reformuler tout « RECEIVES← / EMITS→ »
    en « le **backend** écrit la table du domaine propriétaire » (sadaqa, revenu VTC,
    dépense ticket), conformément au doc 44 §10/§18/§19.
 2. **Supprimer le canal direct Path→Pulse (M5)** dans `41_PATH` §16.3 : remplacer
-   « Path EMITS to Pulse » par « Pulse **lit** l'état de jeûne en mémoire commune »
+   « Path EMITS→Pulse » par « Pulse **lit** l'état de jeûne en mémoire commune »
    (cohérent avec `40_PULSE` §15.2 qui est déjà correct).
 3. **Réaligner le vocabulaire d'événements** (m1, m3, m6, m8, m9, m13) : remplacer
    « X subscribes to Y » / « X EMITS events » par « le backend émet un événement
