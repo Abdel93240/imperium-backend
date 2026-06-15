@@ -605,59 +605,62 @@ view, no AI processing in V1.
 
 ---
 
-## 15. Integration With Other Modules
+## 15. Integration With The Common Brain
 
-### 15.1 With Imperium
+⚠️ Terminology: modules do NOT exchange data with each other. Everything lives
+in the common brain's shared memory (PostgreSQL + pgvector on Hostinger). The
+brain (GPT-5.5 / Qwen / hard rules) reads and writes that memory; apps only
+display. "X reads from Y" elsewhere is shorthand. Authoritative principle: see
+the common-brain doc (to confirm — likely doc 44).
+
+### 15.1 Imperium planning domain
 
 ```text
-Pulse READS from Imperium:
-  - imperium_morning_checkins.energy_score
-  - imperium_morning_checkins.sleep_hours
-  - imperium_daily_plans (to align workout timing)
+Shared data the BRAIN reads for planning (written by the morning check-in / daily
+plan, stored in common memory):
+  - energy_score, sleep_hours (morning check-in)
+  - daily plan (to align workout timing)
 
-Pulse EMITS events Imperium subscribes to:
-  - pulse.workout.completed (Imperium logs success)
-  - pulse.workout.skipped (Imperium notes failure reason)
-  - pulse.medical_rule.activated (Imperium may trigger replan)
-  - pulse.pain.logged (data the brain interprets; no hard severity threshold)
+Workout outcomes the BRAIN records in common memory (surfaced by Imperium as
+display only):
+  - workout completed / skipped (with reason)
+  - medical rule activated (may inform a brain re-plan)
+  - pain logged  ← NOTE: no hard "severity 8-10 -> replan" trigger. Pain is data
+    the brain interprets (Qwen, escalating per scoring) — see §13.3 / §16 /
+    Patch 40-C.
 ```
 
-### 15.2 With Path
+### 15.2 Path fasting/prayer domain
 
 ```text
-Pulse READS from Path:
-  - fasting_active
-  - fasting_type
-  - suhoor_time / iftar_time
-  - hydration_limits
-
-Pulse adapts:
-  - meal suggestions (none during fasting hours; historical logging allowed with warning, never silently blocked)
-  - workout intensity (lighter on fasting days)
-  - hydration logging (only allowed window)
-  - dashboard displays one fasting banner maximum
+Fasting/prayer data in common memory that conditions Pulse display & suggestions:
+  - fasting_active, fasting_type, suhoor/iftar times, hydration_limits
+Deterministic adaptations (hard rules of the brain, not a Pulse↔Path dialogue):
+  - no meal suggestion during fasting hours (historical logging allowed w/ warning)
+  - lighter workout intensity on fasting days
+  - hydration logging only in allowed window
+  - one fasting banner max on the dashboard
 ```
 
-### 15.3 With Vault
+### 15.3 Vault receipt and expense domain
 
 ```text
-Pulse READS from Vault:
-  - food_related_expenses (last 30 days)
-
-Vault → Pulse handoff (receipt):
-  - VAU-05 remains the ONLY receipt review screen in V1
-  - when VAU-05 validates food lines, backend creates a Pulse handoff
-    (stock additions/updates, source reference, confidence/warnings, sync state)
-  - PUL-12 may display a badge for received handoffs;
-    it does NOT ask the user to validate the same receipt again
+Deterministic plumbing (a hard rule of the brain writing to common memory — NOT a
+Vault↔Pulse exchange):
+  - receipt OCR validated at VAU-05 -> brain writes stock additions/updates to
+    common memory (source ref, confidence/warnings, sync state)
+  - the stock tab may show a "received" badge; it never re-asks the user to
+    validate the same receipt
+Food-related expenses (last 30 days) live in common memory; the brain reads them
+when relevant.
 ```
 
-### 15.4 With Vector
+### 15.4 Vector planning domain
 
 ```text
-Pulse and Vector are deliberately decoupled.
-Vector does NOT consume energy_score (per doc 33 §5.2.3).
-The only indirect link: Imperium uses both for daily planning.
+Pulse and Vector are deliberately decoupled: Vector does not consume energy_score
+(doc 33 §5.2.3). The only link is the common brain using both domains' data for
+daily planning — not a direct Pulse↔Vector channel.
 ```
 
 ---
