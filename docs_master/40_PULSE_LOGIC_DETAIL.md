@@ -79,7 +79,7 @@ DOMAIN 1 — NUTRITION (full tracking)
 DOMAIN 2 — TRAINING (full tracking)
   ├─ Workouts (planned + logged + adapted)
   ├─ Body composition (weight, body fat %, measurements)
-  ├─ Recovery state (computed from workout intensity + time)
+  ├─ Recovery state (personalized forecast frame + Qwen day-to-day adjustment)
   ├─ Pain or limitation log
   └─ Goals (e.g. visible abs target)
 
@@ -127,19 +127,19 @@ LAYER 1 — DETERMINISTIC (no AI)
   ├─ Macro totals from logged meals
   ├─ Stock level alerts (item < threshold)
   ├─ Hydration progress vs target
-  ├─ Recovery time computation (workout end + 24-72h)
+  ├─ Workout / recovery display from the current personalized frame
   └─ Cost: 0€
 
 LAYER 2 — QWEN LOCAL
   ├─ Meal suggestions from stock + goals + rules
-  ├─ Workout adaptation (light intensity if fatigue high)
+  ├─ Workout adaptation (Qwen self-scores capability, escalates if needed)
   ├─ Food categorization on receipt scan
   └─ Cost: 0€
 
 LAYER 3 — DEFERRED CLOUD
   ├─ Medical document analysis → GPT-5.5 (doc 34)
   ├─ Weekly review contribution → Opus via WR (doc 32)
-  └─ Long-term plan adjustment → Sonnet 4.6
+  └─ Health program creation/revision → GPT-5.5
 ```
 
 ---
@@ -338,6 +338,25 @@ logs after sync and dedupes identical `Idempotency-Key` writes.
 
 ### 13.1 Plan Workout (PUL-05)
 
+The workout program has three explicit modes:
+
+```text
+MODE 1 — CREATION (one-off, at start)
+  WHO    : GPT-5.5 (health), CONVERSATIONAL with the user, user validates.
+  INPUTS : goals, level, owned equipment (§13-EQUIP), available time, fatigue.
+  OUTPUT : base program + a PERSONALIZED forecast frame (per-person intensities
+           and recovery — NOT generic rules).
+  NOTE   : GPT-5.5 uses owned equipment CREATIVELY — the user declares raw
+           equipment, GPT-5.5 derives many exercises from it (a push-up board →
+           push-ups AND core work; a 20kg handled dumbbell → halo AND more).
+
+MODE 2 — DAILY ADAPTATION (reactive) — see §13.3
+
+MODE 3 — GLOBAL REVISION (proactive, MONTHLY ~4 weeks) — see §13-REVISION
+```
+
+Manual user-planned workouts remain possible.
+
 ```text
 - title
 - scheduled date/time
@@ -350,10 +369,6 @@ logs after sync and dedupes identical `Idempotency-Key` writes.
 TBD POST /api/pulse/workouts
 Headers: Idempotency-Key
 ```
-
-Workouts can be planned manually by the user, or proposed by Pulse based on:
-energy_score (Imperium morning popup), recovery state, active medical rules
-(training caps), fasting state, and weekly objectives.
 
 ### 13.2 Log Workout (PUL-06)
 
@@ -375,21 +390,24 @@ skipped`), planned_at/started_at/completed_at, duration_minutes, intensity_score
 
 ### 13.3 Workout Adaptation (PUL-07)
 
-Adaptation is **suggested, not forced**. Triggers:
-
-- fatigue_state high or energy below backend threshold
-- known pain or injury affects planned exercise
-- fasting_active and workout intensity is medium/high
-- available_equipment no longer matches the plan
-- unexpected event or Imperium replan context
-
-V1 threshold rule:
-
 ```text
-- energy scale 1-10: energy <= 3 requests adaptation
-- fatigue enum: high requests adaptation
-- any pain severity >= 7 requests adaptation
-- fasting_active downgrades high intensity to low/medium suggestion
+An adaptation hook is triggered (triggers list below).
+  → QWEN evaluates whether it can adapt (it scores its OWN capability, as
+    everywhere in the ecosystem):
+      • capable (within reach) → it adapts locally (free)
+      • out of reach (complex/health-heavy) → it escalates to GPT-5.5
+  Adaptation is SUGGESTED, never forced. The user validates (accept/reject
+  endpoints kept). Never auto-applied.
+
+No CatBoost here: the ecosystem already relies on Qwen scoring its own ability;
+adding CatBoost would duplicate that. CatBoost stays Vector-only (ride scoring).
+
+Adaptation triggers (hooks):
+  - fatigue / low readiness
+  - pain or injury affecting SPECIFIC planned exercises (not a global block)
+  - fasting active vs planned intensity
+  - owned/available equipment no longer matches the plan
+  - unexpected event or Imperium replan context
 ```
 
 ```text
@@ -402,21 +420,71 @@ Decision is NEVER auto-applied. If the user refuses, the original workout remain
 and the backend records the decision. Imperium replan is a backend handoff
 surfaced by a toast/banner only.
 
-### 13.4 Recovery computation
+### 13.4 Recovery
 
 ```text
-deterministic rule:
-  recovery_complete_at = workout.completed_at + recovery_hours
-  recovery_hours depends on intensity:
-    - intensity 1-3: 12h
-    - intensity 4-6: 24h
-    - intensity 7-8: 48h
-    - intensity 9-10: 72h
-
-Within recovery period:
-  - Pulse warns if user plans intense workout
-  - Pulse does NOT block (user decides)
+Recovery is part of the PERSONALIZED forecast frame produced by GPT-5.5
+(Mode 1 creation / Mode 3 revision), based on the user's real level. Qwen applies
+and adjusts it day to day. No generic intensity→hours rule.
+Within a recovery window, Pulse may WARN before an intense workout; it never
+blocks (user decides).
 ```
+
+### 13-REVISION. Global monthly revision (Mode 3)
+
+```text
+Independently of daily adaptation, GPT-5.5 returns AUTOMATICALLY every ~4 weeks
+(monthly) for a deep review:
+  - progression (muscle, level), are sessions actually being followed?
+  - global re-adaptation if needed
+  - PHASE TRANSITION decided by GPT-5.5, user-validatable
+    (e.g. objective "visible abs" = phase 1 fat loss → phase 2 muscle gain)
+Rhythm is monthly (not weekly): physical progression is slow; weekly revision
+would over-adjust on noise. A light "is it being followed?" check may occur in
+the weekly WR, without a heavy revision.
+```
+
+### 13-EQUIP. Owned equipment
+
+```text
+A Settings window: "mettre à jour mon matériel" (update my equipment).
+The user adds/removes owned equipment (dumbbells, push-up board with handles,
+attachable elastics, etc.). Owned equipment is considered ALWAYS available with
+the user (at home). It is a direct INPUT to program creation/revision.
+GPT-5.5 exploits it creatively (one item → many exercises).
+```
+
+### 13-PARK. Park equipment & day-continuity routing
+
+```text
+Some generated workouts need equipment NOT owned at home but available outdoors
+(e.g. pull-up bars). Principle: the OPTIMAL workout prevails — the LOCATION
+adapts, not the workout.
+
+When a day's workout requires external equipment:
+  → the UNIFIED BRAIN integrates this need into the day's PLANNING and finds a
+    street-workout park (geo) that has the required equipment ON THE CONTINUITY
+    of the user's trips/missions — same mechanism as prayer mosque selection
+    (doc 41 §7-bis): a need + a geo constraint resolved within the day's flow.
+
+Example:
+  - mission: finish VTC work
+  - mission: pick up a document at the tax office of [ville A]
+  - on the route: a park at [ville B] with the needed equipment, hours fit
+  → Imperium inserts BETWEEN the two missions: "stop at [ville B] park for your
+    workout".
+
+This is a cross-module link (Pulse workout need → Imperium mission placement),
+resolved by the brain like any other day-continuity optimization.
+```
+
+Cross-references:
+- Owned equipment (§13-EQUIP) and park need (§13-PARK) are INPUTS to program
+  creation (§13.1 Mode 1) and revision (§13-REVISION Mode 3).
+- §13-PARK reuses the day-continuity mechanism of doc 41 §7-bis (prayer) and the
+  daily plan (doc 28). The brain places the workout in the trip/mission flow.
+- Routing alignment (§18): workout creation/revision = GPT-5.5 (health, grouped,
+  rare); daily adaptation = Qwen local with GPT-5.5 escalation. No CatBoost.
 
 ---
 
