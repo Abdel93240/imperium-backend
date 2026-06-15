@@ -252,6 +252,101 @@ but no stock quantity changes until the user validates the lines.
 - repeated confirmation with different payload creates Conflict
 ```
 
+### 10.4 Recipe catalogue
+
+```text
+A catalogue of recipes provided by the user via: chatbot | internet search |
+OCR | the "Nourrir l'IA" button (present in every app).
+
+Adding a recipe is a LIGHT conversational capture:
+- The AI that fetches the recipe (web search) discusses ONLY the recipe with the
+  user. It does NOT cross-check the current diet at this stage (that would force a
+  GPT-5.5 diet call — not wanted here).
+- WHO: Qwen local (with a web search tool) finds the recipe; escalates to GPT-5.5
+  only if genuinely needed. No diet reasoning at add-time.
+- The user validates / modifies (e.g. "yes, but oregano instead of coriander").
+- On validation → stored in the recipe catalogue.
+
+The catalogue is then AVAILABLE to GPT-5.5 when it programs the diet (below).
+```
+
+### 10.5 Raw stock (matières premières)
+
+```text
+Stock holds RAW ingredients (matières premières). Sources:
+- OCR receipt (Vault handoff) | manual entry | chatbot | pantry scan (Gemini)
+Stock is the raw material the weekly program draws from.
+```
+
+### 10.6 Weekly diet programming
+
+```text
+WHEN  : start of week, aligned to the Weekly Review (GPT-5.5 grouped call, same
+        model as the workout — rare, planned).
+WHO   : GPT-5.5 (health + diet reasoning).
+INPUTS: nutrition goals + current raw stock + recipe catalogue.
+OUTPUT (three things):
+  1. RECIPES OF THE WEEK
+  2. If raw stock is INSUFFICIENT for the recipes → a SHOPPING LIST (see §10.7)
+  3. A "CUISINER" (batch cooking) mission for Imperium (see §10.8)
+```
+
+### 10.7 Shopping list
+
+```text
+Generated when raw stock is insufficient for the week's recipes.
+
+NO prior validation. The user does the shopping and decides on the ground what he
+buys (a product may be missing, or replaced by another — his freedom).
+
+When he finishes shopping and UPDATES his stock:
+- everything bought → enters stock AND disappears from the list
+- everything not bought → stays on the list
+The user decides when/if he buys the rest; he can also remove an item by force
+via the chatbot.
+
+→ The list self-empties as stock is updated; it follows reality, no friction.
+
+LEARNING: items the user systematically does NOT buy are data for the WR. The AI
+may ask "you never buy what I suggest — is there a reason?" and learn (dislike,
+too expensive, unavailable nearby...). Same pattern as Vector (proposed vs done
+gap → WR learning). The raw datum stays; the brain analyzes it in the WR; the
+user stays free.
+```
+
+### 10.8 Batch cooking mission + smart storage
+
+```text
+A start-of-week Imperium mission "CUISINER" (batch cooking): cook ALL the week's
+meals at once.
+
+Storage: sterilized glass jars, ~1 week shelf life, kept in the CAR'S UNDER-TRUNK
+— the A/C ducts run through it, so it stays at ambient temperature even in heat,
+shielded from sunlight. → a meal reserve accessible all day, wherever the user is.
+
+Result: balanced, cheap, ready meals all week, eaten during the VTC day (Vector).
+Economy + nutrition + health in one loop.
+```
+
+### 10.9 Nutrition / batch cooking loop
+
+```text
+Start of week (on WR) → GPT-5.5 crosses goals + stock + catalogue
+  ├─ recipes of the week
+  ├─ if stock insufficient → shopping list → Imperium "faire les courses"
+  │     (no validation; stock update empties the list; non-buys feed WR learning)
+  └─ Imperium "cuisiner" (batch cooking) → glass jars → car under-trunk
+        → the week's food, accessible everywhere during VTC
+```
+
+Cross-module links:
+- Vault → stock (OCR receipts).
+- Imperium → carries the "faire les courses" and "cuisiner" missions, placed in
+  the week by the brain (day-continuity, like other missions).
+- Vector → meals eaten during the VTC session (under-trunk reserve).
+- Recipe add = Qwen local + web (light); diet programming = GPT-5.5 (grouped, on
+  the WR). Clean separation: collection (light) vs exploitation (GPT-5.5).
+
 ---
 
 ## 11. Food Stock
