@@ -4,7 +4,7 @@ import pytest
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT / "docs_master"
+DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 STATE_MATRIX_PATH = DOCS_ROOT / "67_FRONTEND_STATE_MATRIX_V1.md"
 
 

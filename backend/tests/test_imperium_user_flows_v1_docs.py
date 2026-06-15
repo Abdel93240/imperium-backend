@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT / "docs_master"
+DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 USER_FLOWS_PATH = DOCS_ROOT / "66_IMPERIUM_USER_FLOWS_V1.md"
 
 

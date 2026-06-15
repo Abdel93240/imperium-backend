@@ -6,7 +6,7 @@ import pytest
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT / "docs_master"
+DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 MOCK_CATALOG_PATH = DOCS_ROOT / "68_FRONTEND_MOCK_DATA_CATALOG_V1.md"
 
 
