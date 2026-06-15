@@ -288,19 +288,41 @@ of these discussions can lead to:
 
 ### 8.3 Decision-to-action flow
 
-```text
-During a chatbot conversation, Opus may identify a "decision".
+During a chatbot conversation, the AI may identify a "decision".
 
-Example:
+The AI's role here is a CONSTRUCTIVE CRITIC, not an executor. Before recording
+or applying a decision, it CHALLENGES it: risks, blind spots, data that
+contradicts it, better alternatives. Reason: calling a large model just to agree
+adds no value; the model earns its cost by improving the decision.
+
+The user remains the SOURCE OF TRUTH. After the challenge, the user decides —
+and the AI respects that decision even if it differs from the AI's view. The
+contradiction serves better decisions, it does not impose the AI's opinion.
+
+Example (correct behavior):
   User: "Je pense que je devrais réduire VTC le mardi soir."
-  Opus: "OK. Veux-tu que je note cette décision et l'applique ?"
-  
-  If user accepts:
-    → backend creates a "user_decision" record
+  AI:   "Avant de noter ça — le mardi soir est historiquement un de tes
+         créneaux les plus rentables (~X€/h). Qu'est-ce qui motive la
+         réduction : fatigue, autre priorité ? Si c'est la fatigue, on
+         pourrait alléger ailleurs et garder ce créneau."
+  User: "C'est la fatigue en ce moment."
+  AI:   "Alors deux options : réduire vraiment le mardi (tu perds ~X€), ou
+         garder le mardi et alléger lundi/mercredi. Qu'est-ce que tu choisis ?"
+  User: [tranche en connaissance de cause]
+
+  If user confirms a final decision:
+    → backend creates a "user_decision" record (the INFORMED decision)
     → tied to the ai_result of this conversation
     → optionally creates a mission if action needed
     → feeds pgvector via the next WR validation
-```
+
+Notes:
+- The challenge is proportionate: trivial decisions need little or none; high-
+  impact ones (money, health, time, commitments) deserve a real challenge.
+- The AI challenges with data it actually has (history, profitability, plan);
+  it does not invent facts to win the point.
+- If the user holds their position after the challenge, the AI records it without
+  friction. No nagging, no repeated pushback.
 
 ---
 
