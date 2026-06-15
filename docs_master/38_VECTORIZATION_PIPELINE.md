@@ -89,30 +89,29 @@ V1 implements only HIGH PRIORITY. The pipeline is designed to extend.
 
 ## 5. Embedding Model Choice
 
-> **DÉCISION V1 (mise à jour) : embedding LOCAL bge-m3 par défaut.**
+> **DÉCISION V1 (mise à jour) : embedding LOCAL Qwen3-Embedding par défaut.**
 > Choix tranché pour la cohérence avec la philosophie privacy de l'écosystème :
 > les données ne doivent pas sortir vers un fournisseur cloud par défaut (cf.
 > règles PRIV-001 / PRIV-002, doc 08). Le cloud (OpenAI/Voyage) devient une
 > option de secours, pas le défaut.
 
-### 5.1 V1 default: local embedding (bge-m3)
+### 5.1 V1 default: local embedding (Qwen3-Embedding)
 
 ```text
-Model:     bge-m3 (local via Ollama ou HF)
-Dimension: 1024
-Cost:      0€
-Latency:   ~500ms per element
-RAM:       ~2 GB
+Model:     Qwen3-Embedding (local, GPU-served), privacy-first
+Dimension: 1024   (Matryoshka — the model supports up to 1024; we use 1024)
 ```
 
-Reasoning:
+Rationale: best cross-domain semantic quality with excellent French; same model
+family as the Qwen3 routing model (ecosystem coherence). Multilingual breadth is
+NOT a selection driver here (usage is ~99.9% French; Arabic/religious content is
+mostly hard-coded rules, not vectorized). The driver is reasoning quality on
+French, where Qwen3-Embedding is strong.
 
-- **privacy** : aucune donnée vectorisée ne quitte l'écosystème (cohérent avec la
-  vision « les données restent chez l'utilisateur »)
-- multilingue (FR + AR + EN) — adapté au contenu (dont Path/Dars)
-- coût nul
-- hébergeable sur la machine orchestrateur ou le NAS (cf. F10 topologie infra)
-- volume faible (~50 éléments/semaine max) → la latence locale est sans impact
+Quality > dimension: 1024 dims of a strong model beat 1536 of a weaker one.
+Quantization note: Q8 keeps ~99% quality and is safe for embeddings; **Q4 and
+below are NOT acceptable for embeddings** (they distort the numeric distances
+that retrieval depends on). FP16 = full quality when the hardware allows it.
 
 ### 5.2 Option de secours: cloud embedding (OpenAI / Voyage)
 
@@ -123,7 +122,7 @@ Cost:     ~$0.02 per million tokens
 Latency:  ~200ms per element
 ```
 
-À n'utiliser que si bge-m3 local devient impossible à héberger, et uniquement
+À n'utiliser que si Qwen3-Embedding local devient impossible à héberger, et uniquement
 pour des données non sensibles ayant passé le privacy gate. **Ce n'est pas le
 défaut.**
 
@@ -182,7 +181,7 @@ CREATE TABLE pgvector_memory (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   content         TEXT NOT NULL,
-  embedding       vector(1536) NOT NULL,
+  embedding       vector(1024) NOT NULL,
   source          VARCHAR(64) NOT NULL,
   source_ref_type VARCHAR(64) NOT NULL,
   source_ref_id   UUID NOT NULL,
@@ -418,8 +417,8 @@ class EmbeddingProvider(Protocol):
 class OpenAIEmbedding(EmbeddingProvider):
     """Fallback option. Calls OpenAI text-embedding-3-small (non-default, privacy gate required)."""
 
-class LocalBgeEmbedding(EmbeddingProvider):
-    """V1 DEFAULT. Calls local bge-m3 (privacy-first)."""
+class LocalQwen3Embedding(EmbeddingProvider):
+    """V1 DEFAULT. Calls local Qwen3-Embedding (privacy-first)."""
 
 def get_embedding_provider() -> EmbeddingProvider:
     """Returns the configured provider based on env."""
@@ -429,9 +428,26 @@ Configuration via env:
 
 ```text
 EMBEDDING_PROVIDER=local
-EMBEDDING_MODEL=bge-m3
+EMBEDDING_MODEL=Qwen3-Embedding
 OPENAI_API_KEY=sk-...
 ```
+
+Embedding hardware plan (transitional → final):
+- **Bridge (now):** a dedicated GPU for embedding — Tesla **P40 24GB** running
+  Qwen3-Embedding in **Q8** (~99% quality, fast ~0.2 s/query). Chosen over M40:
+  Pascal (CC 6.1) is still supported by current CUDA/PyTorch, whereas Maxwell
+  (M40, CC 5.2) is being dropped. P40 needs an added blower+shroud (passive
+  card). The routing Qwen3-32B stays on the V100; no VRAM conflict.
+- **Then:** migrate everything onto the server (full re-host).
+- **Final:** a 2nd V100 → Qwen3-Embedding in **FP16** (100% quality, fast).
+
+Note: P40/M40 have weak FP16, which is why the bridge runs Q8 (not FP16). Full
+FP16 quality is deferred to the V100 stage. Q8 vs FP16 ≈ 1% quality, acceptable
+for the transition.
+
+Open item (backlog): confirm the exact Qwen3-Embedding size to serve
+(0.6B / 4B / 8B) given the bridge P40 (24GB is ample) vs final V100. Larger is
+fine on 24GB; the choice is quality vs load time. Track separately.
 
 ---
 
