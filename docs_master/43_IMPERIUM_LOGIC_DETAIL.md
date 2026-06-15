@@ -42,6 +42,7 @@ A "hook" is any event that triggers the AI to re-evaluate the day's plan.
 ```text
 USER-INITIATED HOOKS:
   ├─ Imperium: "Reprogrammer ma journée" button
+  ├─ Chatbot: explicit user request (re-plan, or a decision raised in chat)
   ├─ Imperium: mission marked "ratée" (failed)
   ├─ Imperium: mission marked "annulée" (cancelled)
   ├─ Path: "Ghusl requis" toggle ON
@@ -91,7 +92,9 @@ To avoid plan thrashing:
 ## 4. The Morning Popup
 
 ```text
-First app open of the day OR scheduled trigger at user's configured wake time:
+Triggered when the user presses "commencer la journée" (start day). NOT a clock-
+time/wake-time trigger and NOT merely first app open — Imperium days are bounded
+start→finish (doc 12), not by a 24h schedule.
 
 Imperium opens a popup BEFORE showing dashboard:
 
@@ -121,7 +124,8 @@ Imperium opens a popup BEFORE showing dashboard:
 → ALL AI calls from this flow logged in ai_call_logs (§17)
 ```
 
-The morning checkin is the **only** auto-triggered AI replan. All other replans require an explicit hook.
+The morning checkin is the day's first replan, triggered by the explicit
+"commencer la journée" action (user-triggered, not clock-auto).
 
 ---
 
@@ -155,7 +159,7 @@ Philosophy: AI proposes, user accepts the day, then operates.
 imperium_missions table (per doc 05):
   - id, user_id
   - title, description
-  - mission_type (urgente | très_importante | secondaire)
+  - mission_type (urgente | importante | secondaire)   -- PRIORITY level
   - source (ai_planner | path | vector | pulse | vault | manual)
   - source_ref (link to triggering item, e.g. ghusl_required event)
   - planned_for_at (when AI scheduled it)
@@ -170,18 +174,22 @@ imperium_missions table (per doc 05):
   - overlay_category (for submissions, V3 doc 53)
 ```
 
-### 5.3 Only one active mission rule (per doc 08)
+### 5.3 Main mission + parallel annex missions (see doc 53)
 
-```text
-Constraint: only ONE mission with status='active' can be the
-"current focus" at any time.
+A "mission principale" (carrier) is the active focus. While it runs, optional
+"missions annexes" (submissions / overlay tasks) can be presented in parallel —
+the full model (eligibility by mission TYPE, optional/bonus scoring, carrier
+rules) is owned by doc 53. Do not redefine it here.
 
-The plan can have many active missions for the day, but the user's
-"current focus" is always one. Imperium UI surfaces this.
+Key points (authoritative source = doc 53):
+- Annex missions run in parallel with the principal mission; they are OPTIONAL
+  (strictly bonus, never punitive — doing zero leaves discipline_score unchanged).
+- Eligibility is by mission TYPE (the AI perceives the type), never by a non-
+  perceivable internal moment. The VTC session is a valid carrier; the user
+  chooses when to act on an annex.
+- Front-end (FR): "mission principale" / "mission annexe".
 
-Other active missions are queued. As the current is finished/failed,
-the next active becomes the focus.
-```
+This supersedes any earlier "single active focus / others queued" wording.
 
 ---
 
@@ -195,16 +203,16 @@ discipline_score = SUM(completed_missions × type_coefficient)
 
 type_coefficient:
   - urgente: 3.0
-  - très_importante: 2.0
+  - importante: 2.0
   - secondaire: 1.0
 
 Range: 0.0 to 1.0
 
 EXAMPLE:
-  Day plan: 2 urgentes, 3 très_importantes, 2 secondaires
+  Day plan: 2 urgentes, 3 importantes, 2 secondaires
   Total weighted = 2×3 + 3×2 + 2×1 = 14
   
-  User completed: 1 urgente, 2 très_importantes, 1 secondaire
+  User completed: 1 urgente, 2 importantes, 1 secondaire
   Completed weighted = 1×3 + 2×2 + 1×1 = 8
   
   discipline_score = 8/14 = 0.57
@@ -337,7 +345,7 @@ DEFAULT PRIORITY ORDER (fully customizable):
   3. Pulse critical alerts (pain, medical rule)
   4. Vault pressure alerts
   5. Vector critical ride opportunity
-  6. Imperium très_importante missions
+  6. Imperium importante missions
   7. Pulse routine (workouts, meals)
   8. Imperium secondaire missions
   9. Other notifications
