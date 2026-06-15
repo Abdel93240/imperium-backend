@@ -12,9 +12,8 @@ For GPT medical/health analysis, provide anonymized measurements and context onl
 
 This document is the canonical home for **prompts used with cloud reasoning models**:
 
-- Claude Haiku 4.5
 - Claude Sonnet 4.6
-- Claude Opus 4.7
+- Claude Opus 4.8
 - GPT-5.5
 
 It is the operational counterpart of doc 30 (which defines policy) and doc 31 (which defines the output contract).
@@ -74,15 +73,30 @@ Tone rules:
 ### 2.4 No medical or legal advice
 
 ```text
-- Do not diagnose.
-- Do not prescribe medication.
-- Do not give legal recommendations.
-- Surface concerns and recommend consulting a professional.
+Medical and legal: inform and alert freely; never SUBSTITUTE a professional on
+high-stakes personal decisions. Escalation is IN ADDITION TO useful info, never
+INSTEAD OF it.
+
+ALLOWED (and expected):
+- Factual information: rights, deadlines, penalties, procedures, general health
+  facts. (e.g. "missing this tax filing can incur penalties up to ~X% — act
+  quickly.")
+- Risk/urgency alerts.
+- Help to understand or prepare: read a letter, explain a step, draft a contest
+  letter, outline options.
+
+NOT ALLOWED:
+- Medical: diagnosing a condition, or prescribing medication/dosage.
+- Legal: a definitive verdict on a high-stakes personal case (e.g. "you will win
+  this lawsuit, sue them").
+
+ESCALATE: for high-stakes or ambiguous matters, surface the concern AND recommend
+a professional — together with the useful info, not as a replacement for it.
 ```
 
 ---
 
-## 3. Opus 4.7 — Weekly Report Initial Summary
+## 3. Opus 4.8 — Weekly Report Initial Summary
 
 Used for: `weekly_report.summary` task type (doc 32 §6 step 5).
 
@@ -113,7 +127,7 @@ Language: French for user-facing text. English for internal JSON keys.
 ### 3.2 User prompt template
 
 ```text
-Generate the initial weekly summary for this user's previous completed week.
+Generate the initial Weekly Review summary for this user's previous completed week.
 
 Week range: {week_start} to {week_end} (Europe/Paris)
 
@@ -171,7 +185,7 @@ Output strict JSON only.
 
 ---
 
-## 4. Opus 4.7 — Weekly Report Final Draft
+## 4. Opus 4.8 — Weekly Report Final Draft
 
 Used for: `weekly_report.final` task type (doc 32 §6 step 9).
 
@@ -250,7 +264,7 @@ Important:
 
 ---
 
-## 5. Opus 4.7 — Weekly Report Revision
+## 5. Opus 4.8 — Weekly Report Revision
 
 Used for: `weekly_report.revision` task type (doc 32 §6 step 10 path B).
 
@@ -276,7 +290,7 @@ In `model_notes`, add an entry like:
 
 ---
 
-## 6. Opus 4.7 — Mentoring Chat (Imperium)
+## 6. Opus 4.8 — Mentoring Chat (Imperium)
 
 Used for: chatbot routing decision routes to Opus when score 140+.
 
@@ -407,7 +421,7 @@ Output JSON:
 
 ---
 
-## 8. Haiku 4.5 — Quick Advice With Context
+## 8. Sonnet 4.6 — Quick Advice With Context
 
 Used for: tasks scoring 60-99.
 
