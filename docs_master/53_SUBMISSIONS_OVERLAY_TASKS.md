@@ -122,17 +122,25 @@ The AI uses this **fixed list** to determine if a mission can be a submission. C
 ### 5.1 Explicitly excluded (never overlay-eligible)
 
 ```text
-🚫 NEVER OVERLAY:
+🚫 NEVER OVERLAY (exclusion by mission TYPE — perceivable by the AI):
   ├─ Toute mission Catégorie A (vital immédiat)
   ├─ Prières (besoin focus complet)
   ├─ Workouts (intense physique)
   ├─ Cours Dars (concentration totale)
-  ├─ Conduite proprement dite (focus route)
-  ├─ Repas (digestion, social)
   ├─ Ghusl
   ├─ Sleep
   └─ Tâches qui demandent ordinateur/papier physique
 ```
+
+**Overlay-eligibility is defined by mission TYPE, never by a non-perceivable
+internal moment.** The AI knows which mission TYPE is active (prayer, workout,
+VTC session…) — it does NOT know transient internal states (driving a ride
+right now vs parked, social meal vs quick bite). So exclusions apply to whole
+types the AI can see; within a carrier, the user freely chooses when to act.
+
+This avoids re-introducing the shortcut we removed (the AI guessing an internal
+state it can't observe). Trust the user: he organized his life before Imperium
+and can keep doing so.
 
 ### 5.2 Evolution of the list
 
@@ -153,6 +161,16 @@ The list is NOT frozen. It evolves through:
 4. PERSONAL LEARNING (V4+)
    AI learns the user's specific tolerance per category
 ```
+
+The VTC feedback example is now resolved at the root: VTC is a carrier; only
+active driving would be off, and active driving is a non-perceivable internal
+moment. The system does not encode non-perceivable moments.
+
+Submission volume is small by nature: these are few, low-engagement, low-
+commitment tasks — not an endless stream. If the user keeps up, the backlog
+empties quickly and there is soon almost nothing left to overlay. So over-
+solicitation is a non-issue, and no elaborate defensive exclusion rules are
+needed. Submissions are optional and the reserve is modest and self-depleting.
 
 ---
 
@@ -218,6 +236,13 @@ EXAMPLE 4 — Cooking dinner 60 min
 ---
 
 ## 7. The User Interface
+
+Front-end (French, what the user sees):
+- **mission principale** (the active focus / carrier)
+- **mission annexe** (the optional parallel task / submission / overlay)
+
+Back-end/internal terms (carrier mission, submission, overlay task) are
+unchanged — only the user-facing French labels are fixed to principale/annexe.
 
 ### 7.1 Standard view (no carrier active)
 
@@ -503,7 +528,7 @@ NEVER OVERLAY-ELIGIBLE:
 - Religious obligations (prayer, dars)
 - Vital missions (medical urgency)
 - Workouts or physical activity
-- Sleep, meals, ghusl
+- Sleep, ghusl
 - Tasks longer than 15 minutes
 
 MISSION TO CLASSIFY:
