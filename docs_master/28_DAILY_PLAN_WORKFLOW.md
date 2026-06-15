@@ -21,6 +21,11 @@ The plan is built from existing backend truth only:
 - top active priority rules as context
 - latest day review reference, if present
 
+Prayer awareness zones note (future brain planning): when daily planning becomes
+brain-generated/replanned, prayer awareness zones are part of the generated plan
+and are recomputed on every re-plan. They are not a separate prayer scheduler;
+they inherit the daily plan lifecycle (see doc 41 §7-bis).
+
 ## Database Table
 
 Canonical table: `imperium_daily_plans`

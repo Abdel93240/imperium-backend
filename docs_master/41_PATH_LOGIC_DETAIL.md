@@ -164,10 +164,9 @@ counted by V1 prayer status. This avoids inventing obligation scope.
 Source order:
 
 ```text
-1. Registered default mosque MAWAQIT times (when available and fresh).
-2. Nearest registered mosque MAWAQIT times (when user explicitly allows GPS).
-3. Offline cached MAWAQIT times.
-4. Local calculation engine (fallback).
+1. Reference mosque MAWAQIT times (when available and fresh).
+2. Offline cached MAWAQIT times for the reference mosque.
+3. Local calculation engine (fallback).
 ```
 
 ### 6.3 MAWAQIT rules
@@ -184,15 +183,18 @@ Cache rules:
 - After 48 hours stale, UI must show fallback calculation as primary and stale
   MAWAQIT as historical context only.
 
-Conflict and selection rules:
+Reference mosque (times):
 
-- A user-selected default mosque wins over nearest mosque.
-- If no default exists, the nearest registered mosque may be suggested but not
-  silently registered.
-- `nearby_mosque_id` is a GPS suggestion; PAT-09 registration is explicit user
-  confirmation.
-- Two registered mosques with conflicting times are displayed separately; PAT-01
-  uses the default mosque or prompts the user to choose one.
+- The user has ONE reference mosque (the mosque near home, e.g. [ville]). Its
+  MAWAQIT times are the displayed prayer times, at all times.
+- This is the single source for displayed times. No multi-mosque list, no
+  "pick among registered mosques" for the schedule.
+- Changing the reference mosque (move/travel) is an explicit user action.
+- GPS/`nearby_mosque` suggestion may help the user PICK the reference mosque,
+  but is never silently registered.
+
+IMPORTANT — this section now covers TIMES ONLY. Choosing where to physically pray
+during the day is NOT here; see §7-bis.
 
 Privacy rules:
 
@@ -211,7 +213,7 @@ Adhan with:
 | Setting | V1 default | User setting |
 |---|---|---|
 | Calculation method | `MuslimWorldLeague` | PAT-11b |
-| Madhhab / Asr rule | `Shafi` | PAT-11c |
+| Madhhab / Asr rule | `Maliki` | PAT-11c |
 | Location source | registered city or explicit GPS | PAT-11f |
 | Timezone | device/backend timezone for selected location | derived |
 | Precision | minute-level display | fixed V1 |
@@ -230,6 +232,12 @@ Hanafi, Maliki, Shafii, Hanbali, Jafari
 
 The fallback engine recomputes daily at 00:30 Europe/Paris and stores results in
 `path_calculated_prayer_times` (no per-request recomputation).
+
+⚠️ TO INVESTIGATE before finalizing fallback architecture: explore what the
+MAWAQIT API itself offers when the reference mosque has no data (does it expose
+a calculation, neighboring mosques, etc.?). Do NOT assume a second calculation
+API is needed until MAWAQIT's real capabilities are checked. The Maliki
+calculation engine (§6.4) is the assumed fallback only pending this check.
 
 If GPS is denied and no city is configured, PAT-01 shows an Empty/Warning state
 asking the user to configure city or mosque. **It must not invent times.**
@@ -275,6 +283,41 @@ Offline conflict:
 - Same prayer/day/status with same `Idempotency-Key` dedupes.
 - Different status for the same prayer/day opens a conflict sheet.
 - Latest server state does not silently overwrite a local explicit correction.
+
+---
+
+### 7-bis. Prayer Mission Logic (go pray) — dynamic
+
+Distinct from prayer TIMES (§6) and prayer MARKING (§7). This is the mission of
+physically going to pray, integrated into the day.
+
+**Awareness zones are created during daily planning, not in real time.**
+When the brain plans the day (daily plan — see doc 28 `DAILY_PLAN_WORKFLOW`,
+function around `daily_plan`), it creates the prayer "awareness zones" as part
+of the plan: knowing where the user will be and what mission is active around
+each prayer time, it provisions the prayer in that context.
+
+Because awareness zones live INSIDE daily planning, they are recomputed
+automatically on every re-plan (the re-planning reason is added to context).
+No separate prayer-rescheduling mechanism is needed — the prayer inherits the
+planning lifecycle. If the real day deviates, the next re-plan adjusts the zone
+and the mosque choice.
+
+**Mosque selection is DYNAMIC, not from a pre-registered list.**
+There are tens of thousands of mosques in Île-de-France; a fixed registered
+list is not feasible. At planning time, the brain scans mosques in the zone
+where the user is / will be (geo API), and selects one based on a single
+criterion: **position in the continuity of the day** — i.e. close to the user
+now, OR moving the user toward the next mission. Example: while doing VTC, the
+brain scans mosques along the arrival zone and routes the user to one that fits
+the day's flow.
+
+**Anticipation window is not fixed.** The lead time before a prayer (could be
+10, 15, 20, 30+ min) depends on context (current mission, travel), determined
+at planning time — never a blind fixed rule.
+
+Privacy: mosque scan/selection follows §6.3 privacy rules (GPS gated, no mosque
+data to external models without a privacy gate).
 
 ---
 
