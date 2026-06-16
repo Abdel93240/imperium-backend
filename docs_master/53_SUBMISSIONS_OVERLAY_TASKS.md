@@ -176,35 +176,39 @@ needed. Submissions are optional and the reserve is modest and self-depleting.
 
 ## 6. The Carrier Mission Rules
 
-A mission is a "carrier" when:
+A mission is a "carrier" when Qwen judges that it leaves enough practical
+availability to host short annex missions.
 
 ```text
-RULE 1 — Long duration
-  Estimated duration ≥ 60 minutes
-  (configurable, can be adjusted to 90 min for stricter rules)
+Decisive criterion: ENGAGEMENT.
 
-RULE 2 — Low physical demand
-  Mission type is NOT in the "high-physical" set:
-    workouts, moving, cleaning, cooking, dance, sport
+ENGAGEMENT = physical demand + mental demand + availability of hands/attention.
+It is NOT raw physical effort.
 
-RULE 3 — Low mental focus required (V4 future)
-  Mission type is NOT in the "high-focus" set:
-    studying, dars cours, complex calculations, exam prep
-
-For V3, only RULES 1 and 2 are enforced.
-RULE 3 added in V4 if pattern detection shows it's needed.
+Examples that prove deterministic rules fail:
+  - Carrying a heavy bag while doing an internet search:
+    physically heavy, but one hand and some attention remain free
+    → low engagement for this purpose → can be a carrier.
+  - Holding a tarp up in the air:
+    physically light, but both hands and attention are taken
+    → total engagement → cannot host anything else.
+  - A long engaging mission with pauses:
+    even if engaging, idle stretches can host annex missions.
 ```
 
 ### 6.1 The carrier categorization
 
 ```text
-At mission creation, AI categorizes the mission:
-  - Determines is_carrier_mission TRUE/FALSE based on:
-    * estimated_duration_minutes
-    * physical_demand_category (mapped from mission type)
+At mission creation, Qwen categorizes the mission:
+  - Determines is_carrier_mission TRUE/FALSE based on engagement.
+  - Assesses engagement_level = low | medium | high.
+  - Assesses has_exploitable_pauses TRUE/FALSE.
+  - Uses title, description, estimated duration, and mission type.
 
 Stored in imperium_missions table:
   - is_carrier_mission BOOLEAN
+  - engagement_level VARCHAR(16) NULL
+  - has_exploitable_pauses BOOLEAN NOT NULL DEFAULT FALSE
   - is_overlay_eligible BOOLEAN
   - overlay_category VARCHAR(64) NULL  -- if eligible
 ```
@@ -213,23 +217,24 @@ Stored in imperium_missions table:
 
 ```text
 EXAMPLE 1 — VTC session 8h
-  Duration: 480 min ≥ 60 → ✅ long
-  Physical: sitting in car → ✅ low-physical
+  Duration: 480 min, many waiting gaps between rides
+  Engagement: medium while driving, low during pauses
+  Pauses: exploitable
   → is_carrier_mission = TRUE
 
-EXAMPLE 2 — Workout 45 min
-  Duration: 45 min < 60 → ❌ short
-  Physical: high → ❌ blocking anyway
+EXAMPLE 2 — Holding a tarp for 20 min
+  Physical effort: light
+  Engagement: high because both hands and attention are taken
   → is_carrier_mission = FALSE
 
-EXAMPLE 3 — Errands walking 90 min
-  Duration: 90 min ≥ 60 → ✅ long
-  Physical: light walking → ✅ low-physical
+EXAMPLE 3 — Carry a heavy bag while searching online
+  Physical effort: high
+  Engagement: low enough because one hand and attention remain available
   → is_carrier_mission = TRUE
 
 EXAMPLE 4 — Cooking dinner 60 min
-  Duration: 60 min ≥ 60 → ✅ long
-  Physical: medium-high (hands engaged) → ❌ blocking
+  Hands and attention are occupied by heat, timing, utensils
+  Engagement: high
   → is_carrier_mission = FALSE
 ```
 
@@ -365,18 +370,6 @@ If more than N exist: only the top N are shown.
 The others wait their turn in subsequent carriers.
 ```
 
-### 9.3 No real-time refresh
-
-```text
-Submissions are computed when the carrier becomes active.
-They don't refresh during the carrier (unless user 
-explicitly refreshes via "Actualiser" gesture).
-
-Why: avoiding distraction from the carrier mission itself.
-The user shouldn't be notified that "a new submission appeared"
-while driving.
-```
-
 ---
 
 ## 10. AI Tasks Touched
@@ -399,6 +392,8 @@ All AI calls are local (Qwen). Zero cloud cost for this feature.
 ```sql
 ALTER TABLE imperium_missions
 ADD COLUMN IF NOT EXISTS is_carrier_mission BOOLEAN NOT NULL DEFAULT FALSE,
+ADD COLUMN IF NOT EXISTS engagement_level VARCHAR(16) NULL,
+ADD COLUMN IF NOT EXISTS has_exploitable_pauses BOOLEAN NOT NULL DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS is_overlay_eligible BOOLEAN NOT NULL DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS overlay_category VARCHAR(64) NULL;
 
@@ -418,7 +413,7 @@ CREATE TABLE imperium_submission_completions (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   submission_mission_id UUID NOT NULL REFERENCES imperium_missions(id),
-  carrier_mission_id   UUID NOT NULL REFERENCES imperium_missions(id),
+  carrier_mission_id   UUID NULL REFERENCES imperium_missions(id),
   completed_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   carrier_mission_progress INTEGER NULL  -- 0-100% of carrier when done
 );
@@ -481,11 +476,14 @@ Step 1 — Backend creates the mission as usual
   - Computes intrinsic score (per doc 52)
   - Stores in imperium_missions
 
-Step 2 — Carrier classification (deterministic)
-  is_carrier_mission = (
-    estimated_duration_minutes >= 60
-    AND physical_demand_category != 'high'
-  )
+Step 2 — Carrier classification (Qwen judgment)
+  Qwen reads the mission (title, description, estimated duration, type) and
+  judges:
+    - the ENGAGEMENT it demands = physical + mental + availability of hands/
+      attention (NOT raw physical effort),
+    - whether it leaves availability to do something else in parallel,
+    - whether, even if engaging, it is long with exploitable pauses.
+  → outputs whether the mission can be a CARRIER (can host annex missions).
 
 Step 3 — Overlay classification (Qwen)
   Qwen receives:
@@ -545,6 +543,43 @@ OUTPUT (strict JSON):
   "reasoning": "<one sentence explanation in French>"
 }
 ```
+
+### 12.2 Qwen carrier prompt template
+
+```text
+You are assessing whether a mission can be a "carrier" mission — a mission during
+which the user can also do short annex missions.
+
+The decisive factor is ENGAGEMENT, not physical effort:
+- A physically heavy task can still be a carrier if it leaves a hand and some
+  attention free (e.g. carrying a bag while making a call).
+- A physically light task is NOT a carrier if it takes both hands or full
+  attention (e.g. holding something in place, precise work).
+- A long, engaging task CAN be a carrier if it has pauses/idle stretches where
+  annex missions fit.
+
+MISSION TO ASSESS:
+Title: "{title}"
+Description: "{description}"
+Estimated duration: {duration_minutes} minutes
+Mission type: "{mission_type}"
+
+OUTPUT (strict JSON):
+{
+  "is_carrier_mission": <true | false>,
+  "engagement_level": <"low" | "medium" | "high">,
+  "has_exploitable_pauses": <true | false>,
+  "confidence": <0.0 to 1.0>,
+  "reasoning": "<one sentence in French>"
+}
+```
+
+Coherence note:
+
+Both classifications now use Qwen judgment on the task's nature:
+carrier = availability to host; overlay = fits in a gap. This follows the
+ecosystem principle: capture raw data and let intelligence interpret, rather than
+hard thresholds. Both calls remain local Qwen calls, so the cost remains 0€.
 
 ---
 
@@ -634,9 +669,18 @@ User aborts VTC session.
 ### 15.3 User does a submission in the middle of a non-carrier moment
 
 ```text
-User taps "✓ Fait" on a submission while NOT in any carrier.
-This shouldn't happen via UI (panel only shown in carriers),
-but if user manually navigates to mission view:
+The user may do an annex mission in parallel of a NON-carrier moment. In that
+case the user can simply VALIDATE that he did it through the chatbot.
+
+Primary path:
+  - User tells the chatbot the annex mission is done.
+  - The chatbot marks the annex mission done after normal backend validation.
+  - completion record: carrier_mission_id = NULL (done standalone).
+  - No carrier context required; the user's chatbot validation is the source of
+    truth.
+
+Manual-navigation fallback:
+  User taps "✓ Fait" on a submission while NOT in any carrier.
 
 - Submission marked done
 - carrier_mission_id = NULL in completion record
@@ -678,7 +722,7 @@ Phase 1 — Schema migrations
 
 Phase 2 — Backend services
   ├─ services/imperium/mission_categorizer.py
-  │   - is_carrier_mission classification (deterministic)
+  │   - is_carrier_mission classification (Qwen engagement judgment)
   │   - is_overlay_eligible classification (Qwen call)
   └─ services/imperium/submission_selector.py
       - List submissions for an active carrier
@@ -686,6 +730,7 @@ Phase 2 — Backend services
 
 Phase 3 — Qwen prompts
   └─ Add to doc 35:
+     - qwen_classify_carrier.txt
      - qwen_classify_overlay.txt
 
 Phase 4 — API endpoints
@@ -717,8 +762,8 @@ Phase 7 — WR integration
 
 ```text
 PER MISSION CREATION:
-  Qwen classification: 0€ (local)
-  Carrier check: 0€ (deterministic)
+  Qwen overlay classification: 0€ (local)
+  Qwen carrier classification: 0€ (local)
 
 PER CARRIER ACTIVATION:
   SQL query for submissions: 0€
@@ -767,7 +812,7 @@ USER CONTROL:
    (Strictly bonus, never punitive)
 
 ❌ Dynamic carrier criteria based on user mood
-   (V4: physical_demand_category considers energy)
+   (V4: engagement_level may consider energy)
 
 ❌ Suggesting submissions outside of carrier missions
    (V4: maybe small dashboard widget)
@@ -791,6 +836,8 @@ USER CONTROL:
 - Weather/traffic-based dynamic eligibility
 - Voice control for hands-free completion
 - Auto-detection of micro-pauses in carrier missions
+- Carrier qualification by percentage of available carrier time
+  (placeholder V4 design topic; example numbers are not final)
 - Integration with Vector overlay during VTC
 ```
 
@@ -802,10 +849,10 @@ USER CONTROL:
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — Qwen routing
 - `32_WR_INTERACTIVE_WORKFLOW.md` — WR feedback
 - `33_VECTOR_LOGIC_DETAIL.md` — VTC carrier context
-- `35_QWEN_SETUP_AND_PROMPTS.md` — overlay classification prompt
+- `35_QWEN_SETUP_AND_PROMPTS.md` — carrier and overlay classification prompts
 - `43_IMPERIUM_LOGIC_DETAIL.md` — mission lifecycle
 - `44_BRAIN_UNIFIED_LOGIC.md` — unified brain
-- `45_USER_OBJECTIVES_FEATURE.md` — V3 family
+- `F01_USER_OBJECTIVES.md` — V3 family
 - `47_WR_GUIDED_SECTIONS.md` — WR submission stats
 - `52_AI_DECISION_FRAMEWORK.md` — scoring foundation
 

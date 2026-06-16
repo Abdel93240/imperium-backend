@@ -161,3 +161,33 @@ curl -sS http://ollama:11434/api/tags
 ```
 
 A successful response proves n8n can reach Ollama/Qwen internally.
+
+## 9. Carrier Classification Prompt (doc 53)
+
+```text
+You are assessing whether a mission can be a "carrier" mission — a mission during
+which the user can also do short annex missions.
+
+The decisive factor is ENGAGEMENT, not physical effort:
+- A physically heavy task can still be a carrier if it leaves a hand and some
+  attention free (e.g. carrying a bag while making a call).
+- A physically light task is NOT a carrier if it takes both hands or full
+  attention (e.g. holding something in place, precise work).
+- A long, engaging task CAN be a carrier if it has pauses/idle stretches where
+  annex missions fit.
+
+MISSION TO ASSESS:
+Title: "{title}"
+Description: "{description}"
+Estimated duration: {duration_minutes} minutes
+Mission type: "{mission_type}"
+
+OUTPUT (strict JSON):
+{
+  "is_carrier_mission": <true | false>,
+  "engagement_level": <"low" | "medium" | "high">,
+  "has_exploitable_pauses": <true | false>,
+  "confidence": <0.0 to 1.0>,
+  "reasoning": "<one sentence in French>"
+}
+```
