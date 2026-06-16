@@ -111,17 +111,29 @@ AI can consult. Two mechanisms, two goals.
 ## 6. Accepted File Types & Size (V1)
 
 ```text
-V1 RULE: everything EXCEPT video and audio.
-Precise allow-list and max size: TBD (to define later).
+V1 RULE: accept content files, including AUDIO and VIDEO. The Path needs this,
+for example optional invocation audio. Reject by SAFETY, not by media type.
+
+Likely ACCEPTED:
+  - documents: PDF, plain text, Word, Excel
+  - images: PNG, JPG
+  - AUDIO: common formats (e.g. mp3, m4a, wav, ogg)
+  - VIDEO: common formats (e.g. mp4, mov)
+  (exact allow-list TBD)
+
+REJECTED (safety):
+  - executables and unsafe/odd types
+  - examples: .exe, .info, scripts, and other potentially dangerous file types
+
+Max file size: TBD. Audio/video imply a higher cap than documents, to define.
 ```
 
-Working assumptions (to confirm when finalized):
+The client does a soft pre-check; the backend does the HARD enforcement and
+returns a clear error if the type is unsafe or the size is exceeded.
 
-- Likely accepted: PDF, images (PNG/JPG), plain text, office documents
-  (Word/Excel) — exact list TBD.
-- Rejected in V1: any video, any audio.
-- Max file size: TBD. The client does a soft pre-check; the backend does the
-  hard enforcement and returns a clear error if exceeded or wrong type.
+Rationale: audio/video can be legitimate content. An invocation's audio is useful
+and harmless when validated; an executable is a security risk. The correct reject
+criterion is danger, not media format.
 
 ---
 
@@ -251,6 +263,8 @@ same feature in all five apps; only the entry point's surrounding settings diffe
 
 - Precise accepted file-type allow-list (§6).
 - Max file size (§6).
+- Audio/video storage and processing limits: larger uploads, transcription for
+  audio, frame/OCR extraction for video, and vectorization cost/latency.
 - Whether rejected/cancelled uploads are discarded immediately or kept as pending.
 - Retention policy for the original uploaded file after vectorization (keep the
   source? keep only the embeddings?).
