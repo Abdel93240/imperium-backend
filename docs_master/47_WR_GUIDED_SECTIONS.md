@@ -507,7 +507,9 @@ PULSE SECTION:
   ├─ pulse_medical_rules (active)
   ├─ body_snapshots
   ├─ hydration_logs
-  └─ pulse_pain_logs
+  ├─ pulse_pain_logs
+  ├─ food_stock
+  └─ pulse.diet_weekly_program (recipes + shopping list + cook mission)
 
 PATH SECTION:
   ├─ prayer_logs
@@ -516,11 +518,14 @@ PATH SECTION:
   ├─ adhkar_completions
   └─ quran_progression
 
-IMPERIUM MISSIONS SECTION:
+IMPERIUM SECTION (execution + projects):
   ├─ imperium_missions (filtered by week)
   ├─ imperium_replan_events
   ├─ imperium_discipline_scores
-  └─ imperium_morning_checkins
+  ├─ imperium_morning_checkins
+  ├─ projects
+  ├─ routines
+  └─ routine_daily_checks
 ```
 
 The section service (per Section 13) handles the data assembly per section.
