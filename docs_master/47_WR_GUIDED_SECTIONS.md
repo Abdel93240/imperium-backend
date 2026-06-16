@@ -142,23 +142,6 @@ PHASE 6 — FINAL SYNTHESIS
 
 ---
 
-## 5. Quick Validation Path Still Available
-
-The quick-validation path from doc 32 §6 step 8 is preserved:
-
-```text
-At the start of the WR, user can choose:
-  [Mode guidé section par section] (default, V2 feature)
-  [Mode rapide — voir le résumé global et valider]
-  
-The quick mode preserves the V1 behavior for users who 
-genuinely have nothing to discuss this week.
-```
-
-The user remains in control. The quality gate (doc 32 §7) applies inside each section in guided mode.
-
----
-
 ## 6. Cost Analysis
 
 ```text
@@ -238,7 +221,7 @@ CREATE TABLE weekly_report_sections (
   -- Lifecycle
   status                   VARCHAR(32) NOT NULL DEFAULT 'pending',
                            -- 'pending' | 'awaiting_user' 
-                           -- | 'completed' | 'skipped'
+                           -- | 'completed'
   started_at               TIMESTAMPTZ NULL,
   completed_at             TIMESTAMPTZ NULL,
   created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -250,7 +233,7 @@ CREATE TABLE weekly_report_sections (
   CONSTRAINT weekly_report_sections_order_check
     CHECK (section_order BETWEEN 1 AND 5),
   CONSTRAINT weekly_report_sections_status_check
-    CHECK (status IN ('pending', 'awaiting_user', 'completed', 'skipped'))
+    CHECK (status IN ('pending', 'awaiting_user', 'completed'))
 );
 
 -- One section per (WR, section_name)
@@ -327,7 +310,6 @@ The new weekly_report_sections.status tracks per-section progress:
   pending      - section not started yet
   awaiting_user - AI generated narrative + questions, waiting for answer
   completed    - user answered, section locked
-  skipped      - user took quick-validation path
 
 The UI consults section status to show the user where they are
 in the conversation.
@@ -501,9 +483,6 @@ GET /api/v1/imperium/wr/sessions/{id}/sections
   List all sections of a session with their status.
   Used by UI to show progress (e.g. "3 of 5 done").
 
-POST /api/v1/imperium/wr/sessions/{id}/skip-to-quick
-  User decides mid-session they want to skip remaining sections.
-  Triggers final synthesis with whatever data we have.
 ```
 
 The `/validate` endpoint (doc 32 §14.2) still applies at the very end.
@@ -530,9 +509,6 @@ Each section shows:
   
   [Continuer]  (advances to next section)
   
-At any time:
-  [Mode rapide]  (skips to final synthesis with current data)
-
 Final synthesis shows:
   Full report draft (V1 layout from doc 32 §13)
   
@@ -601,7 +577,7 @@ End-to-end test:
    (AI decides 1-3 based on data complexity)
 
 ❌ Skipping individual sections at user request
-   (Either go through all 5, or use quick-mode for none)
+   (the AI always goes through all 5 sections)
 
 ❌ Cross-section AI questioning during a section
    (Each section is self-contained; cross-references appear
@@ -660,7 +636,6 @@ Phase 6 — Vectorization changes
 Phase 7 — UI in Android app
   ├─ Progress indicator
   ├─ Section header + cards
-  ├─ Quick-mode escape
   └─ Final synthesis view
 
 Phase 8 — Migration of past WRs (optional)
