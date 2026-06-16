@@ -142,6 +142,85 @@ PHASE 6 — FINAL SYNTHESIS
 
 ---
 
+## 5. WR Context Architecture (Opus Audit + RAG)
+
+Cross-domain correlations require a global view, but the WR dialogue must not fill
+Qwen's context window with a large weekly summary. The WR therefore uses an
+audit-first RAG architecture: Opus produces a dense weekly audit, the audit is
+vectorized, and Qwen retrieves only the relevant chunks while guiding the user.
+
+Qwen3-32B native context is approximately 32,768 tokens. YaRN can extend the
+window, but it degrades short-context behavior and is not reliable as the default
+WR design. A talkative WR can grow quickly once the global summary, five guided
+sections, user answers, and self-scoring are all in play. Holding everything in
+context is the wrong design.
+
+The architecture preserves the WR's purpose: cross-domain correlations such as
+Pulse low sleep + Imperium missions marked as "flemme" should surface as possible
+fatigue, not be missed because each section is isolated.
+
+### 5.1 Weekly audit by Opus 4.8 at max effort
+
+```text
+Once per week, Opus 4.8 is run at MAXIMUM reasoning effort. This is the rare,
+high-stakes call that produces a structured weekly AUDIT:
+  - key facts per domain (Vector, Vault, Pulse, Path, Imperium)
+  - severity tiers: critical / high / medium / low points
+  - maximum cross-domain correlations, pre-identified explicitly
+    e.g. "low sleep (5h avg) ↔ 3 missions skipped 'flemme' → fatigue suspected?"
+         "long VTC sessions Tue/Thu ↔ Asr missed those days"
+
+Fable 5 was the originally intended top-tier model for this role but is currently
+suspended (US export-control directive). Opus 4.8 at max effort is the relay until
+that changes.
+```
+
+### 5.2 Vectorize the audit
+
+```text
+The audit is vectorized using the dedicated embedding model (Qwen3-Embedding, Q8,
+on the dedicated embedding GPU per doc 38) and stored in pgvector.
+
+The audit is chunked along its natural structure:
+  - per-domain facts
+  - per-severity points
+  - each cross-domain correlation as its own retrievable unit
+```
+
+### 5.3 Qwen drives the dialogue via retrieval
+
+```text
+Qwen 32B conducts the 5-phase guided conversation. It does NOT load the whole
+audit into context. Per section / per need, it RETRIEVES the relevant audit chunks
+from pgvector and works with just those.
+
+Result: Qwen's context window stays largely free:
+  - room for the user dialogue
+  - room for self-scoring ("can I answer this, or escalate?")
+  - room to call cloud specialists when a point exceeds its competence
+
+Because Opus pre-computed the correlations and they are retrievable, Qwen surfaces
+them in the right section without recomputing or holding everything in memory.
+```
+
+### 5.4 Correlations emerging during the dialogue
+
+```text
+If a new user answer reveals a correlation the audit could not foresee, Qwen has
+the free context to notice it live and escalates to a specialist cloud model if it
+exceeds local competence.
+```
+
+### 5.5 Final synthesis
+
+```text
+The final synthesis (Phase 6) consolidates the validated sections. It may use the
+audit + the section results; being high-stakes because it becomes long-term
+memory, it can escalate to Opus per doc 32 deep weekly analysis.
+```
+
+---
+
 ## 6. Cost Analysis
 
 ```text
