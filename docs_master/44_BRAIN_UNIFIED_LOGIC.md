@@ -198,6 +198,119 @@ But n8n does not become the AI decision authority.
 
 ---
 
+## 6-bis. Expert-Call Orchestration During Qwen Dialogue
+
+### 6-bis.1 Principle: the orchestrator drives
+
+Models never call each other directly.
+
+```text
+Qwen talks with the user
+→ Qwen returns a structured result + self-score to the backend/orchestrator
+→ the orchestrator decides whether escalation is needed
+→ the orchestrator fills the specialist prompt template
+→ the specialist model returns a structured expert result
+→ Qwen reintegrates the result for the user
+```
+
+This prevents runaway chains, uncontrolled cost, and untraceable model-to-model
+calls. Every hop is created, logged, validated, and bounded by the backend/Tower.
+
+### 6-bis.2 Qwen stays master of live dialogue
+
+The user always talks to Qwen. If a specialist is needed, the specialist round
+trip is invisible to the user.
+
+Rules:
+
+- Qwen keeps conversational continuity.
+- The expert does not become the chat surface.
+- Qwen reintegrates the expert answer in its own words.
+- Canonical writes still require backend validation and, when needed, user
+  confirmation.
+
+Continuity lives in Qwen, not in the expert.
+
+### 6-bis.3 Expert data freshness: solved by RAG
+
+The system must not rely on Qwen to gather and forward all domain facts. Qwen may
+forget a key detail, compress too much, or preserve the wrong thing.
+
+When the orchestrator invokes an expert, it provides:
+
+```text
+- expert role / intrinsic project of the domain (Layer 1)
+- user's explicit domain projects from F01 meta-prompt (Layer 2)
+- user's question
+- RAG access to vectorized domain data
+```
+
+Example for Pulse:
+
+```text
+The health expert receives the Pulse role, the user's explicit health projects,
+the user's question, and RAG access to workouts, meals, weight history, pain logs,
+and training evolution. The expert retrieves what it needs itself.
+```
+
+This matches the WR RAG principle: the expert pulls real vectorized data instead
+of depending on a possibly lossy Qwen summary.
+
+### 6-bis.4 Cost control for expert calls
+
+API models are stateless. Keeping an expert "warm" means re-sending prior
+exchanges; it preserves continuity but does not reduce the number of calls and
+can increase per-call cost as history grows.
+
+Cost is controlled by:
+
+```text
+1. RAG: the expert pulls data directly.
+2. Filtering: Qwen escalates only genuinely complex questions.
+3. Light question grouping: Qwen can let the user finish a small flow of domain
+   questions, then make one expert call.
+```
+
+Qwen must not escalate ordinary low-risk questions that it can answer locally.
+
+### 6-bis.5 V1 decision
+
+```text
+V1:
+  - keep expert continuity by re-sending the relevant recent conversation
+  - limit this to a small number of exchanges, around 2-3 max on a topic
+  - combine it with RAG access, strict escalation filtering, and light grouping
+```
+
+This accepts a small context cost for continuity while keeping live expert
+dialogues bounded.
+
+### 6-bis.6 Future option: vectorize expert answers during dialogue
+
+Not V1.
+
+The possible future design is to vectorize expert answers so the next expert call
+retrieves only the important essence instead of re-sending verbatim history.
+
+Merit:
+
+- applies RAG to the expert's own conversational memory
+- can keep context light if expert dialogues become long
+
+V1 blocker:
+
+- latency during live chat: embed, store, embed query, search, build prompt
+- likely overkill for short expert sub-dialogues of 2-5 questions
+
+Viability condition:
+
+```text
+Adopt only if real expert dialogues become genuinely long AND measured embedding
+latency on the V100 is low enough to avoid a slow/choppy chat experience.
+```
+
+---
+
 ## 7. Where AI And n8n Results Are Stored
 
 AI and n8n results are **not** stored in a separate n8n database.
@@ -718,6 +831,10 @@ For Codex / Claude Code:
 - `15_SERVICE_ARCHITECTURE_MAP.md` — service evolution
 - `16_AI_BACKEND_LAYER_OVERVIEW.md` — AI layer overview
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — official scoring and model routing
+- `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen prompts and specialist prompt placement
+- `38_VECTORIZATION_PIPELINE.md` — vectorization mechanics
+- `47_WR_GUIDED_SECTIONS.md` — WR RAG precedent
+- `F01_USER_OBJECTIVES.md` — explicit projects as domain prompt layer
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` — AI task/result storage contract
 - `32_WR_INTERACTIVE_WORKFLOW.md` — Weekly Review interactive workflow
 - `33_VECTOR_LOGIC_DETAIL.md` — Vector scope and VTC logic
