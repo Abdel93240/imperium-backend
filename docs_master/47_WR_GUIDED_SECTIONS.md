@@ -146,8 +146,9 @@ PHASE 6 — FINAL SYNTHESIS
 
 Cross-domain correlations require a global view, but the WR dialogue must not fill
 Qwen's context window with a large weekly summary. The WR therefore uses an
-audit-first RAG architecture: Opus produces a dense weekly audit, the audit is
-vectorized, and Qwen retrieves only the relevant chunks while guiding the user.
+audit-first RAG architecture: Opus produces a dense INPUT audit, the audit is
+vectorized, Qwen retrieves only the relevant chunks while guiding the user, then
+Opus produces a final validated OUTPUT audit.
 
 Qwen3-32B native context is approximately 32,768 tokens. YaRN can extend the
 window, but it degrades short-context behavior and is not reliable as the default
@@ -159,11 +160,11 @@ The architecture preserves the WR's purpose: cross-domain correlations such as
 Pulse low sleep + Imperium missions marked as "flemme" should surface as possible
 fatigue, not be missed because each section is isolated.
 
-### 5.1 Weekly audit by Opus 4.8 at max effort
+### 5.1 Input audit by Opus 4.8 at max effort
 
 ```text
 Once per week, Opus 4.8 is run at MAXIMUM reasoning effort. This is the rare,
-high-stakes call that produces a structured weekly AUDIT:
+high-stakes call that produces a structured weekly INPUT AUDIT:
   - key facts per domain (Vector, Vault, Pulse, Path, Imperium)
   - severity tiers: critical / high / medium / low points
   - maximum cross-domain correlations, pre-identified explicitly
@@ -211,40 +212,72 @@ the free context to notice it live and escalates to a specialist cloud model if 
 exceeds local competence.
 ```
 
-### 5.5 Final synthesis
+### 5.5 Final synthesis and output audit
 
 ```text
-The final synthesis (Phase 6) consolidates the validated sections. It may use the
-audit + the section results; being high-stakes because it becomes long-term
-memory, it can escalate to Opus per doc 32 deep weekly analysis.
+The final synthesis (Phase 6) consolidates the validated sections. Opus 4.8 then
+reruns the audit at maximum effort using the user's corrections from the dialogue.
+
+This OUTPUT AUDIT is the final, user-validated weekly learning artifact. It is
+vectorized and becomes a central memory source for Imperium planning, arbitration,
+advice, missions, and future WRs.
 ```
 
 ---
 
-## 6. Cost Analysis
+## 6. Cost Analysis (RAG architecture, two Opus audits)
+
+The WR no longer runs many per-section Opus calls. Cost shape:
 
 ```text
-V1 WR (free-form):
-├─ 1 Opus call: initial summary (with embedded questions)
-├─ 1 Opus call: integrate user answers into final draft
-├─ Optional: 1 Opus call for revision
-└─ Total: ~$0.20/week
-
-V2 WR (guided sections):
-├─ 5 Opus calls: one per section (summary + questions)
-├─ 5 Opus calls: one per section (integrate user answers)
-├─ 1 Opus call: final synthesis from all sections
-├─ Optional: 1 Opus call for revision
-└─ Total: ~$1.20/week
-
-DIFFERENCE: +$1/week = ~$52/year
-
-Justification: the quality jump is significant. Users
-explicitly identified V1 free-form as a weakness. Paying
-$1/week for guaranteed multi-domain coverage is trivial.
+├─ 1 Opus audit (max effort) — INPUT          — heavy call #1
+├─ Qwen dialogue via RAG (local)               — free in itself
+│    └─ specialist escalations (variable):
+│         finance/health → GPT-5.5 ; other → Opus ; religion → NO AI (DB lookup)
+├─ Vectorization (local embedding GPU)         — free (no API)
+├─ 1 Opus audit (max effort) — OUTPUT          — heavy call #2 (not optional)
+└─ (final user validation of the report)
 ```
 
-The cost remains negligible at the project's scale.
+The OUTPUT audit is not just a source for daily AI advice. It is the central
+learning artifact of the Imperium brain:
+- it teaches the AI from user-validated reality, not hypotheses;
+- week after week, it makes the system progressively more intelligent;
+- it feeds planning, arbitration, advice, missions, WRs, and daily guidance.
+
+This is why both Opus max-effort audits are justified: they invest in Imperium's
+cognitive core, not comfort spending.
+
+Estimated cost per WR (Opus 4.8 at $5/M input, $25/M output; output dominates):
+
+```text
+Opus INPUT audit (max effort):
+  ~15,000 in × $5/M   = $0.075
+  ~ 8,000 out × $25/M = $0.200   → ~$0.275
+
+Qwen RAG dialogue (local)        → $0.000
+
+Specialist escalations (~3 avg, small calls ~3,000 in / ~1,500 out each):
+  ~3 × ~$0.05                    → ~$0.15
+  (finance/health → GPT-5.5 ; other → Opus ; religion → no AI)
+
+Opus OUTPUT audit (max effort, incorporates user corrections):
+  ~25,000 in × $5/M   = $0.125
+  ~10,000 out × $25/M = $0.250   → ~$0.375
+
+Vectorization (local embedding GPU) → $0.000
+──────────────────────────────────────────────
+TOTAL ≈ $0.80 per WR  →  ~$40-45 / year (×52 weeks)
+```
+
+Net: dominated by the two weekly Opus max-effort audits (input + output), plus a
+small number of specialist escalations. The old per-section Opus model is gone.
+The heavy spend is concentrated where it builds Imperium's core memory: the
+validated output audit, which is the system's main asset.
+
+These are estimates based on plausible token sizes. The real cost will be
+calibrated in use via the AI cost-logging layer (doc 43 §17). Order of magnitude:
+tens of dollars per year, not hundreds.
 
 ---
 
