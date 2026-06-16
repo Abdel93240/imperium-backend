@@ -398,6 +398,7 @@ imperium.chat.sonnet_response      - standard chatbot
 imperium.email_triage              - email handling (rare)
 imperium.weekly_review.*           - per doc 32
 imperium.daily_plan_assist         - mid-day suggestion
+imperium.daily_ai_advice           - dashboard advice generated inside daily plan (Qwen)
 imperium.memory_candidate_extract  - identify memorable insights
 imperium.health_snapshot           - system health analysis (Qwen+Sonnet, doc 54)
 imperium.daily_summary             - end-of-day 4-line summary (Sonnet, doc 54)
@@ -474,6 +475,43 @@ Replan is triggered by:
   - User explicit action ("Reprogrammer")
   - Mission ratée (lost time to recover)
   - Calendar event added ≤7 days (V3)
+```
+
+### 12.3 Daily AI advice (dashboard)
+
+```text
+The Daily AI Advice block is generated once per day inside the daily-plan call.
+It does not add a separate paid model call in V1.
+
+Model:
+  - Qwen local, the daily-plan model.
+  - If the daily-plan model is later switched, the advice follows the same
+    fallback path.
+
+Source:
+  - the VECTORIZED latest WR OUTPUT audit
+  - specifically the Opus audit after the WR dialogue corrections validated by
+    the user, not the unvalidated input audit.
+
+Selection rule:
+  - WR output audit memories carry an importance tag
+    (critical / important / light / ...).
+  - Qwen selects one concrete pattern from critical or important items.
+  - Peripheral observations must not become daily advice.
+
+Output:
+  - one short, concrete sentence about a real personal pattern.
+  - example: "Attention à la fatigue vers 16h — dis-moi si tu veux te reposer."
+
+Actions:
+  - [Voir pourquoi] opens the underlying pattern/explanation.
+  - [Ouvrir chatbot] opens the Imperium chatbot so the user can rebound on the
+    advice and ask the brain to replan.
+
+Relation:
+  - Weekly Review is the deep weekly analysis.
+  - Daily AI Advice is its lightweight daily sibling, fed by the vectorized,
+    user-validated WR output.
 ```
 
 ---
@@ -568,6 +606,12 @@ Imperium Dashboard (the main user-facing screen):
   ├─ Current focus mission (the ONE thing now)
   │   - Title + countdown to deadline
   │   - [Faite] [Ratée] [Annulée] buttons
+  ├─ Daily AI Advice
+  │   - one concrete pattern from the latest validated WR output audit
+  │   - [Voir pourquoi] [Ouvrir chatbot]
+  ├─ Projets en cours
+  │   - top active projects with progress %
+  │   - [Voir tous les projets] link to Operations tab (doc 71)
   ├─ Today's plan (other active missions)
   │   - Tap to expand
   ├─ Quick stats:
@@ -579,11 +623,23 @@ Imperium Dashboard (the main user-facing screen):
       [Reprogrammer] [+ Mission manuelle] [Voir historique]
 
 Other tabs:
-  - Plan history (past days)
+  - History screen (read-only consultation)
+    - finances evolution, e.g. 3-month net result curve
+    - discipline evolution curve (real accomplishment ratio, not game score)
+    - completed projects list with dates
+    - AI note on the bilan (strong point / weak point / reading)
   - Decisions log (chatbot decisions)
   - Settings (priorities, morning popup time, etc.)
   - Weekly Reviews (validated WRs)
   - Mon OS personnel (doc 54, system health dashboard)
+```
+
+Gamification boundary for History:
+```text
+The old "Hall of Fame" framing is forbidden. Do not use badges, ranks, levels,
+numeric game scores, streak rewards, or trophy framing. Discipline remains a real
+metric: mission-accomplishment ratio and the composite-weighted metric described
+in §6 and §15.
 ```
 
 ---
@@ -596,10 +652,21 @@ Imperium settings includes:
 CORE:
   - morning_popup_time (e.g. 06:30)
   - morning_popup_enabled (default true)
+  - widget_enabled (show/manage Imperium widget on home screen)
+  - notifications_enabled (missions, routines, alerts + manage)
 
 PRIORITY HIERARCHY:
   - drag-to-reorder list of priority sources
   - default order shown in §9
+
+MODE IA:
+  - STRICT: the AI follows the priority hierarchy and rules to the letter.
+  - ÉQUILIBRÉ: the AI seeks the best balance between priorities and context.
+  - SOUPLE: the AI may deviate from the hierarchy when context justifies it.
+  - Default: to confirm, likely ÉQUILIBRÉ.
+  - This influences daily plan, mission arbitration, advice, and recommendations.
+  - This is not "quick mode": it changes firmness of priority-following, not
+    content depth or validation.
 
 REPLAN BEHAVIOR:
   - replan_on_mission_failure (default: yes for urgente, ask for others)
@@ -608,6 +675,21 @@ REPLAN BEHAVIOR:
 CHATBOT:
   - default_routing (qwen → ... → opus chain visible in advanced)
   - chat history retention (default: 90 days)
+
+FEED IA / NOURRIR L'IA:
+  - button in Settings → Intelligence Artificielle.
+  - references the central Knowledge Inbox spec (doc 70).
+  - the user adds content; AI analyzes it; the user validates or modifies before
+    anything enters common memory / pgvector.
+
+API & SECURITY:
+  - API connection status
+  - location permission
+  - microphone permission
+  - camera permission
+  - health data permission
+  - storage permission
+  - aligns with doc 44 privacy boundaries.
 
 DISCIPLINE:
   - composite_weights (Imperium / Path / Pulse) - default 0.5 / 0.3 / 0.2
@@ -641,6 +723,8 @@ SYSTEM HEALTH (V3, doc 54):
 - `52_AI_DECISION_FRAMEWORK.md` — mission scoring
 - `53_SUBMISSIONS_OVERLAY_TASKS.md` — carrier/overlay logic
 - `54_SYSTEM_HEALTH_DASHBOARD.md` — health snapshots
+- `70_KNOWLEDGE_INBOX.md` — central Feed IA / "Nourrir l'IA" spec
+- `71_IMPERIUM_OPERATIONS_TAB.md` — projects/routines source for dashboard preview
 
 ---
 
