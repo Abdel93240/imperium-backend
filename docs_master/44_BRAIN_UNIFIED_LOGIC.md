@@ -153,6 +153,100 @@ AI proposes, classifies, summarizes, extracts, reasons, or drafts. The backend v
 
 ---
 
+## 5-bis. Terminology & Hierarchy
+
+The ecosystem uses one hierarchy for work, worship, health, finance, and VTC
+execution:
+
+```text
+IMPERIUM = the assistant that helps the user improve their life.
+
+PROJET = what the user wants to BUILD.
+
+Two kinds of projects exist:
+
+1. INTRINSIC projects
+   - vital, implicit, and not entered by the user in the frontend
+   - owned by the backend as each app's reason to exist
+   - examples:
+       Pulse     → être en bonne santé
+       Path      → être un bon musulman
+       Vault     → bien gérer mes finances
+       Imperium  → être bien organisé, être à jour dans ma paperasse
+   - using the ecosystem implies these projects.
+
+2. EXPLICIT projects
+   - declared by the user
+   - organized by domain/category through F01
+   - examples:
+       Santé   → abdos apparents, courir un marathon
+       Finance → acheter la voiture VTC, épargner 20k€
+       Métier  → devenir bijoutier
+
+OBJECTIF = the translation of a project into the RESULTS needed to achieve it.
+Example:
+  projet "abdos apparents"
+    → objectifs "perdre du gras" + "prendre du muscle abdominal"
+
+For a simple project, the brain may generate missions directly without a visible
+intermediate objective layer.
+
+MISSION = the precise task to execute, one by one, to achieve objectives and
+therefore projects.
+Examples:
+  - courir 30 min
+  - faire la séance abdos
+  - appeler l'administration
+
+ROUTINE = a recurring mission that serves an objective and a project.
+Examples:
+  - se brosser les dents
+      → objectif "bonne hygiène"
+      → projet intrinsèque "bonne santé"
+  - lire 30 min sur la joaillerie
+      → objectif "fabriquer une bague"
+      → projet explicite "devenir bijoutier"
+
+Cascade:
+  IMPERIUM → PROJETS (intrinsic + explicit) → OBJECTIFS → MISSIONS
+  routines = recurring missions inside this cascade
+```
+
+Routine classification:
+
+```text
+The AI classifies each routine by the objective/project it serves.
+A routine is never isolated. The AI infers what it feeds.
+
+Example:
+  "lire 30 min sur la joaillerie"
+    → serves objective "fabriquer une bague"
+    → serves project "devenir bijoutier"
+
+This lets WR and daily advice say:
+  "Tu avances sur ton projet bijoutier grâce à ta routine de lecture."
+```
+
+Prompt materialization:
+
+```text
+LAYER 1 — INTRINSIC project = ROLE / SYSTEM layer.
+  It defines who the AI is and why it acts in that domain.
+  Example for Pulse:
+    "Tu es un assistant santé/sport. Ta raison d'être est de maintenir
+     l'utilisateur en bonne santé, au mieux de ses capacités..."
+
+LAYER 2 — EXPLICIT projects = personalized USER-CONTEXT layer.
+  It comes from F01: the user's declared projects in that domain.
+  Opus generates the F01 meta-prompt from these projects, then the backend
+  injects that context into future domain AI calls.
+```
+
+Layer 1 must stay stable and carefully worded because it tints every answer in a
+domain. Layer 2 is personalized and changes when the user edits explicit projects.
+
+---
+
 ## 6. The AI Layer Within The Brain
 
 The AI layer follows docs 30 and 31.

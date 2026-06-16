@@ -1,4 +1,4 @@
-# 45 - User Objectives Feature (V3)
+# F01 - User Projects Feature (V3)
 
 > ⚠️ **V3 feature — do not implement before V1 and V2 are stable.**
 > This document captures the design decisions for future implementation.
@@ -7,7 +7,9 @@
 
 ## 1. Purpose
 
-The User Objectives feature allows the user to declare **personal objectives per application**, which the AI then uses to personalize all future suggestions and decisions in that domain.
+The User Projects feature allows the user to declare **personal projects per
+domain/category**, which the AI then uses to personalize all future suggestions
+and decisions in that domain.
 
 Without this feature, the AI gives **generic answers**.
 With this feature, the AI gives **personally aligned answers**.
@@ -20,42 +22,42 @@ The unified brain (per doc 44) needs to know what the user actually wants in eac
 
 ```text
 V1 — Apps must run and collect data first.
-     Without baseline data, personalized objectives are guesswork.
+     Without baseline data, personalized projects are guesswork.
 
 V2 — User must experience generic AI suggestions and feel
-     their limits. This frustration is what makes objectives
+     their limits. This frustration is what makes projects
      genuinely valuable.
 
-V3 — User now knows what they want from each app, has data
-     to ground the objectives, and has felt the gap.
+V3 — User now knows what they want from each domain, has data
+     to ground the projects, and has felt the gap.
      The feature lands at the right moment.
 ```
 
-Implementing this in V1 would force the user to declare objectives **before** they know what they need.
+Implementing this in V1 would force the user to declare projects **before** they know what they need.
 
 ---
 
 ## 3. Structure
 
-### 3.1 Five objectives per app, max
+### 3.1 Five projects per domain/category, max
 
 ```text
-Each of the five apps can hold up to 5 user objectives:
+Each of the five domains/categories can hold up to 5 user projects:
   - Imperium
   - Vector
   - The Vault
   - Pulse
   - The Path
 
-Total maximum across the system: 25 objectives.
+Total maximum across the system: 25 projects.
 ```
 
 ### 3.2 Hierarchy: principal + secondary
 
 ```text
-Position 1 (mandatory if any objective in this app):
+Position 1 (mandatory if any project in this domain/category):
   importance = "principal"
-  → Drives the main orientation of all AI calls in this app
+  → Drives the main orientation of all AI calls in this domain
 
 Positions 2 to 5 (optional):
   importance = "secondaire"
@@ -81,7 +83,7 @@ When user asks "Quel workout aujourd'hui ?":
   choices that support testosterone (secondary 3).
 
 Without hierarchy:
-  AI doesn't know what to do when objectives compete.
+  AI doesn't know what to do when projects compete.
   Result: random selection or generic compromise.
 
 With hierarchy:
@@ -89,16 +91,16 @@ With hierarchy:
   Result: coherent, personalized advice.
 ```
 
-### 3.4 Minimum: at least one objective per app
+### 3.4 Minimum: at least one project per domain/category
 
 ```text
-The user is NOT required to fill all 5 slots in every app.
+The user is NOT required to fill all 5 slots in every domain/category.
 
 But the user IS required to have at least 1 validated
-objective in each of the 5 apps.
+project in each of the 5 domains/categories.
 
-If the user has not yet defined at least one objective for
-any app, Imperium auto-creates a missions to do so.
+If the user has not yet defined at least one project for
+any domain/category, Imperium auto-creates a mission to do so.
 See Section 5.
 ```
 
@@ -108,10 +110,10 @@ See Section 5.
 
 ```text
 USER PATH:
-Imperium → Settings → Objectifs
+Imperium → Settings → Projets
 
 DISPLAY:
-  Five collapsible sections, one per app.
+  Five collapsible sections, one per domain/category.
   Each section shows the 5 slots:
 
   ┌─────────────────────────────────────────┐
@@ -144,19 +146,19 @@ After "Enregistrer les préférences":
 Slot validated → green dot ✅
   No message shown.
 
-Slot rejected — wrong app → red dot ❌
+Slot rejected — wrong domain/category → red dot ❌
   Red text below the slot:
-  "Cet objectif appartient plutôt à [suggested app].
+  "Ce projet appartient plutôt à [suggested domain].
    Veuillez le déplacer ou le reformuler."
 
 Slot rejected — unclear → red dot ❌
   Red text below the slot:
   "Pas compris. Pourrais-tu reformuler ?"
 
-Slot has cohrence warning → orange dot ⚠️ (non-blocking)
+Slot has coherence warning → orange dot ⚠️ (non-blocking)
   Orange text below the slot:
-  "Attention: cet objectif semble en tension avec ton 
-   objectif principal '[principal text]'. Confirmer quand
+  "Attention: ce projet semble en tension avec ton
+   projet principal '[principal text]'. Confirmer quand
    même ?" 
    [Yes, save anyway] [Edit]
 ```
@@ -165,41 +167,41 @@ The user keeps full control. Cohérence warnings never block.
 
 ---
 
-## 5. Auto-Mission If An App Has No Objective
+## 5. Auto-Mission If A Domain Has No Project
 
 When the user opens the system the first day after the feature is enabled:
 
 ```text
-For each app where user has 0 validated objectives:
+For each domain/category where user has 0 validated projects:
   → Imperium creates a mission:
     
-    Title: "Définir au moins un objectif pour [App name]"
+    Title: "Définir au moins un projet pour [Domain name]"
     type: very_important
     source: ai_planner
     deadline: 7 days
     description: 
-      "Le système est moitié configuré sans objectif pour [app].
-       Une minute en Settings > Objectifs."
+      "Le système est moitié configuré sans projet pour [domain].
+       Une minute en Settings > Projets."
 ```
 
 Why these missions matter:
 
 ```text
-Without objectives in an app, the AI in that app gives
+Without projects in a domain/category, the AI in that domain gives
 generic suggestions. Half-configured systems frustrate users.
 
 These missions push the user to complete the configuration
 without nagging or aggressive notifications.
 ```
 
-If the user explicitly says "I don't want objectives in Vault",
+If the user explicitly says "I don't want projects in Vault",
 they can opt out:
 
 ```text
-In Settings > Objectifs > Vault:
-  [☑ Skip this app — no objectives needed]
+In Settings > Projets > Vault:
+  [☑ Skip this domain — no projects needed]
   
-This removes the auto-mission and the AI uses generic mode for that app.
+This removes the auto-mission and the AI uses generic mode for that domain.
 ```
 
 ---
@@ -207,9 +209,9 @@ This removes the auto-mission and the AI uses generic mode for that app.
 ## 6. The Three-Level Validation By Qwen
 
 ```text
-LEVEL 1 — APP MATCH (per slot, blocking)
+LEVEL 1 — DOMAIN MATCH (per slot, blocking)
   Qwen analyzes:
-    Does this objective belong in this app?
+    Does this project belong in this domain/category?
     
   Examples:
     Slot in Pulse: "Économiser pour acheter une moto"
@@ -219,11 +221,11 @@ LEVEL 1 — APP MATCH (per slot, blocking)
     → REJECT: belongs in Pulse
     
     Slot in Vault: "Mettre 200€ de côté chaque semaine"
-    → ACCEPT: correct app
+    → ACCEPT: correct domain
 
 LEVEL 2 — CLARITY (per slot, blocking)
   Qwen analyzes:
-    Is the objective clear enough to derive a strategy?
+    Is the project clear enough to derive a strategy?
     
   Examples:
     "Truc bidule"
@@ -235,9 +237,9 @@ LEVEL 2 — CLARITY (per slot, blocking)
     "Augmenter ma masse musculaire de 5 kg en 6 mois"
     → ACCEPT: specific and actionable
 
-LEVEL 3 — COHERENCE (per app, non-blocking)
+LEVEL 3 — COHERENCE (per domain/category, non-blocking)
   Qwen analyzes:
-    Do the slots in this app contradict each other?
+    Do the slots in this domain/category contradict each other?
   
   Examples:
     Pulse:
@@ -257,19 +259,21 @@ LEVEL 3 — COHERENCE (per app, non-blocking)
 
 ## 7. Meta-Prompt Generation By Opus 4.7
 
-Once all user objectives in an app are validated (Levels 1 + 2 passed; Level 3 acknowledged or absent), Opus 4.7 generates a meta-prompt that will be injected into all future AI calls in that app.
+Once all user projects in a domain/category are validated (Levels 1 + 2 passed;
+Level 3 acknowledged or absent), Opus 4.7 generates a meta-prompt that will be
+injected into all future AI calls in that domain.
 
 ### 7.1 Why Opus and not Qwen
 
 ```text
 THE PROMPT WILL BE READ 1000+ TIMES:
-  - Each AI call in this app injects it
+  - Each AI call in this domain injects it
   - Workout planning: 200 calls/year
   - Meal suggestion: 1000 calls/year  
   - Total over 3 years: 5000+ uses
 
 THE PROMPT IS GENERATED ONCE:
-  - User defines objectives
+  - User defines projects
   - Opus generates the meta-prompt
   - Stored in DB
   - Reused without regeneration
@@ -277,7 +281,7 @@ THE PROMPT IS GENERATED ONCE:
 ECONOMICS:
   - Pay $0.10 once for top-quality meta-prompt
   - Versus risk: 5000 mediocre AI responses
-  - Total cost lifetime: ~$2.50 max for 25 objectives
+  - Total cost lifetime: ~$2.50 max for 25 projects
   - Negligible for the value
 ```
 
@@ -286,10 +290,10 @@ ECONOMICS:
 ```text
 You are generating a meta-prompt for a personal AI ecosystem.
 
-TARGET APP: {app_name}
-APP PURPOSE: {app_purpose_short}
+TARGET DOMAIN: {domain_name}
+DOMAIN PURPOSE: {domain_purpose_short}
 
-USER OBJECTIVES (in priority order):
+USER PROJECTS (in priority order):
 1. PRINCIPAL: {position_1_text}
 2. SECONDARY: {position_2_text}
 3. SECONDARY: {position_3_text}
@@ -301,21 +305,21 @@ USER PROFILE CONTEXT:
 
 YOUR TASK:
 Produce a meta-prompt that will be INJECTED into every future AI call
-in this app. The meta-prompt must:
+in this domain. The meta-prompt must:
 
 1. Establish a clear strategic orientation aligned with the principal.
-2. Treat secondary objectives as constraints/bonuses, not as competing goals.
-3. Specify HOW the AI should arbitrate when objectives conflict.
+2. Treat secondary projects as constraints/bonuses, not as competing goals.
+3. Specify HOW the AI should arbitrate when projects conflict.
 4. Stay concise (200-400 words) to avoid token bloat in every call.
 5. Use direct, no-flattery tone (the user explicitly rejects soft coaching).
-6. End with a "REMINDER" section listing the 5 objectives verbatim.
+6. End with a "REMINDER" section listing the 5 projects verbatim.
 
 OUTPUT FORMAT (strict):
 {
   "meta_prompt_text": "<the full meta-prompt in French>",
   "summary": "<one sentence summarizing the orientation>",
-  "arbitration_rule": "<how AI should choose when objectives conflict>",
-  "warnings": ["<any concerns about the objectives>"]
+  "arbitration_rule": "<how AI should choose when projects conflict>",
+  "warnings": ["<any concerns about the projects>"]
 }
 
 Output strict JSON only.
@@ -324,8 +328,8 @@ Output strict JSON only.
 ### 7.3 Storage
 
 ```text
-The generated prompt is stored in user_objective_prompts.
-It carries a reference to the source objectives.
+The generated prompt is stored in user_project_prompts.
+It carries a reference to the source projects.
 On any change, it is regenerated and the old version is marked superseded.
 ```
 
@@ -333,23 +337,23 @@ On any change, it is regenerated and the old version is marked superseded.
 
 ## 8. How The Meta-Prompt Is Used At Runtime
 
-When any AI call happens in app X for user U:
+When any AI call happens in domain X for user U:
 
 ```text
-1. Backend retrieves the active meta-prompt for (user U, app X):
-   SELECT generated_prompt FROM user_objective_prompts
-   WHERE user_id = U AND app_target = X
+1. Backend retrieves the active meta-prompt for (user U, domain X):
+   SELECT generated_prompt FROM user_project_prompts
+   WHERE user_id = U AND domain_target = X
    AND superseded_at IS NULL
    LIMIT 1
 
 2. If found:
    final_prompt = base_prompt 
-                + "\n\n--- USER OBJECTIVES CONTEXT ---\n"
+                + "\n\n--- USER PROJECTS CONTEXT ---\n"
                 + meta_prompt_text
                 + "\n\n--- TASK ---\n"
                 + current_task_specific_prompt
 
-3. If not found (app has no objectives):
+3. If not found (domain has no projects):
    final_prompt = base_prompt + current_task_specific_prompt
    (generic mode)
 
@@ -360,17 +364,17 @@ The meta-prompt adds ~50-100 tokens per call. Negligible cost overhead.
 
 ---
 
-## 9. Modifying An Existing Objective
+## 9. Modifying An Existing Project
 
-When the user edits any slot in any app:
+When the user edits any slot in any domain/category:
 
 ```text
 1. Re-validation Qwen on the edited slot only (Levels 1 + 2)
-2. Re-cohérence check on the entire app's slots (Level 3)
+2. Re-cohérence check on the entire domain/category's slots (Level 3)
 3. If validation passes:
-   ├─ Mark old user_objectives rows for this app as superseded
-   ├─ Insert new user_objectives rows (full set of slots)
-   ├─ Mark old user_objective_prompts row as superseded
+   ├─ Mark old user_projects rows for this domain/category as superseded
+   ├─ Insert new user_projects rows (full set of slots)
+   ├─ Mark old user_project_prompts row as superseded
    ├─ Trigger Opus to regenerate the meta-prompt
    └─ New meta-prompt becomes active immediately
 
@@ -380,7 +384,7 @@ When the user edits any slot in any app:
 ### 9.1 Why regenerate the entire prompt
 
 ```text
-Changing one secondary objective shifts the arbitration logic.
+Changing one secondary project shifts the arbitration logic.
 Trying to update the meta-prompt partially:
   - Risk inconsistencies
   - Risk obsolete instructions
@@ -397,17 +401,17 @@ Regenerating fully:
 ## 10. Cost Analysis
 
 ```text
-INITIAL SETUP (lifetime, one-shot per objective):
-  Maximum 25 objectives × Opus generation = ~$2.50
-  Realistic (15 objectives) = ~$1.50
+INITIAL SETUP (lifetime, one-shot per project):
+  Maximum 25 projects × Opus generation = ~$2.50
+  Realistic (15 projects) = ~$1.50
 
 ONGOING USAGE:
   Meta-prompt injected in every call
   +50-100 tokens per call
-  Marginal cost vs without objectives: <$2/year
+  Marginal cost vs without projects: <$2/year
 
 MODIFICATIONS:
-  Changing objectives = regenerating meta-prompt
+  Changing projects = regenerating meta-prompt
   ~$0.10 per change × N changes/year = trivial
 
 VALIDATION:
@@ -426,25 +430,25 @@ VALUE:
 
 ## 11. Database Schema
 
-### 11.1 user_objectives — the raw user-entered objectives
+### 11.1 user_projects — the raw user-entered projects
 
 ```sql
-CREATE TABLE user_objectives (
+CREATE TABLE user_projects (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  app_target        VARCHAR(32) NOT NULL,
+  domain_target     VARCHAR(32) NOT NULL,
                     -- 'imperium' | 'vector' | 'vault' | 'pulse' | 'path'
   position          INTEGER NOT NULL,
                     -- 1 to 5
   importance        VARCHAR(16) NOT NULL,
                     -- 'principal' (position=1) | 'secondaire' (position 2-5)
-  objective_text    TEXT NOT NULL,
+  project_text      TEXT NOT NULL,
   status            VARCHAR(32) NOT NULL DEFAULT 'pending',
-                    -- 'pending' | 'validated' | 'rejected_wrong_app' 
+                    -- 'pending' | 'validated' | 'rejected_wrong_domain'
                     -- | 'rejected_unclear' | 'coherence_warning'
   validation_reason TEXT NULL,
-  suggested_app     VARCHAR(32) NULL,
-                    -- when rejected_wrong_app, suggests which app fits
+  suggested_domain  VARCHAR(32) NULL,
+                    -- when rejected_wrong_domain, suggests which domain fits
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   superseded_at     TIMESTAMPTZ NULL,
   
@@ -455,38 +459,38 @@ CREATE TABLE user_objectives (
   )
 );
 
--- One active objective per (user, app, position)
-CREATE UNIQUE INDEX user_objectives_active_unique_idx
-ON user_objectives (user_id, app_target, position)
+-- One active project per (user, domain, position)
+CREATE UNIQUE INDEX user_projects_active_unique_idx
+ON user_projects (user_id, domain_target, position)
 WHERE superseded_at IS NULL;
 
--- Quick lookup of active objectives per app
-CREATE INDEX user_objectives_active_idx
-ON user_objectives (user_id, app_target)
+-- Quick lookup of active projects per domain
+CREATE INDEX user_projects_active_idx
+ON user_projects (user_id, domain_target)
 WHERE status = 'validated' AND superseded_at IS NULL;
 ```
 
-### 11.2 user_objective_prompts — Opus-generated meta-prompts
+### 11.2 user_project_prompts — Opus-generated meta-prompts
 
 ```sql
-CREATE TABLE user_objective_prompts (
+CREATE TABLE user_project_prompts (
   id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  app_target               VARCHAR(32) NOT NULL,
+  domain_target            VARCHAR(32) NOT NULL,
   meta_prompt_text         TEXT NOT NULL,
   summary                  TEXT NULL,
   arbitration_rule         TEXT NULL,
-  source_objective_ids     UUID[] NOT NULL,
-                           -- references to user_objectives.id
+  source_project_ids       UUID[] NOT NULL,
+                           -- references to user_projects.id
   prompt_model             VARCHAR(32) NOT NULL DEFAULT 'opus-4.7',
   generated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   superseded_at            TIMESTAMPTZ NULL,
   estimated_cost_eur       NUMERIC(6,4) NULL
 );
 
--- One active meta-prompt per (user, app)
-CREATE UNIQUE INDEX user_objective_prompts_active_unique_idx
-ON user_objective_prompts (user_id, app_target)
+-- One active meta-prompt per (user, domain)
+CREATE UNIQUE INDEX user_project_prompts_active_unique_idx
+ON user_project_prompts (user_id, domain_target)
 WHERE superseded_at IS NULL;
 ```
 
@@ -494,14 +498,14 @@ WHERE superseded_at IS NULL;
 
 ```sql
 -- For audit trail and pgvector ingestion
-CREATE TABLE user_objective_events (
+CREATE TABLE user_project_events (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   event_type      VARCHAR(64) NOT NULL,
-                  -- 'objective.created' | 'objective.validated' 
-                  -- | 'objective.rejected' | 'objective.modified'
+                  -- 'project.created' | 'project.validated' 
+                  -- | 'project.rejected' | 'project.modified'
                   -- | 'meta_prompt.generated' | 'meta_prompt.superseded'
-  app_target      VARCHAR(32) NOT NULL,
+  domain_target   VARCHAR(32) NOT NULL,
   payload         JSONB NOT NULL,
   occurred_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -512,9 +516,9 @@ CREATE TABLE user_objective_events (
 ## 12. AI Task Types
 
 ```text
-imperium.user_objective.validate     - Qwen, Levels 1 + 2 + 3
-imperium.user_objective.generate_prompt - Opus, meta-prompt creation
-imperium.user_objective.regenerate_prompt - Opus, after edit
+imperium.user_project.validate     - Qwen, Levels 1 + 2 + 3
+imperium.user_project.generate_prompt - Opus, meta-prompt creation
+imperium.user_project.regenerate_prompt - Opus, after edit
 ```
 
 ---
@@ -522,13 +526,13 @@ imperium.user_objective.regenerate_prompt - Opus, after edit
 ## 13. Routing Decisions Per Task
 
 ```text
-imperium.user_objective.validate          → Qwen local (low complexity)
-imperium.user_objective.generate_prompt   → Opus 4.7 (static override)
-imperium.user_objective.regenerate_prompt → Opus 4.7 (static override)
+imperium.user_project.validate          → Qwen local (low complexity)
+imperium.user_project.generate_prompt   → Opus 4.7 (static override)
+imperium.user_project.regenerate_prompt → Opus 4.7 (static override)
 ```
 
 The "Opus static override" applies because:
-- One-shot per objective (rare)
+- One-shot per project (rare)
 - Critical quality (5000+ future calls depend on it)
 - Cost is trivial vs value
 
@@ -538,18 +542,18 @@ The "Opus static override" applies because:
 
 ### 14.1 Imperium
 
-The backend emits the event user_objective.app_empty; Imperium READS it and
+The backend emits the event user_project.domain_empty; Imperium READS it and
 creates the mission.
 ```text
-- user_objective.app_empty (when an app has no validated objectives)
-  → Imperium auto-creates "Define at least one objective for [app]" mission
+- user_project.domain_empty (when a domain/category has no validated projects)
+  → Imperium auto-creates "Define at least one project for [domain]" mission
 ```
 
-### 14.2 All apps (Vector, Vault, Pulse, Path)
+### 14.2 All domains (Vector, Vault, Pulse, Path)
 
-Each AI call within an app:
+Each AI call within a domain:
 ```text
-1. Backend service queries user_objective_prompts for active prompt
+1. Backend service queries user_project_prompts for active prompt
 2. If exists: injects meta_prompt_text into the AI call
 3. If absent: AI runs in generic mode
 ```
@@ -557,23 +561,23 @@ Each AI call within an app:
 ### 14.3 With WR (doc 32) and WRS (doc 39)
 
 ```text
-When validated user objectives exist, the WR analysis includes:
-  "Cette semaine, alignement avec ton objectif Pulse principal
+When validated user projects exist, the WR analysis includes:
+  "Cette semaine, alignement avec ton projet Pulse principal
    ('Plier le cardio'): X% des workouts étaient cardio."
 
-When objectives change, the next WR comments:
-  "Tu as redéfini ton objectif Pulse principal il y a 3 jours.
+When projects change, the next WR comments:
+  "Tu as redéfini ton projet Pulse principal il y a 3 jours.
    Cette semaine reflète cet ajustement."
 
-WRS (Vector learning loop) factors in objective alignment:
-  "Vector recommended X% of rides aligned with your VTC objective."
+WRS (Vector learning loop) factors in project alignment:
+  "Vector recommended X% of rides aligned with your VTC project."
 ```
 
 ### 14.4 With pgvector (doc 38)
 
 ```text
-Active objectives may be embedded in pgvector with:
-  source: 'user_objective'
+Active projects may be embedded in pgvector with:
+  source: 'user_project'
   weight: 1.0 (no decay while active)
   status: marked 'expired' on supersession
 
@@ -587,11 +591,11 @@ Useful for: providing context when AI reasons across multiple domains.
 ### 15.1 First-time setup
 
 ```text
-User opens Settings > Objectifs (first time)
+User opens Settings > Projets (first time)
 → Greeting screen:
   "Pour t'aider efficacement dans chaque domaine de ta vie,
    définissons ensemble ce que tu veux vraiment.
-   Tu peux mettre 1 à 5 objectifs par application."
+   Tu peux mettre 1 à 5 projets par domaine."
   [Commencer]
 
 → Sequential walkthrough:
@@ -604,20 +608,22 @@ User opens Settings > Objectifs (first time)
 ### 15.2 Edit flow (later)
 
 ```text
-User opens Settings > Objectifs (after initial setup)
+User opens Settings > Projets (after initial setup)
 → Tabs at top: Pulse | Vault | Path | Vector | Imperium
-→ Each tab shows current objectives + "Modifier" buttons
+→ Each tab shows current projects + "Modifier" buttons
 → Modifying a slot triggers re-validation + regeneration
 ```
 
 ### 15.3 Mid-app suggestion flow
 
-When user is using an app, the AI's suggestions naturally reflect their objectives. No special UI; the difference is in the quality and personalization of every AI response.
+When user is using a domain surface, the AI's suggestions naturally reflect their
+projects. No special UI; the difference is in the quality and personalization of
+every AI response.
 
 If the user wants to see why the AI made a specific suggestion:
 ```text
 [Pourquoi cette suggestion ?]
-  → modal: "Cette suggestion s'aligne avec tes objectifs:
+  → modal: "Cette suggestion s'aligne avec tes projets:
               Principal — Plier le cardio
               Secondaire — Avoir un dos droit"
 ```
@@ -630,32 +636,32 @@ If the user wants to see why the AI made a specific suggestion:
 
 ```text
 Qwen validation succeeded but Opus fails:
-  → User objectives saved with status = 'pending_prompt'
-  → User notified: "Objectifs sauvegardés. Génération du
+  → User projects saved with status = 'pending_prompt'
+  → User notified: "Projets sauvegardés. Génération du
                     profil personnalisé en cours..."
   → Background retry every 30 minutes for 24 hours
   → On success: user notified "Profil prêt"
 ```
 
-### 16.2 User wants to delete all objectives in an app
+### 16.2 User wants to delete all projects in a domain/category
 
 ```text
-Settings > Objectifs > [App name] > [Tout supprimer]
+Settings > Projets > [Domain name] > [Tout supprimer]
   → Confirmation modal
   → On confirm: 
-    - all user_objectives for this (user, app) marked superseded
-    - user_objective_prompts marked superseded
-    - app reverts to generic mode
+    - all user_projects for this (user, domain) marked superseded
+    - user_project_prompts marked superseded
+    - domain reverts to generic mode
     - if user previously had skip flag, it's preserved
     - else: new auto-mission created to redefine
 ```
 
-### 16.3 Inconsistent objectives causing AI confusion
+### 16.3 Inconsistent projects causing AI confusion
 
 ```text
-If WR analysis (doc 32) detects that AI suggestions in an app
+If WR analysis (doc 32) detects that AI suggestions in a domain
 seem confused or contradictory, it may flag:
-  "Tu as 4 objectifs dans Pulse qui semblent en tension. 
+  "Tu as 4 projets dans Pulse qui semblent en tension. 
    Voulez-vous les revoir ?"
 
 Surfacing the issue, never auto-modifying.
@@ -667,34 +673,34 @@ Surfacing the issue, never auto-modifying.
 
 ```text
 PHASE 1 — Schema migrations
-  ├─ user_objectives table
-  ├─ user_objective_prompts table
-  └─ user_objective_events table
+  ├─ user_projects table
+  ├─ user_project_prompts table
+  └─ user_project_events table
 
 PHASE 2 — Backend services
-  ├─ services/imperium/user_objectives.py
+  ├─ services/imperium/user_projects.py
   │  - create, validate, list, supersede
-  ├─ services/imperium/objective_prompt_generator.py
+  ├─ services/imperium/project_prompt_generator.py
   │  - Opus call, prompt assembly
-  └─ services/imperium/objective_prompt_injector.py
+  └─ services/imperium/project_prompt_injector.py
      - middleware that injects meta-prompt into AI calls
 
 PHASE 3 — API endpoints
-  ├─ POST /api/v1/imperium/objectives        (save batch)
-  ├─ GET  /api/v1/imperium/objectives        (list current)
-  ├─ PATCH /api/v1/imperium/objectives/:id   (edit one)
-  ├─ DELETE /api/v1/imperium/objectives/:id  (remove one)
-  └─ POST /api/v1/imperium/objectives/regenerate  (force regen)
+  ├─ POST /api/v1/imperium/projects        (save batch)
+  ├─ GET  /api/v1/imperium/projects        (list current)
+  ├─ PATCH /api/v1/imperium/projects/:id   (edit one)
+  ├─ DELETE /api/v1/imperium/projects/:id  (remove one)
+  └─ POST /api/v1/imperium/projects/regenerate  (force regen)
 
 PHASE 4 — n8n workflow
-  └─ user_objective_processing.json
+  └─ user_project_processing.json
      (Qwen validation → Opus generation → backend storage)
 
 PHASE 5 — Imperium subscription logic
-  └─ Auto-mission creator when app has 0 objectives
+  └─ Auto-mission creator when domain has 0 projects
 
 PHASE 6 — UI in Android app
-  ├─ Settings > Objectifs screen
+  ├─ Settings > Projets screen
   ├─ Sequential walkthrough first-time
   ├─ Tabs for editing later
   └─ Validation feedback (green/red/orange dots)
@@ -704,7 +710,7 @@ PHASE 7 — Integration in all AI calls
      when active
 
 PHASE 8 — WR + WRS integration
-  └─ Surface objective alignment in weekly analysis
+  └─ Surface project alignment in weekly analysis
 ```
 
 ---
@@ -712,23 +718,23 @@ PHASE 8 — WR + WRS integration
 ## 18. Non-Goals For V3
 
 ```text
-❌ Auto-suggest objectives based on user behavior
-   (V4: too risky early — user must own their objectives)
+❌ Auto-suggest projects based on user behavior
+   (V4: too risky early — user must own their projects)
 
-❌ Time-bound objectives (deadlines, expirations)
+❌ Time-bound projects (deadlines, expirations)
    (V4: complicates the model, not needed initially)
 
-❌ Sub-objectives or nested goals
-   (Out of scope: 5 flat objectives is enough)
+❌ Sub-projects or nested goals
+   (Out of scope: 5 flat projects is enough)
 
-❌ Sharing objectives between users
+❌ Sharing projects between users
    (System is mono-user)
 
-❌ AI generating objectives FOR the user
+❌ AI generating projects FOR the user
    (Defeats the purpose: user must want them)
 
-❌ Linking objectives across apps
-   (Each app has its own objectives; coherence
+❌ Linking projects across domains
+   (Each domain has its own projects; coherence
     is the user's responsibility)
 ```
 
@@ -737,9 +743,9 @@ PHASE 8 — WR + WRS integration
 ## 19. Future V4+ Considerations
 
 ```text
-- Time-bound objectives (3 months, 1 year, etc.)
-- Progress tracking against objectives
-- Auto-celebration when an objective is achieved
+- Time-bound projects (3 months, 1 year, etc.)
+- Progress tracking against projects
+- Auto-celebration when a project is achieved
 - AI-suggested refinements based on observed patterns
 - Inter-app coherence checks (cross-domain conflicts)
 ```

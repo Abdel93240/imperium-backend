@@ -274,7 +274,7 @@ Imperium dashboard, carrier mission active:
   ┌─────────────────────────────────────────────┐
   │ MISSION ACTIVE: Session VTC                 │
   │ ▶ En cours depuis 09:00                     │
-  │ Objectif: 350€                              │
+  │ Cible: 350€                                 │
   │                                             │
   │ [Fait]  [Pas fait]                          │
   │                                             │

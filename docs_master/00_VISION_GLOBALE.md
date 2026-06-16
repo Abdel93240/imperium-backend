@@ -171,7 +171,7 @@ The Vault is responsible for:
 - wallets
 - upcoming expenses
 - pressure score
-- daily financial objectives
+- daily financial targets
 - recurring obligations
 - financial explanations
 
@@ -183,7 +183,7 @@ MVP boundaries:
 - no wallet transfers in V1
 - fixed wallet types in V1: `CB`, `Cash`, `Crypto`
 - every transaction is an event, not a daily summary
-- daily objectives are advisory, not coercive
+- daily financial targets are advisory, not coercive
 
 The Vault provides financial pressure and cash reality to Imperium, Vector, Pulse, and The Path.
 
@@ -278,6 +278,18 @@ The Path sends constraints. Imperium decides execution order.
 ## Decision and Feedback Loop
 
 The core loop is:
+
+Terminology cascade:
+
+```text
+Projet (what the user wants to build: intrinsic per-app + explicit per-domain)
+  → Objectif (the results needed for the project)
+    → Mission (the precise tasks)
+
+Routine = a recurring mission serving an objective/project.
+
+Full definitions live in doc 44.
+```
 
 ```text
 Projects + Routines + Priorities + Weekly Reality Check
