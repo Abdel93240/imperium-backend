@@ -569,9 +569,8 @@ Offline conflict:
 
 ## 11. Adhkar Routines
 
-> **NOTE — Pending document:** the complete adhkar categorization will be provided
-> by the user in a separate document. This section will be expanded once that
-> document is integrated.
+This section covers dhikr/adhkar counters: repetition counting such as Istighfar
+43/100. Invocation texts to read are specified separately in §11-bis.
 
 Supported `adhkar_type` values:
 
@@ -616,6 +615,107 @@ sheet.
 
 ---
 
+## 11-bis. Invocations Library, Daily Checklists, And Favorites
+
+This section is distinct from §11 dhikr counters. It stores invocation texts to
+read or listen to; it does not count repetitions.
+
+### 11-bis.1 Invocations by situation
+
+```text
+Fixed situations:
+  - quotidien
+  - voyage
+  - protection
+  - difficulte
+  - maladie
+  - peur_anxiete
+
+Each invocation contains:
+  - Arabic text (required)
+  - French translation (required)
+  - optional audio URL when available
+  - favorite flag
+  - source / provenance
+```
+
+Population rule:
+
+- Invocations are added through the central Feed IA / "Nourrir l'IA" flow
+  specified in doc 70.
+- The user adds the source content; AI analyzes and proposes classification under
+  one fixed situation.
+- The user validates or modifies before storage. Nothing enters common memory or
+  pgvector without explicit user validation.
+- Religious content must preserve source/provenance; the AI is not the source of
+  truth.
+
+Indicative data model:
+
+```text
+invocations:
+  id, user_id, situation (quotidien|voyage|protection|difficulte|maladie|
+  peur_anxiete), arabic_text, translation_fr, audio_url (nullable),
+  is_favorite, source, created_at
+```
+
+Endpoint contracts (TBD):
+
+```text
+TBD GET /api/path/invocations?situation=...
+TBD POST /api/path/invocations     (via Feed IA validation)
+TBD PATCH /api/path/invocations/{invocation_id}/favorite
+```
+
+### 11-bis.2 Daily reminder banner
+
+Every Path screen (Accueil, Worship, Jeûne, Aumône, Réglages) displays a top
+banner for the daily reminder.
+
+Rules:
+
+- Content is a hadith, Quran verse, or dua, with Arabic text and French
+  translation.
+- The reminder rotates daily from a curated reliable base.
+- It is not AI-generated. Religious reminders must be verified/authentic.
+- The banner is tappable and opens a detail view with the reference/source.
+
+Indicative data model:
+
+```text
+daily_reminders:
+  id, type (hadith|verse|dua), arabic_text, translation_fr, reference, active
+```
+
+### 11-bis.3 Invocations du jour (morning/evening)
+
+The daily invocation flow is a checklist, not a repetition counter.
+
+```text
+Two blocks:
+  - Invocations du matin: checklist + progress (e.g. 8/8)
+  - Invocations du soir: checklist + progress (e.g. 0/11)
+
+The user ticks each invocation as done. Progress is X/Y items.
+```
+
+Indicative data model:
+
+```text
+daily_invocations:
+  id, user_id, period (morning|evening), invocation_ref, order, checked,
+  checked_at, date
+```
+
+### 11-bis.4 Favorites
+
+- Any invocation from the by-situation library or the daily checklist can be
+  marked favorite.
+- A Favorites tab/screen groups all favorited invocations.
+- The `is_favorite` flag lives on the invocation record.
+
+---
+
 ## 12. Quran Progress
 
 PAT-07 stores the user's validated continuation point.
@@ -631,11 +731,28 @@ Rules:
 - Quran completion is **never inferred** from time spent or screen activity.
 - Khatm milestone is informational and user-confirmed.
 - No restart logic if user misses a day. The progression is theirs to manage.
+- The user can choose a Quran reading plan in addition to raw progression.
 
 ```text
 quran_progression table:
   user_id (unique), last_validated_page, last_validated_at,
   daily_objective
+```
+
+Quran reading plans:
+
+```text
+The user may choose a structured reading plan:
+  - daily pages
+  - finish-in-N-days
+  - juz-based
+
+UI actions:
+  - "Choisir un plan"
+  - "Continuer ma lecture" (resume at last validated point)
+
+quran_plans:
+  id, user_id, plan_type, target (pages/day or end_date), active, started_at
 ```
 
 Endpoint contracts:
@@ -644,6 +761,8 @@ Endpoint contracts:
 TBD GET /api/path/quran/continuation
 TBD POST /api/path/quran/progress
 TBD PATCH /api/path/quran/objective
+TBD POST /api/path/quran/plans
+TBD PATCH /api/path/quran/plans/{plan_id}
 Headers for mutations: Idempotency-Key
 ```
 
@@ -835,6 +954,7 @@ Path V1 screens:
 | PAT-09 | Registered Mosques Management | `PAT.MOSQUES.MANAGE` |
 | PAT-10 | Registered Ghusl Addresses | `PAT.GHUSL.ADDRESSES` |
 | PAT-11 | Path Settings | `PAT.SETTINGS.CORE` |
+| PAT-12 | Worship | `PAT.WORSHIP.MAIN` |
 
 Internal V1 sub-surfaces (confirmed, not counted as new top-level screens):
 
@@ -855,6 +975,17 @@ These sub-surfaces are drawers, dialogs, side panes, or inline states.
 Settings (PAT-11) covers: calculation method, madhhab, large city (Paris default),
 sadaqa percentage, registered mosques (MAWAQIT), registered ghusl addresses, and
 adhkar routines configuration.
+
+Worship (PAT-12) is the structured umbrella for worship content:
+
+```text
+Tabs:
+  - Coran: Quran progress and reading plans (§12)
+  - Invocations: invocations du jour + by-situation library (§11-bis)
+  - Dhikr: §11 counters
+  - Routines: adhkar routine management (PAT-11e)
+  - Favoris: favorited invocations (§11-bis.4)
+```
 
 ---
 
@@ -958,12 +1089,13 @@ CREATE TABLE path_weekly_sadaqa_state (
 - `42_VAULT_LOGIC_DETAIL.md` — business profit source, sadaqa expense handoff
 - `43_IMPERIUM_LOGIC_DETAIL.md` — replan reception of Path events
 - `40_PULSE_LOGIC_DETAIL.md` — fasting / hydration constraints
+- `70_KNOWLEDGE_INBOX.md` — Feed IA / "Nourrir l'IA" source for validated invocations
 - `59_DESIGN_SYSTEM_V1_DRAFT.md` — PAT screens design
 
 ---
 
 **Document version:** 2.0 (merged — worship logic detail + V1 implementation contracts)
-**Status:** Path V1 reference (adhkar categorization section pending user document)
+**Status:** Path V1 reference (invocations library integrated; adhkar counters distinct)
 **Last updated:** 2026-06-06
 ## Patch 41-A Hijri Calendar V3 & Model Routing Alignment
 
