@@ -523,21 +523,34 @@ Final synthesis shows:
 ### 16.1 AI fails on one section
 
 ```text
-section.status = 'failed'
-The flow allows user to:
-  - Retry that section
-  - Skip it (proceeds to next; final synthesis notes the gap)
-  - Cancel WR session entirely (status = cancelled)
+On an AI error on a section, the AI RETRIES the section.
+If the error repeats more than 3 times:
+  - an error message is shown
+  - the user is taken out of the WR
+  - the WR banner on the dashboard stays UNCHANGED
+    → the user can relaunch the WR later; if it still fails, it can be repaired
+      via the orchestrator.
+
+NO "skip section" option: skipping a section means missing what the AI had to
+surface on that domain — contrary to the WR's purpose (the AI always covers all
+domains). The only outcomes are retry, or a clean exit that preserves the banner
+for a later relaunch.
 ```
 
 ### 16.2 User abandons mid-WR
 
 ```text
-Session stays in_progress.
-On next user open: "Tu avais commencé ton WR. Reprendre où 
-tu en étais ?" [Reprendre] [Recommencer] [Abandonner]
+PASSIVE abandon = the user did not decide to stop; they simply left (e.g. exited
+Imperium for several hours mid-WR).
+  - The WR state goes to PAUSE; the WR window disappears.
+  - On reopening Imperium: the WR banner has NOT disappeared — it is replaced by
+    "WR a été coupé. Veux-tu reprendre ?" with three buttons:
+    [Reprendre] [Recommencer] [Abandonner].
+  - Reprendre = resume where they left off; Recommencer = restart from scratch;
+    Abandonner = drop (banner returns to initial state).
 
-If next Tuesday 20:00 arrives: status = expired (per doc 32 §5.2).
+If next Tuesday 20:00 arrives before resumption: status = expired (per doc 32
+§5.2).
 ```
 
 ### 16.3 Slow AI on a section
@@ -546,6 +559,21 @@ If next Tuesday 20:00 arrives: status = expired (per doc 32 §5.2).
 Per doc 32 §12 timeouts apply per section.
 If a section AI call exceeds 60s: retry once, then mark section
 as failed (Section 16.1 path).
+```
+
+### 16.4 User explicitly closes the WR (the X)
+
+```text
+EXPLICIT close = the user clicks the X (top-right) to close the WR window — a
+deliberate decision to stop.
+  - A confirmation popup appears: "Es-tu sûr ? Tu vas perdre toute ton avancée du
+    WR."
+  - If the user confirms (Oui): the WR banner returns to its INITIAL state, as if
+    the WR had never been started (progress discarded).
+  - If the user cancels the popup: they stay in the WR where they were.
+
+Distinction from §16.2: a passive abandon (the user just left) offers Reprendre;
+an explicit close (the user decided to stop) confirms and resets — no resume.
 ```
 
 ---
