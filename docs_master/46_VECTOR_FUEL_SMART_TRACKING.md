@@ -142,8 +142,8 @@ Justification:
   - If unsure, they enter the most recent known price.
   - The result remains accurate to within a few percent.
 
-A safety margin (10-15%) on sadaqa percentage compensates
-for this imprecision (handled separately, see Section 11).
+A Path-owned safety margin (10-15%) on the sadaqa target compensates
+for this imprecision (handled separately in doc 41 §9.5).
 ```
 
 ---
@@ -181,7 +181,7 @@ Why this is fine:
 ├─ It's rare (typically only 1-3 weeks per year)
 ├─ It self-balances over 52 weeks (yearly perspective)
 ├─ Sadaqa imprecision averages out over the year
-└─ The 10-15% sadaqa safety margin absorbs the rest
+└─ The Path-owned 10-15% sadaqa safety margin (doc 41 §9.5) absorbs the rest
 
 We do NOT compute lifetime cumulatives.
 We do NOT carry deficits forward.
@@ -380,29 +380,13 @@ and weekly_report.final tasks (doc 32).
 
 ---
 
-## 11. Sadaqa Safety Margin (Future)
+## 11. Sadaqa Safety Margin → see doc 41 §9.5
 
-Per the user's expressed wish:
-
-```text
-A safety margin of 10-15% applies on top of the calculated 
-sadaqa target.
-
-Reasoning:
-- Fuel price imprecision (~1-3% error)
-- Personal fuel deduction imprecision (~1-3% error)
-- General desire to give slightly more, not less
-- Mathematical safety buffer
-
-This margin is configurable in Path settings:
-  user.sadaqa_safety_margin_percent (default: 12.5%)
-
-Final sadaqa target:
-  effective_target = base_target × (1 + safety_margin)
-
-This safety margin is NOT part of the V2 feature scope itself.
-It's a Path setting (doc 41) that can be set independently.
-```
+The sadaqa target receives a safety margin (default 12.5%) that also absorbs the
+fuel-price/fuel-deduction imprecision introduced by this fuel-tracking feature.
+The margin itself is a PATH setting and is specified in doc 41 §9.5
+(`user.sadaqa_safety_margin_percent`). This document only feeds the corrected
+business profit (see §5.3) into the sadaqa target computation owned by Path.
 
 ---
 

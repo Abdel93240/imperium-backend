@@ -482,6 +482,33 @@ TBD PATCH /api/path/settings/sadaqa
 Headers for mutations: Idempotency-Key
 ```
 
+### 9.5 Safety margin (per user wish)
+
+A safety margin (default 12.5%, range 10-15%) is applied on top of the computed
+sadaqa target. It absorbs small imprecisions and reflects a desire to give
+slightly more, never less:
+
+- fuel-price imprecision (~1-3%), when fuel tracking feeds business profit
+  (doc 46)
+- personal fuel-deduction imprecision (~1-3%)
+- general buffer / preference to give a bit more
+
+Setting owned by Path:
+
+```text
+user.sadaqa_safety_margin_percent (default: 12.5%)
+```
+
+Final target with margin:
+
+```text
+effective_target_with_margin = effective_weekly_target × (1 + safety_margin)
+```
+
+This applies to the §9.2 computation: the margin multiplies the effective weekly
+target after carry. It is a Path setting, configurable independently of any V2
+fuel feature.
+
 ---
 
 ## 10. Ghusl Auto-Mission
