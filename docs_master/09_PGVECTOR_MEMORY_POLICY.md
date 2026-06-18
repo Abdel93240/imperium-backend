@@ -450,6 +450,39 @@ Behavior:
 - confidence increases with repeated evidence
 - can be superseded by later correction
 
+### Mission duration estimation (recurring-pattern application)
+
+RÈGLE — Durée estimée d'une mission (mission_estimated_duration)
+
+Principe directeur. La PRIORITÉ d'une mission est un jugement de valeur de
+l'utilisateur (l'IA ne la choisit pas). La DURÉE est une estimation empirique d'un
+fait : l'IA a le droit de l'estimer et de l'auto-corriger. Estimer un fait
+corrigible ne viole pas "l'IA ne décide pas librement de ce qui structure".
+
+1. Jamais demandée mission par mission.
+   Le nombre de missions par projet rend la saisie manuelle ingérable. L'utilisateur
+   PEUT surcharger ponctuellement une durée, mais ce n'est jamais exigé.
+
+2. Capture du réel.
+   Chaque exécution de mission enregistre le temps réellement passé (infra de mesure
+   déjà présente, cf. télémétrie doc 43). Ces durées réelles alimentent
+   l'apprentissage.
+
+3. Estimation par similarité vectorielle de LIBELLÉ.
+   Durée estimée = médiane des durées réelles des missions au libellé
+   vectoriellement proche. Ex. "écrire un mail" ≈ "rédiger mail client" → même base
+   de temps. Ce n'est PAS une moyenne par catégorie de domaine : c'est de la
+   similarité de libellé.
+
+4. Démarrage à froid (historique vide).
+   Tant qu'aucun voisin proche n'existe, l'IA pose une estimation "à sa sauce"
+   marquée NON CONFIRMÉE. Elle se corrige semaine après semaine à mesure que la
+   vectorisation se remplit, et devient de plus en plus précise.
+
+5. Conséquence sur la planification.
+   Une durée NON CONFIRMÉE ou absente n'est jamais calée au créneau serré : le
+   planificateur la traite en bloc souple, sans inventer un chiffre dur.
+
 ### Expired memory
 
 Purpose:
@@ -633,4 +666,3 @@ Before using pgvector in production:
 - define memory deletion UI/API
 - define correction workflow
 - define retrieval filters per workflow
-
