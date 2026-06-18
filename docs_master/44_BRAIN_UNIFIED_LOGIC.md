@@ -212,6 +212,25 @@ Cascade:
   routines = recurring missions inside this cascade
 ```
 
+Completeness invariant (mission-generation gate):
+
+- An EXPLICIT project generates NO missions while it is INCOMPLETE. An incomplete
+  explicit project that becomes active — by manual activation OR by the
+  completion-promotion cascade (doc 71 §3.1) — surfaces the "Attention requise"
+  red banner (doc 71 §7) and stays INERT until completed. It is never a silent
+  skip: the incomplete state is always made visible to the user, consistent with
+  "the user is the final decision-maker".
+
+- INTRINSIC projects are COMPLETE BY CONSTRUCTION. They are system-owned Layer 1
+  role layers with a standing reason to exist, so they are never subject to this
+  gate and are never blocked from generating missions.
+
+- "Complete" here means the project carries what the brain needs to derive
+  missions (at minimum a usable objective/step structure). NOTE: the exact
+  completeness criteria (which fields/structure are strictly required) is a point
+  to refine — this invariant fixes the BEHAVIOUR (incomplete explicit → 0 mission,
+  visible), not yet the precise field-level checklist.
+
 Routine classification:
 
 ```text
