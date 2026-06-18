@@ -71,6 +71,12 @@ AI can consult. Two mechanisms, two goals.
 > the general-purpose knowledge channel. Where they overlap conceptually, doc 34
 > remains authoritative for medical rule extraction; the Inbox does not duplicate
 > that pipeline.
+> Boundary update (PATCH 05): the source file is ALWAYS retained as reference data,
+> regardless of pipeline — even a medical document routed to doc 34 keeps its
+> OCR/MD source so the AI can re-fetch the exact value if a vector proves lossy.
+> The Inbox→entity creation is limited to PROJECTS in V1; transactions and medical
+> constants remain on their dedicated pipelines. A vector is an INDEX into the
+> retained source, never its replacement.
 
 ---
 
@@ -81,16 +87,24 @@ AI can consult. Two mechanisms, two goals.
    - let the user browse the tablet's folders and select a file
    - validate file type and size before upload
    - upload the file to the backend
+   - ALWAYS retain the uploaded source file as durable reference data, via an
+     abstract pointer (VPS-local in V1, NAS-ready per F06) — independent of whether
+     it is later vectorized
    - have the AI analyze the file immediately
    - show the user what the AI extracted
    - let the user edit/correct the extraction before validation
    - vectorize into the GLOBAL knowledge base only after explicit user validation
+   - on explicit user request + validation, create a structured PROJECT from the
+     extracted content (the vector and/or the project reference the retained source)
 
 ❌ The Knowledge Inbox must never:
    - vectorize anything without explicit user validation
+   - create OR modify ANY canonical entity (project, etc.) without explicit user
+     validation of the extracted structure
    - attach an app tag that restricts cross-domain use
-   - accept video or audio files (V1)
-   - create canonical business records (that is the metric/transaction path)
+   - create transactions or medical constants from the Inbox (V1: those stay on the
+     Vault / Pulse dedicated pipelines, with their own gates)
+   - discard the source file after vectorization (the source is always retained)
    - silently overwrite or delete previously ingested knowledge
 ```
 
@@ -147,16 +161,25 @@ criterion is danger, not media format.
       - if not → reject with clear message, stay on picker
 5. Upload to backend
 6. Backend re-validates type/size (hard enforcement)
-7. AI analyzes the file immediately → produces an extraction summary
-8. The window shows what the AI understood (EDITABLE)
-9. User reviews, edits/corrects if needed
-10. User validates ("Ajouter à la mémoire")
-11. Backend vectorizes the (possibly edited) content into the GLOBAL vector base
-12. Confirmation shown; window can close
+7. Backend STORES the source file as durable reference (abstract pointer;
+   VPS-local in V1, NAS-ready per F06). The source is kept from this point on.
+8. AI analyzes the file immediately → produces an extraction summary
+9. The window shows what the AI understood (EDITABLE)
+10. User reviews, edits/corrects if needed
+11. AI proposes a DESTINATION (one or several), user chooses:
+       - add as vectorized context (memory), and/or
+       - create a structured PROJECT from the extraction (explicit request only)
+    The chosen destinations reference the stored source (step 7).
+12. User validates
+13. Backend executes: vectorize the final content and/or create the project
+    (canonical write only after this validation)
+14. Confirmation shown; window can close
 ```
 
-If the user cancels at step 9/10, nothing is vectorized; the uploaded file is
-discarded or kept as a non-vectorized pending item (see §8 states).
+If the user cancels at the review/validation step, nothing is vectorized and no
+entity is created. The raw upload may be kept as a non-vectorized pending item or
+removed (see §8). Note: a source that has reached step 7 for a VALIDATED item is
+always retained — discarding only ever applies to a fully cancelled upload.
 
 ---
 
@@ -200,15 +223,25 @@ CREATE TABLE knowledge_inbox_documents (
   mime_type          VARCHAR(128) NOT NULL,
   size_bytes         BIGINT NOT NULL,
   status             VARCHAR(24) NOT NULL DEFAULT 'uploaded',
-                     -- uploaded | analyzed | validated | vectorized | rejected | failed
+                     -- uploaded | analyzed | stored | validated | vectorized | rejected | failed
+                     -- 'stored' = source retained, not necessarily vectorized
+  -- Source retention (indirection F06: reference + location) ----------------
+  storage_pointer    TEXT NULL,              -- abstract path to the retained source
+  storage_location   VARCHAR(16) NOT NULL DEFAULT 'vps_local',  -- vps_local | nas
+  source_retained_at TIMESTAMPTZ NULL,
+  -- Optional promotion to a structured entity (V1: project only) -------------
+  created_entity_type VARCHAR(24) NULL,      -- e.g. 'project' (NULL if memory-only)
+  created_entity_id   UUID NULL,             -- FK target validated app-side
+  -- Extraction + vectorization ----------------------------------------------
   extraction_draft   JSONB NULL,             -- what the AI understood (editable)
   extraction_final   JSONB NULL,             -- after user edit + validation
   uploaded_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
   vectorized_at      TIMESTAMPTZ NULL
 );
 
--- The vectorized chunks live in the existing global pgvector store.
--- entry_app is kept for provenance/audit only; retrieval does NOT filter on it.
+-- The vectorized chunks reference this row (vector = index INTO the retained
+-- source, never its replacement). Retention DURATION / purge policy is NOT set
+-- here — see doc 20 (retention) [PATCH 07].
 ```
 
 Note on `entry_app`: it records *where the user uploaded from* for history/audit,
@@ -266,8 +299,10 @@ same feature in all five apps; only the entry point's surrounding settings diffe
 - Audio/video storage and processing limits: larger uploads, transcription for
   audio, frame/OCR extraction for video, and vectorization cost/latency.
 - Whether rejected/cancelled uploads are discarded immediately or kept as pending.
-- Retention policy for the original uploaded file after vectorization (keep the
-  source? keep only the embeddings?).
+- Source retention: DECIDED — the original source is ALWAYS retained (PATCH 05),
+  stored VPS-local in V1, NAS-ready (F06). What remains open is only the retention
+  DURATION / purge rules and the VPS→NAS migration — owned by doc 20 (see PATCH 07),
+  NOT by this document.
 - Whether the ingest history is per-app filtered in the UI (display only) while
   retrieval stays global.
 
