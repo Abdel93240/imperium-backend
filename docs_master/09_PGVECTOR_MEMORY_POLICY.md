@@ -483,6 +483,67 @@ corrigible ne viole pas "l'IA ne décide pas librement de ce qui structure".
    Une durée NON CONFIRMÉE ou absente n'est jamais calée au créneau serré : le
    planificateur la traite en bloc souple, sans inventer un chiffre dur.
 
+### Temporal aggregation cascade (behavioral signals)
+
+Behavioral signals are not kept as fine-grained vectors forever. They are
+progressively compacted into statistical summaries at decreasing granularity. The
+source documents and the structured database remain the truth, so compacting a
+vector loses no information: a vector is an index, re-derivable from the source.
+
+What is vectorized:
+- the measurable trace, never the content
+- the content of a fact stays in the structured database / project dossier
+- what becomes a vectorized signal is the trace: an event occurred, on date D,
+  attached to project or domain X
+
+Cascade:
+- day -> weekly summary
+- weekly summary -> monthly summary
+- stop at month; yearly is too coarse to be useful
+
+Each summary stores statistics, not a bare mean:
+- `n` as the required count
+- median
+- min and max
+- standard deviation
+- trend versus the previous period
+- `source_paths` down to the finer grain
+
+Non-negotiable rules:
+1. Aggregate statistics, never a bare mean.
+2. Re-aggregate always from the finest grain available. The monthly summary is
+   recomputed from the days, never from the weekly summaries.
+3. Every summary carries `source_paths` to the grain below. An anomaly seen at the
+   monthly level must be traced back to the raw days before any conclusion is
+   drawn.
+
+Two families of data:
+- periodic signals, such as sleep hours, spend amounts, prayer counts, and
+  mission-state counts, follow the cascade above
+- punctual events or decisions keep their content in the structured database;
+  only the counted trace is vectorized, and that trace is itself a periodic
+  signal that aggregates like the rest
+
+State signals: one signal per state, never merged.
+- each distinct lifecycle state is its own counted signal
+- states are never merged into a generic activity bucket
+- counting remains mathematically valid, so separate state counts can aggregate
+  without losing meaning
+
+V1 capturable states, bound to existing lifecycles:
+- mission states: active, done, failed, cancelled, expired
+- project states: activated, deactivated
+
+Not capturable in V1:
+- objective states are not captured until the objective lifecycle exists
+
+Open, extensible list:
+- the list of captured state signals is deliberately open
+- adding a new state signal breaks nothing because each state is an independent
+  counter
+- the Weekly Review may suggest a new state to capture when it detects a pattern
+  it cannot yet measure; the user validates, and the list grows
+
 ### Expired memory
 
 Purpose:
