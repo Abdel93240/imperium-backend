@@ -44,6 +44,30 @@ n8n_db
 
 The n8n database may have its own backup process, but it is not the canonical app backend database.
 
+## Source File Store Scope
+
+Beyond the PostgreSQL database, the backend retains SOURCE FILES on the VPS
+filesystem (doc 70 / Knowledge Inbox, PATCH 05): uploaded PDFs, The Path audio,
+OCR markdown, etc. These are referenced from the database via
+`knowledge_inbox_documents.storage_pointer` but are NOT inside a `pg_dump`.
+
+Rule: the source file store is part of the backup perimeter. A database restore
+without its source files yields dead pointers - base and files must be backed up
+and restored together.
+
+V1 (decided):
+- All source files are backed up from V1, regardless of size. A 30 KB medical OCR
+  markdown has no reason to wait for the NAS to be protected.
+- Storage location: VPS-local in V1 (abstract pointer, NAS-ready per F06). The
+  exact VPS directory layout is the existing Open TODO ("document final VPS
+  directory layout") - once fixed, that directory is what gets backed up.
+- Same handling as the database dump: encrypt before offsite, same offsite
+  location (shared TODO), same daily cadence.
+
+Restore invariant: restore the source file store TOGETHER with the database dump,
+never one without the other (consistent with §pgvector Notes: "restore memory only
+together with its source structured data").
+
 ## Backup Command
 
 Run on the VPS or a trusted admin machine with PostgreSQL client tools installed:
@@ -85,17 +109,45 @@ V1 minimum:
 
 ## Retention
 
-Recommended V1 retention:
+V1 retention (decided - kept deliberately simple to start):
 
-- daily backups: keep 14 days
-- weekly backups: keep 8 weeks
-- monthly backups: keep 6 months
+- daily database backups: keep 30 days
+- no weekly/monthly tiers in V1.
+
+Rationale: single user, backend not yet run in real conditions. A full
+grandfather/father/son scheme (daily + weekly + monthly tiers) is intentionally
+DEFERRED. If real usage shows a need to roll back further than 30 days, or volume
+makes it worthwhile, promote to the full scheme then - do not pre-engineer it now.
+
+Note: this daily-only policy matches §Backup Frequency, which generates a daily
+backup only. (The previous 14d/8w/6m recommendation described weekly/monthly tiers
+that nothing ever produced - removed to keep retention and frequency consistent.)
 
 TODO:
 
 - choose final offsite backup location
 - choose final backup encryption passphrase storage method
-- choose final automated cleanup job
+- choose final automated cleanup job (daily, 30-day window)
+
+## Source Retention & Purge (by reference)
+
+This is distinct from backup rotation (above). It governs when a retained SOURCE
+file may be deleted from the live store.
+
+Rule - purge by reference, never by fixed age:
+- A source file is NEVER purged while ANY entity references it: a project created
+  from it (created_entity_id), a vector chunk pointing to it, or a record that may
+  re-fetch its exact content (e.g. a medical OCR source).
+- A source becomes eligible for purge ONLY when it is fully ORPHANED (no entity,
+  no vector, no record points to it) AND the user explicitly confirms deletion.
+- Never a silent/automatic deletion of a referenced source. Consistent with the
+  project-wide "user is the final decision-maker" rule and doc 70 §4 ("never
+  silently overwrite or delete previously ingested knowledge").
+
+VPS -> NAS migration (future, F06):
+- When the NAS exists, heavy sources migrate to it; `storage_location` flips
+  vps_local -> nas and `storage_pointer` is repointed. No entity/vector change is
+  required (indirection F06). Migration must preserve the reference graph above.
 
 ## Restore Test
 
