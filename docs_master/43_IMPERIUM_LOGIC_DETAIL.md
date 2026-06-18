@@ -45,6 +45,7 @@ USER-INITIATED HOOKS:
   ├─ Chatbot: explicit user request (re-plan, or a decision raised in chat)
   ├─ Imperium: mission marked "ratée" (failed)
   ├─ Imperium: mission marked "annulée" (cancelled)
+  ├─ Imperium: project activated / deactivated / reordered
   ├─ Path: "Ghusl requis" toggle ON
   ├─ Vector: "Smart fuel" requested
   ├─ Vector: VTC session paused/ended unexpectedly
@@ -65,11 +66,20 @@ SYSTEM-INITIATED HOOKS:
 ```text
 Hook fires:
   1. Backend captures the hook context (what changed, when, why)
-  2. Backend creates ai_task: imperium.day_replan
+  2. Backend creates the replan ai_task (task type by scope — see step 5)
      - input includes: current plan, current time, hook reason
   3. n8n claims the task
-  4. Qwen scores complexity (typically 60-130)
-  5. Sonnet 4.6 (most common) or Opus 4.7 (rare) replans
+  4. Qwen 32B scores the change on the ecosystem-wide 0–200 scale (doc 30 §5)
+  5. Routing by score (doc 30 §5 table — never bypass it):
+       - 0–99   → Qwen 32B re-plans LOCALLY itself (small scope: ~1–2 missions,
+                  same-day reshuffle). Task type: imperium.day_replan.
+       - 100–179→ escalate: Sonnet 4.6 (most common) or Opus 4.8 (rare).
+                  Task type: imperium.day_replan.
+       - multi-week project-scope change (a project toggle that invalidates /
+                  introduces missions across several weeks) → STATIC RULE,
+                  same livrable as WR Phase 3 (doc 30 §7.8): Fable 5, with the
+                  §7.8 unavailability fallback → Opus 4.8 (active today).
+                  Task type: imperium.rolling_replan (NEW — see below).
   6. New plan returned with rationale
   7. UI shows new plan to user for validation
   8. User accepts / rejects / partially accepts

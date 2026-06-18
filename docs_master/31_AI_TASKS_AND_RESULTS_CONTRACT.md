@@ -1315,6 +1315,7 @@ pulse.medical_report.analyze
 
 imperium.email_triage
 imperium.daily_plan_assist
+imperium.rolling_replan
 imperium.mission_recommendation
 imperium.priority_review
 imperium.memory_candidate_extract
@@ -1805,6 +1806,7 @@ Backend validation steps:
 | vault.receipt_extract | yes | transaction after validation | yes |
 | imperium.email_triage | yes | possible task / inbox | yes for action |
 | imperium.daily_plan_assist | yes | plan / path after validation | yes |
+| imperium.rolling_replan | yes | plan / path after validation | yes |
 | imperium.mission_recommendation | yes | mission after validation | yes |
 | imperium.priority_review | yes | priorities after validation | yes |
 | imperium.memory_candidate_extract | yes | memory after validation | yes |
