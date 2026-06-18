@@ -209,8 +209,10 @@ Role: the most capable model (Mythos-class, above Opus). Reserved strictly for t
 Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable blocks and falls back to Opus 4.8 on its own. This means the "sensitivity" routing criterion is partially handled model-side for Fable.
 
 Two distinct fallbacks to Opus 4.8 must not be conflated:
-(a) Content safeguard - Fable redirects sensitive topics on its own, model-side (above).
-(b) Total model unavailability - handled routing-side, see §7.8. When Fable 5 is unreachable, the (a) safeguard cannot fire (the model is simply absent); the routing layer must substitute Opus 4.8 wherever a static rule forced Fable.
+(a) Content safeguard — Fable redirects sensitive topics on its own, model-side (above).
+(b) Total model unavailability — handled routing-side, see §7.8. When Fable 5 is
+    unreachable, the (a) safeguard cannot fire (the model is simply absent); the
+    routing layer must substitute Opus 4.8 wherever a static rule forced Fable.
 
 Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the one recurring task that reliably meets the three conditions. Everything else escalates to Opus or below.
 
