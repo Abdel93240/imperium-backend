@@ -201,6 +201,70 @@ Key points (authoritative source = doc 53):
 
 This supersedes any earlier "single active focus / others queued" wording.
 
+## 5-bis. Objective Lifecycle
+
+The objective has its own lifecycle, simpler than the mission's. An objective is a
+CONTAINER driven by its block of missions (doc 44 §5-bis: Projet → Objectif →
+Mission). It is never marked "succeeded/failed" by the user directly.
+
+STATUSES:
+
+active     - the objective has at least one open mission; Imperium may generate
+             missions for it
+terminé    - DEDUCED, not a user click: no open mission remains under it (every
+             mission is faite | ratée | annulée). NEUTRAL — presumes nothing about
+             the outcome. The objective's bilan is the SUM of its block's missions
+             (e.g. "1 faite, 3 ratées"); that bilan IS the signal, not a binary.
+dormant    - the parent project is deactivated: the objective remains but is NEVER
+             proposed by Imperium. Reversible if the project is reactivated.
+
+No "abandonné" status at the objective level. Abandonment lives at the MISSION
+level (§5: annulée — definitive, reason required). An objective is terminated,
+modified, or deleted — never "abandoned".
+
+USER ACTIONS (these are NOT statuses, but they ARE traced as signals):
+
+modifier   - the user rewrites the objective. The AI MAY flag an incoherence
+             (e.g. renaming a "camping-car interior" objective into "which bicycle
+             brand") via the "Attention requise" banner — ignorable, never blocking.
+             The user is a responsible adult; if they ignore it, the system will no
+             longer understand the project and they own the consequences.
+supprimer  - the objective is removed TOGETHER WITH its missions. A REASON IS
+             MANDATORY (same rule as cancelling a mission — no deletion without a
+             reason). The raw file is retained in memory (VPS/NAS, PATCH 05/07),
+             so the objective is recoverable later. This is a strong signal: the
+             user discarded a whole branch of the project, not just one mission.
+
+TRANSITIONS:
+
+  active   ──(last open mission of the block terminated)──▶ terminé   [system, deduced]
+  active   ──(parent project deactivated)──▶ dormant                   [system]
+  dormant  ──(parent project reactivated)──▶ active                    [system]
+  (supprimer = a user action available at any time, outside the state machine;
+   it traces a signal and retains the raw file)
+
+WHY SIMPLER THAN A MISSION. A mission is an atomic act the user marks directly
+(faite/ratée/annulée). An objective is a container: its fate is DEDUCED from its
+content (terminé when the block empties) or DECIDED on the container itself
+(modifier/supprimer). There is no "ratée" for an objective — failure, if any, is
+already visible in the bilan of its missions.
+
+DELETION & RECOVERY (illustrative, validated). Deleting an objective keeps its raw
+file. Example: project "devenir joaillier", objective "apprendre à faire un collier"
+deleted with reason "j'ai appris ce que je voulais (bagues, boucles d'oreilles), le
+reste ne m'intéresse pas". A year later the user wants to resume: the AI queries the
+monthly aggregation (PATCH 08) around that date, sees a spike of "objective deleted"
+signals, follows the stored paths to the retained file, reopens the exact objective
+with its reason, and re-enters dialogue to check whether the intent has changed. No
+single dedicated mechanism — this emerges from the aggregation cascade + retained
+paths + raw-file retention combined.
+
+CAPTURABLE OBJECTIVE SIGNALS (now that this lifecycle exists):
+  objective created / terminé / modifié / supprimé / dormant
+  → each counted, dated, attached to its project, aggregated in the cascade
+    (PATCH 08, doc 09), with paths to the finer grain and — for supprimé — the
+    mandatory reason retained for the WR.
+
 ---
 
 ## 6. Discipline Score
