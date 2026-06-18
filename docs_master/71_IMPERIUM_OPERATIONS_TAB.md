@@ -69,6 +69,17 @@ V1 RULE: exactement 2 projets actifs affichés.
 
 Le nombre 2 est FIXÉ en V1.
 Versions suivantes : nombre de projets actifs configurable dans les réglages.
+RÈGLE DE REMONTÉE (à la complétion) :
+  On vise TOUJOURS 2 projets actifs — pas seulement à l'affichage.
+  Quand le projet actif n°1 est terminé :
+    - le projet actif n°2 devient n°1 (principal) ;
+    - le 1ᵉʳ projet non-actif (selon l'ordre utilisateur) est promu n°2 ;
+    - il devient actif du seul fait d'entrer dans les 2 premiers slots.
+  Exception — pile vide :
+    s'il n'y a plus aucun projet non-actif à promouvoir, on reste à 1 actif
+    (ou 0). C'est le SEUL cas où il y a moins de 2 actifs.
+  Cette remontée est AUTOMATIQUE (déclenchée par la complétion d'un projet),
+  distincte du dépassement manuel décrit en §3.3 (activer un 3ᵉ projet à la main).
 ```
 
 Chaque fenêtre de projet actif affiche le projet et son contexte de base
@@ -98,6 +109,10 @@ Sous les fenêtres projets. Au clic, ouvre les actions de gestion des projets :
 Note V1 : avec 2 slots actifs, activer un 3ᵉ projet implique d'en désactiver un
 (ou un choix utilisateur explicite). Comportement exact de dépassement à
 préciser à l'implémentation.
+Note V1 (complétion) : la promotion automatique à la complétion d'un projet actif
+(cf. §3.1, règle de remontée) NE passe PAS par ce menu — elle est déclenchée par
+le système, pas par l'utilisateur. Ce menu "Modifier" ne couvre que les actions
+manuelles (ajouter / supprimer / activer / désactiver / réordonner).
 
 ---
 
@@ -158,6 +173,7 @@ projet-wide "rien de canonique sans aval").
 | Loading | Skeleton des 3 fenêtres projets + liste routines. |
 | Empty | Aucun projet : CTA "Ajouter un projet" ; routines vides : invite à saisir. |
 | Ready | 2 projets actifs + liste non-actifs + routines cochables. |
+| Attention requise | Un projet promu (par remontée auto OU activation manuelle) mais INCOMPLET : bannière rouge "Attention requise" ; le projet est INERTE — il ne génère aucune mission tant qu'il n'est pas complété. Le critère de complétude est défini côté logique de génération (référencé, pas redéfini ici). |
 | Editing | Bouton Modifier actif : actions add/delete/activate/reorder. |
 | Error | Échec lecture/écriture projet ou routine, avec retry. |
 | Offline | Lecture cache, modifications en attente de sync (bannière). |
