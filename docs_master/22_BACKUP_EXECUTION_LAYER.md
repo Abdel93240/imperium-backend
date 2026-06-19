@@ -103,7 +103,7 @@ IMPERIUM_RESTORE_USER=imperium_user
 IMPERIUM_RESTORE_PASSWORD_FILE=/etc/imperium/imperium-db-backup.pass
 IMPERIUM_RESTORE_DB=imperium_restore_drill
 IMPERIUM_BACKUP_DIR=/var/backups/imperium/postgres
-IMPERIUM_BACKUP_RETENTION_DAYS=14
+IMPERIUM_BACKUP_RETENTION_DAYS=30
 IMPERIUM_BACKUP_GPG_PASSPHRASE_FILE=/etc/imperium/imperium-backup-gpg.pass
 
 # Optional future off-host hook.
@@ -227,8 +227,14 @@ IMPERIUM_BACKUP_RETENTION_DAYS
 Default:
 
 ```text
-14 days
+30 days
 ```
+
+> TODO (source file store backup) : le pg_dump ne sauvegarde QUE imperium_core.
+> Les fichiers sources conservés (doc 70/20 : PDF, audio, OCR/MD) vivent sur le
+> système de fichiers et NE sont PAS encore dans le périmètre de backup. À ajouter
+> quand le layout disque sera figé (cf. doc 20 Open TODO "final VPS directory
+> layout"). Bloqué tant que l'emplacement n'est pas décidé.
 
 ## Off-Host Strategy
 
