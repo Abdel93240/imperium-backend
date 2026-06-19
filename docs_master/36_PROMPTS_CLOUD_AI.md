@@ -423,7 +423,7 @@ Output JSON:
 
 ## 8. Sonnet 4.6 — Quick Advice With Context
 
-Used for: tasks scoring 60-99.
+Used for: tasks scoring 100-139 (escalated to Sonnet 4.6). Scores 0-99 stay on Qwen 32B local and never reach this prompt.
 
 ### 8.1 User prompt template
 

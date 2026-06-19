@@ -1845,7 +1845,7 @@ n8n                : orchestrator only
 backend            : sole canonical writer
 imperium_core      : canonical storage
 pgvector           : semantic memory / search, never source of truth
-Routing thresholds : 0–59 / 60–99 / 100–139 / 140–169 / 170–200 (per doc 30)
+Routing thresholds : 0–99 Qwen 32B local / 100–139 Sonnet 4.6 / 140–179 Opus 4.8 / 180–200 critical mechanic (GPT-5.5 re-score → Opus). Fable 5 only by static rule §7. See doc 30 §5 (authoritative).
 ```
 
 ---
