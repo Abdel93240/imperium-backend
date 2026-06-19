@@ -84,7 +84,7 @@ Documents identifiés comme features futures → à mettre en `F` :
 
 ## 6. Décisions connexes prises en même temps
 
-- **Embedding V1 = bge-m3 local** (décision tranchée) : cohérent avec la
+- **Embedding V1 = qwen3-embedding:8b local** (décision tranchée) : cohérent avec la
   philosophie privacy (données ne sortent pas vers OpenAI). ~2 Go RAM à héberger
   (machine orchestrateur ou NAS). → **Aligner tous les docs** : corriger le
   doc 38 qui déclarait OpenAI cloud en V1 default. qwen3-embedding:8b (local, dim 1024) devient le défaut V1.

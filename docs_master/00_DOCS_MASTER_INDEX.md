@@ -46,4 +46,4 @@ Voir `99_REGLES_NOMENCLATURE_DOCS.md` pour les règles complètes.
 - `43` = ex-`43_v2` (l'ancien a été supprimé, le v2 est devenu officiel).
 - `45` = `N8N_RESPONSIBILITY_MATRIX` ; l'ancien `45_USER_OBJECTIVES` est devenu `F01`.
 - Fichiers corrompus supprimés.
-- Doc 38 : embedding V1 = **bge-m3 local** par défaut (privacy), cloud en secours.
+- Doc 38 : embedding V1 = **qwen3-embedding:8b local** par défaut (privacy), cloud en secours.
