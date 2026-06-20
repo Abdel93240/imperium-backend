@@ -6,11 +6,11 @@ This document defines the retention policy for all raw media handled by the ecos
 
 Core principle:
 
-> Raw media is expensive, sensitive, and dangerous if stored without strict rules.
+> Raw media is the source of truth. Processed output (OCR, transcription) is a lossy, error-prone derived view. The raw is kept by default so the truth can always be re-checked.
 
 Default rule:
 
-> Keep structured extracted information. Do not keep raw media longer than necessary unless explicitly justified.
+> Keep raw media by default when it is CONTENT (documents, content audio, images with intrinsic value). Deletion is an explicit user decision with a mandatory reason. EXCEPTION: raw audio used only as INPUT (voice command/chatbot dictation) is deleted after successful transcription — it is transport, not content.
 
 Summaries and structured records are preferred over raw storage.
 
@@ -19,7 +19,7 @@ Summaries and structured records are preferred over raw storage.
 1. Raw media must not be kept forever by accident.
 2. Every media file must have a retention policy.
 3. Every media file must have an expiration or explicit retention reason.
-4. Successful extraction should usually trigger raw media deletion.
+4. Raw media is kept by default. Deletion is an explicit user decision with a mandatory reason (except input-only audio, deleted after transcription).
 5. Failed extraction may allow temporary debug retention with expiry.
 6. Manual user delete must be a real feature.
 7. Backups must respect deletion and retention policy where possible.
@@ -161,10 +161,12 @@ Examples:
 - quick spoken expense declarations
 
 Policy:
-- raw audio is temporary by default
-- keep transcript and structured action result
-- delete raw audio after successful transcription unless user explicitly wants archive
-- failed transcription may keep temporary audio for retry/debug with expiration
+- INPUT audio (voice command, chatbot dictation, quick spoken declaration): transport,
+  not content. Delete raw audio after successful transcription. No user question.
+- CONTENT audio (recorded lesson, voice note with intrinsic value): kept by default
+  (raw = source of truth), via the normal upload flow (doc 70) with the "keep raw?"
+  question defaulting to KEEP.
+- Failed transcription (either role) may keep temporary audio for retry/debug with expiration.
 
 Default:
 - `delete_after_extraction = true`
@@ -350,6 +352,10 @@ Required:
 User must be able to delete raw media.
 
 Manual delete should:
+- require a MANDATORY reason via a dropdown of preset codes (deletion_reason_code:
+  non_pertinent | doublon | trop_lourd | autre | ...). "autre" opens a free-text
+  deletion_reason_text. The reason list is OPEN (extensible; a recurring "autre"
+  is promoted to a code). deletion_reason_code is structured/exploitable by the WR.
 - mark `delete_requested_at`
 - delete raw file from normal storage
 - set `deleted_at`
