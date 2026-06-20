@@ -218,59 +218,24 @@ expires_at      - hard cutoff when status auto-flips to "expired"
 
 ---
 
-## 8. Temporal Decay Function
+## 8. No Temporal Decay (scoring by evidence)
 
-WR vectors carry decreasing weight over time (per doc 32 §9.3):
+There is NO temporal decay and NO weight column. A memory does not age. Confidence
+rises with repeated evidence and never decreases on its own (see doc 09).
 
-```text
-Age (weeks)    Weight
-─────────────────────
-0              1.00
-1              0.70
-2              0.40
-3              0.20
-4              0.05
-5+             excluded (status = 'expired')
-```
+Retrieval scoring:
+- MODE A ("what is true now?"): final_score = cosine_similarity × confidence.
+  Sorts by semantic proximity AND strength of evidence.
+- MODE B ("what was true at the time?"): final_score = cosine_similarity only.
+  No confidence weighting (low-confidence memories are wanted on purpose).
 
-Other source types may have different decay curves:
+Confidence SORTS, it never EXCLUDES. The only exclusion filters are supersession and
+the privacy gate (see doc 09).
 
-```text
-Medical rules:
-  - active until rule.duration_days expires (or never if NULL)
-  - weight stays 1.0 while rule is active
-  - drops to 0 when rule expires or is superseded
-
-Vector signals (V1.5):
-  - 6 hours active, then expired
-  - weight stays 1.0 while active
-
-Vault/Pulse weekly summaries:
-  - same decay as WR (5-week horizon)
-```
-
-### 8.1 Decay applied at retrieval time
-
-```python
-# At retrieval:
-final_score = cosine_similarity * weight
-```
-
-The decay multiplier is applied **at query time**, not stored as the cosine itself. This way:
-
-- weights can be recomputed without re-embedding
-- decay strategy can change without data migration
-
-### 8.2 Weight refresh cron
-
-```text
-Daily cron at 04:00 UTC:
-  → recompute weights for all active entries
-  → mark entries with weight < 0.05 as 'expired'
-  → cleanup: delete expired entries older than 90 days
-```
-
----
+Explicit expiration is DIFFERENT from decay and is KEPT: a memory with a bounded
+lifetime (e.g. a temporary rule valid for a few hours) uses expires_at to cut off
+cleanly at a date. Expiration is a hard cutoff, not a progressive weight. The daily
+cron only enforces expires_at; it does NOT recompute any weight.
 
 ## 9. Retrieval At Decision Time
 
