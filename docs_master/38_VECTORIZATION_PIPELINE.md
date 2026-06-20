@@ -174,40 +174,31 @@ metadata = {
 
 ---
 
-## 7. The pgvector_memory Table
+## 7. The Memory Table (canonical: ai_memories)
 
-```sql
-CREATE TABLE pgvector_memory (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  content         TEXT NOT NULL,
-  embedding       vector(1024) NOT NULL,
-  source          VARCHAR(64) NOT NULL,
-  source_ref_type VARCHAR(64) NOT NULL,
-  source_ref_id   UUID NOT NULL,
-  element_type    VARCHAR(32) NOT NULL,
-  metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
-  weight          NUMERIC(4,3) NOT NULL DEFAULT 1.000,
-  status          VARCHAR(16) NOT NULL DEFAULT 'active',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  expires_at      TIMESTAMPTZ NULL,
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+This pipeline does NOT define its own table. The canonical memory table is
+`ai_memories`, owned by doc 09 (AI Memory Policy). See doc 09 for the full schema.
 
--- HNSW index for fast similarity search
+Key points relevant to this pipeline:
+- column `embedding vector(1024)` (Qwen3-Embedding, dim 1024)
+- column `confidence` (rises with repeated evidence, never decays — NO `weight`)
+- column `privacy_level` (mandatory on every row)
+- columns `source_table` / `source_id` (path back to the rich source log)
+- column `learning_element_type` (open label; no logic branches on its value)
+- supersession via `supersedes_memory_id`; `is_active` for soft-deactivate
+
+There is NO `weight` column and NO temporal decay anywhere (see §8).
+
 CREATE INDEX pgvector_memory_embedding_idx
 ON pgvector_memory
 USING hnsw (embedding vector_cosine_ops);
 
--- Filter index for active entries only
 CREATE INDEX pgvector_memory_user_active_idx
 ON pgvector_memory (user_id, source, status)
 WHERE status = 'active';
 
--- Source ref lookup
 CREATE INDEX pgvector_memory_source_ref_idx
 ON pgvector_memory (source_ref_type, source_ref_id);
-```
 
 ### 7.1 Field meanings
 
