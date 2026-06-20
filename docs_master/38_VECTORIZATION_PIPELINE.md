@@ -73,15 +73,15 @@ V1 implements only HIGH PRIORITY. The pipeline is designed to extend.
                     │
 ┌───────────────────▼──────────────────────────┐
 │ STORER                                       │
-│ Writes to pgvector_memory with metadata      │
-│ Sets initial weight = 1.0                    │
-│ Sets created_at, source, source_ref          │
+│ Writes to ai_memories with metadata          │
+│ Sets confidence and source linkage           │
+│ Sets created_at, expires_at if bounded       │
 └───────────────────┬──────────────────────────┘
                     │
 ┌───────────────────▼──────────────────────────┐
-│ DECAY SCHEDULER (daily cron)                 │
-│ Recomputes weight based on age               │
-│ Marks elements past 5 weeks as inactive      │
+│ EXPIRY SCHEDULER (daily cron)                │
+│ Applies expires_at hard cutoffs              │
+│ Marks expired elements inactive              │
 └──────────────────────────────────────────────┘
 ```
 
@@ -129,7 +129,7 @@ défaut.**
 ### 5.3 Embedding consistency
 
 ```text
-Once chosen, the embedding model MUST stay consistent for the lifetime of pgvector_memory.
+Once chosen, the embedding model MUST stay consistent for the lifetime of ai_memories embeddings.
 
 If switching models later:
   → re-embed all entries
@@ -155,7 +155,7 @@ When a WR is validated, the backend extracts from `report_json.extracted_for_mem
 }
 ```
 
-Each list item becomes one row in `pgvector_memory`.
+Each list item becomes one row in `ai_memories`.
 
 ### 6.2 Medical rules validated → extraction
 
@@ -189,31 +189,34 @@ Key points relevant to this pipeline:
 
 There is NO `weight` column and NO temporal decay anywhere (see §8).
 
-CREATE INDEX pgvector_memory_embedding_idx
-ON pgvector_memory
+CREATE INDEX ai_memories_embedding_idx
+ON ai_memories
 USING hnsw (embedding vector_cosine_ops);
 
-CREATE INDEX pgvector_memory_user_active_idx
-ON pgvector_memory (user_id, source, status)
-WHERE status = 'active';
+CREATE INDEX ai_memories_user_active_idx
+ON ai_memories (user_id, is_active)
+WHERE is_active = true;
 
-CREATE INDEX pgvector_memory_source_ref_idx
-ON pgvector_memory (source_ref_type, source_ref_id);
+CREATE INDEX ai_memories_source_idx
+ON ai_memories (source_table, source_id);
 
 ### 7.1 Field meanings
 
 ```text
 content         - the natural-language text (used for re-embedding if needed)
 embedding       - vector representation
-source          - "weekly_report" | "medical_rule" | ...
-source_ref_type - which canonical table the source lives in
-source_ref_id   - id in that canonical table
-element_type    - "insight" | "decision" | "pattern" | "win" | "blocker" |
+confidence      - evidence strength; rises with repeated proof
+privacy_level   - mandatory privacy classification
+source_table    - which canonical table the source lives in
+source_id       - id in that canonical table
+learning_element_type
+                - "insight" | "decision" | "pattern" | "win" | "blocker" |
                   "nutrition_rule" | "training_rule" | etc.
 metadata        - free-form JSONB (week_start, priority, etc.)
-weight          - current weight (decayed over time)
-status          - "active" | "expired" | "superseded"
-expires_at      - hard cutoff when status auto-flips to "expired"
+is_active       - false when explicitly expired or superseded
+supersedes_memory_id
+                - link to the prior memory replaced by this one
+expires_at      - hard cutoff when is_active auto-flips to false
 ```
 
 ---
@@ -242,17 +245,29 @@ cron only enforces expires_at; it does NOT recompute any weight.
 When Vector / Imperium / Pulse needs context:
 
 ```python
-def retrieve_context(user_id, query_text, source_filter=None, top_k=3):
+def retrieve_context(
+    user_id,
+    query_text,
+    source_filter=None,
+    top_k=3,
+    retrieval_mode="current_truth",
+):
     query_embedding = embed(query_text)
+    score_sql = (
+        "(1 - (embedding <=> %s)) * confidence"
+        if retrieval_mode == "current_truth"
+        else "(1 - (embedding <=> %s))"
+    )
     
-    sql = """
-        SELECT id, content, source, element_type, weight,
+    sql = f"""
+        SELECT id, content, source_table, learning_element_type, confidence,
                (embedding <=> %s) AS distance,
-               (1 - (embedding <=> %s)) * weight AS final_score
-        FROM pgvector_memory
+               {score_sql} AS final_score
+        FROM ai_memories
         WHERE user_id = %s
-          AND status = 'active'
-          AND (%s IS NULL OR source = %s)
+          AND is_active = true
+          AND (expires_at IS NULL OR expires_at > now())
+          AND (%s IS NULL OR source_table = %s)
         ORDER BY final_score DESC
         LIMIT %s
     """
@@ -271,10 +286,10 @@ Retrieved context is injected as **soft information**, never as commands:
 ```text
 Recent validated insights (informational only, not enforced):
 
-[2026-04-27, decision, weight=0.70]
+[2026-04-27, decision, confidence=0.70]
 "Reduce VTC on Tuesday evenings due to fatigue"
 
-[2026-04-20, pattern, weight=0.40]
+[2026-04-20, pattern, confidence=0.40]
 "CA drops by 22% after intense workout days"
 
 The user can ignore these. Surface them only if directly relevant.
@@ -318,7 +333,7 @@ def vectorize_medical_rule(
 ) -> uuid.UUID:
     """
     Called when a medical rule is validated.
-    Returns the new pgvector_memory.id.
+    Returns the new ai_memories.id.
     """
 
 def search_memory(
@@ -332,26 +347,26 @@ def search_memory(
 ) -> list[MemoryRetrievalResult]:
     """
     Retrieves top-k semantically relevant entries.
-    Applies decay weighting and threshold filtering.
+    Applies retrieval scoring and threshold filtering.
     """
 
 def supersede_entries(
     db: Session,
     *,
     user_id: uuid.UUID,
-    source_ref_type: str,
-    source_ref_id: uuid.UUID,
+    source_table: str,
+    source_id: uuid.UUID,
 ) -> int:
     """
-    Marks all entries from a source as 'superseded'.
+    Marks all entries from a source as inactive because they were superseded.
     Used when an old rule is replaced by a new one.
     Returns count of superseded entries.
     """
 
-def decay_refresh(db: Session) -> dict:
+def expiry_refresh(db: Session) -> dict:
     """
-    Daily cron job. Updates weights and expires old entries.
-    Returns {refreshed: N, expired: M}.
+    Daily cron job. Applies expires_at hard cutoffs.
+    Returns {expired: M}.
     """
 ```
 
@@ -416,9 +431,9 @@ If a WR validation is replayed (idempotency replay), the vectorization must not 
 Detection logic:
 
 ```python
-existing = db.scalar(select(PgvectorMemory).where(
-    PgvectorMemory.source_ref_type == "weekly_report",
-    PgvectorMemory.source_ref_id == wr.id,
+existing = db.scalar(select(AiMemory).where(
+    AiMemory.source_table == "weekly_reports",
+    AiMemory.source_id == wr.id,
 ).limit(1))
 
 if existing:
@@ -434,8 +449,8 @@ If a WR is corrected (creates a new `weekly_reports` row with `superseded_by`):
 # 1. Mark old entries as superseded
 supersede_entries(
     user_id=user.id,
-    source_ref_type="weekly_report",
-    source_ref_id=old_wr_id,
+    source_table="weekly_reports",
+    source_id=old_wr_id,
 )
 
 # 2. Vectorize new WR
@@ -488,7 +503,7 @@ The WR is still canonical — vectorization is best-effort enrichment.
 ```text
 Detection: query returns empty or wrong results despite known data
 Recovery:
-  REINDEX TABLE pgvector_memory;
+  REINDEX TABLE ai_memories;
 Or full rebuild from canonical sources:
   python -m app.scripts.rebuild_vector_memory
 ```
@@ -505,16 +520,16 @@ Planned migration documented in Section 5.3.
 
 ```text
 - vectorize_wr_validation extracts correctly
-- decay weights compute correctly at various ages
+- expiry_refresh marks entries inactive when expires_at has passed
 - supersede marks entries correctly
-- search filters by user, source, status
+- search filters by user, source, is_active, and expires_at
 ```
 
 ### 15.2 Integration tests
 
 ```text
-- Validate a fake WR → check pgvector entries
-- Run decay cron → check weight updates
+- Validate a fake WR → check ai_memories entries
+- Run expiry cron → check expired rows become inactive
 - Search for known query → check top result
 ```
 
