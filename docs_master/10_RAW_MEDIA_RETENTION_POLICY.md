@@ -292,10 +292,12 @@ Allowed extracted information:
 - supplement label summary
 - progress note if user explicitly stores it
 
-Do not store by default:
-- raw body progress photos
-- raw health-sensitive notes
-- sensitive images in vector memory
+Raw kept by default (source of truth), local handling:
+- raw body progress photos: kept by default; deletion = explicit user decision + reason
+- raw health-sensitive notes: kept by default; deletion = explicit user decision + reason
+Vectorization rule (NOT retention): sensitive raw images are NEVER put in vector
+memory. Only learning elements are vectorized (see doc 09). Keeping the raw (tier 1)
+does not mean vectorizing it (tier 2).
 
 ## Religious / Private Media Policy
 
@@ -313,12 +315,12 @@ Default:
 - `privacy_level = very_high`
 - external provider blocked unless explicit permission is given
 - summarize only if useful and allowed
-- raw media expires or is deleted after processing
+- raw media kept by default (source of truth); deletion = explicit user decision + reason
 
-Do not store by default:
-- raw private reflections
-- raw religious private states
-- raw worship notes
+Raw kept by default (source of truth), strictly local/private handling:
+- raw private reflections: kept by default; deletion = explicit user decision + reason
+- raw religious private states: kept by default; deletion = explicit user decision + reason
+- raw worship notes: kept by default; deletion = explicit user decision + reason
 
 Religious inference rules (the AI's authority is strictly bounded):
 
@@ -560,4 +562,3 @@ Not stored:
 - raw private note forever
 - external provider payload
 - inferred worship state
-
