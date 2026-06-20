@@ -279,13 +279,13 @@ Examples:
 Policy:
 - stricter privacy handling
 - external provider usage must be controlled
-- default to summary over raw retention
+- raw kept by default (source of truth); summary is ADDED, not a replacement
 
 Default:
-- `privacy_level = high` or `very_high`
-- local/private handling preferred
+- privacy_level = high or very_high
+- local/private handling preferred (local OCR, no cloud for sensitive)
 - external provider requires privacy gate approval
-- delete raw file after extraction unless user archives it
+- raw file KEPT by default; deletion is an explicit user decision with mandatory reason
 
 Allowed extracted information:
 - food estimate
