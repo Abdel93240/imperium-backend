@@ -1,4 +1,4 @@
-# 09 - pgvector Memory Policy
+# 09 - AI Memory Policy (canonical table: ai_memories)
 
 ## Purpose
 
@@ -23,6 +23,7 @@ Columns:
 - `source_table` text nullable
 - `source_id` text nullable
 - `memory_type` memory_type not null
+- `learning_element_type` text nullable
 - `content` text not null
 - `embedding` vector not null
 - `embedding_model` text not null
@@ -85,7 +86,22 @@ Use these memory types:
 - `correction`
 - `system_note`
 
-Do not create new memory types casually. Additions must be documented here first.
+memory_type is the DOMAIN axis (what the memory is about). This list is semi-stable:
+new domains are added only when a genuinely new area of life appears, documented here
+first. It is distinct from learning_element_type (see below), which is the OPEN axis.
+
+## Learning Element Type (open axis)
+
+learning_element_type describes the NATURE of the learning, orthogonal to the domain.
+V1 list: insight, decision, pattern, win, blocker.
+
+This list is OPEN: the Weekly Review may propose a new type when the field reveals the
+need; the user validates (never the WR alone). Cohérent with the open list of signals.
+
+Safety rule (non-negotiable): the type is a purely DESCRIPTIVE label. NO processing
+logic branches on a specific type value (no "if type == 'pattern' then..."). All
+learning elements are vectorized, searched and privacy-gated identically. The type
+only describes and enables filtering ("show me the blockers").
 
 ## What Can Be Stored
 
