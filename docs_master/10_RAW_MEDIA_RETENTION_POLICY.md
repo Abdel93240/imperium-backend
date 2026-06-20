@@ -320,13 +320,24 @@ Do not store by default:
 - raw religious private states
 - raw worship notes
 
-Never infer:
-- prayer completion
-- fasting intention
-- ghusl state
-- Quran completion
-- adhkar completion
-- sadaqa completion
+Religious inference rules (the AI's authority is strictly bounded):
+
+1. The AI MUST NOT infer an unstated religious FACT. Prayer completion, fasting,
+   ghusl state, Quran reading, adhkar, sadaqa are declared by the USER only. The AI
+   never decides "done / not done" on the user's behalf — it cannot perceive these
+   acts; the user is the sole witness. The user MAY declare them; the AI MAY NOT guess them.
+
+2. The AI MAY observe a TREND from facts the user already declared (assiduity,
+   regularity, progression). This is factual aggregation of the user's own
+   declarations, NOT a guess — e.g. "you have been regular in prayer lately". Allowed,
+   and it feeds the learning memory (assiduity pattern).
+
+3. The AI MUST NOT issue a religious JUDGMENT (licit/illicit, permissibility, fatwa).
+   This is a matter of AUTHORITY, not data: it belongs to religious sources / the
+   knowledge base (doc 50), never to a model's inference.
+
+Key distinction: inferring an unstated FACT (forbidden) vs observing a TREND from
+declared facts (allowed) vs ruling on PERMISSIBILITY (forbidden).
 
 ## Deletion Policy
 
