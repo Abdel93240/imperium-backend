@@ -288,15 +288,20 @@ Default retrieval constraints:
 - exclude superseded memory
 - retrieve only memory types relevant to the workflow
 - retrieve only privacy levels allowed by the workflow and user setting
-- prefer higher confidence and recent durable patterns
+- prefer higher confidence as a SORT signal — confidence SORTS, it never EXCLUDES.
+  Never apply a "confidence > threshold" exclusion filter by default. The only
+  exclusion filters are supersession and the privacy gate. A very-low-confidence
+  memory stays retrievable (it is a witness of the past, not garbage).
 
 Recommended default values:
 - top-k: TODO
 - similarity threshold: TODO
 - minimum confidence: TODO
-- recency weighting: TODO
 
-These values must be benchmarked and tuned later.
+NO recency weighting and NO temporal decay. A memory does not age: confidence rises
+with repeated evidence and NEVER decreases on its own. An old memory keeps its
+confidence; it only becomes relatively minor when a competing memory accumulates more
+evidence. (top-k / similarity / minimum confidence must be benchmarked and tuned later.)
 
 ## Retrieval Examples by Workflow
 
@@ -568,6 +573,18 @@ Purpose:
 Behavior:
 - `expires_at < now()`
 - excluded from retrieval
+
+### Contradictory memories coexist
+
+Two contradictory learning elements COEXIST; neither is deleted. The more proven one
+(higher confidence) dominates; the older one survives as a weak trace (historical
+value: it lets the WR speak of progression, and serves as an entry point to the past).
+This is the EVOLUTION case (e.g. "not regular in prayer" vs "regular in prayer": both
+exist, the proven one wins, the old one stays as a faint trace).
+
+This is DISTINCT from supersession below. Evolution = the old one became minority but
+was true at the time. Supersession = the old one was an ERROR, explicitly corrected.
+Keep BOTH mechanisms.
 
 ### Superseded memory
 
