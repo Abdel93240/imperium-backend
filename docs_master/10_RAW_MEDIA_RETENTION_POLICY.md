@@ -267,8 +267,10 @@ Temporary document behavior:
 - set `expires_at`
 - delete raw file after extraction or expiry
 
-Do not store by default:
-- sensitive document raw files without explicit reference/archive decision
+Retention note:
+- sensitive document raw files ARE kept by default like any document (source of truth);
+  their sensitivity is handled by the privacy gate (local handling, no external provider),
+  NOT by deletion. Deletion remains an explicit user decision with a mandatory reason.
 
 ## Health Media Policy
 
