@@ -252,14 +252,15 @@ Examples:
 - school payment docs
 
 Policy:
-- allow secure long-term retention if explicitly marked as reference documents
-- otherwise summarize and apply clear archive/expiration policy
+- documents are CONTENT: raw kept by default (source of truth), secure long-term retention
+- deletion is an explicit user decision with a mandatory reason
+- a document may still be marked as temporary if the user explicitly chooses so
 
 Reference document behavior:
 - `delete_after_extraction = false`
 - `retention_reason = reference_document`
-- document may be chunked/summarized for memory if allowed
-- pgvector memory should store summaries/chunks according to privacy policy
+- only learning elements derived from the document are vectorized in ai_memories
+  (per doc 09); the raw document itself is never vectorized (kept in tier 1)
 
 Temporary document behavior:
 - summarize/extract
