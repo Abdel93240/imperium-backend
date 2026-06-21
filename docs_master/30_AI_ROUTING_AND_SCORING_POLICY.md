@@ -24,7 +24,7 @@ This version is a **full rewrite** (June 2026). It supersedes all previous versi
 - **Opus 4.8** is the default heavy cloud model.
 - **Fable 5** is the top tier, reserved for tasks that are simultaneously long, complex, and high-stakes.
 - **GPT-5.5** is the domain specialist for health (Pulse) and fresh/web data (Vector).
-- **Gemini** handles vision/OCR. **Whisper local** handles audio.
+- **The OCR service handles vision/OCR. The transcription service** handles audio.
 - **CatBoost** is a dedicated metric ML model for Vector ride scoring — not an LLM.
 - **Haiku is removed** from the routing hierarchy (the local Qwen 32B covers the low band; Sonnet bounds the top of it — no room left for a paid light tier).
 - **Gemma** remains a future challenger only, not deployed by default.
@@ -226,11 +226,11 @@ Use for:
 - fresh data: recent events around Paris (Vector — concerts, salons, sports), web retrieval, market comparison, regulatory research.
 - generating actionable rules from sensitive or complex documents.
 
-### 3.9 Gemini — vision / OCR
+### 3.9 OCR service — vision / OCR
 
 Role: vision / OCR. Use for receipts, screenshots, scanned documents, images, structured visual extraction.
 
-### 3.10 Whisper local — audio
+### 3.10 Transcription service — audio
 
 Role: audio transcription. Voice notes, long dictation, audio uploaded to Imperium, text preparation before AI routing. For short driving commands (<10s), Android Speech API is preferred to save resources.
 
@@ -445,13 +445,13 @@ Note — Emergency Mode (§5.7) is NOT a static rule: it raises priority and lif
 
 ### 7.1 Vision / OCR
 ```text
-Image, receipt, screenshot, scanned document → Gemini
+Image, receipt, screenshot, scanned document → OCR service
 ```
-After Gemini extraction, Qwen may score the next step.
+After OCR service extraction, Qwen may score the next step.
 
 ### 7.2 Audio
 ```text
-Raw audio → Whisper local
+Raw audio → transcription service
 ```
 After transcription, Qwen scores the follow-up.
 
@@ -526,8 +526,8 @@ Sonnet 4.6       → first cloud tier (balanced reasoning)
 Opus 4.8         → default heavy model (deep analysis, strategy)
 Fable 5          → top tier, reserved (long + complex + high-stakes/durable; WR re-planning)
 GPT-5.5          → specialist: health/Pulse + fresh data/web (Vector)
-Gemini           → vision / OCR
-Whisper local    → audio
+OCR service      → vision / OCR
+Transcription service → audio
 CatBoost         → Vector ride scoring (business ML, not routing)
 ```
 
