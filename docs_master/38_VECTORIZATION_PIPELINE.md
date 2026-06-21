@@ -221,6 +221,48 @@ expires_at      - hard cutoff when is_active auto-flips to false
 
 ---
 
+## 7-bis. Ephemeral Working Vector Store
+
+A generic ecosystem primitive, distinct from ai_memories. It lets a local agent
+(Qwen) reason over a large TEMPORARY context without saturating its context window,
+by RAG over a throwaway store.
+
+Complement to ai_memories:
+- ai_memories = permanent + selective (validated learning elements).
+- ephemeral store = temporary + bulky (working context for one session).
+
+### Life cycle
+- Invariant: AT MOST ONE ephemeral store exists at any time.
+- Created when a consuming session opens (WR, chatbot, document analysis...).
+- Opening a NEW store DESTROYS any pre-existing store (cleanly closed or not).
+  Self-cleaning: no TTL, no cron. Cleanup happens at creation of the next store.
+- A badly-closed store survives dormant until the next opening (no loss during a
+  user pause), then is destroyed at that moment.
+
+### Storage
+Table ephemeral_vectors in pgvector (reuses the HNSW index), isolated by
+session_id, distinct from ai_memories.
+
+### Watertight separation (never promotes to permanent)
+The ephemeral store NEVER flows into ai_memories by itself. Only the validated
+end-of-session extraction writes permanent memory. Reason: otherwise the same
+learning would exist twice (clean extraction + raw ephemeral copy), worded
+differently → semantic duplicates that pollute retrieval.
+
+### Privacy gate & cloud fallback
+- Qwen LOCAL reads the store freely (local, nothing leaves the machine).
+- "Sonnet replaces Qwen when down" is a MODEL relay, NOT identical data access. The
+  replacement shifts from LOCAL to CLOUD, which changes the access regime: the
+  privacy gate interposes exactly as for any cloud call.
+- Decision (locked): for very_high content (sensitive medical/religious), the service
+  DEGRADES (abstains or reduced handling) rather than sending to the cloud. Fallback
+  preserves continuity, NEVER at the cost of confidentiality. Degraded service is
+  preferred over leaking sensitive data.
+
+### Consumers
+WR (first consumer — the INPUT audit). Then: dense chatbot sessions, large-document
+analysis, complex replanning. Single mechanism, instantiated on demand per session.
+
 ## 8. No Temporal Decay (scoring by evidence)
 
 There is NO temporal decay and NO weight column. A memory does not age. Confidence
