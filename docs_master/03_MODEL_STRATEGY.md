@@ -15,8 +15,8 @@ Key model decisions for V1:
 🟣 Claude Opus 4.8             — premium strategic
 ⭐ Claude Fable 5              — top tier, WR re-planning / long+complex+durable
 🟢 GPT-5.5                     — web research + medical
-🔵 Gemini                      — vision/OCR
-🎤 Whisper local               — transcription
+🔵 OCR service                  — vision/OCR
+🎤 Transcription service       — transcription
 ```
 
 For details, refer to doc 30 sections 2 and 9.
