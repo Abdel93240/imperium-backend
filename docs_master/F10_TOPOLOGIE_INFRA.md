@@ -148,6 +148,9 @@ une ligne à modifier ici, aucun autre doc cassé.
 - Service de transcription = faster-whisper large-v3 (français ET arabe), sur la
   P40. (large-v3 requis pour l'arabe.) Vigilance : arabe dialectal moins fiable.
 - Garde-fou langue = fastText lid.176.ftz (CPU, ~1 Mo, hors-ligne, aucun impact
+  GPU). Détecte les dérives massives de langue sur les artefacts conservés → drapeau →
+  régénération ou validation utilisateur. OUVERT/évolutif : escalade possible
+  (split-lang) si des contaminations ponctuelles passent au terrain.
 
 ---
 
