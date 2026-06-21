@@ -299,8 +299,8 @@ Enforcement layers:
   severity: critical
   enforcement_layer: [android, documentation]
   affected_docs_or_modules: [07_ANDROID_APP_RESPONSIBILITIES.md, 13_VECTOR_MVP_PHASE_DECISION.md]
-  example_violation: Accessibility service reads or controls Bolt as a hidden automation layer.
-  expected_behavior: Do not use accessibility permissions to bypass platform rules.
+  example_violation: Accessibility service controls Bolt, simulates actions, or acts as a hidden automation layer.
+  expected_behavior: Accessibility may be used to READ on-screen content in order to ANALYZE an offer and DISPLAY advice (read-only, the user decides and acts). It must NEVER control Bolt, simulate actions, or act as a hidden automation layer. Read to advise, never act to decide.
 
 - rule_id: VECTOR-005
   rule: Vector V1 is manual-first.
@@ -475,20 +475,20 @@ Enforcement layers:
   expected_behavior: Route simple/private/fast tasks to local Qwen when capability is sufficient.
 
 - rule_id: AI-002
-  rule: Whisper or faster-whisper handles transcription.
+  rule: The transcription service handles transcription.
   severity: high
   enforcement_layer: [ai_router, backend_api]
   affected_docs_or_modules: [03_MODEL_STRATEGY.md, 04_MVP_BACKEND_CONTRACTS.md]
   example_violation: Voice audio is routed to a general reasoning model for transcription.
-  expected_behavior: Use Whisper/faster-whisper for STT, then route transcript if needed.
+  expected_behavior: Use the transcription service for STT, then route transcript if needed.
 
 - rule_id: AI-003
-  rule: Gemini handles OCR and image tasks when external use passes privacy gate.
+  rule: The OCR service handles OCR and image tasks when external use passes privacy gate.
   severity: high
   enforcement_layer: [ai_router, backend_api, media_storage]
   affected_docs_or_modules: [02_AI_ROUTING_POLICY.md, 03_MODEL_STRATEGY.md, 10_RAW_MEDIA_RETENTION_POLICY.md]
-  example_violation: Screenshot OCR goes to Gemini despite privacy gate denial.
-  expected_behavior: Use Gemini only when privacy policy allows; otherwise use local/manual fallback or ask permission.
+  example_violation: Screenshot OCR goes to the OCR service despite privacy gate denial.
+  expected_behavior: Use the OCR service only when privacy policy allows; otherwise use local/manual fallback or ask permission.
 
 - rule_id: AI-004
   rule: GPT or Claude handles complex reasoning and strategy.
