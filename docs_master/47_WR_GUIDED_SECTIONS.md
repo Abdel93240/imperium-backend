@@ -146,9 +146,10 @@ PHASE 6 — FINAL SYNTHESIS
 
 Cross-domain correlations require a global view, but the WR dialogue must not fill
 Qwen's context window with a large weekly summary. The WR therefore uses an
-audit-first architecture: Opus produces a dense INPUT audit, Qwen receives only
-the section-scoped material it needs while guiding the user, then Opus produces a
-final validated OUTPUT audit.
+audit-first architecture: Opus produces a dense INPUT audit, the audit is indexed
+in an ephemeral WR working vector store, Qwen retrieves only the relevant chunks
+it needs while guiding the user, then Opus produces a final validated OUTPUT
+audit.
 
 Qwen3-32B native context is approximately 32,768 tokens. YaRN can extend the
 window, but it degrades short-context behavior and is not reliable as the default
@@ -170,6 +171,10 @@ This rich log contains:
 The rich WR log is never vectorized. Only learning elements extracted from the
 validated WR are embedded into `ai_memories`, and every memory row points back to
 the rich log through `source_table` / `source_id`.
+
+This creates two separate vectorization paths that must not be confused:
+- ephemeral working vectorization for the INPUT audit during one WR session;
+- permanent learning-memory vectorization for validated learning elements only.
 
 ### 5.1 Input audit by Opus 4.8 at max effort
 
@@ -198,16 +203,22 @@ The audit is structured along its natural sections:
   - per-severity points
   - each cross-domain correlation as its own explicit point
 
-These audit sections may be passed to Qwen as section-scoped context during the
-current WR session, but they are not inserted into `ai_memories`.
+During the current WR session, the INPUT audit is chunked and embedded into an
+ephemeral WR working vector store. Qwen queries this temporary store through RAG
+and receives only the relevant chunks for the current section or question.
+
+This working vector store is distinct from `ai_memories`. It is not permanent
+memory, it never becomes a source of historical retrieval, and it is discarded at
+the end of the WR session.
 ```
 
 ### 5.3 Qwen drives the dialogue with scoped context
 
 ```text
 Qwen 32B conducts the 5-phase guided conversation. It does NOT load the whole
-audit into context. Per section / per need, it receives the relevant INPUT audit
-slice and may retrieve historical learning elements from ai_memories.
+audit into context. Per section / per need, it queries the ephemeral WR working
+vector store for relevant INPUT audit chunks and may retrieve historical learning
+elements from ai_memories.
 
 Result: Qwen's context window stays largely free:
   - room for the user dialogue
@@ -218,9 +229,9 @@ Historical retrieval from ai_memories uses doc 38 retrieval mode A by default:
 final_score = cosine_similarity × confidence. Mode B uses cosine_similarity only
 when the workflow explicitly needs past low-confidence witnesses.
 
-Because Opus pre-computed the current-week correlations and they are available as
-scoped INPUT audit slices, Qwen surfaces them in the right section without
-recomputing or holding everything in memory.
+Because Opus pre-computed the current-week correlations and they are retrievable
+from the ephemeral WR working vector store, Qwen surfaces them in the right
+section without recomputing or holding everything in memory.
 ```
 
 ### 5.4 Correlations emerging during the dialogue
@@ -255,7 +266,7 @@ The WR no longer runs many per-section Opus calls. Cost shape:
 ├─ Qwen dialogue with scoped context (local)   — free in itself
 │    └─ specialist escalations (variable):
 │         finance/health → GPT-5.5 ; other → Opus ; religion → NO AI (DB lookup)
-├─ Vectorization (local embedding GPU)         — free (no API)
+├─ INPUT audit working-store vectorization     — free (local embedding GPU)
 ├─ 1 Opus audit (max effort) — OUTPUT          — heavy call #2 (not optional)
 └─ (final user validation of the report)
 ```
@@ -286,7 +297,7 @@ Opus OUTPUT audit (max effort, incorporates user corrections):
   ~25,000 in × $5/M   = $0.125
   ~10,000 out × $25/M = $0.250   → ~$0.375
 
-Vectorization (local embedding GPU) → $0.000
+INPUT audit working-store vectorization → $0.000
 ──────────────────────────────────────────────
 TOTAL ≈ $0.80 per WR  →  ~$40-45 / year (×52 weeks)
 ```
