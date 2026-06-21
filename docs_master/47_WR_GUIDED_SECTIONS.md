@@ -142,13 +142,13 @@ PHASE 6 — FINAL SYNTHESIS
 
 ---
 
-## 5. WR Context Architecture (Opus Audit + RAG)
+## 5. WR Context Architecture (Rich WR Log + Learning RAG)
 
 Cross-domain correlations require a global view, but the WR dialogue must not fill
 Qwen's context window with a large weekly summary. The WR therefore uses an
-audit-first RAG architecture: Opus produces a dense INPUT audit, the audit is
-vectorized, Qwen retrieves only the relevant chunks while guiding the user, then
-Opus produces a final validated OUTPUT audit.
+audit-first architecture: Opus produces a dense INPUT audit, Qwen receives only
+the section-scoped material it needs while guiding the user, then Opus produces a
+final validated OUTPUT audit.
 
 Qwen3-32B native context is approximately 32,768 tokens. YaRN can extend the
 window, but it degrades short-context behavior and is not reliable as the default
@@ -159,6 +159,17 @@ context is the wrong design.
 The architecture preserves the WR's purpose: cross-domain correlations such as
 Pulse low sleep + Imperium missions marked as "flemme" should surface as possible
 fatigue, not be missed because each section is isolated.
+
+The complete WR is preserved as a rich, self-contained Markdown log in text form.
+This rich log contains:
+- the INPUT audit: analysis of the week's data only, plus pointers to source
+  tables/rows; it must not copy raw weekly data into the log;
+- the complete user <-> AI conversation across all guided sections;
+- the OUTPUT audit: validated synthesis plus extracted learning elements.
+
+The rich WR log is never vectorized. Only learning elements extracted from the
+validated WR are embedded into `ai_memories`, and every memory row points back to
+the rich log through `source_table` / `source_id`.
 
 ### 5.1 Input audit by Opus 4.8 at max effort
 
@@ -176,32 +187,40 @@ suspended (US export-control directive). Opus 4.8 at max effort is the relay unt
 that changes.
 ```
 
-### 5.2 Vectorize the audit
+### 5.2 Preserve the audit inside the rich WR log
 
 ```text
-The audit is vectorized using the dedicated embedding model (Qwen3-Embedding, Q8,
-on the dedicated embedding GPU per doc 38) and stored in pgvector.
+The INPUT audit is stored as text inside the rich WR log. It contains analysis and
+source pointers, not copied raw data.
 
-The audit is chunked along its natural structure:
+The audit is structured along its natural sections:
   - per-domain facts
   - per-severity points
-  - each cross-domain correlation as its own retrievable unit
+  - each cross-domain correlation as its own explicit point
+
+These audit sections may be passed to Qwen as section-scoped context during the
+current WR session, but they are not inserted into `ai_memories`.
 ```
 
-### 5.3 Qwen drives the dialogue via retrieval
+### 5.3 Qwen drives the dialogue with scoped context
 
 ```text
 Qwen 32B conducts the 5-phase guided conversation. It does NOT load the whole
-audit into context. Per section / per need, it RETRIEVES the relevant audit chunks
-from pgvector and works with just those.
+audit into context. Per section / per need, it receives the relevant INPUT audit
+slice and may retrieve historical learning elements from ai_memories.
 
 Result: Qwen's context window stays largely free:
   - room for the user dialogue
   - room for self-scoring ("can I answer this, or escalate?")
   - room to call cloud specialists when a point exceeds its competence
 
-Because Opus pre-computed the correlations and they are retrievable, Qwen surfaces
-them in the right section without recomputing or holding everything in memory.
+Historical retrieval from ai_memories uses doc 38 retrieval mode A by default:
+final_score = cosine_similarity × confidence. Mode B uses cosine_similarity only
+when the workflow explicitly needs past low-confidence witnesses.
+
+Because Opus pre-computed the current-week correlations and they are available as
+scoped INPUT audit slices, Qwen surfaces them in the right section without
+recomputing or holding everything in memory.
 ```
 
 ### 5.4 Correlations emerging during the dialogue
@@ -219,8 +238,10 @@ The final synthesis (Phase 6) consolidates the validated sections. Opus 4.8 then
 reruns the audit at maximum effort using the user's corrections from the dialogue.
 
 This OUTPUT AUDIT is the final, user-validated weekly learning artifact. It is
-vectorized and becomes a central memory source for Imperium planning, arbitration,
-advice, missions, and future WRs.
+stored in the rich WR Markdown log together with the INPUT audit and complete
+conversation. Only its extracted learning elements are vectorized into
+`ai_memories`; the log itself remains text and becomes the source referenced by
+Imperium planning, arbitration, advice, missions, and future WRs.
 ```
 
 ---
@@ -231,7 +252,7 @@ The WR no longer runs many per-section Opus calls. Cost shape:
 
 ```text
 ├─ 1 Opus audit (max effort) — INPUT          — heavy call #1
-├─ Qwen dialogue via RAG (local)               — free in itself
+├─ Qwen dialogue with scoped context (local)   — free in itself
 │    └─ specialist escalations (variable):
 │         finance/health → GPT-5.5 ; other → Opus ; religion → NO AI (DB lookup)
 ├─ Vectorization (local embedding GPU)         — free (no API)
@@ -255,7 +276,7 @@ Opus INPUT audit (max effort):
   ~15,000 in × $5/M   = $0.075
   ~ 8,000 out × $25/M = $0.200   → ~$0.275
 
-Qwen RAG dialogue (local)        → $0.000
+Qwen scoped dialogue (local)     → $0.000
 
 Specialist escalations (~3 avg, small calls ~3,000 in / ~1,500 out each):
   ~3 × ~$0.05                    → ~$0.15
@@ -272,8 +293,8 @@ TOTAL ≈ $0.80 per WR  →  ~$40-45 / year (×52 weeks)
 
 Net: dominated by the two weekly Opus max-effort audits (input + output), plus a
 small number of specialist escalations. The old per-section Opus model is gone.
-The heavy spend is concentrated where it builds Imperium's core memory: the
-validated output audit, which is the system's main asset.
+The heavy spend is concentrated where it builds Imperium's core memory: the rich
+WR log and its validated learning elements, which are the system's main assets.
 
 These are estimates based on plausible token sizes. The real cost will be
 calibrated in use via the AI cost-logging layer (doc 43 §17). Order of magnitude:
@@ -292,7 +313,10 @@ V2 adds a generic sections table.
 ```sql
 -- weekly_reports stays as defined in doc 32 §11.2
 -- It still holds: report_markdown, report_json, summary, etc.
--- These now contain the FINAL synthesis after all sections.
+-- report_markdown now contains the rich WR log:
+--   1. INPUT audit analysis + source table/row pointers
+--   2. complete user <-> AI conversation
+--   3. OUTPUT audit with validated synthesis + learning elements
 ```
 
 ### 7.2 New table: weekly_report_sections
@@ -321,7 +345,7 @@ CREATE TABLE weekly_report_sections (
   ai_insights_json         JSONB NULL,
                            -- AI's insights derived from user answers
   extracted_for_memory_json JSONB NULL,
-                           -- Section-specific elements for pgvector
+                           -- Section-specific learning elements for ai_memories
                            -- {insights:[], decisions:[], patterns:[], 
                            --  wins:[], blockers:[]}
   
@@ -363,10 +387,11 @@ ON weekly_report_sections (user_id, status);
 ✅ EVOLUTIVE
    Adding a new section in V3+ = adding 1 row, no schema change.
 
-✅ GRANULAR PGVECTOR
-   Each section's extracted_for_memory feeds pgvector independently.
+✅ GRANULAR LEARNING MEMORY
+   Each section's extracted_for_memory feeds ai_memories independently.
    Future retrieval: "show me what the WR said about Vector"
-   = filter by section_name = 'vector'.
+   = retrieve learning elements with metadata section_name = 'vector',
+     all pointing back to the rich WR log.
 
 ✅ COST TRACKABLE
    Per-section cost helps optimize prompts later.
@@ -444,8 +469,8 @@ WEEK: [week_start] to [week_end]
 DATA FOR THIS SECTION:
 [deterministic_data_for_section]
 
-PAST CONTEXT (from past 4 weeks):
-[past_wr_section_data, decay-weighted]
+PAST CONTEXT (from ai_memories, Mode A unless explicitly overridden):
+[relevant learning elements scored by cosine_similarity × confidence]
 
 YOUR TASK:
 1. Produce a narrative summary of the week for THIS DOMAIN ONLY.
@@ -532,35 +557,51 @@ The section service (per Section 13) handles the data assembly per section.
 
 ---
 
-## 12. Vectorization By Section
+## 12. Learning Element Vectorization By Section
 
-V1 vectorizes the entire WR's `extracted_for_memory` as one batch (per doc 38 §6.1).
+V1 vectorizes learning elements from the WR's `extracted_for_memory` as one batch
+(per doc 38 §6.1).
 
-V2 vectorizes EACH SECTION's `extracted_for_memory_json` separately:
+V2 extracts learning elements from EACH SECTION's `extracted_for_memory_json`
+separately, then writes only those elements to `ai_memories`:
 
 ```text
 For each section in weekly_report_sections (status='completed'):
   for element in section.extracted_for_memory_json:
-    INSERT INTO pgvector_memory:
+    INSERT INTO ai_memories:
       content: element.text
       embedding: vector
-      source: 'weekly_report'
-      source_ref_type: 'weekly_report_section'
-      source_ref_id: section.id
-      element_type: 'insight' | 'decision' | etc.
+      source_table: 'weekly_reports'
+      source_id: weekly_report.id
+      learning_element_type: element.learning_element_type
+      confidence: element.confidence
+      privacy_level: element.privacy_level
+      is_active: true
       metadata: 
         section_name: <section>
+        section_id: <weekly_report_section_id>
         wr_id: <weekly_report_id>
         week_start: <week>
-      weight: 1.0 (decays per doc 38 §8)
+```
+
+`learning_element_type` is an open descriptive label. V1 examples are:
+`insight`, `decision`, `pattern`, `win`, `blocker`.
+
+Anti-double-recording rule:
+```text
+The rich WR log itself is never embedded.
+Only extracted learning elements are embedded.
+Every embedded learning element points back to the rich WR log through
+source_table='weekly_reports' and source_id=<weekly_report_id>.
 ```
 
 This enables fine-grained retrieval:
 ```text
 "What did past WRs say about my Vault patterns?"
-→ search pgvector_memory WHERE 
+→ search ai_memories WHERE 
+    is_active = true
     metadata->>'section_name' = 'vault'
-    AND status = 'active'
+  ORDER BY cosine_similarity(embedding, query_embedding) × confidence DESC
 ```
 
 ---
@@ -706,7 +747,7 @@ For each section, generate test fixtures with:
 
 End-to-end test:
   - Start session → 5 sections → final synthesis → validate
-  - Verify pgvector entries created correctly per section
+  - Verify ai_memories entries created correctly per section
   - Verify cost tracking per section
 ```
 
@@ -793,7 +834,7 @@ Phase 8 — Migration of past WRs (optional)
 
 - `32_WR_INTERACTIVE_WORKFLOW.md` — V1 WR foundation (preserved)
 - `36_PROMPTS_CLOUD_AI.md` — section-specific prompt templates
-- `38_VECTORIZATION_PIPELINE.md` — pgvector ingestion
+- `38_VECTORIZATION_PIPELINE.md` — ai_memories ingestion
 - `39_WRS_VECTOR_LEARNING_LOOP.md` — Vector-specific learning loop
 - `33_VECTOR_LOGIC_DETAIL.md` — Vector data
 - `40_PULSE_LOGIC_DETAIL.md` — Pulse data
