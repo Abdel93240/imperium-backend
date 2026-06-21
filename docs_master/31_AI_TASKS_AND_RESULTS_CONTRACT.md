@@ -726,7 +726,7 @@ Safety rules remain unchanged:
 - no automatic approval;
 - no `stored_at` on approval;
 - no memory write;
-- no pgvector write;
+- no ai_memories write;
 - no direct n8n DB write.
 
 ---
@@ -1381,7 +1381,7 @@ Storage:
 
 - working data → `ai_results` (result_type prefixed by `weekly_report.*`)
 - canonical → `weekly_reports` (defined in doc 32)
-- semantic memory → `pgvector_memory` (extracted at validation)
+- semantic memory → `ai_memories` (extracted at validation)
 
 ---
 

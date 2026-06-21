@@ -127,7 +127,7 @@ backend/app/
 │  │  ├─ tasks.py                   (create, fetch, transition state)
 │  │  ├─ results.py                 (store callback results)
 │  │  ├─ validations.py             (user accept/reject)
-│  │  └─ vectorize.py               (extract → pgvector with decay)
+│  │  └─ vectorize.py               (extract → ai_memories)
 │  ├─ imperium/
 │  │  ├─ wr_session.py              (WR interactive sessions)
 │  │  └─ (existing files)
@@ -224,8 +224,8 @@ If a similar latency-critical case appears later, it must be documented here exp
                        ↓ extraction at validation time
 ┌─────────────────────────────────────────────────────┐
 │ LAYER 3: SEMANTIC MEMORY                            │
-│ - pgvector_memory                                   │
-│ - retention: forever (with temporal decay weighting)│
+│ - ai_memories                                       │
+│ - retention: forever                                │
 │ - never canonical, always informational             │
 └─────────────────────────────────────────────────────┘
 ```
