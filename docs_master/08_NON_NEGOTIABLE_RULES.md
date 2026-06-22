@@ -264,7 +264,15 @@ Enforcement layers:
   enforcement_layer: [backend_api, pgvector, postgresql]
   affected_docs_or_modules: [09_PGVECTOR_MEMORY_POLICY.md]
   example_violation: Incorrect memory continues to be retrieved after user correction.
-  expected_behavior: Memory can be soft-deactivated, superseded, expired, or hard-deleted when requested.
+  expected_behavior: Memory can be soft-deactivated, superseded, expired, or hard-deleted when requested. The chatbot is the user's channel to request this (add/modify/delete), always under explicit user validation before any write — see doc 72 §4.
+
+- rule_id: PRIV-006
+  rule: No AI write without explicit user validation.
+  severity: critical
+  enforcement_layer: [backend_api, pgvector, postgresql, media_storage]
+  affected_docs_or_modules: [72_CHATBOT.md, 09_PGVECTOR_MEMORY_POLICY.md]
+  example_violation: The chatbot deletes a document or writes a memory before the user validates.
+  expected_behavior: AI proposes; the write executes only after explicit user validation.
 ```
 
 ## Vector
