@@ -1,18 +1,18 @@
-# 37 - Gemini Vision Prompts
+# 37 - Vision / OCR Prompts
 
 ## 1. Purpose
 
-Canonical home for **Gemini vision prompts** (OCR, screenshot analysis, image-based extraction).
+Canonical home for **vision / OCR prompts** (OCR, screenshot analysis, image-based extraction).
 
-Per doc 30 §6.1, Gemini is the static override for any task involving an image input.
+The concrete execution engine is defined in F10.
 
 ---
 
-## 2. General Rules For Gemini Prompts
+## 2. General Rules For Vision / OCR Prompts
 
 ### 2.1 Mandatory output contract
 
-Every Gemini call returns the standard JSON contract (per doc 31 §19), with image-specific fields in `structured_result`.
+Every OCR service call returns the standard JSON contract (per doc 31 §19), with image-specific fields in `structured_result`.
 
 ### 2.2 No invention
 
@@ -29,8 +29,19 @@ Every Gemini call returns the standard JSON contract (per doc 31 §19), with ima
 - Reject and flag if the image contains personal IDs (passport, license)
   unless the task explicitly requires ID extraction.
 - Reject if image quality makes accurate extraction impossible.
-- Privacy: image data is sent to Gemini API, redacted from logs.
+- Privacy: image data is processed through the OCR service and redacted from logs.
 ```
+
+## Exécution par moteur (local + fallback)
+
+The OCR service is the canonical execution layer for every prompt in this file.
+
+- Main engine: local OCR, defined concretely in F10. All OCR uses the local engine by default.
+- Mandatory fallback: Gemini cloud, only if the local OCR tower is unavailable or down.
+- Gemini fallback must return JSON via `responseSchema` and `response_mime_type: application/json` (structured output, Gemini 2.5+).
+- Privacy gate is mandatory before any fallback to Gemini, because the data moves from local to cloud.
+- For `very_high` content (medical or religious), the privacy gate must prefer abstention over fallback to Gemini.
+- The fallback exists for continuity, never at the expense of confidentiality.
 
 ---
 
@@ -110,7 +121,7 @@ Output strict JSON only.
 
 ### 3.3 Post-processing
 
-After Gemini returns, the backend:
+After the OCR service returns, the backend:
 
 1. Validates the JSON structure
 2. Stores raw result in `ai_results`
@@ -330,7 +341,7 @@ Output strict JSON only.
 
 ---
 
-## 6. General Document OCR (fallback)
+## 6. General Document OCR
 
 Used for: `media.image_ocr` task when no specific extractor matches.
 
@@ -425,18 +436,24 @@ If `should_warn_user = true`, the user must explicitly confirm before processing
 
 ---
 
-## 8. Cost And Performance Notes
+## 8. Cost And Performance Notes (Gemini fallback only)
 
 ### 8.1 Cost estimation
 
 ```text
-Gemini per image (typical):
+Gemini fallback per image (typical):
   Input:    ~$0.0003 per image
   Output:   ~$0.001 per image
   Total:    ~$0.0013 per image
 ```
 
-For ~50 receipt scans / month:
+Local OCR primary path:
+
+```text
+0 € for the local OCR engine
+```
+
+For ~50 receipt scans / month through Gemini fallback:
 
 ```text
 Monthly cost: ~$0.07 (~0.06 €)
@@ -445,7 +462,7 @@ Monthly cost: ~$0.07 (~0.06 €)
 ### 8.2 Latency
 
 ```text
-Typical Gemini response time: 2-5 seconds
+Typical Gemini fallback response time: 2-5 seconds
 For real-time Bolt overlay (V2): may need to use Gemini Flash variant
 ```
 
@@ -490,7 +507,7 @@ Per doc 10 (raw media retention policy).
 ### 10.1 Image too low quality
 
 ```text
-Gemini returns image_quality: "poor"
+The OCR service returns image_quality: "poor"
 Backend stores result but flags it
 UI prompts user: "Photo trop floue. Reprendre une photo ?"
 ```
@@ -498,7 +515,7 @@ UI prompts user: "Photo trop floue. Reprendre une photo ?"
 ### 10.2 No content detected
 
 ```text
-Gemini returns empty fields
+The OCR service returns empty fields
 Confidence < 0.3
 Backend stores result, UI shows: "Aucun contenu détecté."
 User can retry with another photo.
@@ -508,7 +525,7 @@ User can retry with another photo.
 
 ```text
 e.g. user uploads a Bolt screenshot to receipt extractor
-Gemini detects mismatch (low merchant confidence, no line items)
+The OCR service detects mismatch (low merchant confidence, no line items)
 Backend flags: "Ceci ne ressemble pas à un ticket. Bon document ?"
 User confirms or cancels.
 ```
@@ -521,20 +538,20 @@ Same approach as doc 36 §12:
 
 ```text
 backend/app/services/ai/prompts/
-├─ gemini_receipt.txt
-├─ gemini_bolt_screenshot.txt
-├─ gemini_kitchen_inventory.txt
-├─ gemini_meal_photo_macros.txt
-├─ gemini_generic_ocr.txt
-└─ gemini_id_check.txt
+├─ ocr_receipt.txt
+├─ ocr_bolt_screenshot.txt
+├─ ocr_kitchen_inventory.txt
+├─ ocr_meal_photo_macros.txt
+├─ ocr_generic.txt
+└─ ocr_id_check.txt
 ```
 
 Header on each:
 
 ```text
-# Prompt: gemini_receipt
+# Prompt: ocr_receipt
 # Version: 1.0
-# Last updated: 2026-04-28
+# Last updated: 2026-06-22
 # Doc reference: 37_GEMINI_VISION_PROMPTS.md §3
 ```
 
@@ -545,12 +562,12 @@ Header on each:
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` §6.1 — vision override
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` §19 — output contract
 - `33_VECTOR_LOGIC_DETAIL.md` §5.2 — Bolt overlay V2
-- `34_PULSE_MEDICAL_FEED_AI.md` — medical (uses GPT-5.5, not Gemini, by static override)
+- `34_PULSE_MEDICAL_FEED_AI.md` — medical (uses GPT-5.5, not the OCR service, by static override)
 - `10_RAW_MEDIA_RETENTION_POLICY.md` — media retention
 - `36_PROMPTS_CLOUD_AI.md` — sister prompts file
 
 ---
 
-**Document version:** 1.0
-**Status:** Gemini V1 reference
-**Last updated:** 2026-04-28
+**Document version:** 1.1
+**Status:** Vision / OCR reference
+**Last updated:** 2026-06-22
