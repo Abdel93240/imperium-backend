@@ -96,6 +96,17 @@ AI can consult. Two mechanisms, two goals.
    - vectorize into the GLOBAL knowledge base only after explicit user validation
    - on explicit user request + validation, create a structured PROJECT from the
      extracted content (the vector and/or the project reference the retained source)
+   - let the user remove a previously ingested source LATER via the chatbot (deliberate,
+     validated removal — distinct from the forbidden "silent" delete): the chatbot
+     applies write-authority level 3 (doc 72 §4) — deletes the raw source + supersedes
+     the DIRECT learning elements (via source_table/source_id); indirect already-
+     propagated influences cannot be undone (supersession neutralizes future reliance,
+     does not rewrite the past)
+
+> Retention is frictionless at upload (the source is always kept, no extra question)
+> and reversible later on explicit user request through the chatbot. Consistent with
+> doc 10 (raw = source of truth, kept by default, deleted only on explicit reasoned
+> request).
 
 ❌ The Knowledge Inbox must never:
    - vectorize anything without explicit user validation
