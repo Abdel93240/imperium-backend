@@ -145,10 +145,10 @@ Storage values:
 | vtc_final_ca | Vector | Vector/The Vault | decimal | `284.50` | Vector, Vault, Imperium | user/Vector/Vault | session end/transaction | user_confirmed | high | yes | yes | summary_only | Final revenue. |
 | vtc_objective_reached | Vector | Vector | boolean | `true` | Vector, Imperium, learning | backend | session end | system_calculated | medium | yes | yes | summary_only | Compared with VTC session revenue reference when available. |
 | ride_offer_id | Vector | Vector | uuid | `ride_123` | Vector, n8n, learning | backend | ride detection | system_calculated | high | yes | yes | no | Derived from screenshot/capture. |
-| ride_offer_price | Vector | Vector | decimal | `38.00` | Vector decision engine | Gemini/OCR/user | ride detection | mixed | high | yes | yes | no | Extracted from Bolt offer or entered manually. |
-| pickup_distance | Vector | Vector | decimal | `2.4` | Vector decision engine | Gemini/OCR/maps | ride detection | mixed | high | yes | yes | no | Unit: kilometers. |
-| total_estimated_time | Vector | Vector | integer | `42` | Vector decision engine | Gemini/OCR/maps/backend | ride detection | mixed | high | yes | yes | summary_only | Minutes, adjusted by learned multiplier if possible. |
-| destination_zone | Vector | Vector | string | `Orly` | Vector, Imperium | Gemini/OCR/maps/user | ride detection | mixed | high | yes | yes | summary_only | Zone taxonomy TODO. |
+| ride_offer_price | Vector | Vector | decimal | `38.00` | Vector decision engine | OCR service/user | ride detection | mixed | high | yes | yes | no | Extracted from Bolt offer or entered manually. |
+| pickup_distance | Vector | Vector | decimal | `2.4` | Vector decision engine | OCR service/maps | ride detection | mixed | high | yes | yes | no | Unit: kilometers. |
+| total_estimated_time | Vector | Vector | integer | `42` | Vector decision engine | OCR service/maps/backend | ride detection | mixed | high | yes | yes | summary_only | Minutes, adjusted by learned multiplier if possible. |
+| destination_zone | Vector | Vector | string | `Orly` | Vector, Imperium | OCR service/maps/user | ride detection | mixed | high | yes | yes | summary_only | Zone taxonomy TODO. |
 | return_probability | Vector | Vector | number | `0.72` | Vector decision engine | AI/rules | ride analysis | ai_inferred | high | yes | yes | summary_only | Must be explainable. |
 | hourly_rate_estimate | Vector | Vector | decimal | `54.20` | Vector, Imperium | backend/rules | ride analysis | system_calculated | high | yes | yes | summary_only | Top evaluation priority. |
 | strategic_direction | Vector | Vector/Imperium | string | `return Paris` | Vector, Imperium | Imperium/AI/rules | session context | mixed | high | yes | yes | summary_only | Depends on active mission and strategy. |
@@ -183,7 +183,7 @@ Storage values:
 | transaction_source_type | The Vault | The Vault | enum | `scan_ticket` | Vault, AI router | app/OCR/user | transaction create | mixed | high | yes | yes | no | `manual`, `scan_ticket`, `imported_image`, `system_generated`. |
 | transaction_notes | The Vault | The Vault | text nullable | `Fuel before airport` | Vault, AI memory | user | transaction create/update | user_confirmed | high | conditional | yes | summary_only | Optional. |
 | ai_confidence | The Vault | AI routing | decimal nullable | `0.86` | Vault, AI router | AI/OCR | OCR/import | ai_inferred | medium | yes | yes | no | For extracted transaction fields. |
-| raw_extracted_text | The Vault | Gemini/OCR | text nullable | `TOTAL 52.40 EUR` | Vault, audit | OCR | scan/import | ai_inferred | very_high | conditional | conditional | no | Raw sensitive data; retention TODO. |
+| raw_extracted_text | The Vault | OCR service | text nullable | `TOTAL 52.40 EUR` | Vault, audit | OCR | scan/import | ai_inferred | very_high | conditional | conditional | no | Raw sensitive data; retention TODO. |
 | derived_wallet_available_balance | The Vault | The Vault | decimal | `500.00` | Vault, Imperium, AI objective | backend | query/calculation | system_calculated | very_high | yes | no | summary_only | Derived display value only. Canonical truth is wallets + transactions + wallet_adjustments. Not stored as independent balance truth. |
 | derived_wallet_cash_balance | The Vault | The Vault | decimal | `1000.00` | Vault, Imperium, AI objective | backend | query/calculation | system_calculated | very_high | yes | no | summary_only | Derived display value for wallet_type `Cash`; not canonical storage. |
 | derived_wallet_crypto_balance | The Vault | The Vault | decimal | `0.00` | Vault, Imperium, AI objective | backend | query/calculation | system_calculated | very_high | yes | no | summary_only | Derived display value for wallet_type `Crypto`; not canonical storage. |
@@ -295,11 +295,11 @@ Storage values:
 | cost_sensitivity | AI routing | Core | enum | `low_cost` | AI router | backend/user policy | per request | system_calculated | medium | yes | yes | no | Prefer local when possible. |
 | request_privacy_level | AI routing | Core | enum | `very_high` | AI router, n8n | backend/app | per request | mixed | high | yes | yes | no | Determines local-first or minimal external payload. |
 | complexity_level | AI routing | Core | enum | `complex_strategy` | AI router | Qwen/router/rules | per request | ai_inferred | medium | yes | yes | summary_only | Deterministic, simple, contextual, complex, multimodal. |
-| audio_length_seconds | AI routing | Core | integer nullable | `42` | AI router, transcription workflow | app/backend | audio request | device_reported | very_high | yes | yes | no | Routes Whisper/faster-whisper profile. |
-| image_ocr_required | AI routing | Core | boolean | `true` | AI router | app/backend | per request | system_calculated | high | yes | yes | no | Routes to Gemini. |
+| audio_length_seconds | AI routing | Core | integer nullable | `42` | AI router, transcription workflow | app/backend | audio request | device_reported | very_high | yes | yes | no | Routes the transcription service profile. |
+| image_ocr_required | AI routing | Core | boolean | `true` | AI router | app/backend | per request | system_calculated | high | yes | yes | no | Routes to the OCR service. |
 | offline_required | AI routing | Core | boolean | `false` | AI router | app/backend | per request | device_reported | high | yes | yes | no | Forces local-only when true. |
 | long_term_memory_required | AI routing | Core | boolean | `true` | AI router, n8n | backend/app | per request | mixed | high | yes | yes | no | Determines PG/pgvector read/write. |
-| selected_model | AI routing | Core | enum | `Gemini` | n8n, AI logs | AI router | per request | system_calculated | medium | yes | yes | no | Qwen E2B/E4B, Gemini, GPT, Claude, Whisper/faster-whisper. |
+| selected_model | AI routing | Core | enum | `ocr_service` | n8n, AI logs | AI router | per request | system_calculated | medium | yes | yes | no | Qwen, OCR service, GPT, Claude, transcription service. |
 | selected_workflow | AI routing | n8n | string | `vault_receipt_ocr` | n8n, backend | AI router/n8n | per request | system_calculated | medium | yes | yes | no | Workflow names TODO. |
 | routing_reason | AI routing | Core | text | `image OCR required` | logs, debug, learning | AI router | per request | system_calculated | medium | yes | yes | summary_only | Must be explainable. |
 | model_confidence | AI routing | Core | decimal nullable | `0.88` | n8n, apps, learning | model/router | per response | ai_inferred | medium | yes | yes | summary_only | Display where useful, especially OCR/health. |

@@ -147,8 +147,8 @@ V1 excludes real-time Android automation.
 |---|---|---|---|---|---|
 | `ai-routing-service` | V1 | backend | module | Choose model/workflow using routing policy | `imperium-ai-router`, `imperium-db` |
 | `ai-memory-service` | V1 | backend | module | Memory write approval/retrieval policy | `imperium-vector-memory`, `event-store-service` |
-| `ai-audio-transcription-service` | V1 | backend/media | module/worker | Whisper/faster-whisper STT pipeline | `imperium-media-processor` |
-| `ai-ocr-service` | V1 | backend/media | module/worker | Gemini OCR/image extraction after privacy gate | `imperium-media-processor` |
+| `ai-audio-transcription-service` | V1 | backend/media | module/worker | STT pipeline (transcription service) | `imperium-media-processor` |
+| `ai-ocr-service` | V1 | backend/media | module/worker | OCR/image extraction after privacy gate (OCR service) | `imperium-media-processor` |
 | `ai-strategy-service` | V1 | backend/AI | module | GPT/Claude complex reasoning when allowed | `ai-routing-service`, `ai-memory-service` |
 
 ### Data Services
