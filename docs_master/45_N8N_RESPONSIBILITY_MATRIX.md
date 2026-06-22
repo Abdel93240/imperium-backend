@@ -64,7 +64,7 @@ Exemples valides :
 - scan hebdomadaire des événements VTC
 - surveillance API transport / trafic
 - OCR ticket de caisse
-- appel Gemini OCR puis Qwen classification
+- appel du service OCR puis classification Qwen
 - appel Qwen puis Opus
 - synchronisation mail entrant
 - webhook externe
@@ -431,9 +431,9 @@ Backend crée un MediaItem / ai_task(vault.receipt_extract)
 ↓
 Backend déclenche n8n ou expose la tâche pour n8n
 ↓
-n8n appelle Gemini OCR
+n8n appelle le service OCR
 ↓
-Gemini extrait le texte et les champs possibles
+Le service OCR extrait le texte et les champs possibles
 ↓
 n8n appelle Qwen
 ↓
@@ -494,7 +494,7 @@ Le backend reste responsable de :
 
 ---
 
-## 10. Audio / Whisper
+## 10. Audio / service de transcription
 
 Quand l'utilisateur relâche un bouton d'enregistrement audio, le flux peut être direct.
 
@@ -509,9 +509,9 @@ Workflow préféré :
 ```text
 Utilisateur enregistre audio
 ↓
-App/backend appelle Whisper
+App/backend appelle le service de transcription
 ↓
-Whisper renvoie le texte
+Le service de transcription renvoie le texte
 ↓
 Texte affiché dans la popup/chatbot
 ↓
@@ -671,7 +671,7 @@ Le backend décide :
 | Routes/travaux | Oui | n8n | Même famille que événements |
 | Photo ticket | Oui | Backend + n8n | Backend possède l'upload et la tâche, n8n orchestre OCR + classification |
 | Validation ticket | Non | Backend + utilisateur | Décision humaine finale |
-| Audio court | Non | Backend/App + Whisper | Pipeline simple |
+| Audio court | Non | Backend/App + service de transcription | Pipeline simple |
 | Commencer journée | Non | Backend | Action métier simple |
 | Finir journée | Non | Backend | Action métier simple |
 | Dashboard | Non | Backend | Lecture DB |

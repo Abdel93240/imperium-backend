@@ -66,12 +66,13 @@ Per doc 30 §6.4, medical analysis uses a **GPT-5.5 static override**.
 task: pulse.medical_document_extract
 model_override: GPT-5.5 static override
 reason: medical document reasoning and safety
-gemini: not used except generic image/PDF OCR pre-extraction when required
+ocr_service: not used except generic image/PDF OCR pre-extraction when required
 qwen: may classify routing metadata only, never final medical content
 ```
 
-Gemini may extract raw visible text from a scanned image if needed, but medical
-interpretation and rule drafting are routed to GPT-5.5 static override.
+The OCR service may extract raw visible text from a scanned image if needed,
+but medical interpretation and rule drafting are routed to GPT-5.5 static
+override.
 
 ### 3.1 Why GPT-5.5 (and not Opus)
 

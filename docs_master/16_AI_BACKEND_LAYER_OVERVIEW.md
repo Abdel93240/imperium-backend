@@ -45,7 +45,7 @@ Read this before implementing any AI-related backend code.
 └─────┬───────────┘                └────────────────────┘
       │
       ├─ Qwen 32B (local, GPU-served on V100 / qwen3:32b)
-      ├─ Whisper local (faster-whisper)
+      ├─ the transcription service (local)
       ├─ Claude Sonnet/Opus (cloud API)
       ├─ GPT-5.5 (cloud API)
       └─ Gemini (cloud API)
@@ -187,7 +187,7 @@ Why the exception:
 ├─ Latency target: <2s (Bolt ride offer expires fast)
 ├─ Going via n8n adds 500ms-1s of network overhead per hop
 ├─ User has explicitly started a VTC session (consent)
-└─ The flow is short: Gemini OCR → Qwen profitability score → advisory color
+└─ The flow is short: the OCR service → Qwen profitability score → advisory color
 
 Why this is safe:
 ├─ The two API calls are simple (no orchestration, no retry, no chain)
@@ -357,8 +357,8 @@ Qwen returns:
 Some tasks skip Qwen scoring entirely (per doc 30 §6):
 
 ```text
-Vision (image present)         → Gemini
-Audio                          → Whisper local
+Vision (image present)         → the OCR service
+Audio                          → the transcription service
 Web fresh data                 → GPT-5.5 + web
 Medical reports                → GPT-5.5
 WR re-planning                 → Fable 5

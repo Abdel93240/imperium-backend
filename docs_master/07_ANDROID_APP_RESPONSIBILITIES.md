@@ -325,7 +325,7 @@ Backend responsibilities:
 - receive upload
 - enforce auth and device trust
 - apply privacy gate
-- transcribe using Whisper or faster-whisper
+- transcribe using the transcription service
 - route AI if needed
 - validate final action
 - store event/result
