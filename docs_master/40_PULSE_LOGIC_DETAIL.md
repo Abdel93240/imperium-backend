@@ -209,8 +209,8 @@ the score card is hidden and an incomplete-data banner is shown.
 Supported V1 inputs:
 
 - chatbot text description (primary natural-language path)
-- voice note transcribed by Whisper/faster-whisper
-- meal photo processed by Gemini prompt `pulse.meal_photo_macros`
+- voice note transcribed by the transcription service
+- meal photo processed by the OCR service using prompt `pulse.meal_photo_macros`
 
 The backend creates a meal draft through `TBD POST /api/pulse/meals/estimate`.
 The draft contains:
@@ -275,7 +275,7 @@ The catalogue is then AVAILABLE to GPT-5.5 when it programs the diet (below).
 
 ```text
 Stock holds RAW ingredients (matières premières). Sources:
-- OCR receipt (Vault handoff) | manual entry | chatbot | pantry scan (Gemini)
+- OCR receipt (Vault handoff) | manual entry | chatbot | pantry scan via the OCR service
 Stock is the raw material the weekly program draws from.
 ```
 
@@ -358,7 +358,7 @@ Cross-module links:
 |---|---|
 | Manual add/edit | PUL-12 Stock Tab opens stock item edit/add surface. |
 | Vault receipt handoff | VAU-05 validates receipt; backend creates Pulse draft/stock update without second receipt UI. |
-| Pantry scan | PUL-13 uses Gemini task `pulse.kitchen_inventory_photo`; user validates diff. |
+| Pantry scan | PUL-13 uses the OCR service task `pulse.kitchen_inventory_photo`; user validates diff. |
 | Chatbot | User declares stock in natural language ("j'ai acheté 2kg de riz"); backend updates stock. |
 | Meal decrement | PUL-03 confirmed stock lines decrement quantities. |
 
@@ -615,7 +615,7 @@ Headers: Idempotency-Key
 
 **Body photo upload is disabled in V1.** The Android app may keep a local-only
 photo reference for comparison, but the backend payload must not include the
-binary, remote URI, or Gemini analysis request.
+binary, remote URI, or OCR service analysis request.
 
 Body snapshot data is high privacy. It can be used for user-confirmed progress
 visibility but **not for automatic medical conclusions**. Frequency is
@@ -739,8 +739,8 @@ override Imperium mission priority without backend validation.
 
 ```text
 pulse.meal_estimate            - estimate calories/macros from text (Qwen local)
-pulse.meal_photo_macros        - macros from meal photo (Gemini vision)
-pulse.kitchen_inventory_photo  - parse fridge/pantry image (Gemini vision)
+pulse.meal_photo_macros        - macros from meal photo (OCR service vision)
+pulse.kitchen_inventory_photo  - parse fridge/pantry image (OCR service vision)
 pulse.recipe_web_lookup        - find a recipe on the web for the catalogue
                                  (Qwen local + web tool; NO diet cross-check at
                                  add-time; escalate GPT-5.5 only if needed)
@@ -769,7 +769,7 @@ pulse.weekly_review_contribution - feeds the WR (per doc 32; model per doc 30 WR
 Daily ops / daily adaptation : Qwen 32B local   (the large majority — free, local)
   (incl. training_adjustment, pain_interpretation first pass, meal_estimate,
    recipe_web_lookup)
-Vision (meal/pantry photos)  : Gemini
+Vision (meal/pantry photos)  : the OCR service
 Deterministic plumbing       : backend hard rules, CPU, NO model
   (OCR receipt → stock, stock decrement, hydration buttons dual-effect, fasting
    window interactions, offline dedup)
@@ -785,7 +785,7 @@ WR contribution : per doc 32 + doc 30 WR rule (Fable 5 for re-planning, Opus 4.8
 Note: percentages intentionally dropped — they were invented and misleading. The
 real split is principled: Qwen local handles the everyday; GPT-5.5 is reserved for
 health reasoning, creation, and the grouped weekly program; hard rules handle
-deterministic plumbing; Gemini handles vision. No CatBoost in Pulse.
+deterministic plumbing; the OCR service handles vision. No CatBoost in Pulse.
 
 Cross-references:
 - Model hierarchy & thresholds: doc 30 (canonical).

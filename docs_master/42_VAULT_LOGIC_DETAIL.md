@@ -20,7 +20,7 @@ Vault observes and reports. **It never decides on its own.** Investment decision
    - feed sadaqa target to Path
    - emit upcoming expense alerts
    - propose categorization via Qwen
-   - parse receipts via Gemini
+   - parse receipts via the OCR service
 
 ❌ Vault must never:
    - automatically transfer money
@@ -127,7 +127,7 @@ LAYER 2 — QWEN LOCAL
   └─ Cost: 0€
 
 LAYER 3 — DEFERRED CLOUD
-  ├─ Receipt OCR → Gemini
+  ├─ Receipt OCR → the OCR service
   ├─ Detailed advice (Level 2 popup) → Haiku 4.5
   ├─ Monthly analysis → Sonnet 4.6
   └─ Weekly review → Opus 4.7 (via WR)
@@ -185,9 +185,9 @@ User taps "+ Dépense" in Vault
 User taps "Scanner ticket"
   → camera opens
   → photo taken
-  → Gemini OCR (per doc 37 §3)
+  → the OCR service (per doc 37 §3)
   → backend creates ai_task vault.receipt_extract
-  → Gemini returns structured data
+  → the OCR service returns structured data
   → backend creates draft transactions:
      - one expense for the receipt total
      - line items proposed
@@ -355,7 +355,7 @@ n8n never writes directly to Postgres.
 ## 12. Vault AI Task Types
 
 ```text
-vault.receipt_extract              - Gemini OCR (doc 37)
+vault.receipt_extract              - OCR via the OCR service (doc 37)
 vault.categorization_suggestion    - Qwen local
 vault.weekly_finance_analysis      - Sonnet 4.6, monthly
 vault.detailed_advice              - Haiku 4.5, "see why?" popup
@@ -368,7 +368,7 @@ vault.weekly_review_contribution   - Opus via WR
 
 ```text
 Daily ops (92%):           Qwen local
-Receipt OCR (2%):          Gemini
+Receipt OCR (2%):          the OCR service
 Level 2 advice (4%):       Haiku 4.5
 Monthly analysis (1%):     Sonnet 4.6
 Weekly review (1%):        Opus 4.7 (via WR)

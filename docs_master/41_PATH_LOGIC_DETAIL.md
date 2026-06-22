@@ -610,7 +610,7 @@ V1 routines:
 - Maximum 8 active routines.
 - Default suggested routines can exist, but user activation is explicit.
 - Counter supports tactile +1 as the canonical input.
-- Voice counting through Whisper/faster-whisper is optional in V1 and must display
+- Voice counting through the transcription service is optional in V1 and must display
   confidence; low confidence requires user validation.
 - Arabic text can render with Noto Naskh Arabic, plus transliteration and optional
   translation when configured.
