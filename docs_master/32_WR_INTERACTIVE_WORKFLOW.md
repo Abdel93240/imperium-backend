@@ -961,6 +961,10 @@ This is not memory storage. Approved or edited decisions are only proposals read
 
 ### Patch 5A-5D Chatbot Weekly Review Flow
 
+The chatbot as a general component (universal entry point, per-message scoring,
+write authority, closing extraction) is owned by doc 72. This section describes
+its WR-specific flow only; doc 72 owns the general chatbot behavior.
+
 Patch 5A-5D changes the product contract from a form-like flow to a chatbot popup flow.
 
 Primary chat endpoints:
@@ -1133,6 +1137,11 @@ The n8n execution history is not the source of truth. It is only operational tra
 When a cloud model is called in a future patch, the backend should send a complete but minimized working summary.
 
 The model should not receive direct personal identifiers unless a future explicit exception is created and approved by privacy policy.
+
+On very_high content (health, religious), the access-regime principle applies:
+the service degrades (abstention) rather than sending to the cloud - see doc 52
+§9A. The minimized-summary rule above is the standard case; very_high is the
+degraded case.
 
 ## 14. Failure Handling
 
@@ -1323,7 +1332,11 @@ mission, a budget change). No project field becomes a WR-managed object.
   The "summarized, vectorized" integration the WR is designed around is a
   **planned milestone** on the existing pgvector infrastructure, to be enabled by
   a later patch. Until then, memory candidates are stored without embeddings and
-  read non-vectorially.
+  read non-vectorially. The target mechanism (rich WR log, learning elements
+  vectorized into ai_memories, and the entry-audit vectorized in the ephemeral
+  working vector store then destroyed) is owned by doc 47 (WR guided sections)
+  and doc 38 §7-bis (ephemeral store). This doc describes the V1 phasing; doc
+  47/38 describe the target design.
 
 ### Section 10 rewrite (replaces the former "10. AI Routing")
 
