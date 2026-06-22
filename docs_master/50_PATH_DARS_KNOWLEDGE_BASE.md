@@ -886,7 +886,7 @@ User deletes a document:
 - `09_PGVECTOR_MEMORY_POLICY.md` — vector storage policy
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — model selection
 - `36_PROMPTS_CLOUD_AI.md` — Sonnet + Opus prompts
-- `37_GEMINI_VISION_PROMPTS.md` — Gemini OCR prompts
+- `37_VISION_OCR_PROMPTS.md` — Gemini OCR prompts
 - `38_VECTORIZATION_PIPELINE.md` — embedding architecture
 
 ---

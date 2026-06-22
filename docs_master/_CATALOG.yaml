@@ -121,9 +121,9 @@ docs:
     categories: [ai]
     status: needs_alignment
 
-  - file: "37_GEMINI_VISION_PROMPTS.md"
+  - file: "37_VISION_OCR_PROMPTS.md"
     number: 37
-    title: "Gemini Vision Prompts"
+    title: "Vision / OCR Prompts"
     family: architecture
     categories: [ai]
     status: to_review

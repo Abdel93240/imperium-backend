@@ -563,7 +563,7 @@ Settings:
 - `01_SIGNAL_VARIABLES_DICTIONARY.md` — vault signal list
 - `41_PATH_LOGIC_DETAIL.md` — sadaqa integration
 - `43_IMPERIUM_LOGIC_DETAIL.md` — pressure consumption
-- `37_GEMINI_VISION_PROMPTS.md` — receipt OCR prompt
+- `37_VISION_OCR_PROMPTS.md` — receipt OCR prompt
 
 ---
 

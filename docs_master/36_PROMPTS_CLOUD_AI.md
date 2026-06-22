@@ -678,7 +678,7 @@ Once a quarter:
 - `32_WR_INTERACTIVE_WORKFLOW.md` §6, §8 — WR flow + anti-flattery rules
 - `34_PULSE_MEDICAL_FEED_AI.md` — medical prompt
 - `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen prompts
-- `37_GEMINI_VISION_PROMPTS.md` — Gemini prompts
+- `37_VISION_OCR_PROMPTS.md` — Gemini prompts
 
 ---
 

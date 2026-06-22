@@ -19,7 +19,7 @@ Canonical sources used by this V1 detail:
 
 - `01_SIGNAL_VARIABLES_DICTIONARY.md`
 - `07_ANDROID_APP_RESPONSIBILITIES.md`
-- `37_GEMINI_VISION_PROMPTS.md`
+- `37_VISION_OCR_PROMPTS.md`
 - `43_IMPERIUM_LOGIC_DETAIL.md`
 - `59_DESIGN_SYSTEM_V1_DRAFT.md`
 
@@ -921,7 +921,7 @@ must be implemented in backend patches before UI relies on them.
 - `34_PULSE_MEDICAL_FEED_AI.md` — medical document analysis
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — routing rules
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` — task contracts
-- `37_GEMINI_VISION_PROMPTS.md` — meal photo / pantry scan prompts
+- `37_VISION_OCR_PROMPTS.md` — meal photo / pantry scan prompts
 - `41_PATH_LOGIC_DETAIL.md` — fasting and hydration constraints
 - `42_VAULT_LOGIC_DETAIL.md` — receipt handoff source
 - `43_IMPERIUM_LOGIC_DETAIL.md` — energy_score popup origin

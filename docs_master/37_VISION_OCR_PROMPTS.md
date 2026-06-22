@@ -552,7 +552,7 @@ Header on each:
 # Prompt: ocr_receipt
 # Version: 1.0
 # Last updated: 2026-06-22
-# Doc reference: 37_GEMINI_VISION_PROMPTS.md §3
+# Doc reference: 37_VISION_OCR_PROMPTS.md §3
 ```
 
 ---

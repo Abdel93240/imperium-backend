@@ -54,7 +54,7 @@ Les documents canoniques exploitables par le DS V1 sont les fichiers physiquemen
 - `32_WR_INTERACTIVE_WORKFLOW.md`
 - `33_VECTOR_LOGIC_DETAIL.md`
 - `34_PULSE_MEDICAL_FEED_AI.md`
-- `37_GEMINI_VISION_PROMPTS.md`
+- `37_VISION_OCR_PROMPTS.md`
 - `40_PULSE_LOGIC_DETAIL.md`
 - `41_PATH_LOGIC_DETAIL.md`
 - `42_VAULT_LOGIC_DETAIL.md`
