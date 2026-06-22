@@ -331,7 +331,7 @@ Ordre telephone :
 | Fail | `ImperiumDestructiveButton` | opens visual reason requirement only. | `POST /api/imperium/missions/{mission_id}/fail`. |
 | Replan | `ImperiumSecondaryButton` | snackbar `Mock replan request`. | open `IMP.REPLAN.VALIDATE` after backend proposal. |
 | Save note | `ImperiumGhostButton` | stores local preview note only. | `TBD POST /api/imperium/missions/{mission_id}/notes`. |
-| Voice note | `ImperiumVoiceInput` | visual recording/transcribed mock. | Whisper/faster-whisper transcription then backend validation. |
+| Voice note | `ImperiumVoiceInput` | visual recording/transcribed mock. | the transcription service handles transcription then backend validation. |
 
 ### 4.7 Mock data
 

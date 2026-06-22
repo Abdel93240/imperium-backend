@@ -47,8 +47,8 @@ Apps (Android, V2)             = display + collect, never decide
 ~3%        → Sonnet 4.6 (balanced)
 ~1.5%      → Opus 4.7 (deep, WR)
 ~0.5%      → GPT-5.5 (web + medical)
-~0.3%      → Gemini (vision)
-Whisper local for audio
+~0.3%      → the OCR service (vision)
+the transcription service for audio
 ```
 
 **Routing rule:** Qwen scores tasks `/200`. Static overrides for vision/audio/web/medical/WR.
@@ -80,8 +80,8 @@ Whisper local for audio
 Simple CRUD, deterministic compute → backend, no AI, no n8n
 Multi-step / async / external      → n8n
 Routing / classification / score   → Qwen local
-Receipt / screenshot / image       → Gemini (static override)
-Audio                              → Whisper local
+Receipt / screenshot / image       → the OCR service (static override)
+Audio                              → the transcription service
 Web fresh data                     → GPT-5.5 + web
 Medical reports                    → GPT-5.5
 WR analysis                        → Opus 4.7

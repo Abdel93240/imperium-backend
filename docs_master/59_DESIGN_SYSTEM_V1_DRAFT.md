@@ -724,7 +724,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 | Mission detail V1 | `IMP.MISSION.DETAIL` est une surface `deep_link` read/detail contextuelle, non une entrée top-level navigation et non un écran V1 supplémentaire. |
 | Weekly Review | `IMP.WR.INTERACTIVE` est l'interaction guidée ; `IMP.WR.READ_ONLY` est le rapport stocké read-only après validation. La WR n'est pas top-level. |
 | Backend ownership | Les écrans Imperium n'inventent pas la stratégie : mission creation/replan/priority changes passent par endpoints backend ou tasks n8n. |
-| Voice input | Les notes voix peuvent collecter une intention, mais Whisper/faster-whisper transcrit et le backend valide avant action canonique. |
+| Voice input | Les notes voix peuvent collecter une intention, mais le service de transcription assure la transcription et le backend valide avant action canonique. |
 
 ### 12.1 Canonical Routing Typology
 
@@ -1052,10 +1052,10 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Screen name:** VAU-04 Scan Ticket Capture.
 - **Type / slug :** `route`, `vault/receipts/capture`, stable ID `VAU.TX.SCAN_CAPTURE`.
 - **Composants :** Camera Capture Surface, Top Bar minimal, shutter icon button, manual expense fallback, permission inline, blur/lighting helper banner.
-- **Données affichées :** camera permission state, live preview, capture status, privacy note that receipt image is sent to Gemini and redacted from logs.
+- **Données affichées :** camera permission state, live preview, capture status, privacy note that receipt image is sent to the OCR service and redacted from logs.
 - **Widgets :** viewfinder frame, image quality helper.
 - **Assets :** Vault receipt scan asset, Material Symbols `photo_camera`, `flash_on`, `close`.
-- **Etats :** Loading=camera initializing ; Empty=permission not requested with CTA ; Error=camera unavailable/OCR upload failure with retry/manual entry ; Offline=camera can capture local draft but OCR disabled banner ; Syncing=photo upload/Gemini task creation line ; Synced=route to VAU-05 when draft ready ; Conflict=duplicate pending receipt task dialog.
+- **Etats :** Loading=camera initializing ; Empty=permission not requested with CTA ; Error=camera unavailable/OCR upload failure with retry/manual entry ; Offline=camera can capture local draft but OCR disabled banner ; Syncing=photo upload/OCR service task creation line ; Synced=route to VAU-05 when draft ready ; Conflict=duplicate pending receipt task dialog.
 - **Backend deps :** `TBD POST /api/vault/receipt-extractions`, ai_task `vault.receipt_extract`, Gemini prompt doc 37 §3.
 - **Navigation :** opened from VAU-01 `Scan ticket`; VAU-04 --> VAU-05 after OCR draft; camera denied/manual exits to VAU-03.
 - **Tab S10 Ultra :** fullscreen route, preview centered max 1280dp, right 320dp panel for capture guidance.
@@ -1068,7 +1068,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Données affichées :** merchant, date/time, total_eur, payment_method, OCR confidence, warnings, draft expense, line_items, Qwen category suggestions, food handoff preview.
 - **Widgets :** OCR confidence badge, total comparator, Pulse handoff summary.
 - **Assets :** receipt thumbnail image, Material Symbols `receipt_long`, `inventory_2`, `warning`.
-- **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=Gemini fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
+- **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=OCR service fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
 - **Backend deps :** `TBD GET /api/vault/receipt-extractions/{receipt_task_id}`, `TBD POST /api/vault/receipt-extractions/{receipt_task_id}/validate`, `POST /api/vault/transactions`, `TBD POST /api/pulse/food-stock/drafts/confirm`.
 - **Navigation :** from VAU-04; VAU-05 --> VAU-01 on validation; VAU-05 --> PULSE_HANDOFF as backend event only, no second screen V1; re-scan returns VAU-04.
 - **Tab S10 Ultra :** two-column: receipt preview left 40%, draft cards right 60%, sticky validation bar bottom.
@@ -1195,7 +1195,7 @@ Transitions conditionnelles canoniques V1 :
 
 | Transition | Condition |
 |---|---|
-| VAU-04 --> VAU-05 | Gemini OCR task returns a valid draft or pending draft is available for review. |
+| VAU-04 --> VAU-05 | OCR service task returns a valid draft or pending draft is available for review. |
 | VAU-05 --> PULSE_HANDOFF | User validates receipt lines containing food items; backend creates Pulse draft/stock updates without a second V1 screen. |
 | VAU-12 --> PATH_SETTINGS | User wants to change sadaqa percentage; Path owns the setting. |
 | VAU-08 --> VAU-07 | Reversal or correction is confirmed by backend. |
@@ -1523,7 +1523,7 @@ Mapping écran Pulse ↔ composants foundation ↔ assets ↔ états ↔ navigat
 |---|---|
 | Receipt scan | VAU-05 reste l'unique écran de validation receipt. Les lignes food créent un handoff Pulse backend non bloquant. |
 | PUL-03 scope | PUL-03 is independent from VAU-05 : c'est la confirmation post PUL-02 Add Meal, avec macros et décrément stock optionnel. |
-| Macros source | Meal macros V1 source is backend AI estimation : texte/voix/photo créent un draft via backend ; photo utilise Gemini `pulse.meal_photo_macros`; validation user obligatoire. |
+| Macros source | Meal macros V1 source is backend AI estimation : texte/voix/photo créent un draft via backend ; photo utilise le service OCR `pulse.meal_photo_macros`; validation user obligatoire. |
 | Stock decrement | Stock decrement is user-confirmed and idempotent. Aucune ligne proposée par AI ne décrémente le stock avant validation utilisateur. |
 | Workout adaptation | Adaptation suggérée si énergie <= 3/10, fatigue high, pain >= 7, fasting actif avec intensité haute, ou équipement manquant. Elle n'est jamais forcée. |
 | Body photo | Body photo upload is disabled in V1. PUL-08 peut référencer une photo locale Android, mais aucune image corporelle n'est envoyée au backend. |
@@ -1559,8 +1559,8 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Données affichées :** meal description draft, transcript status, selected photo thumbnail, source `text|voice|photo`, fasting warning if outside eating window.
 - **Widgets :** voice recording chip, photo preview, AI estimating progress line.
 - **Assets :** Material Symbols `restaurant`, `mic`, `photo_camera`, `schedule`.
-- **Etats :** Loading=Whisper/Gemini/backend estimation spinner ; Empty=form untouched ; Error=transcription/photo/estimation failure with retry/manual macros option ; Offline=local meal draft allowed but estimation disabled unless cached ; Syncing=estimate request line ; Synced=opens PUL-03 with meal draft ; Conflict=duplicate draft idempotency dialog.
-- **Backend deps :** `TBD POST /api/pulse/meals/estimate` with `Idempotency-Key`, ai_task `pulse.meal_photo_macros`, Whisper/faster-whisper transcription.
+- **Etats :** Loading=the transcription service/the OCR service/backend estimation spinner ; Empty=form untouched ; Error=transcription/photo/estimation failure with retry/manual macros option ; Offline=local meal draft allowed but estimation disabled unless cached ; Syncing=estimate request line ; Synced=opens PUL-03 with meal draft ; Conflict=duplicate draft idempotency dialog.
+- **Backend deps :** `TBD POST /api/pulse/meals/estimate` with `Idempotency-Key`, ai_task `pulse.meal_photo_macros`, the transcription service.
 - **Navigation :** opened from PUL-01 or PUL-10; success PUL-02 --> PUL-03; cancel returns source.
 - **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard/meals tab.
 
@@ -1638,7 +1638,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Widgets :** weight delta display, measurement rows, local privacy banner.
 - **Assets :** Material Symbols `monitor_weight`, `straighten`, `photo_camera`, `lock`.
 - **Etats :** Loading=previous snapshot skeleton ; Empty=form untouched ; Error=invalid numeric/photo policy violation ; Offline=local numeric draft pending, no remote photo upload ; Syncing=snapshot submit line ; Synced=returns PUL-01 with snapshot snackbar ; Conflict=same-date snapshot diff dialog.
-- **Backend deps :** `TBD POST /api/pulse/body-snapshots` with `Idempotency-Key`, event `pulse.body_snapshot.created`; no Gemini body photo task in V1.
+- **Backend deps :** `TBD POST /api/pulse/body-snapshots` with `Idempotency-Key`, event `pulse.body_snapshot.created`; no OCR service body photo task in V1.
 - **Navigation :** from PUL-01 or PUL-10/11 progress links; success returns source.
 - **Tab S10 Ultra :** two-column form + comparison panel; local photo never occupies a decorative hero.
 
@@ -1699,10 +1699,10 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Screen name:** PUL-13 Scan Pantry / Fridge.
 - **Type / slug :** `route`, `pulse/stock/scan`, stable ID `PUL.STOCK.SCAN`.
 - **Composants :** Camera Capture Surface, review draft list, Stock Item Row diff, confidence chips, warnings list, Primary `Valider le stock`, Secondary `Reprendre`.
-- **Données affichées :** pantry photo, Gemini `pulse.kitchen_inventory_photo` result, name_fr/category/estimated_quantity/unit/expiry_visible/confidence, existing stock diff.
+- **Données affichées :** pantry photo, the OCR service `pulse.kitchen_inventory_photo` result, name_fr/category/estimated_quantity/unit/expiry_visible/confidence, existing stock diff.
 - **Widgets :** image quality helper, inventory diff, confidence badge, low-confidence per-item warning.
 - **Assets :** Material Symbols `photo_camera`, `kitchen`, `add_box`, `warning`.
-- **Etats :** Loading=camera/Gemini scan pending ; Empty=0 item detected with retry/manual add CTA ; Error=camera permission/Gemini fail/invalid JSON ; Offline=camera can capture local photo but AI disabled banner ; Syncing=scan validate write line ; Synced=returns PUL-12 with stock update snackbar ; Conflict=scan already validated or stock version diff.
+- **Etats :** Loading=camera/OCR service scan pending ; Empty=0 item detected with retry/manual add CTA ; Error=camera permission/OCR service fail/invalid JSON ; Offline=camera can capture local photo but AI disabled banner ; Syncing=scan validate write line ; Synced=returns PUL-12 with stock update snackbar ; Conflict=scan already validated or stock version diff.
 - **Backend deps :** `TBD POST /api/pulse/food-stock/scan` with `Idempotency-Key`, `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` with `Idempotency-Key`, ai_task `pulse.kitchen_inventory_photo`.
 - **Navigation :** from PUL-12; validation returns PUL-12; retry stays PUL-13.
 - **Tab S10 Ultra :** fullscreen camera/review route: preview left 50%, diff review right 50%, no second receipt validation.
@@ -1815,7 +1815,7 @@ Pulse handles high and very-high privacy data. V1 rules:
 - GPT-5.5 static override is used for medical extraction; Qwen cannot activate medical rules.
 - Raw medical document retention defaults to 90 days and user deletion must revoke derived active rules.
 - Medical rules stay inactive until user validation before activation.
-- Body photo upload is disabled in V1; no backend URI, Gemini task, or vector memory storage.
+- Body photo upload is disabled in V1; no backend URI, OCR service task, or vector memory storage.
 - Pain notes and medical summaries are redacted from logs and stored only through authenticated endpoints.
 - Active rules can appear on PUL-01 only as validated constraints with source and expiry.
 - Wearable signals are optional and never absolute truth.
@@ -1844,7 +1844,7 @@ Mapping écran Path ↔ composants foundation ↔ assets ↔ états ↔ navigati
 | Religious privacy | Religious data uses privacy gate before external GPT/Claude/Gemini calls; mosque patterns, ghusl addresses, sadaqa destination and GPS are redacted from logs. |
 | Offline merge | Prayer uses explicit conflict review; adhkar increments merge sum by idempotency key; Quran regression requires confirmation; ghusl/fasting mutations sync in order. |
 | Qibla and Hijri | Hijri date and white days are dashboard/fasting context; Qibla is informational and asks sensor permission only on user action. |
-| Voice input | Whisper/faster-whisper can support PAT-03 notes and PAT-06 counting, but tactile/manual input remains canonical when confidence is low. |
+| Voice input | the transcription service can support PAT-03 notes and PAT-06 counting, but tactile/manual input remains canonical when confidence is low. |
 | Sub-screens | PAT-06b, PAT-07b, PAT-09b, PAT-10b, PAT-11b/c/d/e/f are internal panes/dialogs and do not increase the V1 screen count. |
 
 Surfaces principales Path V1 : Dashboard (`PAT-01`), Prayer Mark (`PAT-02`), Sadaqa (`PAT-03`), Ghusl (`PAT-04`, `PAT-10`), Fasting (`PAT-05`), Adhkar (`PAT-06`), Quran (`PAT-07`), Mosque Detail (`PAT-08`), Mosques Management (`PAT-09`), Settings (`PAT-11`).
@@ -1925,7 +1925,7 @@ Vraies entrées top-level navigation Path V1, alignées avec le graph Mermaid : 
 - **Widgets :** large +1 counter, progress ring/bar, routine tabs, voice-count transcript chip, target reached banner.
 - **Assets :** Material Symbols `add_circle`, `event_repeat`, `mic`, `done_all`, Noto Naskh Arabic.
 - **Etats :** Loading=routine loading ; Empty=no routine configured with PAT-11e CTA ; Error=increment/reset/voice transcription failure ; Offline=increments queued locally ; Syncing=pending increment count line ; Synced=progress snackbar ; Conflict=reset vs queued increments review.
-- **Backend deps :** `TBD GET /api/path/adhkar/routines`, `TBD POST /api/path/adhkar/routines/{routine_id}/increment` with `Idempotency-Key`, `TBD POST /api/path/adhkar/routines/{routine_id}/reset` with `Idempotency-Key`, Whisper/faster-whisper for optional voice.
+- **Backend deps :** `TBD GET /api/path/adhkar/routines`, `TBD POST /api/path/adhkar/routines/{routine_id}/increment` with `Idempotency-Key`, `TBD POST /api/path/adhkar/routines/{routine_id}/reset` with `Idempotency-Key`, the transcription service for optional voice.
 - **Navigation :** from PAT-01 adhkar widget or PAT-02 post-prayer suggestion; PAT-06b/PAT-11e for routine edits; returns PAT-01.
 - **Tab S10 Ultra :** fullscreen focus route max 960dp center, right 320dp for routine list/progress; fixed counter size prevents layout shift.
 
