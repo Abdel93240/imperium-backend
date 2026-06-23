@@ -73,7 +73,7 @@ Else → classification scoring:
 
 **Hard rule:** vital categories (housing, food, health, children's schooling, legal obligations) can NEVER be classified deferrable by the AI alone. The scoring guides ambiguous cases; it cannot downgrade a vital expense.
 
-This couples cleanly with doc 30: financial reasoning is GPT-5.5's domain, and GPT-5.5 must surface its reasoning / flag uncertainty rather than fabricate a classification.
+This couples cleanly with doc 30: financial reasoning is the finance specialist's domain, and the finance specialist must surface its reasoning / flag uncertainty rather than fabricate a classification.
 
 ## Core Inputs
 
@@ -758,4 +758,3 @@ TODO:
 - exact smoothing window and how `payment_day_of_month` maps a monthly/quarterly expense onto real-pressure timing
 - exact scoring weights for the out-of-list classification grid
 - whether/how an explicit "mobilize crypto" user action feeds a secondary pressure view
-

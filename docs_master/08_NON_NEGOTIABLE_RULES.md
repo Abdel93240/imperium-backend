@@ -231,7 +231,7 @@ Enforcement layers:
   severity: critical
   enforcement_layer: [backend_api, ai_router, model_prompt]
   affected_docs_or_modules: [02_AI_ROUTING_POLICY.md, 03_MODEL_STRATEGY.md, 10_RAW_MEDIA_RETENTION_POLICY.md]
-  example_violation: High privacy religious note is sent to GPT without permission.
+  example_violation: High privacy religious note is sent to a domain specialist without permission.
   expected_behavior: Backend checks privacy_level, data category, user settings, and explicit permission requirements.
 
 - rule_id: PRIV-002
@@ -359,7 +359,7 @@ Enforcement layers:
   severity: critical
   enforcement_layer: [backend_api, android, documentation]
   affected_docs_or_modules: [11_FINANCIAL_PRESSURE_FORMULA.md]
-  example_violation: GPT returns an unexplained financial pressure number.
+  example_violation: The finance specialist returns an unexplained financial pressure number.
   expected_behavior: Use deterministic formula and display factors/reasons.
 ```
 
@@ -475,12 +475,12 @@ Enforcement layers:
 
 ```yaml
 - rule_id: AI-001
-  rule: Qwen local handles simple, private, and fast tasks when suitable.
+  rule: The local model handles simple, private, and fast tasks when suitable.
   severity: high
   enforcement_layer: [ai_router, backend_api]
   affected_docs_or_modules: [02_AI_ROUTING_POLICY.md, 03_MODEL_STRATEGY.md]
-  example_violation: Simple private text classification is sent to GPT by default.
-  expected_behavior: Route simple/private/fast tasks to local Qwen when capability is sufficient.
+  example_violation: Simple private text classification is sent to a domain specialist by default.
+  expected_behavior: Route simple/private/fast tasks to the local model when capability is sufficient.
 
 - rule_id: AI-002
   rule: The transcription service handles transcription.
@@ -499,12 +499,12 @@ Enforcement layers:
   expected_behavior: Use the OCR service only when privacy policy allows; otherwise use local/manual fallback or ask permission.
 
 - rule_id: AI-004
-  rule: GPT or Claude handles complex reasoning and strategy.
+  rule: The first cloud tier or the high reasoning model handles complex reasoning and strategy.
   severity: medium
   enforcement_layer: [ai_router, model_prompt]
   affected_docs_or_modules: [02_AI_ROUTING_POLICY.md, 03_MODEL_STRATEGY.md]
-  example_violation: Local small model is asked to perform complex weekly strategic replanning beyond capability.
-  expected_behavior: Route complex reasoning to GPT/Claude after privacy gate and cost/latency checks.
+  example_violation: The local model is asked to perform complex weekly strategic replanning beyond capability.
+  expected_behavior: Route complex reasoning to the first cloud tier or the high reasoning model after privacy gate and cost/latency checks.
 
 - rule_id: AI-005
   rule: Model outputs must carry confidence when inferred.

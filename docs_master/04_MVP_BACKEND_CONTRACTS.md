@@ -700,7 +700,7 @@ No endpoint is introduced by this reader.
 No projection layer is introduced by this reader.
 No database write is allowed through this reader.
 No cross-module write is allowed through this reader.
-No Vault, Vector, Pulse, Path, n8n, Qwen, OCR, AI scoring, coaching, or recommendation integration is part of this contract.
+No Vault, Vector, Pulse, Path, n8n, local model, OCR service, AI scoring, coaching, or recommendation integration is part of this contract.
 
 Primary function:
 `read_imperium_events(db, EventReadFilters(...)) -> EventReadPage`
