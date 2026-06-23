@@ -106,12 +106,12 @@ ON THE TOWER (Tier 1):
 ├─ Python 3.12 with venv
 ├─ Playwright (Python) for web automation
 ├─ Chromium headless (managed by Playwright)
-├─ Ollama serving Qwen 2.5 3B Q4_K_M
+├─ Ollama serving the local model
 ├─ PostgreSQL for task queue (lightweight)
 ├─ Custom Python scripts:
 │   - orchestrator.py (main loop)
 │   - pattern_matcher.py (regex layer)
-│   - llm_classifier.py (Qwen fallback)
+│   - llm_classifier.py (local model fallback)
 │   - playwright_actions.py (browser automation)
 │   - vps_executor.py (SSH ops)
 │   - telegram_bot.py (notifications)
@@ -197,7 +197,7 @@ If any pattern matches: act immediately, skip Layer 2.
 LAYER 2 — LLM CLASSIFICATION (~5% of messages)
 
 If no pattern matches: ChatGPT formulated differently.
-Send the message to local Qwen 3B with this prompt:
+Send the message to the local model with this prompt:
 
   System: "You are an intent classifier. Read the ChatGPT
    message and classify it into one of these intents:
@@ -371,8 +371,8 @@ Examples of deviation:
 - "I think there's an issue with the previous patch..."
 - "Let me suggest a different approach..."
 
-These don't match patterns → Layer 2 (Qwen) handles them.
-Qwen classifies them as NOTIFY_TELEGRAM or UNCLEAR.
+These don't match patterns → Layer 2 (the local model) handles them.
+The local model classifies them as NOTIFY_TELEGRAM or UNCLEAR.
 User responds via Telegram, orchestrator forwards to ChatGPT.
 
 = Graceful degradation, no system crash.
@@ -596,7 +596,7 @@ CREATE TABLE orchestrator_chatgpt_messages (
   regex_pattern_matched VARCHAR(64) NULL,
                         -- which pattern matched (e.g. 'PATTERN_A')
   llm_raw_output        TEXT NULL,
-                        -- what Qwen returned (JSON string)
+                        -- what the local model returned (JSON string)
   
   -- ACTION TAKEN
   action_taken          VARCHAR(64) NULL,
@@ -810,7 +810,7 @@ ON orchestrator_playwright_actions (acted_at DESC)
 WHERE success = FALSE;
 ```
 
-### 8.7 LLM classifier log (Qwen decisions)
+### 8.7 LLM classifier log (local model decisions)
 
 ```sql
 CREATE TABLE orchestrator_llm_classifications (
@@ -820,13 +820,13 @@ CREATE TABLE orchestrator_llm_classifications (
   
   -- INPUT
   input_text            TEXT NOT NULL,
-                        -- the message sent to Qwen for classification
+                        -- the message sent to the local model for classification
   input_length_chars    INTEGER GENERATED ALWAYS AS
                         (LENGTH(input_text)) STORED,
   
-  -- QWEN OUTPUT
+  -- LOCAL MODEL OUTPUT
   raw_output            TEXT NULL,
-                        -- exact JSON returned by Qwen
+                        -- exact JSON returned by the local model
   classified_intent     VARCHAR(64) NULL,
   confidence_score      NUMERIC(3,2) NULL,
   
@@ -1063,7 +1063,7 @@ ORDER BY 4 DESC;
 
 -- ─────────────────────────────────────────────────────
 -- VIEW 3: LLM CLASSIFIER ACCURACY
--- Question: "Is Qwen understanding ChatGPT correctly?"
+-- Question: "Is the local model understanding ChatGPT correctly?"
 -- ─────────────────────────────────────────────────────
 CREATE VIEW orchestrator_classifier_accuracy AS
 SELECT
@@ -1215,7 +1215,7 @@ HAVING MAX(attempt_count) >= 3;
 SELECT day, accuracy_pct
 FROM orchestrator_classifier_accuracy
 WHERE day = CURRENT_DATE AND accuracy_pct < 70;
--- If returned: Qwen is misunderstanding ChatGPT, review messages.
+-- If returned: the local model is misunderstanding ChatGPT, review messages.
 
 -- ALERT 3: Playwright is destabilizing
 SELECT action_type, failure_rate_pct
@@ -1333,7 +1333,7 @@ DAY 2:
 - Update packages
 - Install Python 3.12, Node.js 20, build-essential
 - Install Ollama: curl -fsSL https://ollama.com/install.sh | sh
-- Pull Qwen 2.5 3B: ollama pull qwen2.5:3b
+- Pull the local model: ollama pull qwen2.5:3b
 - Test: ollama run qwen2.5:3b "classify: hello world"
 - Install Playwright + Chromium
 
@@ -1630,7 +1630,7 @@ WEEKLY:
 MONTHLY:
 - Update Ubuntu packages: sudo apt update && apt upgrade
 - Update Playwright: pip install --upgrade playwright
-- Update Ollama and Qwen: ollama pull qwen2.5:3b
+- Update Ollama and the local model: ollama pull qwen2.5:3b
 - Run Claude Code audit on V1 code so far
 - Review monthly stats trends
 
@@ -1793,7 +1793,7 @@ TO ANSWER WHEN IMPLEMENTING:
 
 - `08_NON_NEGOTIABLE_RULES.md` — backend authority
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — model selection patterns
-- `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen deployment reference
+- `35_QWEN_SETUP_AND_PROMPTS.md` — local model deployment reference
 - ChatGPT custom instructions documentation
 - Codex pricing: https://chatgpt.com/codex/pricing/
 - Codex speed modes: https://developers.openai.com/codex/speed

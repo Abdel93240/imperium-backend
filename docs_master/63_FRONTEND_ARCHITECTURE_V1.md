@@ -1055,7 +1055,7 @@ Préférences chiffrées :
 
 No secrets in UI :
 
-- aucune API key Gemini, OpenAI, Claude, n8n, backend admin ou service externe dans le frontend ;
+- aucune API key pour [OCR service], OpenAI, Claude, n8n, backend admin ou service externe dans le frontend ;
 - aucun secret affiché dans Compose, logs, previews, widgets, debug banners ou crash reports ;
 - les screenshots UI ne doivent pas révéler token, cookie, Authorization header, refresh token ou payload sensible ;
 - les erreurs affichées sont redaction-safe ;
@@ -1131,9 +1131,9 @@ Conséquences :
 
 - aucun dossier `android/`, `frontend/` ou fichier Kotlin n'est créé par cette documentation ;
 - aucune architecture multiplateforme n'est prévue en V1 ;
-- OCR, vision Gemini, routage AI et modèles locaux restent backend/orchestration ;
+- OCR, vision via [OCR service], routage AI et modèles locaux restent backend/orchestration ;
 - le frontend Android peut capturer ou uploader, mais il n'exécute pas l'OCR runtime V1 ;
-- Qwen local router/scorer reste côté backend, pas dans le frontend.
+- [the local model] router/scorer reste côté backend, pas dans le frontend.
 
 ---
 

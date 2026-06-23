@@ -206,11 +206,11 @@ This removes the auto-mission and the AI uses generic mode for that domain.
 
 ---
 
-## 6. The Three-Level Validation By Qwen
+## 6. The Three-Level Validation By The Local Model
 
 ```text
 LEVEL 1 — DOMAIN MATCH (per slot, blocking)
-  Qwen analyzes:
+  The local model analyzes:
     Does this project belong in this domain/category?
     
   Examples:
@@ -224,7 +224,7 @@ LEVEL 1 — DOMAIN MATCH (per slot, blocking)
     → ACCEPT: correct domain
 
 LEVEL 2 — CLARITY (per slot, blocking)
-  Qwen analyzes:
+  The local model analyzes:
     Is the project clear enough to derive a strategy?
     
   Examples:
@@ -238,7 +238,7 @@ LEVEL 2 — CLARITY (per slot, blocking)
     → ACCEPT: specific and actionable
 
 LEVEL 3 — COHERENCE (per domain/category, non-blocking)
-  Qwen analyzes:
+  The local model analyzes:
     Do the slots in this domain/category contradict each other?
   
   Examples:
@@ -257,13 +257,13 @@ LEVEL 3 — COHERENCE (per domain/category, non-blocking)
 
 ---
 
-## 7. Meta-Prompt Generation By Opus 4.7
+## 7. Meta-Prompt Generation By The High Reasoning Model
 
 Once all user projects in a domain/category are validated (Levels 1 + 2 passed;
-Level 3 acknowledged or absent), Opus 4.7 generates a meta-prompt that will be
+Level 3 acknowledged or absent), the high reasoning model generates a meta-prompt that will be
 injected into all future AI calls in that domain.
 
-### 7.1 Why Opus and not Qwen
+### 7.1 Why The High Reasoning Model And Not The Local Model
 
 ```text
 THE PROMPT WILL BE READ 1000+ TIMES:
@@ -274,7 +274,7 @@ THE PROMPT WILL BE READ 1000+ TIMES:
 
 THE PROMPT IS GENERATED ONCE:
   - User defines projects
-  - Opus generates the meta-prompt
+  - The high reasoning model generates the meta-prompt
   - Stored in DB
   - Reused without regeneration
 
@@ -285,7 +285,7 @@ ECONOMICS:
   - Negligible for the value
 ```
 
-### 7.2 Opus prompt template
+### 7.2 High Reasoning Model Prompt Template
 
 ```text
 You are generating a meta-prompt for a personal AI ecosystem.
@@ -357,7 +357,7 @@ When any AI call happens in domain X for user U:
    final_prompt = base_prompt + current_task_specific_prompt
    (generic mode)
 
-4. Send to chosen model (Qwen / Sonnet / Opus per scoring).
+4. Send to chosen role (the local model / the first cloud tier / the high reasoning model per scoring).
 ```
 
 The meta-prompt adds ~50-100 tokens per call. Negligible cost overhead.
@@ -369,16 +369,16 @@ The meta-prompt adds ~50-100 tokens per call. Negligible cost overhead.
 When the user edits any slot in any domain/category:
 
 ```text
-1. Re-validation Qwen on the edited slot only (Levels 1 + 2)
+1. Re-validation by the local model on the edited slot only (Levels 1 + 2)
 2. Re-cohérence check on the entire domain/category's slots (Level 3)
 3. If validation passes:
    ├─ Mark old user_projects rows for this domain/category as superseded
    ├─ Insert new user_projects rows (full set of slots)
    ├─ Mark old user_project_prompts row as superseded
-   ├─ Trigger Opus to regenerate the meta-prompt
+   ├─ Trigger the high reasoning model to regenerate the meta-prompt
    └─ New meta-prompt becomes active immediately
 
-4. Cost per modification: ~$0.10 (Opus regeneration)
+4. Cost per modification: ~$0.10 (high reasoning model regeneration)
 ```
 
 ### 9.1 Why regenerate the entire prompt
@@ -402,7 +402,7 @@ Regenerating fully:
 
 ```text
 INITIAL SETUP (lifetime, one-shot per project):
-  Maximum 25 projects × Opus generation = ~$2.50
+  Maximum 25 projects × high reasoning model generation = ~$2.50
   Realistic (15 projects) = ~$1.50
 
 ONGOING USAGE:
@@ -415,7 +415,7 @@ MODIFICATIONS:
   ~$0.10 per change × N changes/year = trivial
 
 VALIDATION:
-  Qwen local validation = $0
+  Local model validation = $0
 
 TOTAL COST OVER 3 YEARS:
   ~$10 — completely negligible.
@@ -470,7 +470,7 @@ ON user_projects (user_id, domain_target)
 WHERE status = 'validated' AND superseded_at IS NULL;
 ```
 
-### 11.2 user_project_prompts — Opus-generated meta-prompts
+### 11.2 user_project_prompts — High-Reasoning-Model-Generated Meta-Prompts
 
 ```sql
 CREATE TABLE user_project_prompts (
@@ -516,9 +516,9 @@ CREATE TABLE user_project_events (
 ## 12. AI Task Types
 
 ```text
-imperium.user_project.validate     - Qwen, Levels 1 + 2 + 3
-imperium.user_project.generate_prompt - Opus, meta-prompt creation
-imperium.user_project.regenerate_prompt - Opus, after edit
+imperium.user_project.validate     - the local model, Levels 1 + 2 + 3
+imperium.user_project.generate_prompt - the high reasoning model, meta-prompt creation
+imperium.user_project.regenerate_prompt - the high reasoning model, after edit
 ```
 
 ---
@@ -526,12 +526,12 @@ imperium.user_project.regenerate_prompt - Opus, after edit
 ## 13. Routing Decisions Per Task
 
 ```text
-imperium.user_project.validate          → Qwen local (low complexity)
-imperium.user_project.generate_prompt   → Opus 4.7 (static override)
-imperium.user_project.regenerate_prompt → Opus 4.7 (static override)
+imperium.user_project.validate          → the local model (low complexity)
+imperium.user_project.generate_prompt   → the high reasoning model (static override)
+imperium.user_project.regenerate_prompt → the high reasoning model (static override)
 ```
 
-The "Opus static override" applies because:
+The "high reasoning model static override" applies because:
 - One-shot per project (rare)
 - Critical quality (5000+ future calls depend on it)
 - Cost is trivial vs value
@@ -632,10 +632,10 @@ If the user wants to see why the AI made a specific suggestion:
 
 ## 16. Failure Modes And Recovery
 
-### 16.1 Opus unreachable during prompt generation
+### 16.1 High Reasoning Model Unreachable During Prompt Generation
 
 ```text
-Qwen validation succeeded but Opus fails:
+Local model validation succeeded but the high reasoning model fails:
   → User projects saved with status = 'pending_prompt'
   → User notified: "Projets sauvegardés. Génération du
                     profil personnalisé en cours..."
@@ -681,7 +681,7 @@ PHASE 2 — Backend services
   ├─ services/imperium/user_projects.py
   │  - create, validate, list, supersede
   ├─ services/imperium/project_prompt_generator.py
-  │  - Opus call, prompt assembly
+  │  - high reasoning model call, prompt assembly
   └─ services/imperium/project_prompt_injector.py
      - middleware that injects meta-prompt into AI calls
 
@@ -694,7 +694,7 @@ PHASE 3 — API endpoints
 
 PHASE 4 — n8n workflow
   └─ user_project_processing.json
-     (Qwen validation → Opus generation → backend storage)
+     (local model validation → high reasoning model generation → backend storage)
 
 PHASE 5 — Imperium subscription logic
   └─ Auto-mission creator when domain has 0 projects
@@ -756,9 +756,9 @@ These are for later. V3 focuses on the foundational mechanism.
 
 ## 20. References
 
-- `30_AI_ROUTING_AND_SCORING_POLICY.md` — Opus static override
+- `30_AI_ROUTING_AND_SCORING_POLICY.md` — high reasoning model static override
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` — task types, contracts
-- `36_PROMPTS_CLOUD_AI.md` — Opus prompt template (will be added when implemented)
+- `36_PROMPTS_CLOUD_AI.md` — high reasoning model prompt template (will be added when implemented)
 - `38_VECTORIZATION_PIPELINE.md` — pgvector integration potential
 - `40_PULSE_LOGIC_DETAIL.md` — example of meta-prompt usage
 - `41_PATH_LOGIC_DETAIL.md` — same
