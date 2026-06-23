@@ -79,7 +79,7 @@ DOMAIN 1 — NUTRITION (full tracking)
 DOMAIN 2 — TRAINING (full tracking)
   ├─ Workouts (planned + logged + adapted)
   ├─ Body composition (weight, body fat %, measurements)
-  ├─ Recovery state (personalized forecast frame + Qwen day-to-day adjustment)
+  ├─ Recovery state (personalized forecast frame + the local model day-to-day adjustment)
   ├─ Pain or limitation log
   └─ Goals (e.g. visible abs target)
 
@@ -109,8 +109,8 @@ FLOW:
 
 3. Pulse READS this data via shared backend
    → uses energy_score for workout adaptation
-   → sleep_hours feeds the PERSONALIZED recovery evaluation (GPT-5.5 frame / Qwen
-     day-to-day), NOT a hard-coded calculation. (see §13.4)
+   → sleep_hours feeds the PERSONALIZED recovery evaluation (the health specialist
+     frame / the local model day-to-day), NOT a hard-coded calculation. (see §13.4)
 
 4. Pulse does NOT consume Vector signals.
    Pulse does NOT consume Vault signals (except food expenses, see §15.3).
@@ -131,16 +131,16 @@ LAYER 1 — DETERMINISTIC (no AI)
   ├─ Workout / recovery display from the current personalized frame
   └─ Cost: 0€
 
-LAYER 2 — QWEN LOCAL
+LAYER 2 — THE LOCAL MODEL
   ├─ Meal suggestions from stock + goals + rules
-  ├─ Workout adaptation (Qwen self-scores capability, escalates if needed)
+  ├─ Workout adaptation (the local model self-scores capability, escalates if needed)
   ├─ Food categorization on receipt scan
   └─ Cost: 0€
 
 LAYER 3 — DEFERRED CLOUD
-  ├─ Medical document analysis → GPT-5.5 (doc 34)
-  ├─ Weekly review contribution → Opus via WR (doc 32)
-  └─ Health program creation/revision → GPT-5.5
+  ├─ Medical document analysis → the health specialist (doc 34)
+  ├─ Weekly review contribution → the high reasoning model via WR (doc 32)
+  └─ Health program creation/revision → the health specialist
 ```
 
 ---
@@ -158,7 +158,7 @@ Pulse V1 may emit:
 | `pulse.workout.skipped` | Workout skipped with reason | Imperium may replan if workout was central. |
 | `pulse.workout.adaptation.accepted` | User accepts adaptation proposal | Backend may emit Imperium replan request. |
 | `pulse.body_snapshot.created` | User confirms body snapshot | Photo binary is local-only in V1. |
-| `pulse.pain.logged` | Pain log confirmed | Pain data is interpreted by Qwen; escalation follows model scoring, not a hard severity threshold. |
+| `pulse.pain.logged` | Pain log confirmed | Pain data is interpreted by the local model; escalation follows model scoring, not a hard severity threshold. |
 | `pulse.recommendation.requested` | User asks for Pulse suggestion | Backend routes model; UI displays explanation. |
 | `pulse.medical_rule.activated` | Medical rule validated (doc 34) | Imperium may trigger replan. |
 
@@ -178,7 +178,7 @@ Pulse has many same-day mutations, so V1 uses type-specific conflict handling:
 | Workout completion | Continue local workout log | Server completed/cancelled conflict opens user diff; no silent overwrite. |
 | Workout adaptation | Queue accept/reject only if proposal id matches | Stale proposal is rejected with conflict. |
 | Body snapshot | Queue numeric fields; photo remains local-only V1 | Same date conflict opens diff, latest is not auto-won. |
-| Pain log | Queue with zone, severity, impact, and notes | Sync stores data; Qwen interpretation/escalation is not a hard offline threshold. |
+| Pain log | Queue with zone, severity, impact, and notes | Sync stores data; the local model interpretation/escalation is not a hard offline threshold. |
 | Stock update | Queue line-level update | Quantity is patched with version; negative stock requires explicit user override. |
 | Medical rule | Offline upload disabled in V1 | Rules activate only after doc 34 validation flow. |
 
@@ -195,7 +195,7 @@ Pulse dashboard combines today-only operational signals:
 - stock expiring soon
 - active fasting constraints from Path
 - active medical rules summary from doc 34
-- unresolved pain banner when Qwen interpretation marks it relevant
+- unresolved pain banner when the local model interpretation marks it relevant
 
 **Health score must never render without explanation.** If factors are missing,
 the score card is hidden and an incomplete-data banner is shown.
@@ -262,13 +262,13 @@ OCR | the "Nourrir l'IA" button (present in every app).
 Adding a recipe is a LIGHT conversational capture:
 - The AI that fetches the recipe (web search) discusses ONLY the recipe with the
   user. It does NOT cross-check the current diet at this stage (that would force a
-  GPT-5.5 diet call — not wanted here).
-- WHO: Qwen local (with a web search tool) finds the recipe; escalates to GPT-5.5
+  the health specialist diet call — not wanted here).
+- WHO: the local model (with a web search tool) finds the recipe; escalates to the health specialist
   only if genuinely needed. No diet reasoning at add-time.
 - The user validates / modifies (e.g. "yes, but oregano instead of coriander").
 - On validation → stored in the recipe catalogue.
 
-The catalogue is then AVAILABLE to GPT-5.5 when it programs the diet (below).
+The catalogue is then AVAILABLE to the health specialist when it programs the diet (below).
 ```
 
 ### 10.5 Raw stock (matières premières)
@@ -282,9 +282,9 @@ Stock is the raw material the weekly program draws from.
 ### 10.6 Weekly diet programming
 
 ```text
-WHEN  : start of week, aligned to the Weekly Review (GPT-5.5 grouped call, same
+WHEN  : start of week, aligned to the Weekly Review (the health specialist grouped call, same
         model as the workout — rare, planned).
-WHO   : GPT-5.5 (health + diet reasoning).
+WHO   : the health specialist (health + diet reasoning).
 INPUTS: nutrition goals + current raw stock + recipe catalogue.
 OUTPUT (three things):
   1. RECIPES OF THE WEEK
@@ -332,7 +332,7 @@ Economy + nutrition + health in one loop.
 ### 10.9 Nutrition / batch cooking loop
 
 ```text
-Start of week (on WR) → GPT-5.5 crosses goals + stock + catalogue
+Start of week (on WR) → the health specialist crosses goals + stock + catalogue
   ├─ recipes of the week
   ├─ if stock insufficient → shopping list → Imperium "faire les courses"
   │     (no validation; stock update empties the list; non-buys feed WR learning)
@@ -345,8 +345,8 @@ Cross-module links:
 - Imperium → carries the "faire les courses" and "cuisiner" missions, placed in
   the week by the brain (day-continuity, like other missions).
 - Vector → meals eaten during the VTC session (under-trunk reserve).
-- Recipe add = Qwen local + web (light); diet programming = GPT-5.5 (grouped, on
-  the WR). Clean separation: collection (light) vs exploitation (GPT-5.5).
+- Recipe add = the local model + web (light); diet programming = the health specialist (grouped, on
+  the WR). Clean separation: collection (light) vs exploitation (the health specialist).
 
 ---
 
@@ -385,7 +385,7 @@ Daily cron at 09:00 Europe/Paris (deterministic, no AI):
 When stock contains items expiring soon:
 
 ```text
-Qwen called when user asks "what should I eat?"
+The local model is called when user asks "what should I eat?"
   Inputs:
     - current stock with expiry dates
     - recent meals (last 3 days)
@@ -414,7 +414,7 @@ Headers: Idempotency-Key
 Payload stores `amount_ml`, `logged_at`, `source`, and Path constraint context.
 
 ```text
-Hydration target is a PERSONALIZED RANGE computed by GPT-5.5 from the user's data
+Hydration target is a PERSONALIZED RANGE computed by the health specialist from the user's data
 (weight, height, sex, activity — VTC + workouts —, climate, etc.). Not a fixed
 number.
 
@@ -457,12 +457,12 @@ The workout program has three explicit modes:
 
 ```text
 MODE 1 — CREATION (one-off, at start)
-  WHO    : GPT-5.5 (health), CONVERSATIONAL with the user, user validates.
+  WHO    : the health specialist (health), CONVERSATIONAL with the user, user validates.
   INPUTS : goals, level, owned equipment (§13-EQUIP), available time, fatigue.
   OUTPUT : base program + a PERSONALIZED forecast frame (per-person intensities
            and recovery — NOT generic rules).
-  NOTE   : GPT-5.5 uses owned equipment CREATIVELY — the user declares raw
-           equipment, GPT-5.5 derives many exercises from it (a push-up board →
+  NOTE   : the health specialist uses owned equipment CREATIVELY — the user declares raw
+           equipment, the health specialist derives many exercises from it (a push-up board →
            push-ups AND core work; a 20kg handled dumbbell → halo AND more).
 
 MODE 2 — DAILY ADAPTATION (reactive) — see §13.3
@@ -507,14 +507,14 @@ skipped`), planned_at/started_at/completed_at, duration_minutes, intensity_score
 
 ```text
 An adaptation hook is triggered (triggers list below).
-  → QWEN evaluates whether it can adapt (it scores its OWN capability, as
+  → the local model evaluates whether it can adapt (it scores its OWN capability, as
     everywhere in the ecosystem):
       • capable (within reach) → it adapts locally (free)
-      • out of reach (complex/health-heavy) → it escalates to GPT-5.5
+      • out of reach (complex/health-heavy) → it escalates to the health specialist
   Adaptation is SUGGESTED, never forced. The user validates (accept/reject
   endpoints kept). Never auto-applied.
 
-No CatBoost here: the ecosystem already relies on Qwen scoring its own ability;
+No CatBoost here: the ecosystem already relies on the local model scoring its own ability;
 adding CatBoost would duplicate that. CatBoost stays Vector-only (ride scoring).
 
 Adaptation triggers (hooks):
@@ -538,8 +538,8 @@ surfaced by a toast/banner only.
 ### 13.4 Recovery
 
 ```text
-Recovery is part of the PERSONALIZED forecast frame produced by GPT-5.5
-(Mode 1 creation / Mode 3 revision), based on the user's real level. Qwen applies
+Recovery is part of the PERSONALIZED forecast frame produced by the health specialist
+(Mode 1 creation / Mode 3 revision), based on the user's real level. The local model applies
 and adjusts it day to day. No generic intensity→hours rule.
 Within a recovery window, Pulse may WARN before an intense workout; it never
 blocks (user decides).
@@ -548,11 +548,11 @@ blocks (user decides).
 ### 13-REVISION. Global monthly revision (Mode 3)
 
 ```text
-Independently of daily adaptation, GPT-5.5 returns AUTOMATICALLY every ~4 weeks
+Independently of daily adaptation, the health specialist returns AUTOMATICALLY every ~4 weeks
 (monthly) for a deep review:
   - progression (muscle, level), are sessions actually being followed?
   - global re-adaptation if needed
-  - PHASE TRANSITION decided by GPT-5.5, user-validatable
+  - PHASE TRANSITION decided by the health specialist, user-validatable
     (e.g. objective "visible abs" = phase 1 fat loss → phase 2 muscle gain)
 Rhythm is monthly (not weekly): physical progression is slow; weekly revision
 would over-adjust on noise. A light "is it being followed?" check may occur in
@@ -566,7 +566,7 @@ A Settings window: "mettre à jour mon matériel" (update my equipment).
 The user adds/removes owned equipment (dumbbells, push-up board with handles,
 attachable elastics, etc.). Owned equipment is considered ALWAYS available with
 the user (at home). It is a direct INPUT to program creation/revision.
-GPT-5.5 exploits it creatively (one item → many exercises).
+The health specialist exploits it creatively (one item → many exercises).
 ```
 
 ### 13-PARK. Park equipment & day-continuity routing
@@ -598,8 +598,8 @@ Cross-references:
   creation (§13.1 Mode 1) and revision (§13-REVISION Mode 3).
 - §13-PARK reuses the day-continuity mechanism of doc 41 §7-bis (prayer) and the
   daily plan (doc 28). The brain places the workout in the trip/mission flow.
-- Routing alignment (§18): workout creation/revision = GPT-5.5 (health, grouped,
-  rare); daily adaptation = Qwen local with GPT-5.5 escalation. No CatBoost.
+- Routing alignment (§18): workout creation/revision = the health specialist (health, grouped,
+  rare); daily adaptation = the local model with the health specialist escalation. No CatBoost.
 
 ---
 
@@ -628,7 +628,7 @@ view, no AI processing in V1.
 
 ⚠️ Terminology: modules do NOT exchange data with each other. Everything lives
 in the common brain's shared memory (PostgreSQL + pgvector on Hostinger). The
-brain (GPT-5.5 / Qwen / hard rules) reads and writes that memory; apps only
+brain (the health specialist / the local model / hard rules) reads and writes that memory; apps only
 display. "X reads from Y" elsewhere is shorthand. Authoritative principle: see
 the common-brain doc (to confirm — likely doc 44).
 
@@ -645,7 +645,7 @@ display only):
   - workout completed / skipped (with reason)
   - medical rule activated (may inform a brain re-plan)
   - pain logged  ← NOTE: no hard "severity 8-10 -> replan" trigger. Pain is data
-    the brain interprets (Qwen, escalating per scoring) — see §13.3 / §16 /
+    the brain interprets (the local model, escalating per scoring) — see §13.3 / §16 /
     Patch 40-C.
 ```
 
@@ -696,18 +696,18 @@ Headers: Idempotency-Key
 ```
 
 ```text
-The pain log is DATA, an INPUT for Qwen in workout adaptation (§13.3). Qwen
+The pain log is DATA, an INPUT for the local model in workout adaptation (§13.3). The local model
 interprets the real situation (zone + severity + type + impact on SPECIFIC
 exercises) and, per its own scoring:
   - adapts locally if within reach, OR
-  - escalates to GPT-5.5 (health) if it looks medically serious, OR
+  - escalates to the health specialist (health) if it looks medically serious, OR
   - if the scored gravity is critical (>=180/200), the critical mechanism
-    (doc 30 §5.6 / Patch 30-B: GPT-5.5 re-score -> Opus orchestration) engages.
+    (doc 30 §5.6 / Patch 30-B: the health specialist re-score -> the high reasoning model orchestration) engages.
 
-A high severity NATURALLY raises Qwen's score (error consequences + health
+A high severity NATURALLY raises the local model's score (error consequences + health
 sensitivity) -> a deserved escalation, NOT a mechanical threshold.
 
-NO hard safety net: the probability that Qwen misses an EXPLICIT "9/10" signal is
+NO hard safety net: the probability that the local model misses an EXPLICIT "9/10" signal is
 near nil (gravity is stated in clear, not inferred). The ultimate fallback is the
 user triggering Emergency Mode manually via the chatbot (Patch 30-C).
 ```
@@ -738,52 +738,52 @@ override Imperium mission priority without backend validation.
 ### 18.1 Task types
 
 ```text
-pulse.meal_estimate            - estimate calories/macros from text (Qwen local)
+pulse.meal_estimate            - estimate calories/macros from text (the local model)
 pulse.meal_photo_macros        - macros from meal photo (OCR service vision)
 pulse.kitchen_inventory_photo  - parse fridge/pantry image (OCR service vision)
 pulse.recipe_web_lookup        - find a recipe on the web for the catalogue
-                                 (Qwen local + web tool; NO diet cross-check at
-                                 add-time; escalate GPT-5.5 only if needed)
+                                 (the local model + web tool; NO diet cross-check at
+                                 add-time; escalate the health specialist only if needed)
 pulse.diet_weekly_program      - week's recipes + shopping list + cook mission,
-                                 crossing goals+stock+catalogue (GPT-5.5, on WR)
+                                 crossing goals+stock+catalogue (the health specialist, on WR)
 pulse.workout_create           - create the training program, conversational
-                                 (GPT-5.5 health, user-validated)
+                                 (the health specialist, user-validated)
 pulse.workout_revision_monthly - monthly global revision + phase transitions
-                                 (GPT-5.5 health, user-validated)
-pulse.training_adjustment      - daily workout adaptation: Qwen self-scores its
-                                 ability → adapts locally OR escalates GPT-5.5
+                                 (the health specialist, user-validated)
+pulse.training_adjustment      - daily workout adaptation: the local model self-scores its
+                                 ability → adapts locally OR escalates the health specialist
 pulse.pain_interpretation      - interpret a pain log (zone/severity/impact);
-                                 Qwen → adapt / escalate GPT-5.5 / critical
+                                 the local model → adapt / escalate the health specialist / critical
                                  mechanism if scored critical (doc 30 §5.6)
 pulse.hydration_target         - personalized hydration range (part of the health
-                                 program frame, GPT-5.5)
-pulse.medical_document_extract - delegated to GPT-5.5 (doc 34)
+                                 program frame, the health specialist)
+pulse.medical_document_extract - delegated to the health specialist (doc 34)
 pulse.weekly_review_contribution - feeds the WR (per doc 32; model per doc 30 WR
-                                 rule — currently Fable 5 for WR re-planning, or
-                                 Opus 4.8 if Fable unavailable)
+                                 rule — currently the sustained long-context model for WR re-planning, or
+                                 the high reasoning model if the sustained long-context model is unavailable)
 ```
 
 ### 18.2 Routing distribution
 
 ```text
-Daily ops / daily adaptation : Qwen 32B local   (the large majority — free, local)
+Daily ops / daily adaptation : the local model   (the large majority — free, local)
   (incl. training_adjustment, pain_interpretation first pass, meal_estimate,
    recipe_web_lookup)
 Vision (meal/pantry photos)  : the OCR service
 Deterministic plumbing       : backend hard rules, CPU, NO model
   (OCR receipt → stock, stock decrement, hydration buttons dual-effect, fasting
    window interactions, offline dedup)
-Health programming (grouped, rare) : GPT-5.5
+Health programming (grouped, rare) : the health specialist
   (workout_create, workout_revision_monthly, hydration_target, diet_weekly_program,
-   medical_document_extract, escalations from Qwen)
-Critical mechanism (very rare) : Qwen score ≥180 → GPT-5.5 re-score → Opus 4.8
+   medical_document_extract, escalations from the local model)
+Critical mechanism (very rare) : the local model score ≥180 → the health specialist re-score → the high reasoning model
                                  orchestration (doc 30 §5.6 / Patch 30-B)
-WR contribution : per doc 32 + doc 30 WR rule (Fable 5 for re-planning, Opus 4.8
-                  fallback while Fable is unavailable)
+WR contribution : per doc 32 + doc 30 WR rule (the sustained long-context model for re-planning, the high reasoning model
+                  fallback while the sustained long-context model is unavailable)
 ```
 
 Note: percentages intentionally dropped — they were invented and misleading. The
-real split is principled: Qwen local handles the everyday; GPT-5.5 is reserved for
+real split is principled: the local model handles the everyday; the health specialist is reserved for
 health reasoning, creation, and the grouped weekly program; hard rules handle
 deterministic plumbing; the OCR service handles vision. No CatBoost in Pulse.
 

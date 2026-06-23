@@ -545,7 +545,7 @@ On reception:
   1. Creates a mission: "Faire le ghusl avant {next_prayer}"
      source: "path", priority: high, status: active
   2. Triggers AI replan (ai_task imperium.day_replan, reason ghusl_required;
-     n8n claims, Sonnet 4.6 replans the day)
+     n8n claims, the first cloud tier replans the day)
   3. Replan finds nearest registered ghusl address, inserts the ghusl mission
      before next prayer, reorganizes other missions
   4. New plan returned to backend
@@ -854,9 +854,9 @@ TBD GET /api/path/qibla
 ## 15. Path AI Task Types & Routing
 
 ```text
-path.weekly_review_contribution  - feeds the WR (Opus via doc 32)
+path.weekly_review_contribution  - feeds the WR (the high reasoning model via doc 32)
 path.routine_adjustment          - rare, "should I adapt my adhkar routine?"
-path.sadaqa_strategy             - rare, deep advice (Opus)
+path.sadaqa_strategy             - rare, deep advice (the high reasoning model)
 ```
 
 Most Path operations are deterministic. AI is rarely needed because prayer times
@@ -866,9 +866,9 @@ adhkar is counting.
 Routing distribution:
 
 ```text
-Daily ops (98%):           Qwen local OR backend deterministic
-Light adaptations (1%):    Haiku 4.5
-Strategic spiritual (1%):  Opus 4.7
+Daily ops (98%):           the local model OR backend deterministic
+Light adaptations (1%):    the removed light tier
+Strategic spiritual (1%):  the high reasoning model
 Cost per month: < 0.50 €
 ```
 
@@ -934,9 +934,9 @@ Path handles high and very-high privacy data. V1 rules:
 - `sadaqa_destination`, `sadaqa_donation_amount`, `ghusl_required`,
   `ghusl_addresses`, mosque attendance patterns, and precise GPS are redacted
   from logs.
-- External model routing for Path data defaults to local Qwen only for routing,
+- External model routing for Path data defaults to the local model only for routing,
   classification, short summaries, and clarification.
-- GPT/Claude/Gemini receive Path religious data only after privacy gate approval
+- Cloud models receive Path religious data only after privacy gate approval
   and only the minimum required payload.
 - Donation receipts or charity scans are local-only in V1 unless the user
   explicitly uploads for OCR; OCR uses a privacy gate.
@@ -1131,8 +1131,8 @@ Patch 41-A does two things:
    lunar observation + manual confirmation, duplicate-date mechanic, bridge to
    Imperium, 2-week display window);
 2. realigns Path AI routing (§15) and the Imperium integration (§16.1) with the
-   consolidated AI architecture (doc 30, June 2026 rewrite): Haiku removed,
-   Qwen 32B as local model, Opus 4.8, and WR routing delegated to doc 30/32.
+   consolidated AI architecture (doc 30, June 2026 rewrite): the light tier remains removed,
+   the local model, the high reasoning model, and WR routing delegated to doc 30/32.
 
 This is a documentation alignment patch. It does not, by itself, change
 implemented backend behaviour; the V3 calendar feature is targeted for V3.
@@ -1235,16 +1235,16 @@ path.sadaqa_strategy             - rare, deep advice
 Routing distribution (aligned with doc 30):
 
 ```text
-Daily ops (~98%):           Qwen 32B local OR backend deterministic
-Rare adaptations:           escalate via the /200 score (doc 30 §5) — typically Sonnet 4.6
-Strategic spiritual advice: Opus 4.8 (doc 30); Fable 5 only if long + complex + durable
+Daily ops (~98%):           the local model OR backend deterministic
+Rare adaptations:           escalate via the /200 score (doc 30 §5) — typically the first cloud tier
+Strategic spiritual advice: the high reasoning model (doc 30); the sustained long-context model only if long + complex + durable
 Cost per month:             still < 0.50 € (AI rarely invoked)
 ```
 
 Changes vs the former §15:
-- **Haiku 4.5 removed** (no longer in the hierarchy; the local Qwen 32B covers the
+- **The light tier was removed** (no longer in the hierarchy; the local model covers the
   low band — doc 30 §0).
-- **Opus 4.7 → Opus 4.8**.
+- **The high reasoning model updated to the current version**.
 - WR contribution routing is **delegated to doc 30/32**, not fixed to a model here.
 
 ---

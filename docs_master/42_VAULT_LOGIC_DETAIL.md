@@ -19,7 +19,7 @@ Vault observes and reports. **It never decides on its own.** Investment decision
    - compute pressure score (per doc 11)
    - feed sadaqa target to Path
    - emit upcoming expense alerts
-   - propose categorization via Qwen
+   - propose categorization via the local model
    - parse receipts via the OCR service
 
 ❌ Vault must never:
@@ -120,7 +120,7 @@ LAYER 1 — DETERMINISTIC (no AI)
   ├─ Categorization application (after first validation)
   └─ Cost: 0€
 
-LAYER 2 — QWEN LOCAL
+LAYER 2 — THE LOCAL MODEL
   ├─ Initial categorization suggestion
   ├─ Quick advice: "is this expense reasonable?"
   ├─ Pattern detection: "you spent 2x more on fuel this week"
@@ -128,9 +128,9 @@ LAYER 2 — QWEN LOCAL
 
 LAYER 3 — DEFERRED CLOUD
   ├─ Receipt OCR → the OCR service
-  ├─ Detailed advice (Level 2 popup) → Haiku 4.5
-  ├─ Monthly analysis → Sonnet 4.6
-  └─ Weekly review → Opus 4.7 (via WR)
+  ├─ Detailed advice (Level 2 popup) → the light cloud tier
+  ├─ Monthly analysis → the first cloud tier
+  └─ Weekly review → the high reasoning model (via WR)
 ```
 
 ---
@@ -191,7 +191,7 @@ User taps "Scanner ticket"
   → backend creates draft transactions:
      - one expense for the receipt total
      - line items proposed
-     - category suggested by Qwen
+     - category suggested by the local model
   → user reviews + validates
   → on validation: 
      - INSERT INTO vault_transactions
@@ -206,7 +206,7 @@ User taps "Scanner ticket"
 
 ```text
 First time a description appears:
-  Qwen suggests a category based on:
+  the local model suggests a category based on:
     - the description text
     - the amount
     - the user's past categorization history
@@ -356,10 +356,10 @@ n8n never writes directly to Postgres.
 
 ```text
 vault.receipt_extract              - OCR via the OCR service (doc 37)
-vault.categorization_suggestion    - Qwen local
-vault.weekly_finance_analysis      - Sonnet 4.6, monthly
-vault.detailed_advice              - Haiku 4.5, "see why?" popup
-vault.weekly_review_contribution   - Opus via WR
+vault.categorization_suggestion    - the local model
+vault.weekly_finance_analysis      - the first cloud tier, monthly
+vault.detailed_advice              - the light cloud tier, "see why?" popup
+vault.weekly_review_contribution   - the high reasoning model via WR
 ```
 
 ---
@@ -367,11 +367,11 @@ vault.weekly_review_contribution   - Opus via WR
 ## 13. Routing Distribution For Vault
 
 ```text
-Daily ops (92%):           Qwen local
+Daily ops (92%):           the local model
 Receipt OCR (2%):          the OCR service
-Level 2 advice (4%):       Haiku 4.5
-Monthly analysis (1%):     Sonnet 4.6
-Weekly review (1%):        Opus 4.7 (via WR)
+Level 2 advice (4%):       the light cloud tier
+Monthly analysis (1%):     the first cloud tier
+Weekly review (1%):        the high reasoning model (via WR)
 ```
 
 ---
@@ -394,7 +394,7 @@ LEVEL 2 — On-demand "Voir pourquoi"
   When tapped:
     → POST /api/vault/advice/detail
     → ai_task: vault.detailed_advice
-    → Haiku 4.5 generates contextual advice (3 sentences)
+    → the light cloud tier generates contextual advice (3 sentences)
     → e.g. "Le carburant représente 60% des dépenses business
             cette semaine. C'est 25% au-dessus de la moyenne.
             Vérifier les trajets ou les prix."
@@ -533,7 +533,7 @@ Vault Dashboard:
   ├─ Week balance: business +A €  / personal +B €
   ├─ Month balance: business +C € / personal +D €
   ├─ Pressure score: N/10
-  │   └─ [Voir pourquoi ?] (Haiku Level 2)
+  │   └─ [Voir pourquoi ?] (light cloud tier level 2)
   ├─ Upcoming alerts (next 7 days)
   └─ Quick actions: + Gain | + Dépense | Scan ticket
 
