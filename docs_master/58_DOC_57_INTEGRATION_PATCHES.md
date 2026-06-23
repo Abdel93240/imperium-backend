@@ -71,7 +71,7 @@ REPLACE WITH:
 
 ```text
 CURRENT line: 
-  vector.ride_overlay_decision      - Bolt halo overlay (Qwen/Haiku)
+  vector.ride_overlay_decision      - Bolt halo overlay (the local model)
   
 REPLACE WITH:
   vector.ride_score.catboost        - Real-time CatBoost scoring (0€, <1ms)
@@ -103,7 +103,7 @@ REPLACE WITH:
 
 ```text
 CURRENT line:
-  Bolt overlay (3%):            Haiku 4.5
+  Bolt overlay (3%):            the local model
   
 REPLACE WITH:
   Bolt ride scoring (3%):       CatBoost local (0€, <1ms)

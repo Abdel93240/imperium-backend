@@ -128,7 +128,7 @@ LAYER 2 — THE LOCAL MODEL
 
 LAYER 3 — DEFERRED CLOUD
   ├─ Receipt OCR → the OCR service
-  ├─ Detailed advice (Level 2 popup) → the light cloud tier
+  ├─ Detailed advice (Level 2 popup) → the local model
   ├─ Monthly analysis → the first cloud tier
   └─ Weekly review → the high reasoning model (via WR)
 ```
@@ -358,7 +358,7 @@ n8n never writes directly to Postgres.
 vault.receipt_extract              - OCR via the OCR service (doc 37)
 vault.categorization_suggestion    - the local model
 vault.weekly_finance_analysis      - the first cloud tier, monthly
-vault.detailed_advice              - the light cloud tier, "see why?" popup
+vault.detailed_advice              - the local model, "see why?" popup
 vault.weekly_review_contribution   - the high reasoning model via WR
 ```
 
@@ -369,7 +369,7 @@ vault.weekly_review_contribution   - the high reasoning model via WR
 ```text
 Daily ops (92%):           the local model
 Receipt OCR (2%):          the OCR service
-Level 2 advice (4%):       the light cloud tier
+Level 2 advice (4%):       the local model
 Monthly analysis (1%):     the first cloud tier
 Weekly review (1%):        the high reasoning model (via WR)
 ```
@@ -394,7 +394,7 @@ LEVEL 2 — On-demand "Voir pourquoi"
   When tapped:
     → POST /api/vault/advice/detail
     → ai_task: vault.detailed_advice
-    → the light cloud tier generates contextual advice (3 sentences)
+    → the local model generates contextual advice (3 sentences)
     → e.g. "Le carburant représente 60% des dépenses business
             cette semaine. C'est 25% au-dessus de la moyenne.
             Vérifier les trajets ou les prix."
@@ -533,7 +533,7 @@ Vault Dashboard:
   ├─ Week balance: business +A €  / personal +B €
   ├─ Month balance: business +C € / personal +D €
   ├─ Pressure score: N/10
-  │   └─ [Voir pourquoi ?] (light cloud tier level 2)
+  │   └─ [Voir pourquoi ?] (the local model)
   ├─ Upcoming alerts (next 7 days)
   └─ Quick actions: + Gain | + Dépense | Scan ticket
 

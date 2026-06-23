@@ -1077,11 +1077,11 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 
 - **Screen name:** VAU-06 Pressure Detail Popup.
 - **Type / slug :** `dialog`, `vault/pressure/explain`, stable ID `VAU.PRESSURE.EXPLAIN`.
-- **Composants :** Dialog L3, Pressure Gauge, deterministic input breakdown list, Haiku 3-sentence advice card, cooldown label, Primary "Compris".
+- **Composants :** Dialog L3, Pressure Gauge, deterministic input breakdown list, the local model 3-sentence advice card, cooldown label, Primary "Compris".
 - **Données affichées :** financial_pressure_score 0-100, label, available_liquidity, required_money_this_week, remaining_realistic_earning_capacity, overdue_expenses, critical_signals, AI explanation when requested.
 - **Widgets :** pressure breakdown bar, critical signal chips.
 - **Assets :** Vault pressure asset 96dp max, Material Symbols `insights`, `warning`.
-- **Etats :** Loading=Haiku advice spinner while deterministic breakdown remains visible ; Empty=no pressure snapshot yet with wallet update CTA ; Error=advice failure falls back to deterministic explanation ; Offline=deterministic cached breakdown only ; Syncing=advice request line ; Synced=advice displayed no success toast ; Conflict=pressure snapshot stale warning with refresh action.
+- **Etats :** Loading=the local model advice spinner while deterministic breakdown remains visible ; Empty=no pressure snapshot yet with wallet update CTA ; Error=advice failure falls back to deterministic explanation ; Offline=deterministic cached breakdown only ; Syncing=advice request line ; Synced=advice displayed no success toast ; Conflict=pressure snapshot stale warning with refresh action.
 - **Backend deps :** `TBD GET /api/vault/pressure/current`, `POST /api/vault/advice/detail`, ai_task `vault.detailed_advice`.
 - **Navigation :** opened from VAU-01 "Voir pourquoi"; dismiss returns VAU-01.
 - **Tab S10 Ultra :** centered Dialog max 720dp; no side sheet.

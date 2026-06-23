@@ -867,7 +867,7 @@ Routing distribution:
 
 ```text
 Daily ops (98%):           the local model OR backend deterministic
-Light adaptations (1%):    the removed light tier
+Light adaptations (1%):    the local model
 Strategic spiritual (1%):  the high reasoning model
 Cost per month: < 0.50 €
 ```

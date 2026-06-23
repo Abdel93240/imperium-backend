@@ -43,7 +43,7 @@ Apps (Android, V2)             = display + collect, never decide
 
 ```text
 ~90% calls → Qwen local (free)
-~5%        → Haiku 4.5 (light cloud)
+~5%        → the local model
 ~3%        → Sonnet 4.6 (balanced)
 ~1.5%      → Opus 4.7 (deep, WR)
 ~0.5%      → GPT-5.5 (web + medical)
@@ -85,7 +85,7 @@ Audio                              → the transcription service
 Web fresh data                     → GPT-5.5 + web
 Medical reports                    → GPT-5.5
 WR analysis                        → Opus 4.7
-Quick advice with context          → Haiku 4.5
+Quick advice with context          → the local model
 Day reorganization (multi-factor)  → Sonnet 4.6
 Mentoring chat                     → Opus 4.7
 ```

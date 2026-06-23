@@ -610,7 +610,7 @@ backend/app/services/ai/prompts/
 ├─ opus_wr_revision.txt
 ├─ opus_mentoring.txt
 ├─ sonnet_day_reorg.txt
-├─ haiku_quick_advice.txt
+├─ local_quick_advice.txt
 ├─ gpt55_event_scan.txt
 └─ gpt55_web_chat.txt
 ```
