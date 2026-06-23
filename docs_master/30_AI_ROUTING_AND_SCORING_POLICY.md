@@ -211,6 +211,14 @@ Opus must never be called by reflex.
 - Selection criteria: endurance on long tasks.
 - Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence.
 
+#### Current availability status (temporary)
+
+Fable 5 is currently UNAVAILABLE — blocked by a US government regulatory decision on national-security grounds; Anthropic is in discussion with the authorities. While it is unavailable, this role's work is handled by the high reasoning model (§3.6). This is acceptable for now because early-ecosystem contexts are still short (few prior weeks, few examples, light vector history), so the sustained-long-context advantage does not yet materialize: on short contexts, the high reasoning model and Fable perform comparably, and Fable's edge is endurance over long contexts, not raw intelligence.
+
+Planned switch-back: as data accumulates and contexts grow long, if Fable 5 is still unavailable and the high reasoning model starts to struggle on length, evaluate an endurance-capable substitute (Fable 5 returning, or Gemini Pro 3.1 - chosen for long-context endurance, not for being more intelligent than the high reasoning model). Until that point, the Opus-based cascade stands.
+
+Consequently, the monthly-plan generation cascade (§8.5) is currently high-reasoning-model-based for this reason, not by oversight.
+
 Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable blocks and falls back to Opus 4.8 on its own. This means the "sensitivity" routing criterion is partially handled model-side for Fable.
 
 Two distinct fallbacks must not be conflated:
