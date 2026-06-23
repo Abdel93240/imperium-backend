@@ -118,17 +118,17 @@ Example:
 }
 ```
 
-## 6. Qwen Role in Vector
+## 6. The local model Role in Vector
 
 The split is strict:
 
-- **Ride classification/scoring = CatBoost only** (the ML metric model). Qwen does NOT classify rides and does NOT verbalize the verdict in real time.
+- **Ride classification/scoring = CatBoost only** (the ML metric model). The local model does NOT classify rides and does NOT verbalize the verdict in real time.
 - Natural-language commentary about rides exists **only after the fact**, in the **Vector report inside the Weekly Review** (built on recorded history), never during live work.
-- Qwen keeps its non-scoring micro-roles where they make sense off the critical driving path — but not ride scoring and not live ride explanations.
+- The local model keeps its non-scoring micro-roles where they make sense off the critical driving path — but not ride scoring and not live ride explanations.
 
-Qwen can be called often because Vector needs frequent micro-decisions.
+The local model can be called often because Vector needs frequent micro-decisions.
 
-Qwen tasks (off the critical driving path):
+The local model tasks (off the critical driving path):
 
 - classify user feedback;
 - summarize why a zone is attractive;
@@ -137,7 +137,7 @@ Qwen tasks (off the critical driving path):
 - detect bad or incomplete data;
 - decide whether escalation is needed.
 
-Qwen should not invent data. If a required VTC input is missing, it must ask for clarification or return low confidence.
+The local model should not invent data. If a required VTC input is missing, it must ask for clarification or return low confidence.
 
 ## 7. Escalation
 
@@ -146,7 +146,7 @@ Escalate to a stronger model only when:
 - context is long;
 - the decision has high operational impact;
 - multiple feeds conflict;
-- Qwen confidence is low;
+- The local model's confidence is low;
 - the user explicitly asks for deeper strategy.
 
 Routine VTC micro-decisions should stay local and cheap.

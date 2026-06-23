@@ -47,9 +47,9 @@ USER FLOW:
 
 4. Backend processing (~6 seconds):
    - Step 0: Learn from yesterday's modifications (if any)
-   - Step 1: Qwen extracts intent from seed tracks
+   - Step 1: The local model extracts intent from seed tracks
    - Step 2: Spotify /recommendations endpoint
-   - Step 3: Qwen filters and orders results
+   - Step 3: The local model filters and orders results
    - Step 4: Spotify creates playlist "Vector daily YYYY-MM-DD"
 
 5. UI shows:
@@ -161,12 +161,12 @@ LATENCY: ~1-2 seconds
 COST: 0€ (Spotify API free)
 ```
 
-### 5.2 Step 1 — Qwen extracts intent
+### 5.2 Step 1 — The local model extracts intent
 
 ```text
 INPUT: 5 seed tracks (with Spotify track features)
 
-QWEN ANALYZES:
+THE LOCAL MODEL ANALYZES:
 - Tempo distribution
 - Energy distribution
 - Valence (positivity) distribution
@@ -174,7 +174,7 @@ QWEN ANALYZES:
 - Languages
 - Era/decade
 
-QWEN PRODUCES:
+THE LOCAL MODEL PRODUCES:
 {
   "target_energy": 0.7,
   "target_tempo": 110,
@@ -187,7 +187,7 @@ QWEN PRODUCES:
 }
 
 LATENCY: ~2 seconds
-COST: 0€ (Qwen local)
+COST: 0€ (the local model)
 ```
 
 ### 5.3 Step 2 — Spotify recommendations
@@ -195,7 +195,7 @@ COST: 0€ (Qwen local)
 ```text
 INPUT: 
 - seed_tracks (the 1-5 user-provided IDs)
-- target_energy, target_tempo, target_valence (from Qwen)
+- target_energy, target_tempo, target_valence (from the local model)
 - limit: 80 (we'll filter later)
 
 CALL: GET https://api.spotify.com/v1/recommendations
@@ -206,7 +206,7 @@ LATENCY: ~500ms
 COST: 0€
 ```
 
-### 5.4 Step 3 — Qwen filters and orders
+### 5.4 Step 3 — The local model filters and orders
 
 ```text
 INPUT:
@@ -214,7 +214,7 @@ INPUT:
 - User's vector_music_profile (Section 7)
 - Past contextual modifications matching current context
 
-QWEN APPLIES:
+THE LOCAL MODEL APPLIES:
 
 A. Anti-patterns (HARD FILTER):
    - Exclude tracks by globally disliked artists
@@ -460,18 +460,18 @@ If NOT SIMILAR (<= 1 of 3):
    → Only global anti-patterns/affinities apply
 ```
 
-This is computed on-the-fly during Step 3 (Qwen filtering).
+This is computed on-the-fly during Step 3 (the local model filtering).
 
 ---
 
 ## 9. AI Task Types
 
 ```text
-vector.music.intent_extract  - Qwen, extract vibe from seed tracks
-vector.music.filter_order    - Qwen, filter + order Spotify results
-vector.music.profile_update  - Qwen, update profile from modifications
+vector.music.intent_extract  - the local model, extract vibe from seed tracks
+vector.music.filter_order    - the local model, filter + order Spotify results
+vector.music.profile_update  - the local model, update profile from modifications
 
-NO Sonnet, no Opus. Qwen handles everything.
+No cloud tier, no high reasoning model — the local model handles everything.
 ```
 
 ---
@@ -479,7 +479,7 @@ NO Sonnet, no Opus. Qwen handles everything.
 ## 10. Routing Distribution
 
 ```text
-All AI calls in this feature: Qwen 2.5 7B local (100%)
+All AI calls in this feature: the local model (100%)
 
 Cost per playlist generation: 0€
 Cost per profile update: 0€
@@ -685,8 +685,8 @@ DATA SENT TO SPOTIFY:
 - Playlist creation requests
 - Track features queries
 
-DATA SENT TO QWEN:
-- All Qwen calls are LOCAL on the VPS
+DATA SENT TO THE LOCAL MODEL:
+- All local model calls are LOCAL on the VPS
 - No external transmission
 - Zero privacy concern
 
@@ -719,9 +719,9 @@ Phase 2 — Spotify integration layer
   └─ Encryption for stored tokens
 
 Phase 3 — Backend services
-  ├─ services/vector/music/intent.py (Qwen call)
+  ├─ services/vector/music/intent.py (the local model call)
   ├─ services/vector/music/recommendation.py (Spotify call)
-  ├─ services/vector/music/filter_order.py (Qwen call)
+  ├─ services/vector/music/filter_order.py (the local model call)
   ├─ services/vector/music/profile_updater.py
   └─ services/vector/music/modification_detector.py
 
@@ -733,8 +733,8 @@ Phase 4 — API endpoints
   ├─ DELETE /api/v1/vector/music/sessions/all (clear history)
   └─ DELETE /api/v1/vector/music/disconnect
 
-Phase 5 — Qwen prompts
-  ├─ Add to doc 35 (Qwen prompts):
+Phase 5 — The local model prompts
+  ├─ Add to doc 35 (the local model prompts):
   │  - qwen_music_intent.txt
   │  - qwen_music_filter_order.txt
   └─ Test with realistic seed examples
@@ -804,7 +804,7 @@ These are not in V3 scope. They're noted for future ideation.
 ## 19. References
 
 - `33_VECTOR_LOGIC_DETAIL.md` — Vector core logic
-- `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen prompts (will add music prompts)
+- `35_QWEN_SETUP_AND_PROMPTS.md` — the local model prompts (will add music prompts)
 - `09_PGVECTOR_MEMORY_POLICY.md` — modifications could feed pgvector in V4
 - `08_NON_NEGOTIABLE_RULES.md` — privacy and user authority
 

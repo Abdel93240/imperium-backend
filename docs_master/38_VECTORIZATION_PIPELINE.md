@@ -89,24 +89,24 @@ V1 implements only HIGH PRIORITY. The pipeline is designed to extend.
 
 ## 5. Embedding Model Choice
 
-> **DÉCISION V1 (mise à jour) : embedding LOCAL Qwen3-Embedding par défaut.**
+> **DÉCISION V1 (mise à jour) : service d'embedding local par défaut.**
 > Choix tranché pour la cohérence avec la philosophie privacy de l'écosystème :
 > les données ne doivent pas sortir vers un fournisseur cloud par défaut (cf.
 > règles PRIV-001 / PRIV-002, doc 08). Le cloud (OpenAI/Voyage) devient une
 > option de secours, pas le défaut.
 
-### 5.1 V1 default: local embedding (Qwen3-Embedding)
+### 5.1 V1 default: local embedding (the embedding service)
 
 ```text
-Model:     Qwen3-Embedding (local, GPU-served), privacy-first
+Model:     the embedding service (local, GPU-served), privacy-first
 Dimension: 1024   (Matryoshka — the model supports up to 1024; we use 1024)
 ```
 
 Rationale: best cross-domain semantic quality with excellent French; same model
-family as the Qwen3 routing model (ecosystem coherence). Multilingual breadth is
+family as the local routing model (ecosystem coherence). Multilingual breadth is
 NOT a selection driver here (usage is ~99.9% French; Arabic/religious content is
 mostly hard-coded rules, not vectorized). The driver is reasoning quality on
-French, where Qwen3-Embedding is strong.
+French, where the embedding service is strong.
 
 Quality > dimension: 1024 dims of a strong model beat 1536 of a weaker one.
 Quantization note: Q8 keeps ~99% quality and is safe for embeddings; **Q4 and
@@ -122,7 +122,7 @@ Cost:     ~$0.02 per million tokens
 Latency:  ~200ms per element
 ```
 
-À n'utiliser que si Qwen3-Embedding local devient impossible à héberger, et uniquement
+À n'utiliser que si le service d'embedding local devient impossible to host, et uniquement
 pour des données non sensibles ayant passé le privacy gate. **Ce n'est pas le
 défaut.**
 
@@ -180,7 +180,7 @@ This pipeline does NOT define its own table. The canonical memory table is
 `ai_memories`, owned by doc 09 (AI Memory Policy). See doc 09 for the full schema.
 
 Key points relevant to this pipeline:
-- column `embedding vector(1024)` (Qwen3-Embedding, dim 1024)
+- column `embedding vector(1024)` (the embedding service, dim 1024)
 - column `confidence` (rises with repeated evidence, never decays — NO `weight`)
 - column `privacy_level` (mandatory on every row)
 - columns `source_table` / `source_id` (path back to the rich source log)
@@ -224,7 +224,7 @@ expires_at      - hard cutoff when is_active auto-flips to false
 ## 7-bis. Ephemeral Working Vector Store
 
 A generic ecosystem primitive, distinct from ai_memories. It lets a local agent
-(Qwen) reason over a large TEMPORARY context without saturating its context window,
+use the local model to reason over a large TEMPORARY context without saturating its context window,
 by RAG over a throwaway store.
 
 Complement to ai_memories:
@@ -250,8 +250,8 @@ learning would exist twice (clean extraction + raw ephemeral copy), worded
 differently → semantic duplicates that pollute retrieval.
 
 ### Privacy gate & cloud fallback
-- Qwen LOCAL reads the store freely (local, nothing leaves the machine).
-- "Sonnet replaces Qwen when down" is a MODEL relay, NOT identical data access. The
+- The local model reads the store freely (local, nothing leaves the machine).
+- "the first cloud tier replaces the local model when down" is a MODEL relay, NOT identical data access. The
   replacement shifts from LOCAL to CLOUD, which changes the access regime: the
   privacy gate interposes exactly as for any cloud call.
 - Decision (locked): for very_high content (sensitive medical/religious), the service
@@ -431,7 +431,7 @@ class OpenAIEmbedding(EmbeddingProvider):
     """Fallback option. Calls OpenAI text-embedding-3-small (non-default, privacy gate required)."""
 
 class LocalQwen3Embedding(EmbeddingProvider):
-    """V1 DEFAULT. Calls local Qwen3-Embedding (privacy-first)."""
+    """V1 DEFAULT. Calls the local embedding service (privacy-first)."""
 
 def get_embedding_provider() -> EmbeddingProvider:
     """Returns the configured provider based on env."""
@@ -447,18 +447,18 @@ OPENAI_API_KEY=sk-...
 
 Embedding hardware plan (transitional → final):
 - **Bridge (now):** a dedicated GPU for embedding — Tesla **P40 24GB** running
-  Qwen3-Embedding in **Q8** (~99% quality, fast ~0.2 s/query). Chosen over M40:
+  the embedding service in **Q8** (~99% quality, fast ~0.2 s/query). Chosen over M40:
   Pascal (CC 6.1) is still supported by current CUDA/PyTorch, whereas Maxwell
   (M40, CC 5.2) is being dropped. P40 needs an added blower+shroud (passive
-  card). The routing Qwen3-32B stays on the V100; no VRAM conflict.
+  card). The routing model stays on the V100; no VRAM conflict.
 - **Then:** migrate everything onto the server (full re-host).
-- **Final:** a 2nd V100 → Qwen3-Embedding in **FP16** (100% quality, fast).
+- **Final:** a 2nd V100 → the embedding service in **FP16** (100% quality, fast).
 
 Note: P40/M40 have weak FP16, which is why the bridge runs Q8 (not FP16). Full
 FP16 quality is deferred to the V100 stage. Q8 vs FP16 ≈ 1% quality, acceptable
 for the transition.
 
-Open item (backlog): confirm the exact Qwen3-Embedding size to serve
+Open item (backlog): confirm the exact embedding service size to serve
 (0.6B / 4B / 8B) given the bridge P40 (24GB is ample) vs final V100. Larger is
 fine on 24GB; the choice is quality vs load time. Track separately.
 
