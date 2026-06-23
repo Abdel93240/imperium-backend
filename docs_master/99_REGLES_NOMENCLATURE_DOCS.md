@@ -102,3 +102,39 @@ Documents identifiés comme features futures → à mettre en `F` :
 
 **Architecture = numéros (inchangés). Features futures = préfixe F. Un numéro =
 un doc vivant. Une évolution écrase le fichier. Pas de doublon actif.**
+
+## 8. Grande passe nomenclature par rôle (décidée, à exécuter quand la doc est stable)
+
+PRINCIPE : à terme, les docs de logique nomment le RÔLE du modèle, jamais le fournisseur
+ni la version. Exemples : "high reasoning cloud model", "health cloud model",
+"vision/OCR service", "transcription service", "fast local model". Un doc propriétaire
+unique mappe rôle → modèle concret → version, et porte les critères de sélection.
+
+JUSTIFICATION : dans cet écosystème, le modèle est une dépendance enfichable (clé API +
+prompt). Nommer le rôle (stable) plutôt que le fournisseur (volatil) reflète la réalité
+et survit aux changements de modèle. Évite la panade déjà vécue (Opus 4.7 périmé dispersé
+dans ~21 docs).
+
+GARDE-FOUS (décidés) :
+1. Liste de rôles FERMÉE, PETITE, GÉNÉRALISTE (~6, alignés sur les modèles réellement
+   utilisés : local, Sonnet, Opus, GPT, OCR local, embedding local). On ne crée pas de
+   rôle pour un gain marginal (un généraliste à 97% vaut mieux qu'un spécialiste à 97,6%
+   à gérer). Garde-fou d'ajout : exposer le besoin à une autre IA avant d'ajouter un
+   rôle, pour vérifier qu'on ne peut pas le couvrir par croisement des rôles existants.
+2. CRITÈRES DE SÉLECTION (ex. santé = garanties RGPD/UE) attachés au RÔLE chez le doc
+   propriétaire, pas au nom du fournisseur. La garantie persiste ainsi au changement de
+   modèle.
+3. TIMING : à exécuter quand la doc est STABLE (= liste des incohérences de fond traitée).
+   Sinon cible mouvante. Sûr car personne ne code le backend (attente des cartes GPU) et
+   personne d'autre ne touche la doc.
+
+MÉTHODE D'EXÉCUTION : grande passe via l'orchestrateur, 3 docs à la fois, même prompt
+(~30 passes). En un seul passage par doc : retirer les versions périmées (Opus 4.7,
+bge-m3, Qwen 2.5, gemini-2.5-pro, whisper-large-v3, Sonnet 4.6...), généraliser les
+mentions OCR/transcription restantes, ET brancher les renvois vers le doc 72 (chatbot)
+partout où il est mentionné. Le doc 43 (noms périmés dans la table de coûts) entre dans
+cette passe.
+
+NE PAS CONFONDRE avec : la généralisation OCR/transcription déjà faite (docs 40-65,
+37 renommé), ni les corrections de logique déjà faites (doc 50 : vectorisation du corpus
+religieux retirée). Ces chantiers-là sont distincts et terminés.
