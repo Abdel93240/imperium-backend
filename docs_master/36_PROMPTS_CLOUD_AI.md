@@ -23,7 +23,7 @@ Prompts are stored here so that:
 
 - they're versioned alongside the docs
 - changes are explicit and reviewed
-- Codex and the cloud coding tool see the exact prompt expected when implementing workflows
+- Codex and Claude Code see the exact prompt expected when implementing workflows
 
 ---
 
