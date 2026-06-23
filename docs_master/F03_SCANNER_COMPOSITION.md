@@ -37,9 +37,9 @@ produit. La donnée précise est la fondation de tout calcul santé fiable en av
 réelle. **Suivi factuel précis, rien de plus à ce stade.**
 
 **Ce qu'elle ne fait PAS (volontairement) en Phase 1 :**
-- Pas de recommandation de dosage / conseil santé (réservé à GPT-5.5 dans
-  l'écosystème Pulse, avec sa prudence déjà éprouvée, et toujours en orientant
-  vers des professionnels de santé).
+- Pas de recommandation de dosage / conseil santé (réservé au
+  [health specialist] dans l'écosystème Pulse, avec sa prudence déjà éprouvée,
+  et toujours en orientant vers des professionnels de santé).
 - Pas de comparaison entre produits (phase ultérieure possible).
 
 > Raison : on construit la donnée solide d'abord. Comparaison et reco
@@ -53,9 +53,10 @@ réelle. **Suivi factuel précis, rien de plus à ce stade.**
   choisit PAS s'il scanne les ingrédients ou les valeurs nutritionnelles — sur
   un emballage réel les deux sont souvent côte à côte.
 - L'utilisateur prend la/les photo(s) de l'étiquette.
-- **L'IA (Gemini) identifie elle-même** ce qu'elle voit : liste d'ingrédients
-  (pattern : liste séquentielle) et/ou tableau nutritionnel (pattern : tableau
-  clé/valeur/unité, parfois deux colonnes « pour 100g » / « par portion »).
+- **L'IA ([OCR service]) identifie elle-même** ce qu'elle voit : liste
+  d'ingrédients (pattern : liste séquentielle) et/ou tableau nutritionnel
+  (pattern : tableau clé/valeur/unité, parfois deux colonnes « pour 100g » /
+  « par portion »).
 - **Étape de confirmation OBLIGATOIRE** : l'IA affiche ce qu'elle a compris
   (ex. « protéines 22g/100g, glucides 1g/100g, forme : magnésium bisglycinate »)
   et demande validation AVANT d'enregistrer.
@@ -70,20 +71,20 @@ réelle. **Suivi factuel précis, rien de plus à ce stade.**
 ## 5. Pipeline technique
 
 Réutilise le **pattern existant du scanner de tickets de caisse** (photo →
-OCR/IA → IA locale → stock structuré). C'est une extension, pas une nouvelle
-infra.
+[OCR service] → [local model] → stock structuré). C'est une extension, pas une
+nouvelle infra.
 
 ```
 Photo étiquette
-   → Gemini (multimodal : OCR + structuration)
+   → [OCR service] (multimodal : OCR + structuration)
    → sortie JSON structuré
    → confirmation utilisateur
-   → IA locale enregistre la fiche produit dans le stock
+   → le [local model] enregistre la fiche produit dans le stock
 ```
 
 **Point technique clé** : la robustesse ne vient PAS de l'OCR brut mais du
-**prompt qui impose une sortie structurée**. Demander explicitement à Gemini un
-JSON du type :
+**prompt qui impose une sortie structurée**. Demander explicitement au
+[OCR service] un JSON du type :
 ```json
 {
   "ingredients": ["...", "..."],
@@ -99,7 +100,7 @@ JSON du type :
 plutôt que du texte libre. C'est ce qui sépare un scan exploitable d'une bouillie
 de texte.
 
-> ⚠️ À vérifier à l'implémentation : capacité réelle de Gemini à structurer
+> ⚠️ À vérifier à l'implémentation : capacité réelle du [OCR service] à structurer
 > correctement un tableau nutritionnel courbé/multilingue. A priori bon
 > (multimodal), mais à tester sur de vrais emballages.
 
@@ -107,8 +108,9 @@ de texte.
 
 ## 6. Confidentialité (donnée santé)
 
-- Les **données personnelles restent dans l'écosystème** (Pulse / IA locale).
-- Les appels externes (Gemini pour l'OCR, GPT-5.5 pour le raisonnement santé)
+- Les **données personnelles restent dans l'écosystème** (Pulse / [local model]).
+- Les appels externes (le [OCR service] pour l'OCR, le [health specialist] pour
+  le raisonnement santé)
   reçoivent du **contexte anonymisé**, redonné à chaque appel. Pas de stockage
   d'identité côté tiers.
 
@@ -133,10 +135,10 @@ le professionnel décide, et la décision réalimente le système.
 ## 8. Dépendances et intégrations
 
 - **Pattern scanner existant** (tickets de caisse → stock). À étendre.
-- **Gemini** : OCR + structuration multimodale.
-- **IA locale** : enregistrement de la fiche produit dans le stock.
+- **[OCR service]** : OCR + structuration multimodale.
+- **[local model]** : enregistrement de la fiche produit dans le stock.
 - **Écosystème Pulse** : consomme la donnée pour le suivi santé (et appels
-  GPT-5.5 anonymisés pour le raisonnement).
+  anonymisés au [health specialist] pour le raisonnement).
 - **Stock nourriture existant** : la fiche produit enrichit le stock déjà géré.
 
 ---
@@ -151,16 +153,17 @@ le professionnel décide, et la décision réalimente le système.
   (même produit racheté = même fiche, ou nouvelle fiche par lot ?).
 - Que faire quand l'utilisateur corrige la lecture de l'IA à l'étape de
   confirmation (apprentissage ? simple correction ponctuelle ?).
-- Tester la fiabilité de Gemini sur tableaux nutritionnels réels avant de
+- Tester la fiabilité du [OCR service] sur tableaux nutritionnels réels avant de
   généraliser.
 
 ---
 
 ## 10. Phasage (le jour venu)
 
-1. **Capture + structuration + confirmation** (cette spec) : photo → Gemini →
+1. **Capture + structuration + confirmation** (cette spec) : photo → [OCR service] →
    JSON → validation → stock.
 2. **Comparaison de produits** (ultérieur) : exploiter la donnée pour comparer
    qualité / macros / rapport qualité-prix.
-3. **Aide à la décision santé** (ultérieur, prudent) : via GPT-5.5, toujours en
-   orientation vers des professionnels, jamais en diagnostic autonome.
+3. **Aide à la décision santé** (ultérieur, prudent) : via le
+   [health specialist], toujours en orientation vers des professionnels, jamais
+   en diagnostic autonome.

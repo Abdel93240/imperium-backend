@@ -9,14 +9,16 @@ This document defines the official interactive WR flow and the Patch 2B backend 
 Core ownership:
 
 ```text
-User <-> App popup <-> Backend Imperium <-> Qwen later <-> Backend Imperium <-> App popup
+User <-> App popup <-> Backend Imperium <-> the local model later <-> Backend Imperium <-> App popup
 ```
 
-n8n may later orchestrate heavy preparation or Opus calls through `ai_tasks` and `ai_results`, but n8n does not own the WR conversation and must not receive every user message.
+n8n may later orchestrate heavy preparation or calls to the high reasoning
+model through `ai_tasks` and `ai_results`, but n8n does not own the WR
+conversation and must not receive every user message.
 
-## Patch 2E - Qwen Adapter Boundary
+## Patch 2E - Local Model Adapter Boundary
 
-Patch 2E adds a backend-side Qwen adapter helper for WR summary generation:
+Patch 2E adds a backend-side local model adapter helper for WR summary generation:
 
 ```text
 generate_wr_summary_with_qwen(session, input_payload)
@@ -29,19 +31,19 @@ It does not:
 - approve a weekly review;
 - create a final report;
 - write pgvector memory;
-- call Opus, GPT, Claude, or Gemini;
+- call the high reasoning model, GPT, Claude, or the OCR service;
 - call n8n;
-- make Qwen canonical truth.
+- make the local model canonical truth.
 
 In dry-run mode, the helper returns a clearly marked mock summary with `warnings` that include `dry_run_no_network`.
 
 The WR conversation remains backend-owned:
 
 ```text
-User <-> App popup <-> Backend Imperium <-> Qwen adapter later <-> Backend Imperium <-> App popup
+User <-> App popup <-> Backend Imperium <-> the local model adapter later <-> Backend Imperium <-> App popup
 ```
 
-## Patch 2F - n8n Qwen Dry-Run Contract
+## Patch 2F - n8n Local Model Dry-Run Contract
 
 Patch 2F adds an importable n8n workflow:
 
@@ -61,13 +63,16 @@ Webhook path:
 imperium/wr/interactive-start-qwen-dry-run
 ```
 
-The workflow receives the backend `prepared_payload`, calls the backend internal Qwen dry-run bridge, converts the structured Qwen response into an `AIResultCallback`, stores it through the official internal callback, then attaches the result to the WR session.
+The workflow receives the backend `prepared_payload`, calls the backend internal
+local model dry-run bridge, converts the structured local model response into an
+`AIResultCallback`, stores it through the official internal callback, then
+attaches the result to the WR session.
 
 Important boundaries:
 
 - n8n does not call the local model directly;
 - n8n does not use the n8n AI Agent;
-- no Opus, GPT, Claude, or Gemini call is made;
+- no call is made to the high reasoning model, GPT, Claude, or the OCR service;
 - no direct database write exists;
 - the WR final report is not approved automatically;
 - the result remains a proposal/message until backend/user validation.
@@ -141,7 +146,7 @@ It returns one consolidated frontend-friendly snapshot:
 
 This endpoint does not:
 
-- call Qwen, Opus, GPT, Claude, Gemini, or n8n;
+- call the local model, the high reasoning model, GPT, Claude, the OCR service, or n8n;
 - approve a final WR report;
 - create canonical memory;
 - write pgvector memory;
@@ -362,7 +367,9 @@ The user does not have to start immediately. The banner stays active until the u
 
 Patch 2B implements backend-owned storage and contracts only.
 
-It does not implement Qwen calls, Opus calls, GPT calls, Gemini calls, n8n workflows, frontend UI, pgvector memory writes, or automatic finalization.
+It does not implement calls to the local model, calls to the high reasoning
+model, GPT calls, OCR service calls, n8n workflows, frontend UI, pgvector memory
+writes, or automatic finalization.
 
 ### Tables Added
 
@@ -404,7 +411,7 @@ Patch 2C prepares the backend-side contract for a future n8n WR workflow.
 It is mock/contract-only:
 
 - no real n8n workflow is added;
-- no Qwen, Opus, GPT, Claude, Gemini, or external AI call is made;
+- no call is made to the local model, the high reasoning model, GPT, Claude, the OCR service, or any external AI;
 - no frontend is touched;
 - no `n8n_db` access is allowed;
 - no AI output becomes canonical automatically.
@@ -530,7 +537,9 @@ Expected backend result:
 - no pgvector memory is written;
 - no canonical WR finalization happens.
 
-Patch 2D still does not implement Qwen, Opus, GPT, Claude, Gemini, real n8n production workflows, frontend UI, or final WR automation.
+Patch 2D still does not implement calls to the local model, calls to the high
+reasoning model, GPT calls, Claude calls, OCR service calls, real n8n production
+workflows, frontend UI, or final WR automation.
 
 ---
 
@@ -588,7 +597,7 @@ The backend is the only DB writer.
 
 n8n never writes directly to PostgreSQL.
 
-Qwen, Opus, GPT, Claude, and Gemini never write directly to PostgreSQL.
+The local model, the high reasoning model, GPT, Claude, and the OCR service never write directly to PostgreSQL.
 
 All AI results return to the backend through authenticated endpoints and remain proposals until validated.
 
@@ -614,11 +623,11 @@ The AI must clearly separate:
 
 ## 10. AI Routing
 
-Qwen is the future local router and conversation controller.
+The local model is the future local router and conversation controller.
 
-Opus is the future default model for deep weekly analysis when WR has long context, multi-domain interpretation, and high consequence for long-term memory.
+The high reasoning model is the future default model for deep weekly analysis when WR has long context, multi-domain interpretation, and high consequence for long-term memory.
 
-Patch 2B does not call Qwen, Opus, GPT, Claude, Gemini, or any external provider.
+Patch 2B does not call the local model, the high reasoning model, GPT, Claude, the OCR service, or any external provider.
 
 ## 11. User Approval Rule
 
@@ -988,7 +997,7 @@ Rules:
 
 - the initial AI summary is shown as visible state-of-week analysis in the chat;
 - user chat messages are stored as backend-owned WR messages;
-- dry-run Qwen follow-up messages are deterministic and user-facing;
+- dry-run local model follow-up messages are deterministic and user-facing;
 - hidden chain-of-thought, raw provider payloads, and internal prompts must never be exposed;
 - final draft generation happens only after explicit `confirm_no_more_input`;
 - `request_changes` supersedes the active draft and returns the session to `conversation_active`;
@@ -1126,7 +1135,7 @@ The final WR is stored in Imperium's canonical DB, not in n8n.
 Storage split:
 
 1. WR session table: state, week range, status, timestamps.
-2. WR messages table: user/backend/Qwen/Opus/system chat turns.
+2. WR messages table: user/backend/local-model/high-reasoning-model/system chat turns.
 3. WR final report table: draft/approved final report and structured extracts.
 4. AI task/result tables: raw AI task metadata, model used, confidence, and result envelope.
 
@@ -1134,7 +1143,7 @@ The n8n execution history is not the source of truth. It is only operational tra
 
 ## 13. Privacy Rule
 
-When a cloud model is called in a future patch, the backend should send a complete but minimized working summary.
+When an external model is called in a future patch, the backend should send a complete but minimized working summary.
 
 The model should not receive direct personal identifiers unless a future explicit exception is created and approved by privacy policy.
 
@@ -1228,7 +1237,8 @@ WR remains the feedback loop, not the automatic decision writer:
 - future patches may use WR feedback to tune scoring inputs;
 - this patch does not change WR state machines;
 - this patch does not create monthly plans or daily plans;
-- this patch does not call Qwen, Opus, GPT, Claude, Gemini, or n8n;
+- this patch does not call the local model, the high reasoning model, GPT,
+  Claude, the OCR service, or n8n;
 - this patch does not write memory, pgvector, embeddings, or canonical mission
   changes.
 
@@ -1346,41 +1356,46 @@ WR routing is governed by **doc 30 (AI Routing & Scoring Policy)**. This section
 states only how the WR uses that policy; it does not redefine models, scores, or
 thresholds.
 
-- **Shared dialogue engine.** The WR uses the dialogue engine of doc 30 §6: a
-  single **conductor model (Qwen 32B local)** holds the thread and speaks to the
+- **Shared dialogue engine.** The WR uses the dialogue engine of doc 30 §6:
+  the **local model** holds the thread and speaks to the
   user; the **backend holds the shared context** across turns; **specialists are
-  consulted behind the scenes** (e.g. health → GPT-5.5) and the conductor
-  restitutes their input itself, so the user always faces a single interlocutor.
+  consulted behind the scenes** (e.g. health → the health specialist) and the
+  conductor restitutes their input itself, so the user always faces a single
+  interlocutor.
   Raw provider payloads, internal prompts, and hidden reasoning are never exposed
   (consistent with Patches 5A-5H).
 
 - **Per-turn escalation (mixed).** Each turn is scored (doc 30 §5). Routine turns
-  (acknowledgements, simple follow-ups) stay on Qwen 32B; demanding turns
-  escalate to Opus 4.8. Escalation is mixed: hard rules at key moments, dynamic
-  scoring for the rest (doc 30 §5.6–§5.8).
+  (acknowledgements, simple follow-ups) stay on the local model; demanding turns
+  escalate to the high reasoning model. Escalation is mixed: hard rules at key
+  moments, dynamic scoring for the rest (doc 30 §5.6–§5.8).
 
 - **Phase mapping.**
   - Phase 1 (summary by exception): reasons over backend-prepared data; escalates
-    to Opus 4.8 if needed, lighter when data is well prepared.
-  - Phase 2 (questions + conversation): Qwen 32B conductor, escalating to Opus
-    4.8 on demanding turns; domain turns consult specialists.
-  - Phase 3 (rolling re-planning): **forced to Fable 5** by doc 30 §7.6 (the one
-    recurring task that is simultaneously long, complex, and high-stakes/durable).
-    Fable's own safeguard reroutes high-risk topics to Opus 4.8.
+    to the high reasoning model if needed, lighter when data is well prepared.
+  - Phase 2 (questions + conversation): the local model conductor, escalating
+    to the high reasoning model on demanding turns; domain turns consult
+    specialists.
+  - Phase 3 (rolling re-planning): **forced to the sustained long-context
+    model** by doc 30 §7.6 (the one recurring task that is simultaneously long,
+    complex, and high-stakes/durable). The sustained long-context model's own
+    safeguard reroutes high-risk topics to the high reasoning model.
 
-- **No reflex premium calls.** Opus and Fable are never called by reflex. The
-  heavy tiers serve the WR only at the moments their value is established (the
-  re-planning step, or a turn the scoring escalates).
+- **No reflex premium calls.** The high reasoning model and the sustained
+  long-context model are never called by reflex. The heavy tiers serve the WR
+  only at the moments their value is established (the re-planning step, or a
+  turn the scoring escalates).
 
 - **Same engine, the Imperium chatbot.** The Imperium chatbot reuses this exact
   engine (doc 30 §6.4): same conductor, same specialists-in-the-background, same
   shared context — but as an open, on-demand dialogue with no imposed phases and
   no forced re-planning step.
 
-Historical note: the former §10 described "Qwen later" and "Opus later" as
-future models with no real calls (dry-run era). That description is superseded by
-this rewrite and by doc 30. The dry-run implementation boundaries still hold
-until the model calls are separately enabled.
+Historical note: the former §10 described "the local model later" and "the high
+reasoning model later" as future models with no real calls (dry-run era). That
+description is superseded by this rewrite and by doc 30. The dry-run
+implementation boundaries still hold until the model calls are separately
+enabled.
 
 ### §9 addendum — calendar as a data source
 
