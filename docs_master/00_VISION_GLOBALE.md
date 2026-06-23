@@ -120,10 +120,10 @@ The apps:
 3. n8n orchestrates workflows.
 4. PostgreSQL stores structured data.
 5. pgvector stores semantic memory.
-6. Qwen local handles simple, private, fast tasks.
+6. The local model handles simple, private, fast tasks.
 7. The transcription service handles audio transcription.
 8. The OCR service handles OCR, images, receipts, screenshots, and visual extraction.
-9. GPT or Claude handles complex reasoning, strategy, synthesis, and mentoring.
+9. The first cloud tier, the high reasoning model, or a domain specialist handles complex reasoning, strategy, synthesis, and mentoring.
 10. Only one active mission can exist at a time.
 11. The Vault reports financial reality.
 12. Vector advises VTC decisions but must not automate Bolt or violate platform rules.
@@ -375,9 +375,9 @@ The Vault must provide financial truth to the rest of the system.
 
 Implement:
 - request classification
-- local Qwen routing for simple/private tasks
+- local model routing for simple/private tasks
 - OCR service routing for OCR/images/screenshots
-- GPT/Claude routing for complex reasoning
+- first cloud tier / high reasoning model / domain specialist routing for complex reasoning
 - Transcription service routing for audio transcription
 - routing decision logs
 - feedback storage

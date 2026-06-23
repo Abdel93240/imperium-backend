@@ -4,11 +4,11 @@ This archive is the cleaned working baseline for Imperium docs.
 
 ## Official decisions locked in this cleanup
 
-1. Qwen is the official local AI router in V1.
-2. Qwen runs through Ollama in Docker on the same Docker network as n8n.
+1. The local model is the official local AI router in V1.
+2. The local model runs through Ollama in Docker on the same Docker network as n8n.
 3. n8n orchestrates workflows but does not write directly to PostgreSQL.
 4. The n8n AI Agent is not part of the official V1 architecture.
-5. WR interactive flow uses backend state, n8n orchestration, Qwen routing, Opus analysis, user clarification, user approval, then backend storage.
+5. WR interactive flow uses backend state, n8n orchestration, local model routing, high reasoning model analysis, user clarification, user approval, then backend storage.
 6. Vector is scoped to VTC profitability only. Fatigue, financial pressure, personal objectives, and health are handled by Imperium/Pulse/Vault, not Vector.
 7. Cloud AI calls must use anonymized summaries whenever possible.
 8. Doc 30 owns AI routing thresholds. Doc 31 uses the same thresholds.
@@ -16,7 +16,7 @@ This archive is the cleaned working baseline for Imperium docs.
 ## Cleaned conflicts
 
 - Removed the duplicate `36_OPUS_PROMPTS.md` document. `36_PROMPTS_CLOUD_AI.md` is the canonical prompt contract.
-- Replaced obsolete old dual-local-model role language with Qwen-only V1 routing language.
+- Replaced obsolete old dual-local-model role language with local-model-only V1 routing language.
 - Rewrote Vector docs to remove cross-domain health/pressure/objective logic.
 - Rewrote WR doc with current implemented endpoints and planned conversational endpoints.
 - Updated n8n docs with the official trigger families and DB-write boundary.
@@ -28,8 +28,8 @@ The next backend/n8n work should follow this order:
 1. AI task/result storage layer.
 2. Internal AI task result callback.
 3. WR conversational session tables and endpoints.
-4. n8n workflow for WR launch → Qwen → Opus → callback.
-5. Qwen/Ollama Docker deployment on shared n8n network.
+4. n8n workflow for WR launch → the local model → the high reasoning model → callback.
+5. The local model / Ollama Docker deployment on shared n8n network.
 
 ---
 
@@ -46,4 +46,4 @@ Voir `99_REGLES_NOMENCLATURE_DOCS.md` pour les règles complètes.
 - `43` = ex-`43_v2` (l'ancien a été supprimé, le v2 est devenu officiel).
 - `45` = `N8N_RESPONSIBILITY_MATRIX` ; l'ancien `45_USER_OBJECTIVES` est devenu `F01`.
 - Fichiers corrompus supprimés.
-- Doc 38 : embedding V1 = **qwen3-embedding:8b local** par défaut (privacy), cloud en secours.
+- Doc 38 : embedding V1 = **the embedding service** par défaut (privacy), cloud en secours.

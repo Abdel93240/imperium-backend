@@ -294,12 +294,12 @@ Storage values:
 | latency_target_ms | AI routing | Core | integer nullable | `1500` | AI router, n8n | backend | per request | TODO | low | yes | yes | no | Numeric targets TODO. |
 | cost_sensitivity | AI routing | Core | enum | `low_cost` | AI router | backend/user policy | per request | system_calculated | medium | yes | yes | no | Prefer local when possible. |
 | request_privacy_level | AI routing | Core | enum | `very_high` | AI router, n8n | backend/app | per request | mixed | high | yes | yes | no | Determines local-first or minimal external payload. |
-| complexity_level | AI routing | Core | enum | `complex_strategy` | AI router | Qwen/router/rules | per request | ai_inferred | medium | yes | yes | summary_only | Deterministic, simple, contextual, complex, multimodal. |
+| complexity_level | AI routing | Core | enum | `complex_strategy` | AI router | local model/router/rules | per request | ai_inferred | medium | yes | yes | summary_only | Deterministic, simple, contextual, complex, multimodal. |
 | audio_length_seconds | AI routing | Core | integer nullable | `42` | AI router, transcription workflow | app/backend | audio request | device_reported | very_high | yes | yes | no | Routes the transcription service profile. |
 | image_ocr_required | AI routing | Core | boolean | `true` | AI router | app/backend | per request | system_calculated | high | yes | yes | no | Routes to the OCR service. |
 | offline_required | AI routing | Core | boolean | `false` | AI router | app/backend | per request | device_reported | high | yes | yes | no | Forces local-only when true. |
 | long_term_memory_required | AI routing | Core | boolean | `true` | AI router, n8n | backend/app | per request | mixed | high | yes | yes | no | Determines PG/pgvector read/write. |
-| selected_model | AI routing | Core | enum | `ocr_service` | n8n, AI logs | AI router | per request | system_calculated | medium | yes | yes | no | Qwen, OCR service, GPT, Claude, transcription service. |
+| selected_model | AI routing | Core | enum | `ocr_service` | n8n, AI logs | AI router | per request | system_calculated | medium | yes | yes | no | the local model, the OCR service, the first cloud tier, the high reasoning model, the sustained long-context model, a domain specialist, the transcription service. |
 | selected_workflow | AI routing | n8n | string | `vault_receipt_ocr` | n8n, backend | AI router/n8n | per request | system_calculated | medium | yes | yes | no | Workflow names TODO. |
 | routing_reason | AI routing | Core | text | `image OCR required` | logs, debug, learning | AI router | per request | system_calculated | medium | yes | yes | summary_only | Must be explainable. |
 | model_confidence | AI routing | Core | decimal nullable | `0.88` | n8n, apps, learning | model/router | per response | ai_inferred | medium | yes | yes | summary_only | Display where useful, especially OCR/health. |
