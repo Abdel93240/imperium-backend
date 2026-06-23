@@ -15,7 +15,7 @@ This archive is the cleaned working baseline for Imperium docs.
 
 ## Cleaned conflicts
 
-- Removed the duplicate `36_OPUS_PROMPTS.md` document. `36_PROMPTS_CLOUD_AI.md` is the canonical prompt contract.
+- Resolved the duplicate prompt document. `36_PROMPTS_CLOUD_AI.md` is the canonical prompt contract.
 - Replaced obsolete old dual-local-model role language with local-model-only V1 routing language.
 - Rewrote Vector docs to remove cross-domain health/pressure/objective logic.
 - Rewrote WR doc with current implemented endpoints and planned conversational endpoints.
