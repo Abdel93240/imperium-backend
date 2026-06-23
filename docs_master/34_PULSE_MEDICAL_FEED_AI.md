@@ -3,8 +3,8 @@
 ## 1. Purpose
 
 This document defines how Pulse handles medical documents (blood tests,
-prescriptions, medical reports) using GPT-5.5 to generate actionable rules
-consumable by Qwen for daily nutrition and training adjustments — and the
+prescriptions, medical reports) using the health specialist to generate
+actionable rules consumable by the local model for daily nutrition and training adjustments — and the
 **V1 safety policy** that governs that handling.
 
 Pulse can store user-provided medical context and extract practical constraints
@@ -33,13 +33,13 @@ Backend creates ai_task (pulse.medical_document_extract)
         ↓
 n8n claims task
         ↓
-GPT-5.5 (omnimodal native) reads document + cross-references with:
+the health specialist (omnimodal native) reads document + cross-references with:
   - anonymized biological context required for interpretation only
   - past workout history
   - past nutrition data
   - past medical reports
         ↓
-GPT-5.5 produces structured rules JSON (requires_user_validation = TRUE)
+the health specialist produces structured rules JSON (requires_user_validation = TRUE)
         ↓
 Backend stores ai_result
         ↓
@@ -49,7 +49,7 @@ Backend stores validated rules in pulse_medical_rules
         ↓
 pulse.medical_rule.activated → Imperium may replan
         ↓
-Qwen reads active rules daily to adjust:
+the local model reads active rules daily to adjust:
   - meal suggestions
   - training intensity
   - hydration targets
@@ -60,32 +60,32 @@ Qwen reads active rules daily to adjust:
 
 ## 3. Model Routing
 
-Per doc 30 §6.4, medical analysis uses a **GPT-5.5 static override**.
+Per doc 30 §6.4, medical analysis uses a **health specialist static override**.
 
 ```text
 task: pulse.medical_document_extract
-model_override: GPT-5.5 static override
+model_override: health specialist static override
 reason: medical document reasoning and safety
 ocr_service: not used except generic image/PDF OCR pre-extraction when required
-qwen: may classify routing metadata only, never final medical content
+local_model: may classify routing metadata only, never final medical content
 ```
 
 The OCR service may extract raw visible text from a scanned image if needed,
-but medical interpretation and rule drafting are routed to GPT-5.5 static
+but medical interpretation and rule drafting are routed to the health specialist static
 override.
 
-### 3.1 Why GPT-5.5 (and not Opus)
+### 3.1 Why the health specialist (and not the high reasoning model)
 
 ```text
 ✅ Native omnimodal (PDF + image in one model)
-✅ Output more concise than Opus (better for rules consumption)
+✅ Output more concise than the high reasoning model (better for rules consumption)
 ✅ Excellent grounded reasoning
 ✅ Explicit instruction following (rule format strict)
 ✅ Better at producing structured rules from medical content
 ```
 
-Fable 5 is reserved for the WR re-planning (deep reasoning across domains).
-GPT-5.5 is the right tool for medical-to-rules transformation.
+the sustained long-context model is reserved for the WR re-planning (deep reasoning across domains).
+the health specialist is the right tool for medical-to-rules transformation.
 
 ---
 
@@ -189,7 +189,7 @@ n8n claims the task
       - anonymized biological context (for interpretation only)
       - last 6 medical reports rules (for cross-reference)
       - last 4 weeks workout summary
-  → calls GPT-5.5 with:
+  → calls the health specialist with:
       - the raw document (image or PDF)
       - the structured context
       - the prompt template (see §8)
@@ -241,7 +241,7 @@ active from extraction alone.**
 
 ---
 
-## 8. GPT-5.5 Prompt Template
+## 8. Health Specialist Prompt Template
 
 ```text
 You are analyzing a medical document for a personal AI wellness system.
@@ -260,7 +260,7 @@ Your task:
 2. Identify any values out of range or trending poorly.
 3. Cross-reference with the user profile and past data.
 4. Generate ACTIONABLE RULES that a downstream local model
-   (Qwen) can apply daily for nutrition and training adjustments.
+   (the local model) can apply daily for nutrition and training adjustments.
 5. Flag anything that requires medical follow-up
    (you do not replace a doctor; surface the concern).
 
@@ -270,7 +270,7 @@ Important constraints:
 - DO NOT diagnose. DO NOT prescribe medication.
 - DO NOT recommend stopping medication.
 - ALWAYS surface medical concerns rather than hide them.
-- Rules must be CONCRETE and APPLICABLE BY A LOCAL AI (Qwen).
+- Rules must be CONCRETE and APPLICABLE BY THE LOCAL MODEL.
 - Avoid generic advice ("eat healthy"). Be specific
   (e.g. "increase iron intake to 18mg/day via red meat or supplements").
 - French language for summary and user-facing text.
@@ -380,9 +380,9 @@ When a source document is deleted:
 - active rules from that document are revoked
 - `pulse.medical_rule.deactivated` may be emitted for each active rule
 
-### 10.3 Daily use of rules by Qwen
+### 10.3 Daily use of rules by the local model
 
-Once validated and stored in `pulse_medical_rules`, Qwen reads them when generating:
+Once validated and stored in `pulse_medical_rules`, the local model reads them when generating:
 
 ```text
 - Daily meal suggestions (pulse.meal_suggestion task)
@@ -396,12 +396,12 @@ Example:
 ```text
 User asks Pulse: "What should I eat for lunch?"
 
-Qwen reads:
+The local model reads:
   active rules: [iron rule, hydration rule]
   user_meal_history: last 7 days
   current_stock: from kitchen inventory
 
-Qwen produces:
+The local model produces:
   "Lentilles + épinards + œuf au plat. 600 cal, 22g protein.
    Apporte 4mg de fer pour ton objectif quotidien.
    N'oublie pas tes 3.5L d'eau aujourd'hui (déjà 1.2L)."
@@ -534,7 +534,7 @@ validated the extracted fact.
 ### 15.1 Critical concern detected
 
 ```text
-If GPT-5.5 sets a proposed_rule severity = "critical":
+If the health specialist sets a proposed_rule severity = "critical":
   → backend pushes immediate notification to user
   → "Concern médical important détecté. Consulte ton médecin rapidement."
   → ai_result still stored normally
@@ -555,7 +555,7 @@ New rule conflicts with existing active rule:
 ```text
 Rule with expires_at set:
   → backend cron daily marks expired rules as 'expired'
-  → Qwen no longer reads expired rules
+  → the local model no longer reads expired rules
   → user notified: "Règle expirée: {action}. Renouveler ?"
 ```
 
@@ -577,12 +577,12 @@ Rule with expires_at set:
 ### 16.1 What stays local (never sent to cloud)
 
 ```text
-- Raw document files (analyzed via GPT-5.5 streaming, not stored at GPT)
+- Raw document files (analyzed via the health specialist streaming, not stored in the model)
 - Medical history details
-- Exact medication names (sent to GPT-5.5 but not retained)
+- Exact medication names (sent to the health specialist but not retained)
 ```
 
-### 16.2 What goes to GPT-5.5
+### 16.2 What goes to the health specialist
 
 ```text
 - The document content (necessary for analysis)
@@ -616,7 +616,7 @@ Rule with expires_at set:
 
 ## 18. References
 
-- `30_AI_ROUTING_AND_SCORING_POLICY.md` §6.4 (medical override → GPT-5.5)
+- `30_AI_ROUTING_AND_SCORING_POLICY.md` §6.4 (medical override → the health specialist)
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` (ai_tasks, ai_results, validation)
 - `09_PGVECTOR_MEMORY_POLICY.md` (medical insights summary feeds pgvector)
 - `10_RAW_MEDIA_RETENTION_POLICY.md` (raw document retention)

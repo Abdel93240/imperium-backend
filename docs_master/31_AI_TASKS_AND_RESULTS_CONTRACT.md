@@ -4,7 +4,7 @@
 
 Status: implemented as backend storage and callback contract only.
 
-No Qwen, Claude, Opus, GPT, Gemini, n8n workflow, frontend, or business-domain automation is implemented in this patch.
+No local model, first cloud tier, high reasoning model, health specialist, OCR service, n8n workflow, frontend, or business-domain automation is implemented in this patch.
 
 ### Tables Created
 
@@ -92,11 +92,11 @@ The result remains `pending_validation` until explicitly accepted, rejected, or 
 
 ### Future Roles
 
-Qwen role: future local router/preparer. Not implemented in Patch 2A.
+the local model role: future local router/preparer. Not implemented in Patch 2A.
 
-Claude/Opus/GPT role: future heavy reasoning providers selected by routing policy. Not implemented in Patch 2A.
+cloud reasoning roles: future heavy reasoning providers selected by routing policy. Not implemented in Patch 2A.
 
-Gemini role: future image/OCR provider selected by routing policy. Not implemented in Patch 2A.
+the OCR service role: future image/OCR provider selected by routing policy. Not implemented in Patch 2A.
 
 n8n role: future orchestration only. n8n must call backend APIs and must not write directly to PostgreSQL.
 
@@ -139,10 +139,10 @@ Supported future WR result types:
 Conversation ownership remains:
 
 ```text
-User <-> App popup <-> Backend Imperium <-> Qwen later <-> Backend Imperium <-> App popup
+User <-> App popup <-> Backend Imperium <-> the local model later <-> Backend Imperium <-> App popup
 ```
 
-n8n is reserved for heavy preparation or Opus orchestration later. It must not receive every WR user message.
+n8n is reserved for heavy preparation or high reasoning model orchestration later. It must not receive every WR user message.
 
 ---
 
@@ -155,7 +155,7 @@ Backend launch behavior:
 - `/api/imperium/weekly-review/launch` creates or opens the WR session;
 - it creates an `ai_task` placeholder for `weekly_report.interactive.start` when needed;
 - it stores the future n8n trigger payload in `ai_tasks.prepared_payload`;
-- it does not call n8n, Qwen, Opus, GPT, Claude, Gemini, or any external AI.
+- it does not call n8n, the local model, the high reasoning model, the health specialist, the first cloud tier, the OCR service, or any external AI.
 
 Prepared WR trigger payload:
 
@@ -216,9 +216,9 @@ prepared_payload
 
 It is still mock-only:
 
-- no Qwen call;
-- no Opus call;
-- no GPT, Claude, Gemini, or external AI call;
+- no local model call;
+- no high reasoning model call;
+- no health specialist, first cloud tier, OCR service, or external AI call;
 - no direct PostgreSQL write;
 - no `n8n_db` access except normal n8n internal execution storage;
 - no final report approval;
@@ -244,19 +244,19 @@ No plaintext shared secret header is sent.
 
 ---
 
-## Patch 2E - Qwen Local Adapter Foundation
+## Patch 2E - Local Model Adapter Foundation
 
-Patch 2E adds the backend-side local Qwen adapter contract.
+Patch 2E adds the backend-side local model adapter contract.
 
 Status: implemented as a safe adapter foundation only.
 
-No Opus, GPT, Claude, Gemini, frontend, n8n AI Agent, or real n8n workflow wiring is added by this patch.
+No high reasoning model, health specialist, first cloud tier, OCR service, frontend, n8n AI Agent, or real n8n workflow wiring is added by this patch.
 
-### Qwen role
+### Local model role
 
-Qwen 32B is the V1 local router/scorer/classifier/preparer.
+The local model is the V1 local router/scorer/classifier/preparer.
 
-Qwen may:
+The local model may:
 
 - classify task type;
 - score task difficulty from 0 to 200;
@@ -265,7 +265,7 @@ Qwen may:
 - ask clarification questions;
 - return routing metadata.
 
-Qwen must not:
+The local model must not:
 
 - write directly to PostgreSQL;
 - create canonical missions, Vault transactions, memories, final WR reports, or priority rules;
@@ -285,7 +285,7 @@ QWEN_REQUEST_TIMEOUT_SECONDS=60
 QWEN_DRY_RUN=true
 ```
 
-Dry-run is the default. Missing Qwen configuration does not break backend startup.
+Dry-run is the default. Missing local-model configuration does not break backend startup.
 
 ### Structured output contracts
 
@@ -295,7 +295,7 @@ The adapter returns typed Pydantic contracts:
 - `QwenRoutingDecision`
 - `QwenWeeklySummary`
 
-All Qwen outputs are JSON-compatible proposals or routing metadata. They are not canonical business actions.
+All local-model outputs are JSON-compatible proposals or routing metadata. They are not canonical business actions.
 
 ### Smoke endpoint
 
@@ -329,7 +329,7 @@ The adapter asks for strict JSON. Invalid JSON, timeout, or HTTP failure raises 
 
 ---
 
-## Patch 2F - n8n Qwen Dry-Run Workflow
+## Patch 2F - n8n Local Model Dry-Run Workflow
 
 Patch 2F adds a second importable n8n workflow artifact:
 
@@ -348,8 +348,8 @@ This workflow proves the contract chain:
 ```text
 WR prepared_payload
   -> n8n webhook
-  -> backend internal Qwen dry-run bridge
-  -> n8n converts Qwen output into AIResultCallback
+  -> backend internal local-model dry-run bridge
+  -> n8n converts local-model output into AIResultCallback
   -> POST /api/internal/ai/tasks/{task_id}/result
   -> POST /api/internal/weekly-review/{session_id}/attach-ai-result
   -> backend stores pending proposal/message
@@ -389,7 +389,7 @@ Expected backend result:
 
 ### Patch 2G stabilization
 
-Patch 2G stabilizes the Qwen dry-run n8n workflow and WR attach behavior after VPS smoke testing.
+Patch 2G stabilizes the local-model dry-run n8n workflow and WR attach behavior after VPS smoke testing.
 
 Changes:
 
@@ -407,7 +407,7 @@ The result remains only a pending proposal. No canonical final report or memory 
 
 ## Patch 2H - Backend Outbound WR n8n Trigger
 
-Patch 2H wires WR launch to optionally trigger the stable Qwen dry-run n8n workflow.
+Patch 2H wires WR launch to optionally trigger the stable local-model dry-run n8n workflow.
 
 When `/api/imperium/weekly-review/launch` creates a fresh `ai_task` for:
 
@@ -488,7 +488,7 @@ The endpoint returns the backend-owned WR conversation state in one response:
 - latest draft/final reports;
 - UI-safe flags for answering, revision, approval, waiting state, and whether summaries/drafts exist.
 
-This is a read model only. It does not create AI tasks, call n8n, call Qwen, approve final reports, write memory, or make AI output canonical.
+This is a read model only. It does not create AI tasks, call n8n, call the local model, approve final reports, write memory, or make AI output canonical.
 
 Patch 2M safety rule: this popup read model returns slim AI result summaries only. `AIResult.raw_payload` remains stored internally for audit/debug, but it is intentionally excluded from `initial_ai_result` and `final_ai_result` in the conversation response.
 
@@ -506,7 +506,7 @@ Limits:
 - `final_reports_limit`: default `5`, minimum `1`, maximum `20`;
 - final report candidates are selected newest-first.
 
-This remains a read model only. It does not call n8n, Qwen, Opus, GPT, Claude, Gemini, modify WR state, expose `raw_payload`, write pgvector memory, or approve final reports.
+This remains a read model only. It does not call n8n, the local model, the high reasoning model, the health specialist, the first cloud tier, the OCR service, modify WR state, expose `raw_payload`, write pgvector memory, or approve final reports.
 
 ---
 
@@ -550,7 +550,7 @@ POST /api/internal/ai/tasks/{task_id}/result
 POST /api/internal/weekly-review/{session_id}/attach-ai-result
 ```
 
-Patch 2J does not auto-trigger n8n for this task, does not call Qwen/Opus/GPT/Claude/Gemini, does not create a final report, and does not write pgvector memory.
+Patch 2J does not auto-trigger n8n for this task, does not call the local model / the high reasoning model / the health specialist / the first cloud tier / the OCR service, does not create a final report, and does not write pgvector memory.
 
 Patch 2M safety rule: creating a `weekly_report.answers.integrate` task must not overwrite an existing `session.current_ai_task_id`. If a launch task such as `weekly_report.interactive.start` is still in flight, the answer integration task is still created and prepared, but the existing pointer remains unchanged. If `current_ai_task_id` is empty, the new answer integration task may become the current pointer.
 
@@ -868,7 +868,7 @@ No n8n workflow may bypass this approval endpoint.
 
 ## 1. Document Purpose
 
-This document defines the official contract between the Imperium app, the backend, n8n, Qwen, and external AI models.
+This document defines the official contract between the Imperium app, the backend, n8n, the local model, and external AI models.
 
 Central rule:
 
@@ -878,8 +878,8 @@ This document removes any confusion between:
 
 - the canonical backend
 - n8n
-- Qwen (local router)
-- GPT / Claude / Gemini / other models
+- the local model (local router)
+- the health specialist / first cloud tier / OCR service / other models
 - pgvector semantic memory
 - user-facing actions
 
@@ -912,11 +912,11 @@ external workflow → DB direct
 
 Rule:
 
-> n8n orchestrates. Qwen routes. Models reason. The backend validates and writes.
+> n8n orchestrates. The local model routes. Models reason. The backend validates and writes.
 
 ### 2.2 User-triggered AI calls
 
-No expensive AI cloud call (Sonnet / Opus / Fable / GPT / Gemini) without explicit user action or a deterministic schedule the user has opted into.
+No expensive AI cloud call (the first cloud tier / the high reasoning model / the sustained long-context model / the health specialist / the OCR service) without explicit user action or a deterministic schedule the user has opted into.
 
 Pattern:
 
@@ -926,7 +926,7 @@ Suggest → Inform → User decides → Execute
 
 Exceptions allowed without user action:
 
-- Qwen local calls (free, fast, no impact)
+- local model calls (free, fast, no impact)
 - Vision OCR inside a flow the user explicitly initiated
 - Pure deterministic backend calculations (no AI)
 
@@ -961,14 +961,14 @@ n8n can:
 - watch external APIs
 - receive emails
 - call the backend
-- call Qwen or external models per contract
+- call the local model or external models per contract
 - return results to the backend
 
 n8n cannot:
 
 - write directly to the Imperium canonical DB
 - become the official decision brain
-- replace Qwen
+- replace the local model
 - decide a final business action alone
 - silently modify canonical data
 
@@ -983,20 +983,20 @@ The n8n built-in AI Agent is **not part** of the official architecture for now.
 Reasons:
 
 - it would create a second decision layer
-- it overlaps with Qwen
+- it overlaps with the local model
 - it makes debugging harder
 - it blurs responsibilities
 - it risks producing decisions that diverge from the official AI policy
 
 Official decision:
 
-> The n8n AI Agent is excluded. Qwen handles routing, classification, adaptive questions, and triage.
+> The n8n AI Agent is excluded. The local model handles routing, classification, adaptive questions, and triage.
 
-### 3.4 Qwen 32B (local)
+### 3.4 Local Model (local)
 
-Qwen is the operational AI router.
+The local model is the operational AI router.
 
-Qwen can:
+The local model can:
 
 - classify tasks
 - score difficulty (`/200`)
@@ -1007,7 +1007,7 @@ Qwen can:
 - triage incoming signals
 - produce structured decisions
 
-Qwen cannot:
+The local model cannot:
 
 - write directly to the DB
 - bypass the backend
@@ -1018,11 +1018,11 @@ Qwen cannot:
 
 Possible external models:
 
-- GPT-5.5
-- Claude Sonnet 4.6
-- Claude Opus 4.8
-- Gemini (vision)
-- Whisper / faster-whisper for audio
+- the health specialist
+- the first cloud tier
+- the high reasoning model
+- the OCR service
+- the transcription service for audio
 - future specialized models
 
 They are used for:
@@ -1032,13 +1032,13 @@ They are used for:
 - sensitive tasks
 - multimodal tasks
 - high-impact-on-error tasks
-- tasks beyond Qwen's threshold
+- tasks beyond the local model's threshold
 
 They return structured results. The backend decides what is stored.
 
 ### 3.6 External model privacy rule
 
-When a task is routed to an external cloud model such as GPT, Claude, Opus, Sonnet, Fable or Gemini, the backend/Qwen context package must be minimized and anonymized before the cloud call.
+When a task is routed to an external cloud role such as the health specialist, the first cloud tier, the high reasoning model, the sustained long-context model, or the OCR service, the backend/local-model context package must be minimized and anonymized before the cloud call.
 
 External models receive a complete task summary, but not direct identity data. The package should remove or generalize:
 
@@ -1047,7 +1047,7 @@ External models receive a complete task summary, but not direct identity data. T
 - unnecessary dates, locations, plates, invoices or document IDs
 - any detail not required for the reasoning task
 
-Medical or health-related tasks may still use GPT when required, but only through an anonymized medical summary plus the specific values needed for interpretation. GPT analyzes the data; it does not need to know who the user is.
+Medical or health-related tasks may still use the health specialist when required, but only through an anonymized medical summary plus the specific values needed for interpretation. The health specialist analyzes the data; it does not need to know who the user is.
 
 
 ---
@@ -1057,7 +1057,7 @@ Medical or health-related tasks may still use GPT when required, but only throug
 ```text
 1. Trigger
 2. Task creation
-3. Qwen classifies and scores
+3. The local model classifies and scores
 4. Router selects the model
 5. Model produces a structured result
 6. n8n returns the result to the backend
@@ -1079,7 +1079,7 @@ User clicks "Start Weekly Report"
   → backend records the intent (creates ai_task)
   → backend notifies n8n (signed webhook)
   → n8n claims the task
-  → Qwen prepares context
+  → the local model prepares context
   → result returns to the backend
 ```
 
@@ -1088,8 +1088,8 @@ User clicks "Start Weekly Report"
 ```text
 Every Monday 03:00 Europe/Paris
   → n8n triggers events research within 30 km of Paris
-  → Qwen filters useful events for Vector
-  → strong model if needed (GPT-5.5 + web)
+  → the local model filters useful events for Vector
+  → strong model if needed (the finance specialist + web)
   → backend stores the result
 ```
 
@@ -1099,7 +1099,7 @@ Every Monday 03:00 Europe/Paris
 weekly_report.validated
   → backend POSTs to n8n internal webhook
   → n8n triggers downstream analysis if any
-  → Qwen routes to Opus / GPT if necessary
+  → the local model routes to the high reasoning model / the health specialist if necessary
   → backend stores the analysis
 ```
 
@@ -1108,7 +1108,7 @@ weekly_report.validated
 ```text
 IDF Mobilités flags a problem on RER D
   → n8n captures the signal
-  → Qwen evaluates VTC impact
+  → the local model evaluates VTC impact
   → backend stores a Vector signal
 ```
 
@@ -1117,7 +1117,7 @@ IDF Mobilités flags a problem on RER D
 ```text
 Tax reminder email
   → n8n captures the email
-  → Qwen triages urgency and domain
+  → the local model triages urgency and domain
   → backend stores an item to handle
 ```
 
@@ -1171,7 +1171,7 @@ source_ref_type           VARCHAR(64) NULL
 source_ref_id             UUID NULL
 trigger_type              VARCHAR(32) (button|schedule|db_event|external|email|media)
 status                    VARCHAR(32) (see statuses below)
-difficulty_score          INTEGER NULL  (computed by Qwen, 0..200)
+difficulty_score          INTEGER NULL  (computed by the local model, 0..200)
 score_breakdown           JSONB NULL    (per-criterion scores)
 routing_model             VARCHAR(64)   (e.g. qwen3:32b)
 selected_model            VARCHAR(64)   (e.g. opus-4.8)
@@ -1369,8 +1369,8 @@ User starts the WR
   → backend creates ai_task(weekly_report.interactive.start)
   → backend POSTs signed webhook to n8n
   → n8n claims the task
-  → Qwen routes
-  → Opus generates summary / questions / draft
+  → the local model routes
+  → the high reasoning model generates summary / questions / draft
   → n8n callback to backend with structured result
   → backend stores ai_result(weekly_report.summary | questions | draft)
   → user converses inside the popup (each turn = one ai_task + ai_result)
@@ -1443,10 +1443,10 @@ User takes receipt photo
   → App sends image to backend
   → Backend creates MediaItem / ai_task(vault.receipt_extract)
   → Backend triggers n8n or exposes the task for n8n
-  → n8n calls Gemini OCR
-  → Gemini extracts text and possible fields
-  → n8n calls Qwen
-  → Qwen classifies the data
+  → n8n calls the OCR service
+  → the OCR service extracts text and possible fields
+  → n8n calls the local model
+  → the local model classifies the data
   → n8n returns result to backend via HMAC callback
   → Backend stores ai_result as pending_validation
   → Backend pre-fills the "add expense" popup
@@ -1475,7 +1475,7 @@ Flow:
 ```text
 Email received
   → n8n captures
-  → Qwen classifies
+  → the local model classifies
   → strong model on sensitive subject
   → backend stores the analysis
 ```
@@ -1565,7 +1565,7 @@ Coded and documented:
 
 ### 15.2 Dynamic variables
 
-Computed by Qwen at request time:
+Computed by the local model at request time:
 
 - real complexity
 - ambiguity
@@ -1580,7 +1580,7 @@ Computed by Qwen at request time:
 
 Rule:
 
-> The backend defines the playing field. Qwen plays within the playing field.
+> The backend defines the playing field. The local model plays within the playing field.
 
 ---
 
@@ -1621,10 +1621,10 @@ This is the **canonical V1 thresholds** (aligned with doc 30): doc 30 is the sou
 
 | Score `/200` | Recommended model | Role |
 |---:|---|---|
-| 0–99 | Qwen 32B local | Execute locally |
-| 100–139 | Sonnet 4.6 | Balanced reasoning |
-| 140–179 | Opus 4.8 | Deep analysis |
-| 180–200 | Critical mechanic (doc 30 §5.6 / Patch 30-B) | GPT-5.5 re-score → Opus orchestration |
+| 0–99 | the local model | Execute locally |
+| 100–139 | the first cloud tier | Balanced reasoning |
+| 140–179 | the high reasoning model | Deep analysis |
+| 180–200 | Critical mechanic (doc 30 §5.6 / Patch 30-B) | the health specialist re-score → the high reasoning model orchestration |
 
 These thresholds are adjustable after observing costs and results, but only with explicit decision (not silently).
 
@@ -1637,14 +1637,14 @@ Some tasks bypass dynamic scoring entirely. Static rules win.
 Examples:
 
 ```text
-Medical report          → GPT-5.5 (preferred) or Opus
-Legal analysis          → Opus or GPT-5.5
-OCR receipt / photo     → Gemini
-Audio transcription     → Whisper / faster-whisper
+Medical report          → the health specialist (preferred) or the high reasoning model
+Legal analysis          → the high reasoning model
+OCR receipt / photo     → the OCR service
+Audio transcription     → the transcription service
 Sensitive financial/legal action → strong model + user validation
-Web research            → GPT-5.5 + web
-WR draft analysis       → Opus
-Vector weekly events    → GPT-5.5 + web
+Web research            → the finance specialist + web
+WR draft analysis       → the high reasoning model
+Vector weekly events    → the finance specialist + web
 ```
 
 Rule:
@@ -1832,7 +1832,7 @@ routing_reason
 
 Goal:
 
-> Qwen reduces costs by handling simple tasks locally and escalating only when justified.
+> The local model reduces costs by handling simple tasks locally and escalating only when justified.
 
 ---
 
@@ -1840,12 +1840,12 @@ Goal:
 
 ```text
 n8n AI Agent       : excluded
-Qwen 32B           : official local router/scorer
+the local model    : official local router/scorer
 n8n                : orchestrator only
 backend            : sole canonical writer
 imperium_core      : canonical storage
 pgvector           : semantic memory / search, never source of truth
-Routing thresholds : 0–99 Qwen 32B local / 100–139 Sonnet 4.6 / 140–179 Opus 4.8 / 180–200 critical mechanic (GPT-5.5 re-score → Opus). Fable 5 only by static rule §7. See doc 30 §5 (authoritative).
+Routing thresholds : 0–99 local model / 100–139 the first cloud tier / 140–179 the high reasoning model / 180–200 critical mechanic (the health specialist re-score → the high reasoning model). the sustained long-context model only by static rule §7. See doc 30 §5 (authoritative).
 ```
 
 ---
@@ -1883,25 +1883,25 @@ Why this one first:
 
 - high value
 - low operational risk
-- exercises the full chain n8n → Qwen → strong model → backend
+- exercises the full chain n8n → the local model → strong model → backend
 - no dual-validation needed before storing the analysis itself
 - enables clean cost / latency / quality measurement
 
-### Step 4 — Wire Qwen local
+### Step 4 — Wire local model
 
-Install Qwen via Ollama on the VPS (KVM 4: 16 GB RAM, suitable for Q5_K_M).
+Install the local model via Ollama on the VPS (KVM 4: 16 GB RAM, suitable for Q5_K_M).
 
-Replace mock Qwen calls in workflows with real local calls.
+Replace mock local-model calls in workflows with real local calls.
 
 ### Step 5 — Wire premium models
 
-Add Sonnet / Opus / Fable / GPT-5.5 / Gemini progressively.
+Add the first cloud tier / the high reasoning model / the sustained long-context model / the health specialist / the OCR service progressively.
 
 Log every call with cost, latency, and routing reason.
 
-### Step 6 — Wire Whisper local
+### Step 6 — Wire transcription service local
 
-Install faster-whisper alongside Qwen.
+Install the transcription service alongside the local model.
 
 ---
 
@@ -2106,7 +2106,7 @@ store_final_report
 Contract:
 
 - user chat turns are stored as WR messages in the backend;
-- deterministic dry-run Qwen follow-ups are stored as proposal/chat messages only;
+- deterministic dry-run local-model follow-ups are stored as proposal/chat messages only;
 - final draft generation is gated by explicit `confirm_no_more_input`;
 - draft approval and storage stay separate user actions;
 - `request_changes` supersedes the active draft and resumes `conversation_active`;

@@ -69,16 +69,16 @@ Hook fires:
   2. Backend creates the replan ai_task (task type by scope — see step 5)
      - input includes: current plan, current time, hook reason
   3. n8n claims the task
-  4. Qwen 32B scores the change on the ecosystem-wide 0–200 scale (doc 30 §5)
+  4. The local model scores the change on the ecosystem-wide 0–200 scale (doc 30 §5)
   5. Routing by score (doc 30 §5 table — never bypass it):
-       - 0–99   → Qwen 32B re-plans LOCALLY itself (small scope: ~1–2 missions,
+       - 0–99   → the local model re-plans LOCALLY itself (small scope: ~1–2 missions,
                   same-day reshuffle). Task type: imperium.day_replan.
-       - 100–179→ escalate: Sonnet 4.6 (most common) or Opus 4.8 (rare).
+       - 100–179→ escalate: the first cloud tier (most common) or the high reasoning model (rare).
                   Task type: imperium.day_replan.
        - multi-week project-scope change (a project toggle that invalidates /
                   introduces missions across several weeks) → STATIC RULE,
-                  same livrable as WR Phase 3 (doc 30 §7.8): Fable 5, with the
-                  §7.8 unavailability fallback → Opus 4.8 (active today).
+                  same livrable as WR Phase 3 (doc 30 §7.8): the sustained long-context model, with the
+                  §7.8 unavailability fallback → the high reasoning model (active today).
                   Task type: imperium.rolling_replan (NEW — see below).
   6. New plan returned with rationale
   7. UI shows new plan to user for validation
@@ -307,7 +307,7 @@ LAYER 1 — DETERMINISTIC
   ├─ Mission expiry detection
   └─ Cost: 0€
 
-LAYER 2 — QWEN LOCAL
+LAYER 2 — THE LOCAL MODEL
   ├─ Quick interpretation of user input
   ├─ Routing chatbot to right specialist
   ├─ Mission categorization (doc 52)
@@ -315,12 +315,12 @@ LAYER 2 — QWEN LOCAL
   └─ Cost: 0€
 
 LAYER 3 — DEFERRED CLOUD
-  ├─ Day replan (most common): Sonnet 4.6
-  ├─ Mentoring / strategic chat: Opus 4.7
-  ├─ Web research chat: GPT-5.5 + web
-  ├─ Standard chat: Sonnet 4.6
-  ├─ Monthly plan (doc 52): Opus 4.7
-  └─ Weekly review: Opus 4.7 (per doc 32)
+  ├─ Day replan (most common): the first cloud tier
+  ├─ Mentoring / strategic chat: the high reasoning model
+  ├─ Web research chat: the finance specialist + web
+  ├─ Standard chat: the first cloud tier
+  ├─ Monthly plan (doc 52): the high reasoning model
+  └─ Weekly review: the high reasoning model (per doc 32)
 
 ALL LAYER 2 AND LAYER 3 CALLS are logged in ai_call_logs (§17).
 ```
@@ -334,13 +334,13 @@ The Imperium dashboard includes a chatbot accessible at any time.
 ### 8.1 Routing the chatbot
 
 ```text
-User message → Qwen analyzes:
+User message → the local model analyzes:
   - Does it need web data? (keywords: "actuel", "récent", "2026"...)
-    → GPT-5.5 + web
+    → the finance specialist + web
   - Is it mentoring / deep thinking?
-    → Opus 4.7
+    → the high reasoning model
   - Is it standard conversation?
-    → Sonnet 4.6
+    → the first cloud tier
     
 Routing decision logged in ai_call_logs with task_type='chatbot.routing'
 Downstream call logged with task_type='chatbot.opus'/'chatbot.sonnet'/etc.
@@ -457,26 +457,26 @@ The brain is unified: Vector and Path don't argue. The brain decides.
 ## 10. Imperium AI Task Types
 
 ```text
-imperium.morning_plan              - first plan of the day (Sonnet)
-imperium.day_replan                - hook-triggered replan (Sonnet, sometimes Opus)
-imperium.monthly_plan              - rolling 4-week plan (Opus, V2 doc 52)
-imperium.mission_scoring           - score mission intrinsèque (Qwen, doc 52)
-imperium.mission_categorize        - catégoriser mission type A-I (Qwen, doc 52)
-imperium.mission_overlay_classify  - classify overlay eligibility (Qwen, doc 53)
+imperium.morning_plan              - first plan of the day (the first cloud tier)
+imperium.day_replan                - hook-triggered replan (the first cloud tier, sometimes the high reasoning model)
+imperium.monthly_plan              - rolling 4-week plan (the high reasoning model, V2 doc 52)
+imperium.mission_scoring           - score mission intrinsèque (the local model, doc 52)
+imperium.mission_categorize        - catégoriser mission type A-I (the local model, doc 52)
+imperium.mission_overlay_classify  - classify overlay eligibility (the local model, doc 53)
 imperium.mission_recommendation    - propose new missions during the day
 imperium.priority_review           - rare, when user changes settings
-imperium.chat.routing              - Qwen routing decision
+imperium.chat.routing              - the local model routing decision
 imperium.chat.opus_response        - mentoring chatbot
 imperium.chat.web_response         - web-needed chatbot
 imperium.chat.sonnet_response      - standard chatbot
 imperium.email_triage              - email handling (rare)
 imperium.weekly_review.*           - per doc 32
 imperium.daily_plan_assist         - mid-day suggestion
-imperium.daily_ai_advice           - dashboard advice generated inside daily plan (Qwen)
+imperium.daily_ai_advice           - dashboard advice generated inside daily plan (the local model)
 imperium.memory_candidate_extract  - identify memorable insights
-imperium.health_snapshot           - system health analysis (Qwen+Sonnet, doc 54)
-imperium.daily_summary             - end-of-day 4-line summary (Sonnet, doc 54)
-imperium.submission_refusal_analyze - analyze rejection reason (Qwen, doc 53)
+imperium.health_snapshot           - system health analysis (the local model + the first cloud tier, doc 54)
+imperium.daily_summary             - end-of-day 4-line summary (the first cloud tier, doc 54)
+imperium.submission_refusal_analyze - analyze rejection reason (the local model, doc 53)
 ```
 
 ---
@@ -484,13 +484,13 @@ imperium.submission_refusal_analyze - analyze rejection reason (Qwen, doc 53)
 ## 11. Routing Distribution For Imperium
 
 ```text
-Daily ops / classification (90%):  Qwen local
-Day reorganization (4%):           Sonnet 4.6
-Chatbot mentoring (3%):            Opus 4.7
-Chatbot web (2%):                  GPT-5.5 + web
-Chatbot standard (1%):             Sonnet 4.6
-Weekly review:                     Opus 4.7 (via WR)
-Monthly plan (1x/week):            Opus 4.7
+Daily ops / classification (90%):  the local model
+Day reorganization (4%):           the first cloud tier
+Chatbot mentoring (3%):            the high reasoning model
+Chatbot web (2%):                  the finance specialist + web
+Chatbot standard (1%):             the first cloud tier
+Weekly review:                     the high reasoning model (via WR)
+Monthly plan (1x/week):            the high reasoning model
 
 Imperium is the most AI-call-intensive app.
 Estimated cost: 5-7 €/month.
@@ -558,19 +558,19 @@ The Daily AI Advice block is generated once per day inside the daily-plan call.
 It does not add a separate paid model call in V1.
 
 Model:
-  - Qwen local, the daily-plan model.
+  - the local model, the daily-plan model.
   - If the daily-plan model is later switched, the advice follows the same
     fallback path.
 
 Source:
   - the VECTORIZED latest WR OUTPUT audit
-  - specifically the Opus audit after the WR dialogue corrections validated by
+  - specifically the high reasoning model audit after the WR dialogue corrections validated by
     the user, not the unvalidated input audit.
 
 Selection rule:
   - WR output audit memories carry an importance tag
     (critical / important / light / ...).
-  - Qwen selects one concrete pattern from critical or important items.
+  - the local model selects one concrete pattern from critical or important items.
   - Peripheral observations must not become daily advice.
 
 Output:
@@ -880,7 +880,7 @@ CREATE TABLE ai_call_logs (
                         --  'chat_session' | 'wr_session' | 'health_snapshot'
   related_entity_id     UUID NULL,
   
-  -- CHAIN: if this call triggered another (e.g. Qwen routing → Sonnet response)
+  -- CHAIN: if this call triggered another (e.g. local model routing → the first cloud tier response)
   parent_call_id        UUID NULL REFERENCES ai_call_logs(id)
 );
 
@@ -1249,7 +1249,7 @@ FROM ai_call_logs
 ORDER BY cost_eur DESC
 LIMIT 10;
 
--- Qwen 7B hallucination rate by task type
+-- local model hallucination rate by task type
 SELECT
   task_type,
   COUNT(*) FILTER (WHERE was_validated IS NOT NULL) AS checked,
@@ -1290,8 +1290,8 @@ Weekly spend > 7€
 Error rate > 5% in last 24h
   → Model or network issue
 
-Qwen hallucination rate > 15% on a task type
-  → Prompt needs improvement or switch to Sonnet
+local model hallucination rate > 15% on a task type
+  → Prompt needs improvement or switch to the first cloud tier
 
 Single call cost > 0.50€
   → Context window too large, review pruning
@@ -1311,7 +1311,7 @@ APRÈS 2 MOIS:
 ├─ Lancer: SELECT * FROM ai_hallucination_tracker;
 ├─ Lancer: SELECT * FROM ai_vs_estimates;
 └─ Questions à se poser:
-   - Qwen 7B hallucine combien en %? Si >15% → switch Haiku
+   - local model hallucine combien en %? Si >15% → switch to the first cloud tier
    - Coût réel vs estimé? Si >20% écart → ajuster routage
    - Tâche la plus chère? Optimiser le contexte envoyé
    - Erreurs récurrentes? Corriger avant que ça empire
@@ -1328,7 +1328,7 @@ APRÈS 6 MOIS:
 ├─ Toutes les vues précédentes
 ├─ Decision: rester KVM 4 ou passer KVM 8 ou serveur maison?
 │   → Basé sur la vraie consommation RAM et coûts cloud
-├─ Decision: Qwen 7B suffit ou upgrade nécessaire?
+├─ Decision: the local model suffit ou upgrade nécessaire?
 │   → Basé sur taux d'hallucinations réel
 └─ Decision: V3 features pertinentes?
     → Basé sur quels patterns d'usage ont le plus de valeur
