@@ -145,17 +145,17 @@ PHASE 6 — FINAL SYNTHESIS
 ## 5. WR Context Architecture (Rich WR Log + Learning RAG)
 
 Cross-domain correlations require a global view, but the WR dialogue must not fill
-Qwen's context window with a large weekly summary. The WR therefore uses an
-audit-first architecture: Opus produces a dense INPUT audit, the audit is indexed
-in an ephemeral WR working vector store, Qwen retrieves only the relevant chunks
-it needs while guiding the user, then Opus produces a final validated OUTPUT
-audit.
+the local model's context window with a large weekly summary. The WR therefore
+uses an audit-first architecture: the high reasoning model produces a dense INPUT
+audit, the audit is indexed in an ephemeral WR working vector store, the local
+model retrieves only the relevant chunks it needs while guiding the user, then
+the high reasoning model produces a final validated OUTPUT audit.
 
-Qwen3-32B native context is approximately 32,768 tokens. YaRN can extend the
-window, but it degrades short-context behavior and is not reliable as the default
-WR design. A talkative WR can grow quickly once the global summary, five guided
-sections, user answers, and self-scoring are all in play. Holding everything in
-context is the wrong design.
+The local model native context is approximately 32,768 tokens. YaRN can extend
+the window, but it degrades short-context behavior and is not reliable as the
+default WR design. A talkative WR can grow quickly once the global summary, five
+guided sections, user answers, and self-scoring are all in play. Holding
+everything in context is the wrong design.
 
 The architecture preserves the WR's purpose: cross-domain correlations such as
 Pulse low sleep + Imperium missions marked as "flemme" should surface as possible
@@ -176,20 +176,20 @@ This creates two separate vectorization paths that must not be confused:
 - ephemeral working vectorization for the INPUT audit during one WR session;
 - permanent learning-memory vectorization for validated learning elements only.
 
-### 5.1 Input audit by Opus 4.8 at max effort
+### 5.1 Input audit by the high reasoning model at max effort
 
 ```text
-Once per week, Opus 4.8 is run at MAXIMUM reasoning effort. This is the rare,
-high-stakes call that produces a structured weekly INPUT AUDIT:
+Once per week, the high reasoning model is run at MAXIMUM reasoning effort. This
+is the rare, high-stakes call that produces a structured weekly INPUT AUDIT:
   - key facts per domain (Vector, Vault, Pulse, Path, Imperium)
   - severity tiers: critical / high / medium / low points
   - maximum cross-domain correlations, pre-identified explicitly
     e.g. "low sleep (5h avg) ↔ 3 missions skipped 'flemme' → fatigue suspected?"
          "long VTC sessions Tue/Thu ↔ Asr missed those days"
 
-Fable 5 was the originally intended top-tier model for this role but is currently
-suspended (US export-control directive). Opus 4.8 at max effort is the relay until
-that changes.
+The sustained long-context model was the originally intended top-tier model for
+this role but is currently suspended (US export-control directive). The high
+reasoning model at max effort is the relay until that changes.
 ```
 
 ### 5.2 Preserve the audit inside the rich WR log
@@ -204,7 +204,7 @@ The audit is structured along its natural sections:
   - each cross-domain correlation as its own explicit point
 
 During the current WR session, the INPUT audit is chunked and embedded into an
-ephemeral WR working vector store. Qwen queries this temporary store through RAG
+ephemeral WR working vector store. The local model queries this temporary store through RAG
 and receives only the relevant chunks for the current section or question.
 
 This working vector store is distinct from `ai_memories`. It is not permanent
@@ -212,15 +212,15 @@ memory, it never becomes a source of historical retrieval, and it is discarded a
 the end of the WR session.
 ```
 
-### 5.3 Qwen drives the dialogue with scoped context
+### 5.3 The local model drives the dialogue with scoped context
 
 ```text
-Qwen 32B conducts the 5-phase guided conversation. It does NOT load the whole
+The local model conducts the 5-phase guided conversation. It does NOT load the whole
 audit into context. Per section / per need, it queries the ephemeral WR working
 vector store for relevant INPUT audit chunks and may retrieve historical learning
 elements from ai_memories.
 
-Result: Qwen's context window stays largely free:
+Result: the local model's context window stays largely free:
   - room for the user dialogue
   - room for self-scoring ("can I answer this, or escalate?")
   - room to call cloud specialists when a point exceeds its competence
@@ -229,24 +229,26 @@ Historical retrieval from ai_memories uses doc 38 retrieval mode A by default:
 final_score = cosine_similarity × confidence. Mode B uses cosine_similarity only
 when the workflow explicitly needs past low-confidence witnesses.
 
-Because Opus pre-computed the current-week correlations and they are retrievable
-from the ephemeral WR working vector store, Qwen surfaces them in the right
-section without recomputing or holding everything in memory.
+Because the high reasoning model pre-computed the current-week correlations and
+they are retrievable from the ephemeral WR working vector store, the local model
+surfaces them in the right section without recomputing or holding everything in
+memory.
 ```
 
 ### 5.4 Correlations emerging during the dialogue
 
 ```text
-If a new user answer reveals a correlation the audit could not foresee, Qwen has
-the free context to notice it live and escalates to a specialist cloud model if it
-exceeds local competence.
+If a new user answer reveals a correlation the audit could not foresee, the local
+model has the free context to notice it live and escalates to a specialist cloud
+model if it exceeds local competence.
 ```
 
 ### 5.5 Final synthesis and output audit
 
 ```text
-The final synthesis (Phase 6) consolidates the validated sections. Opus 4.8 then
-reruns the audit at maximum effort using the user's corrections from the dialogue.
+The final synthesis (Phase 6) consolidates the validated sections. The high
+reasoning model then reruns the audit at maximum effort using the user's
+corrections from the dialogue.
 
 This OUTPUT AUDIT is the final, user-validated weekly learning artifact. It is
 stored in the rich WR Markdown log together with the INPUT audit and complete
@@ -257,17 +259,17 @@ Imperium planning, arbitration, advice, missions, and future WRs.
 
 ---
 
-## 6. Cost Analysis (RAG architecture, two Opus audits)
+## 6. Cost Analysis (RAG architecture, two high reasoning model audits)
 
-The WR no longer runs many per-section Opus calls. Cost shape:
+The WR no longer runs many per-section high reasoning model calls. Cost shape:
 
 ```text
-├─ 1 Opus audit (max effort) — INPUT          — heavy call #1
-├─ Qwen dialogue with scoped context (local)   — free in itself
+├─ 1 high reasoning model audit (max effort) — INPUT          — heavy call #1
+├─ the local model dialogue with scoped context (local)   — free in itself
 │    └─ specialist escalations (variable):
-│         finance/health → GPT-5.5 ; other → Opus ; religion → NO AI (DB lookup)
+│         finance → the finance specialist ; health → the health specialist ; other → the high reasoning model ; religion → NO AI (DB lookup)
 ├─ INPUT audit working-store vectorization     — free (local embedding GPU)
-├─ 1 Opus audit (max effort) — OUTPUT          — heavy call #2 (not optional)
+├─ 1 high reasoning model audit (max effort) — OUTPUT          — heavy call #2 (not optional)
 └─ (final user validation of the report)
 ```
 
@@ -277,23 +279,23 @@ learning artifact of the Imperium brain:
 - week after week, it makes the system progressively more intelligent;
 - it feeds planning, arbitration, advice, missions, WRs, and daily guidance.
 
-This is why both Opus max-effort audits are justified: they invest in Imperium's
+This is why both high reasoning model max-effort audits are justified: they invest in Imperium's
 cognitive core, not comfort spending.
 
-Estimated cost per WR (Opus 4.8 at $5/M input, $25/M output; output dominates):
+Estimated cost per WR (the high reasoning model at $5/M input, $25/M output; output dominates):
 
 ```text
-Opus INPUT audit (max effort):
+High reasoning model INPUT audit (max effort):
   ~15,000 in × $5/M   = $0.075
   ~ 8,000 out × $25/M = $0.200   → ~$0.275
 
-Qwen scoped dialogue (local)     → $0.000
+The local model scoped dialogue (local)     → $0.000
 
 Specialist escalations (~3 avg, small calls ~3,000 in / ~1,500 out each):
   ~3 × ~$0.05                    → ~$0.15
-  (finance/health → GPT-5.5 ; other → Opus ; religion → no AI)
+  (finance → the finance specialist ; health → the health specialist ; other → the high reasoning model ; religion → no AI)
 
-Opus OUTPUT audit (max effort, incorporates user corrections):
+High reasoning model OUTPUT audit (max effort, incorporates user corrections):
   ~25,000 in × $5/M   = $0.125
   ~10,000 out × $25/M = $0.250   → ~$0.375
 
@@ -302,8 +304,9 @@ INPUT audit working-store vectorization → $0.000
 TOTAL ≈ $0.80 per WR  →  ~$40-45 / year (×52 weeks)
 ```
 
-Net: dominated by the two weekly Opus max-effort audits (input + output), plus a
-small number of specialist escalations. The old per-section Opus model is gone.
+Net: dominated by the two weekly high reasoning model max-effort audits (input +
+output), plus a small number of specialist escalations. The old per-section high
+reasoning model setup is gone.
 The heavy spend is concentrated where it builds Imperium's core memory: the rich
 WR log and its validated learning elements, which are the system's main assets.
 
@@ -467,7 +470,7 @@ in the conversation.
 
 ## 10. Section Generation Prompts
 
-Each section uses a specialized Opus prompt (defined in doc 36).
+Each section uses a specialized high reasoning model prompt (defined in doc 36).
 
 ### 10.1 Section prompt template (generic)
 

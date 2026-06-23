@@ -2,9 +2,9 @@
 
 ## 0. Cloud Model Privacy Rule
 
-All prompts in this document assume that Qwen/backend already created an anonymized context package. Cloud models must receive the task-relevant facts, not raw identity data.
+All prompts in this document assume that the local model/backend already created an anonymized context package. Cloud models must receive the task-relevant facts, not raw identity data.
 
-For GPT medical/health analysis, provide anonymized measurements and context only. Do not include the user’s name, email, phone, exact address, account identifiers, or unrelated personal details.
+For the health specialist, provide anonymized measurements and context only. Do not include the user’s name, email, phone, exact address, account identifiers, or unrelated personal details.
 
 ---
 
@@ -12,9 +12,10 @@ For GPT medical/health analysis, provide anonymized measurements and context onl
 
 This document is the canonical home for **prompts used with cloud reasoning models**:
 
-- Claude Sonnet 4.6
-- Claude Opus 4.8
-- GPT-5.5
+- the first cloud tier
+- the high reasoning model
+- the health specialist
+- the web/fresh-data specialist
 
 It is the operational counterpart of doc 30 (which defines policy) and doc 31 (which defines the output contract).
 
@@ -22,7 +23,7 @@ Prompts are stored here so that:
 
 - they're versioned alongside the docs
 - changes are explicit and reviewed
-- Codex and Claude Code see the exact prompt expected when implementing workflows
+- Codex and the cloud coding tool see the exact prompt expected when implementing workflows
 
 ---
 
@@ -96,7 +97,7 @@ a professional — together with the useful info, not as a replacement for it.
 
 ---
 
-## 3. Opus 4.8 — Weekly Report Initial Summary
+## 3. The high reasoning model — Weekly Report Initial Summary
 
 Used for: `weekly_report.summary` task type (doc 32 §6 step 5).
 
@@ -185,7 +186,7 @@ Output strict JSON only.
 
 ---
 
-## 4. Opus 4.8 — Weekly Report Final Draft
+## 4. The high reasoning model — Weekly Report Final Draft
 
 Used for: `weekly_report.final` task type (doc 32 §6 step 9).
 
@@ -264,7 +265,7 @@ Important:
 
 ---
 
-## 5. Opus 4.8 — Weekly Report Revision
+## 5. The high reasoning model — Weekly Report Revision
 
 Used for: `weekly_report.revision` task type (doc 32 §6 step 10 path B).
 
@@ -290,9 +291,9 @@ In `model_notes`, add an entry like:
 
 ---
 
-## 6. Opus 4.8 — Mentoring Chat (Imperium)
+## 6. The high reasoning model — Mentoring Chat (Imperium)
 
-Used for: chatbot routing decision routes to Opus when score 140+.
+Used for: chatbot routing decision routes to the high reasoning model when score 140+.
 
 ### 6.1 System prompt
 
@@ -358,7 +359,7 @@ Output JSON:
 
 ---
 
-## 7. Sonnet 4.6 — Day Reorganization
+## 7. The first cloud tier — Day Reorganization
 
 Used for: `imperium.day_reorganization` task (typically score 100-139).
 
@@ -421,9 +422,9 @@ Output JSON:
 
 ---
 
-## 8. Sonnet 4.6 — Quick Advice With Context
+## 8. The first cloud tier — Quick Advice With Context
 
-Used for: tasks scoring 100-139 (escalated to Sonnet 4.6). Scores 0-99 stay on Qwen 32B local and never reach this prompt.
+Used for: tasks scoring 100-139 (escalated to the first cloud tier). Scores 0-99 stay on the local model and never reach this prompt.
 
 ### 8.1 User prompt template
 
@@ -458,7 +459,7 @@ Output JSON:
 
 ---
 
-## 9. GPT-5.5 — Weekly Events Research (Vector)
+## 9. The web/fresh-data specialist — Weekly Events Research (Vector)
 
 Used for: `vector.event_scan` task (Monday 03:00 Europe/Paris cron, doc 30 §6.8, doc 33 §7).
 
@@ -542,7 +543,7 @@ Output strict JSON only.
 
 ---
 
-## 10. GPT-5.5 — Medical Report Analysis (Pulse)
+## 10. The health specialist — Medical Report Analysis (Pulse)
 
 Defined in detail in `34_PULSE_MEDICAL_FEED_AI.md` §6.
 
@@ -550,7 +551,7 @@ Cross-reference: prompt template lives there to keep medical-specific rules co-l
 
 ---
 
-## 11. GPT-5.5 — Web-Sourced Chatbot Answer
+## 11. The web/fresh-data specialist — Web-Sourced Chatbot Answer
 
 Used for: Imperium chatbot when web search is needed (current events, regulations).
 
@@ -677,8 +678,8 @@ Once a quarter:
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` §19 — output contract
 - `32_WR_INTERACTIVE_WORKFLOW.md` §6, §8 — WR flow + anti-flattery rules
 - `34_PULSE_MEDICAL_FEED_AI.md` — medical prompt
-- `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen prompts
-- `37_VISION_OCR_PROMPTS.md` — Gemini prompts
+- `35_QWEN_SETUP_AND_PROMPTS.md` — local model prompts
+- `37_VISION_OCR_PROMPTS.md` — the OCR service prompts
 
 ---
 

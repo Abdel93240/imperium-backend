@@ -39,7 +39,7 @@ Imperium may use those signals elsewhere. Vector does not.
 1. User approves final WR.
 2. Backend stores canonical WR.
 3. Backend creates an AI task for module-specific extraction if needed.
-4. Qwen classifies whether WR contains Vector-relevant VTC lessons.
+4. The local model classifies whether WR contains Vector-relevant VTC lessons.
 5. If yes, n8n orchestrates the extraction.
 6. The result returns to backend through an authenticated callback.
 7. Backend stores approved Vector learning candidates.
