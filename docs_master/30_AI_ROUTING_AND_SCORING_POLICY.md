@@ -143,15 +143,23 @@ This has **nothing to do** with model routing. It does not call the cloud. It is
 
 ## 3. Component Roles
 
+This section is the single owner of the role → concrete model → version mapping. Other docs name the ROLE; the concrete model and version live here only (and feed the code's API calls).
+
 ### 3.1 Imperium Backend
 
-Responsibilities: authentication, authorization, payload validation, idempotency, canonical storage, internal endpoints, permission enforcement, event journaling, exposing reliable snapshots to AI, and **maintaining shared dialogue context** (see §6).
+- Current model: backend service
+- Role: authentication, authorization, payload validation, idempotency, canonical storage, internal endpoints, permission enforcement, event journaling, exposing reliable snapshots to AI, and **maintaining shared dialogue context** (see §6).
+- Selection criteria: source-of-truth authority, not model quality.
+- Use for: canonical writes, reliable snapshots, backend validation, and final storage decisions.
 
 The backend can call n8n or receive results from n8n, but it remains the final judge of what gets stored.
 
 ### 3.2 n8n
 
-Responsibilities: run scheduled workflows, listen to webhooks, call external APIs, receive files/audio/images, chain multiple AI models, run long background workflows, return structured results to the backend.
+- Current model: workflow engine
+- Role: run scheduled workflows, listen to webhooks, call external APIs, receive files/audio/images, chain multiple AI models, run long background workflows, return structured results to the backend.
+- Selection criteria: orchestration and temporal execution, not authority over truth.
+- Use for: scheduled workflows, multi-step chains, external integrations, file/audio/image intake, and background job execution.
 
 V1 rule:
 
@@ -160,17 +168,13 @@ Simple CRUD, simple read, simple deterministic compute → backend
 Multi-step, temporal, AI, external, email, file, audio, image → n8n
 ```
 
-### 3.3 Qwen 32B — local router / scorer / executor / dialogue conductor
+### 3.3 Fast local model
 
-GPU-served locally (V100). V1 roles:
-
-- classify incoming tasks
-- compute the dynamic difficulty score `/200`
-- pick the recommended model
-- detect ambiguities
-- decide whether to escalate
-- emit strict JSON routing output
-- **conduct dialogue sessions** (Weekly Review, Imperium chatbot) as the default speaker, escalating per §6
+- Current model: Qwen 32B
+- Role: local router / scorer / executor / dialogue conductor.
+- Selection criteria: local, nothing leaves the machine.
+- Use for: classify incoming tasks; compute the dynamic difficulty score `/200`; pick the recommended model; detect ambiguities; decide whether to escalate; emit strict JSON routing output; conduct dialogue sessions (Weekly Review, Imperium chatbot) as the default speaker, escalating per §6.
+- Deployment: GPU-served locally (V100). The serving stack (Ollama or vLLM, to be finalized for a 32B on the V100) must be reachable by the backend through internal networking only. No public model port is exposed.
 
 Qwen 32B also executes local tasks directly: light reformulation, classification, short summary, categorization, simple extraction, non-critical micro-decisions, and the routine turns of a dialogue.
 
@@ -178,61 +182,74 @@ Qwen 32B is the router, not the sovereign. It must not be treated as absolute tr
 
 **Working hypothesis (assumed, validated empirically):** the 32B is capable of routing and conducting dialogue reliably. If real-world use shows it is not, that is an ecosystem-wide problem (not a Weekly-Review-specific one), and the answer is a hardware decision (e.g. a 70B model + an additional GPU), not a local patch.
 
-### 3.3.1 Local deployment
-
-Qwen 32B is GPU-served on the V100. The serving stack (Ollama or vLLM, to be finalized for a 32B on the V100) must be reachable by the backend through internal networking only. No public model port is exposed.
-
 ### 3.4 Gemma
 
 Optional, not deployed by default. Future possible uses: A/B challenger to Qwen on a sample of decisions, local fallback when Qwen is unavailable, specialized micro-model if benchmarks prove it useful. Do not run Qwen + Gemma in parallel by default in V1.
 
-### 3.5 Sonnet 4.6 — first cloud tier
+### 3.5 First cloud tier
 
-Role: balanced cloud model, the first step above the local model.
-
-Use for: structured reasoning, daily reorganization (multi-factor), logic correction, medium-complexity code, decisions with moderate context, document transformation, detailed financial advice (Vault Level 2), weekly nutrition / recovery plans, structuring projects (project module).
+- Current model: Sonnet 4.6
+- Role: balanced cloud model, the first step above the local model.
+- Selection criteria: balanced cost/quality.
+- Use for: structured reasoning, daily reorganization (multi-factor), logic correction, medium-complexity code, decisions with moderate context, document transformation, detailed financial advice (Vault Level 2), weekly nutrition / recovery plans, structuring projects (project module).
 
 Note: candidates MiniMax M3 / Qwen3.7 Max may later challenge this tier on cost/quality — to be tested on real tasks before any swap.
 
-### 3.6 Opus 4.8 — default heavy model
+### 3.6 High reasoning model
 
-Role: premium strategic model, the default when real depth is required.
-
-Use when value justifies cost: deep analysis, complex priority arbitration, long-term strategy, multi-domain synthesis, serious architectural debugging, high-consequence decisions, strategic reflection in the project module.
+- Current model: Opus 4.8
+- Role: premium strategic model, the default when real depth is required.
+- Selection criteria: depth of reasoning.
+- Use for: deep analysis, complex priority arbitration, long-term strategy, multi-domain synthesis, serious architectural debugging, high-consequence decisions, strategic reflection in the project module.
 
 Opus must never be called by reflex.
 
-### 3.7 Fable 5 — top tier (reserved)
+### 3.7 Sustained long-context model
 
-Role: the most capable model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably — so paying for Fable is only justified when task length and complexity let its lead materialize.
+- Current model: Fable 5 (availability fallback: Gemini Pro 3.1; content-safeguard fallback: Opus 4.8)
+- Role: the most capable long-context model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably, so paying for Fable is only justified when task length and complexity let its endurance advantage materialize.
+- Selection criteria: endurance on long tasks.
+- Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence.
 
 Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable blocks and falls back to Opus 4.8 on its own. This means the "sensitivity" routing criterion is partially handled model-side for Fable.
 
-Two distinct fallbacks to Opus 4.8 must not be conflated:
-(a) Content safeguard — Fable redirects sensitive topics on its own, model-side (above).
+Two distinct fallbacks must not be conflated:
+(a) Content safeguard — Fable redirects sensitive topics on its own, model-side, to Opus 4.8 (above).
 (b) Total model unavailability — handled routing-side, see §7.8. When Fable 5 is
-    unreachable, the (a) safeguard cannot fire (the model is simply absent); the
-    routing layer must substitute Opus 4.8 wherever a static rule forced Fable.
+    unreachable, the routing layer must substitute Gemini Pro 3.1 wherever a static
+    rule forced Fable.
 
 Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the one recurring task that reliably meets the three conditions. Everything else escalates to Opus or below.
 
-### 3.8 GPT-5.5 — domain specialist (health + finance + fresh data)
+### 3.8 Health specialist
 
-Role: specialist for health/Pulse, **financial reasoning (Vault domain)**, and for fresh data / web research / verification / complex multimodal analysis.
+- Current model: GPT-5.5
+- Role: specialist for health/Pulse.
+- Selection criteria: GDPR/EU guarantees for health data.
+- Use for: health/ Pulse (weight/nutrition/recovery calculations and medical-feed analysis). GPT-5.5 is the de facto "owner" of Pulse reasoning.
 
-Use for:
-- health: weight/nutrition/recovery calculations and medical-feed analysis (Pulse). GPT-5.5 is the de facto "owner" of Pulse reasoning.
-- **finance: analysis and advice over Vault data (budgets, cash-flow, financial pressure, project cost reasoning). GPT-5.5 is the de facto "owner" of financial reasoning. This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.**
-- fresh data: recent events around Paris (Vector — concerts, salons, sports), web retrieval, market comparison, regulatory research.
-- generating actionable rules from sensitive or complex documents.
+### 3.8bis Finance specialist
+
+- Current model: GPT-5.5
+- Role: specialist for financial reasoning over Vault data, fresh data / web research, verification, and complex multimodal analysis.
+- Selection criteria: hallucination resistance — must show reasoning and flag uncertainty, never invent a figure.
+- Use for: financial reasoning over Vault data (budgets, cash-flow, financial pressure, project cost reasoning), invoked by the chatbot and the Weekly Review, not by the Vault app; fresh data / web research / multimodal analysis; generating actionable rules from sensitive or complex documents.
+
+This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.
 
 ### 3.9 OCR service — vision / OCR
 
-Role: vision / OCR. Use for receipts, screenshots, scanned documents, images, structured visual extraction.
+- Current model: see F10 (owner of concrete local model names)
+- Role: vision / OCR.
+- Selection criteria: delegated to the infra owner for concrete local model names.
+- Use for: receipts, screenshots, scanned documents, images, structured visual extraction.
 
 ### 3.10 Transcription service — audio
 
-Role: audio transcription. Voice notes, long dictation, audio uploaded to Imperium, text preparation before AI routing. For short driving commands (<10s), Android Speech API is preferred to save resources.
+- Current model: see F10 (owner of concrete local model names)
+- Role: audio transcription.
+- Selection criteria: delegated to the infra owner for concrete local model names.
+- Use for: voice notes, long dictation, audio uploaded to Imperium, text preparation before AI routing. For short driving commands (<10s), Android Speech API is preferred to save resources.
 
 ### 3.11 CatBoost — Vector ride scoring
 
