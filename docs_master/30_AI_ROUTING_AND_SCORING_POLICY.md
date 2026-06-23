@@ -237,6 +237,15 @@ Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the
 
 This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.
 
+### 3.8ter Web / fresh-data specialist
+
+- Current model: GPT-5.5
+- Role: real-time / fresh information specialist.
+- Selection criteria: must have web access / real-time retrieval.
+- Use for: fresh data (recent events around Paris for Vector — concerts, salons, sports), web retrieval, market/price comparison, regulatory research, real-time verification.
+
+Note: the three specialist roles (health 3.8, finance 3.8bis, web/fresh-data 3.8ter) are all served by the same concrete model today (GPT-5.5), but they remain distinct roles, each with its own selection criterion and may be served by a different model in the future.
+
 ### 3.9 OCR service — vision / OCR
 
 - Current model: see F10 (owner of concrete local model names)
