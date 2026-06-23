@@ -116,7 +116,7 @@ et survit aux changements de modèle. Évite la panade déjà vécue (Opus 4.7 p
 dans ~21 docs).
 
 GARDE-FOUS (décidés) :
-1. Liste de rôles FERMÉE, PETITE, GÉNÉRALISTE (~6, alignés sur les modèles réellement
+1. Liste de rôles PETITE, GÉNÉRALISTE (~6, alignés sur les modèles réellement
    utilisés : local, Sonnet, Opus, GPT, OCR local, embedding local). On ne crée pas de
    rôle pour un gain marginal (un généraliste à 97% vaut mieux qu'un spécialiste à 97,6%
    à gérer). Garde-fou d'ajout : exposer le besoin à une autre IA avant d'ajouter un
