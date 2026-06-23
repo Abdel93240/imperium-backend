@@ -24,7 +24,7 @@ Décision centrale :
 
 ```text
 Backend = source de vérité, état métier, DB, sécurité, validation finale
-The local model = cerveau opérationnel, routing IA, discussion utilisateur, préparation des appels lourds
+Le [local model] = cerveau opérationnel, routing IA, discussion utilisateur, préparation des appels lourds
 n8n = orchestration externe/asynchrone, appels multi-outils, pipelines IA lourds
 App = interface utilisateur, validation humaine, popups, boutons
 DB Imperium = stockage canonique
@@ -64,8 +64,8 @@ Exemples valides :
 - scan hebdomadaire des événements VTC
 - surveillance API transport / trafic
 - OCR ticket de caisse
-- appel du service OCR puis classification par the local model
-- appel de the local model puis de the high reasoning model
+- appel du [OCR service] puis classification par le [local model]
+- appel du [local model] puis du [high reasoning model]
 - synchronisation mail entrant
 - webhook externe
 ```
@@ -110,7 +110,7 @@ Popup WR
 ↓
 Backend Imperium
 ↓
-The local model
+[local model]
 ↓
 Backend Imperium
 ↓
@@ -165,10 +165,10 @@ n8n peut être utilisé pour préparer le contexte lourd :
 
 ```text
 n8n récupère les données utiles
-n8n appelle the local model
-The local model prépare et mâche le travail
-n8n appelle the high reasoning model
-The high reasoning model produit une analyse profonde
+n8n appelle le [local model]
+Le [local model] prépare et mâche le travail
+n8n appelle le [high reasoning model]
+Le [high reasoning model] produit une analyse profonde
 n8n renvoie le résultat au backend
 backend affiche le résumé initial dans la popup WR
 ```
@@ -180,10 +180,10 @@ backend affiche le résumé initial dans la popup WR
 Après le résumé initial, la discussion se poursuit sans n8n.
 
 ```text
-Utilisateur ↔ Popup WR ↔ Backend ↔ the local model
+Utilisateur ↔ Popup WR ↔ Backend ↔ [local model]
 ```
 
-The local model peut :
+Le [local model] peut :
 
 - poser des questions ;
 - demander des précisions ;
@@ -196,27 +196,27 @@ n8n ne doit pas être au milieu de cette conversation.
 
 ---
 
-### 5.5 Appel du High Reasoning Model pendant la conversation WR
+### 5.5 Appel du [high reasoning model] pendant la conversation WR
 
-Si the local model estime qu'une analyse lourde est nécessaire, il ne doit pas appeler the high reasoning model directement de manière sauvage.
+Si le [local model] estime qu'une analyse lourde est nécessaire, il ne doit pas appeler le [high reasoning model] directement de manière sauvage.
 
 Flux propre :
 
 ```text
-The local model détecte besoin the high reasoning model
+Le [local model] détecte un besoin d'analyse par le [high reasoning model]
 ↓
 Backend crée une tâche IA
 ↓
-n8n orchestre l'appel the high reasoning model
+n8n orchestre l'appel au [high reasoning model]
 ↓
 n8n renvoie le résultat au backend
 ↓
-The local model reprend le résultat
+Le [local model] reprend le résultat
 ↓
 La popup affiche la suite
 ```
 
-n8n reste orchestrateur. The local model reste le cerveau conversationnel.
+n8n reste orchestrateur. Le [local model] reste le cerveau conversationnel.
 
 ---
 
@@ -227,7 +227,7 @@ Quand l'utilisateur est satisfait du rapport :
 ```text
 Utilisateur valide dans l'app
 ↓
-The local model formalise le rapport final
+Le [local model] formalise le rapport final
 ↓
 Backend reçoit le rapport final
 ↓
@@ -282,11 +282,11 @@ Trigger temporel lundi 03:00 Europe/Paris
 ↓
 n8n lance un scan web
 ↓
-n8n appelle the web/fresh-data specialist pour recherche web structurée
+n8n appelle le [web/fresh-data specialist] pour une recherche web structurée
 ↓
-n8n transmet le résultat à the local model
+n8n transmet le résultat au [local model]
 ↓
-The local model classe les événements du plus impactant au moins impactant
+Le [local model] classe les événements du plus impactant au moins impactant
 ↓
 n8n renvoie le résultat au backend
 ↓
@@ -346,9 +346,9 @@ n8n surveille les APIs externes utiles
 ↓
 un changement d'état est détecté
 ↓
-n8n appelle the local model
+n8n appelle le [local model]
 ↓
-The local model classe l'importance du changement
+Le [local model] classe l'importance du changement
 ↓
 n8n renvoie le résultat au backend
 ↓
@@ -381,7 +381,7 @@ n8n orchestre la récupération et la classification du signal.
 La recommandation finale revient à :
 
 ```text
-Backend + Vector + the local model selon les règles métier
+Backend + Vector + [local model] selon les règles métier
 ```
 
 ---
@@ -401,9 +401,9 @@ Workflow :
 ```text
 n8n scan / récupère les données
 ↓
-The web/fresh-data specialist peut aider à structurer
+Le [web/fresh-data specialist] peut aider à structurer
 ↓
-The local model classe l'impact VTC
+Le [local model] classe l'impact VTC
 ↓
 backend stocke
 ↓
@@ -431,13 +431,13 @@ Backend crée un MediaItem / ai_task(vault.receipt_extract)
 ↓
 Backend déclenche n8n ou expose la tâche pour n8n
 ↓
-n8n appelle le service OCR
+n8n appelle le [OCR service]
 ↓
-Le service OCR extrait le texte et les champs possibles
+Le [OCR service] extrait le texte et les champs possibles
 ↓
-n8n appelle the local model
+n8n appelle le [local model]
 ↓
-The local model classe les données
+Le [local model] classe les données
 ↓
 n8n renvoie le résultat au backend via HMAC callback
 ↓
@@ -494,7 +494,7 @@ Le backend reste responsable de :
 
 ---
 
-## 10. Audio / service de transcription
+## 10. Audio / [transcription service]
 
 Quand l'utilisateur relâche un bouton d'enregistrement audio, le flux peut être direct.
 
@@ -509,13 +509,13 @@ Workflow préféré :
 ```text
 Utilisateur enregistre audio
 ↓
-App/backend appelle le service de transcription
+App/backend appelle le [transcription service]
 ↓
-Le service de transcription renvoie le texte
+Le [transcription service] renvoie le texte
 ↓
 Texte affiché dans la popup/chatbot
 ↓
-The local model traite si nécessaire
+Le [local model] traite si nécessaire
 ```
 
 n8n pourra être réévalué plus tard seulement si le pipeline devient complexe :
@@ -587,7 +587,7 @@ n8n détecte le mail
 ↓
 n8n extrait les informations utiles
 ↓
-n8n appelle the local model pour classification
+n8n appelle le [local model] pour classification
 ↓
 n8n renvoie le signal au backend
 ↓
@@ -609,7 +609,7 @@ Décision :
 ```text
 n8n utile si l'intégration mail est externe.
 Backend reste source de vérité.
-The local model classe et explique.
+Le [local model] classe et explique.
 ```
 
 ---
@@ -632,7 +632,7 @@ Exemples :
 Règle :
 
 ```text
-Webhook externe → n8n → the local model/the OCR service/a domain specialist si besoin → backend → DB
+Webhook externe → n8n → le [local model] / le [OCR service] / un [domain specialist] si besoin → backend → DB
 ```
 
 ---
@@ -662,16 +662,16 @@ Le backend décide :
 | Cas | n8n utile ? | Responsable principal | Pourquoi |
 |---|---:|---|---|
 | Bannière WR mardi à 20:00 Europe/Paris | Non | Backend | Règle temporelle simple |
-| Démarrer WR | Partiellement | Backend + the local model | n8n seulement pour préparation lourde |
-| Conversation WR | Non | The local model + Backend | Interaction utilisateur longue |
-| Appel the high reasoning model WR | Oui | n8n | Orchestration IA lourde |
+| Démarrer WR | Partiellement | Backend + [local model] | n8n seulement pour préparation lourde |
+| Conversation WR | Non | [local model] + Backend | Interaction utilisateur longue |
+| Appel [high reasoning model] WR | Oui | n8n | Orchestration IA lourde |
 | Validation finale WR | Non | Backend | Stockage canonique |
 | Scan événements lundi 03:00 Europe/Paris | Oui | n8n | Web + IA + traitement asynchrone |
 | Surveillance API session VTC | Oui | n8n | Écoute externe continue |
 | Routes/travaux | Oui | n8n | Même famille que événements |
 | Photo ticket | Oui | Backend + n8n | Backend possède l'upload et la tâche, n8n orchestre OCR + classification |
 | Validation ticket | Non | Backend + utilisateur | Décision humaine finale |
-| Audio court | Non | Backend/App + service de transcription | Pipeline simple |
+| Audio court | Non | Backend/App + [transcription service] | Pipeline simple |
 | Commencer journée | Non | Backend | Action métier simple |
 | Finir journée | Non | Backend | Action métier simple |
 | Dashboard | Non | Backend | Lecture DB |
@@ -719,7 +719,7 @@ n8n reste dans l'écosystème IMPERIUM, mais avec un rôle strict :
 
 ```text
 n8n = orchestrateur externe et asynchrone
-The local model = intelligence opérationnelle
+Le [local model] = intelligence opérationnelle
 Backend = autorité, sécurité, état, DB
 App = interaction utilisateur
 ```
