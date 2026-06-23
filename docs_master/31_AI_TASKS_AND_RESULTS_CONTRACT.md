@@ -1089,7 +1089,7 @@ User clicks "Start Weekly Report"
 Every Monday 03:00 Europe/Paris
   → n8n triggers events research within 30 km of Paris
   → the local model filters useful events for Vector
-  → strong model if needed (the finance specialist + web)
+  → strong model if needed (the web/fresh-data specialist)
   → backend stores the result
 ```
 
@@ -1642,9 +1642,9 @@ Legal analysis          → the high reasoning model
 OCR receipt / photo     → the OCR service
 Audio transcription     → the transcription service
 Sensitive financial/legal action → strong model + user validation
-Web research            → the finance specialist + web
+Web research            → the web/fresh-data specialist
 WR draft analysis       → the high reasoning model
-Vector weekly events    → the finance specialist + web
+Vector weekly events    → the web/fresh-data specialist
 ```
 
 Rule:

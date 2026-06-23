@@ -317,7 +317,7 @@ LAYER 2 — THE LOCAL MODEL
 LAYER 3 — DEFERRED CLOUD
   ├─ Day replan (most common): the first cloud tier
   ├─ Mentoring / strategic chat: the high reasoning model
-  ├─ Web research chat: the finance specialist + web
+  ├─ Web research chat: the web/fresh-data specialist
   ├─ Standard chat: the first cloud tier
   ├─ Monthly plan (doc 52): the high reasoning model
   └─ Weekly review: the high reasoning model (per doc 32)
@@ -336,7 +336,7 @@ The Imperium dashboard includes a chatbot accessible at any time.
 ```text
 User message → the local model analyzes:
   - Does it need web data? (keywords: "actuel", "récent", "2026"...)
-    → the finance specialist + web
+    → the web/fresh-data specialist
   - Is it mentoring / deep thinking?
     → the high reasoning model
   - Is it standard conversation?
@@ -487,7 +487,7 @@ imperium.submission_refusal_analyze - analyze rejection reason (the local model,
 Daily ops / classification (90%):  the local model
 Day reorganization (4%):           the first cloud tier
 Chatbot mentoring (3%):            the high reasoning model
-Chatbot web (2%):                  the finance specialist + web
+Chatbot web (2%):                  the web/fresh-data specialist
 Chatbot standard (1%):             the first cloud tier
 Weekly review:                     the high reasoning model (via WR)
 Monthly plan (1x/week):            the high reasoning model
