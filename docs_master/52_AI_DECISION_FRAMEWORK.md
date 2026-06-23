@@ -561,6 +561,8 @@ If issues found: feedback loop (Section 8.5).
 
 ### 8.5 The fallback loop
 
+> Note: this cascade is high-reasoning-model-based (not sustained-long-context-based) because the sustained long-context model is currently unavailable and early contexts are still short — see doc 30 §3.7 for the status and the planned switch-back. The GPT-5.5 third attempt is a generic last-resort generator (no dedicated role).
+
 ```text
 ATTEMPT 1 — the high reasoning model generates plan.
   the local model validates.
