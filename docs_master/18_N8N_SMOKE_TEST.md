@@ -49,7 +49,7 @@ The routes mission in Patch 8A->8H must not trigger n8n.
 n8n remains out of path for the mission routes.
 n8n smoke tests must not depend on the mission routes.
 
-## Patch 2F - WR Qwen Dry-Run Workflow Smoke Test
+## Patch 2F - WR Local-Model Dry-Run Workflow Smoke Test
 
 Workflow file:
 
@@ -161,7 +161,7 @@ No direct DB write, no n8n AI Agent, no real model call, no automatic final appr
 
 ### Patch 2G stabilization notes
 
-The Qwen dry-run workflow was stabilized for n8n `2.14.2`.
+The local-model dry-run workflow was stabilized for n8n `2.14.2`.
 
 Runtime requirements:
 
@@ -213,7 +213,7 @@ POST /api/imperium/weekly-review/launch
   -> creates ai_task
   -> stores prepared_payload
   -> signs and POSTs prepared_payload to n8n webhook when real outbound mode is configured
-  -> n8n calls backend Qwen dry-run bridge
+  -> n8n calls backend local-model dry-run bridge
   -> n8n stores ai_result through backend callback
   -> n8n attaches ai_result to WR session
 ```
@@ -409,7 +409,7 @@ Expected status:
 
 Patch 2C adds a mock-only WR endpoint for local contract testing.
 
-This is not a real n8n workflow and does not call Qwen, Opus, GPT, Claude, Gemini, or any external AI.
+This is not a real n8n workflow and does not call the local model, the high reasoning model, GPT, Claude, the OCR service, or any external AI.
 
 Endpoint:
 
@@ -476,7 +476,7 @@ Purpose:
 Mock contract test for weekly_report.interactive.start
 ```
 
-This workflow is mock-only. It does not call Qwen, Opus, GPT, Claude, Gemini, or any external AI provider.
+This workflow is mock-only. It does not call the local model, the high reasoning model, GPT, Claude, the OCR service, or any external AI provider.
 
 ### Required n8n Environment Variables
 
@@ -785,7 +785,7 @@ Expected checks:
 - `chat_timeline` contains display-safe items only;
 - `visible_ai_state.current_step` matches the state (`collecting_user_context`, `reviewing_final_draft`, `ready_to_store`, `closed`, or `waiting_for_ai`);
 - no `raw_payload`, internal prompts, hidden reasoning, secrets, or debug blobs appear in the conversation response;
-- chat messages create a user `chat_message` and a deterministic Qwen dry-run `assistant_followup`;
+- chat messages create a user `chat_message` and a deterministic local-model dry-run `assistant_followup`;
 - the assistant follow-up ends with `As-tu autre chose à ajouter avant que je prépare le rapport final ?`;
 - no final report candidate is created by `/chat/messages`;
 - `/chat/confirm-no-more-input` creates a draft candidate and moves to `draft_ready`;
