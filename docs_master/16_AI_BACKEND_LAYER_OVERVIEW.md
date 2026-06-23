@@ -11,7 +11,7 @@ It connects the dots between:
 - the WR interactive workflow (doc 32)
 - the existing backend services (`imperium`, `vault`, etc.)
 - n8n orchestration
-- Qwen local routing
+- local model routing
 - pgvector semantic memory
 
 Read this before implementing any AI-related backend code.
@@ -44,9 +44,9 @@ Read this before implementing any AI-related backend code.
 │  - workflows    │                │ + pgvector         │
 └─────┬───────────┘                └────────────────────┘
       │
-      ├─ Qwen 32B (local, GPU-served on V100 / qwen3:32b)
+      ├─ the local model (local, GPU-served on V100 / qwen3:32b)
       ├─ the transcription service (local)
-      ├─ Claude Sonnet/Opus (cloud API)
+      ├─ the first cloud tier / the high reasoning model (cloud API)
       ├─ GPT-5.5 (cloud API)
       └─ Gemini (cloud API)
 ```
@@ -84,11 +84,11 @@ Every AI interaction in the system flows through these tables, whatever the sour
 4. n8n CLAIMS THE TASK
    (fetches context via internal API)
         ↓
-5. QWEN ROUTES + SCORES (`/200`)
+5. LOCAL MODEL ROUTES + SCORES (`/200`)
    (decides which model to call)
         ↓
 6. CHOSEN MODEL EXECUTES
-   (Sonnet, Opus, GPT-5.5, Gemini, or Qwen itself)
+   (the first cloud tier, the high reasoning model, a domain specialist, the OCR service, or the local model itself)
         ↓
 7. n8n POSTS CALLBACK TO BACKEND
    (signed HMAC + timestamp + idempotency)
@@ -158,15 +158,15 @@ Each workflow follows the same pattern:
 
 ```text
 trigger → fetch context (backend API)
-        → Qwen route + score
+        → local model route + score
         → call selected model
         → POST callback to backend
 ```
 
-### 5.3 Qwen runtime
+### 5.3 Local model runtime
 
 ```text
-Ollama/Qwen in Docker on the VPS:
+Ollama/the local model in Docker on the VPS:
 └─ Model: qwen3:32b (Q4_K_M, ~20-24 GB VRAM on V100)
    Endpoint: internal Docker network only, for example http://ollama:11434/api/generate
    Network: same internal Docker network as n8n, and reachable by backend through internal networking
@@ -176,7 +176,7 @@ Ollama/Qwen in Docker on the VPS:
                              (see Section 5.4)
 ```
 
-### 5.4 Direct Backend → Qwen exception (latency-critical)
+### 5.4 Direct Backend → local model exception (latency-critical)
 
 By default, all AI calls go through n8n. This keeps responsibility boundaries clear.
 
@@ -187,7 +187,7 @@ Why the exception:
 ├─ Latency target: <2s (Bolt ride offer expires fast)
 ├─ Going via n8n adds 500ms-1s of network overhead per hop
 ├─ User has explicitly started a VTC session (consent)
-└─ The flow is short: the OCR service → Qwen profitability score → advisory color
+└─ The flow is short: the OCR service → local model profitability score → advisory color
 
 Why this is safe:
 ├─ The two API calls are simple (no orchestration, no retry, no chain)
@@ -266,7 +266,7 @@ GET  /api/ai/results/recent
 
 ```text
 GET  /api/internal/ai/tasks/{task_id}/context
-     n8n fetches input + relevant data for Qwen.
+     n8n fetches input + relevant data for the local model.
 
 POST /api/internal/ai/tasks/{task_id}/result
      n8n callback to store the model output.
@@ -301,9 +301,9 @@ These domain-specific endpoints are wrappers that create the correct `ai_task` a
 
 ---
 
-## 9. Qwen Routing Inputs
+## 9. Local Model Routing Inputs
 
-When n8n calls Qwen for routing, it provides:
+When n8n calls the local model for routing, it provides:
 
 ```json
 {
@@ -328,7 +328,7 @@ When n8n calls Qwen for routing, it provides:
 }
 ```
 
-Qwen returns:
+The local model returns:
 
 ```json
 {
@@ -352,15 +352,15 @@ Qwen returns:
 
 ---
 
-## 10. Static Overrides Bypass Qwen Scoring
+## 10. Static Overrides Bypass Local-Model Scoring
 
-Some tasks skip Qwen scoring entirely (per doc 30 §6):
+Some tasks skip local-model scoring entirely (per doc 30 §6):
 
 ```text
 Vision (image present)         → the OCR service
 Audio                          → the transcription service
-Web fresh data                 → GPT-5.5 + web
-Medical reports                → GPT-5.5
+Web fresh data                 → the web specialist
+Medical reports                → the health specialist
 WR re-planning                 → Fable 5
 Backend deterministic          → no AI
 ```
@@ -401,10 +401,10 @@ After max retries, status=failed
 User sees: "Service IA temporairement indisponible"
 ```
 
-### 12.2 Qwen unavailable
+### 12.2 Local model unavailable
 
 ```text
-n8n falls back to Sonnet 4.6 for routing decisions
+n8n falls back to the first cloud tier for routing decisions
 (more expensive but usable)
 Logged as fallback event
 User experience unchanged
@@ -413,7 +413,7 @@ Fallback is gated by token caps (see Section 12.6)
 
 ### 12.6 Token caps for fallback (mandatory)
 
-When Qwen is unavailable and the system falls back to Sonnet 4.6 (or any cloud model used as substitute), three independent caps apply:
+When the local model is unavailable and the system falls back to the first cloud tier (or any cloud model used as substitute), three independent caps apply:
 
 ```text
 Cap 1 — Per-task hard limit:
@@ -453,8 +453,8 @@ At any time:
 ### 12.8 Cap recovery
 
 ```text
-When Qwen comes back online:
-  → routing returns to default (Qwen local)
+When the local model comes back online:
+  → routing returns to default (local model)
   → caps stop being charged (only fallback usage counts)
   → daily counters keep their value (no reset)
 ```
@@ -462,7 +462,7 @@ When Qwen comes back online:
 ### 12.3 Cloud model unavailable
 
 ```text
-n8n uses fallback_model from Qwen routing decision
+n8n uses fallback_model from the local model routing decision
 If fallback also fails, ai_task → status=failed
 User notified via push
 ```
@@ -518,7 +518,7 @@ daily_failed_tasks
 ```text
 Bank account numbers, card numbers
 Government IDs
-Detailed medical history (only summaries sent to GPT-5.5)
+Detailed medical history (only summaries sent to the health specialist)
 Personal voice recordings (Whisper local only)
 Religious private practice details
 ```
@@ -565,7 +565,7 @@ Step 4 — Internal callbacks
 Step 5 — Mock n8n workflow
   └─ generic_ai_task_router with fake Qwen + fake model
 
-Step 6 — Real Qwen via Ollama
+Step 6 — Real local model via Ollama
   └─ Replace mock in n8n
 
 Step 7 — First real cloud workflow

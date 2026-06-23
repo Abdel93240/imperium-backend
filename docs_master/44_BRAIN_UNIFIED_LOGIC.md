@@ -73,7 +73,7 @@ RIGHT:
                  │  PostgreSQL canonical DB │
                  │  pgvector memory         │
                  │  ai_tasks / ai_results   │
-                 │  Qwen router             │
+                 │  local model router      │
                  │  cloud model escalation  │
                  │  deterministic rules     │
                  │  user priority hierarchy │
@@ -136,7 +136,7 @@ The official order is:
 1. Hard rules / non-negotiable rules
 2. Deterministic backend logic
 3. User priority hierarchy
-4. Qwen routing / classification when needed
+4. local model routing / classification when needed
 5. Cloud model escalation only when justified by doc 30 scoring
 6. Backend validation before any canonical write
 ```
@@ -257,7 +257,7 @@ LAYER 1 — INTRINSIC project = ROLE / SYSTEM layer.
 
 LAYER 2 — EXPLICIT projects = personalized USER-CONTEXT layer.
   It comes from F01: the user's declared projects in that domain.
-  Opus generates the F01 meta-prompt from these projects, then the backend
+  the high reasoning model generates the F01 meta-prompt from these projects, then the backend
   injects that context into future domain AI calls.
 ```
 
@@ -273,12 +273,12 @@ The AI layer follows docs 30 and 31.
 ### 6.1 Official V1 router
 
 ```text
-Official local router / classifier: Qwen 32B
-Runtime target: Ollama/Qwen in Docker
+Official local router / classifier: the local model
+Runtime target: Ollama/the local model in Docker
 Network target: same Docker network as n8n and imperium-api
 ```
 
-Qwen is responsible for:
+the local model is responsible for:
 
 ```text
 - task classification
@@ -297,7 +297,7 @@ Gemma is optional lab infrastructure only.
 It must not be referenced as the production decision-maker.
 ```
 
-This avoids ambiguity between Qwen and Gemma.
+This avoids ambiguity between the local model and Gemma.
 
 ### 6.3 n8n AI Agent status
 
@@ -305,48 +305,48 @@ This avoids ambiguity between Qwen and Gemma.
 The n8n AI Agent is not part of the official V1 intelligence layer.
 ```
 
-n8n may execute workflows, call Qwen/Ollama, call external models, wait for results, and send results back to the backend.
+n8n may execute workflows, call the local model/Ollama, call external models, wait for results, and send results back to the backend.
 
 But n8n does not become the AI decision authority.
 
 ---
 
-## 6-bis. Expert-Call Orchestration During Qwen Dialogue
+## 6-bis. Expert-Call Orchestration During Local-Model Dialogue
 
 ### 6-bis.1 Principle: the orchestrator drives
 
 Models never call each other directly.
 
 ```text
-Qwen talks with the user
-→ Qwen returns a structured result + self-score to the backend/orchestrator
+the local model talks with the user
+→ the local model returns a structured result + self-score to the backend/orchestrator
 → the orchestrator decides whether escalation is needed
 → the orchestrator fills the specialist prompt template
 → the specialist model returns a structured expert result
-→ Qwen reintegrates the result for the user
+→ the local model reintegrates the result for the user
 ```
 
 This prevents runaway chains, uncontrolled cost, and untraceable model-to-model
 calls. Every hop is created, logged, validated, and bounded by the backend/Tower.
 
-### 6-bis.2 Qwen stays master of live dialogue
+### 6-bis.2 the local model stays master of live dialogue
 
-The user always talks to Qwen. If a specialist is needed, the specialist round
+The user always talks to the local model. If a specialist is needed, the specialist round
 trip is invisible to the user.
 
 Rules:
 
-- Qwen keeps conversational continuity.
+- the local model keeps conversational continuity.
 - The expert does not become the chat surface.
-- Qwen reintegrates the expert answer in its own words.
+- the local model reintegrates the expert answer in its own words.
 - Canonical writes still require backend validation and, when needed, user
   confirmation.
 
-Continuity lives in Qwen, not in the expert.
+Continuity lives in the local model, not in the expert.
 
 ### 6-bis.3 Expert data freshness: solved by RAG
 
-The system must not rely on Qwen to gather and forward all domain facts. Qwen may
+The system must not rely on the local model to gather and forward all domain facts. The local model may
 forget a key detail, compress too much, or preserve the wrong thing.
 
 When the orchestrator invokes an expert, it provides:
@@ -367,7 +367,7 @@ and training evolution. The expert retrieves what it needs itself.
 ```
 
 This matches the WR RAG principle: the expert pulls real vectorized data instead
-of depending on a possibly lossy Qwen summary.
+of depending on a possibly lossy local-model summary.
 
 ### 6-bis.4 Cost control for expert calls
 
@@ -379,12 +379,12 @@ Cost is controlled by:
 
 ```text
 1. RAG: the expert pulls data directly.
-2. Filtering: Qwen escalates only genuinely complex questions.
-3. Light question grouping: Qwen can let the user finish a small flow of domain
+2. Filtering: the local model escalates only genuinely complex questions.
+3. Light question grouping: the local model can let the user finish a small flow of domain
    questions, then make one expert call.
 ```
 
-Qwen must not escalate ordinary low-risk questions that it can answer locally.
+the local model must not escalate ordinary low-risk questions that it can answer locally.
 
 ### 6-bis.5 V1 decision
 
@@ -452,7 +452,7 @@ n8n_db must not become an Imperium source of truth.
 ```text
 Backend creates ai_task
 → n8n receives/observes task
-→ n8n calls Qwen or cloud model
+→ n8n calls the local model or cloud model
 → model returns structured result
 → n8n POSTs result to backend internal endpoint
 → backend validates result against schema
@@ -724,7 +724,7 @@ The brain is not one endpoint. It is the combined behavior of:
 - canonical tables
 - events
 - ai_tasks / ai_results
-- Qwen routing
+- local model routing
 - model escalation
 - deterministic rules
 - user priorities
@@ -831,8 +831,8 @@ Tuesday 20:00
 → user clicks "Start Weekly Review"
 → backend launches WR state
 → n8n receives the workflow signal
-→ Qwen routes the task
-→ Opus generates the first weekly synthesis when required
+→ the local model routes the task
+→ the high reasoning model generates the first weekly synthesis when required
 → user reads it in WR popup
 → AI asks clarification questions if needed
 → user answers in the popup
@@ -845,8 +845,8 @@ Important constraints:
 
 ```text
 - n8n orchestrates the workflow
-- Qwen routes/classifies
-- Opus may synthesize
+- the local model routes/classifies
+- the high reasoning model may synthesize
 - user validates the final report
 - backend writes the final canonical result
 - n8n never writes canonical DB tables directly
@@ -909,7 +909,7 @@ The backend and DB unified the day.
 ❌ app-to-app HTTP calls
 ❌ cloud models receiving unnecessary identity data
 ❌ Gemma being treated as the official V1 router
-❌ n8n AI Agent replacing Qwen routing
+❌ n8n AI Agent replacing local-model routing
 ❌ Vector owning fatigue, health pressure, or global objective pressure
 ```
 
@@ -926,8 +926,8 @@ For Codex / Claude Code:
 4. Services write only their owned domain tables.
 5. Events are append-only audit/coordination records.
 6. ai_tasks and ai_results are the official AI work ledger.
-7. Qwen 32B is the official V1 local router.
-8. Ollama/Qwen runs in Docker on the same network as n8n and imperium-api.
+7. the local model is the official V1 local router.
+8. Ollama/the local model runs in Docker on the same network as n8n and imperium-api.
 9. n8n orchestrates triggers and workflows, but owns no truth.
 10. n8n sends all results back to backend internal endpoints.
 11. Backend validates and writes canonical results.
@@ -944,7 +944,7 @@ For Codex / Claude Code:
 - `15_SERVICE_ARCHITECTURE_MAP.md` — service evolution
 - `16_AI_BACKEND_LAYER_OVERVIEW.md` — AI layer overview
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — official scoring and model routing
-- `35_QWEN_SETUP_AND_PROMPTS.md` — Qwen prompts and specialist prompt placement
+- `35_QWEN_SETUP_AND_PROMPTS.md` — local-model prompts and specialist prompt placement
 - `38_VECTORIZATION_PIPELINE.md` — vectorization mechanics
 - `47_WR_GUIDED_SECTIONS.md` — WR RAG precedent
 - `F01_USER_OBJECTIVES.md` — explicit projects as domain prompt layer

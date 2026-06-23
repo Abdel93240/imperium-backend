@@ -23,7 +23,7 @@ HORIZON 1 — DAILY (today)
   Adapts via hooks throughout the day.
 
 HORIZON 2 — ROLLING MONTHLY (4-week glide)
-  Generated every Monday morning by Opus 4.8.
+  Generated every Monday morning by the high reasoning model.
   Always 4 weeks forward from "now".
   Regenerated entirely each Monday based on what happened.
   Acts as the "spinal cord" that guides daily plans.
@@ -173,7 +173,7 @@ The AI categorizes the mission into one of 9 categories:
    Flexible mission with no impact if missed.
 ```
 
-Categorization is performed silently by Qwen. The user does NOT validate each categorization (impractical at ~50 missions/day). Errors are caught via the WR feedback loop (Section 9).
+Categorization is performed silently by the local model. The user does NOT validate each categorization (impractical at ~50 missions/day). Errors are caught via the WR feedback loop (Section 9).
 
 ### 4.4 Criterion D — DEPENDENCY (0-10 points)
 
@@ -282,7 +282,7 @@ backend-only reads.
    by changing prompts.
 
 ✅ AI-FRIENDLY
-   Qwen categorizes (CAT A-I) and computes (deadline math).
+   the local model categorizes (CAT A-I) and computes (deadline math).
    No subjective judgment required.
 
 ✅ EMERGENCIES DOMINATE
@@ -386,7 +386,7 @@ This keeps compute lightweight and predictable.
 
 ## 8. The Rolling 4-Week Plan
 
-The Opus-generated monthly plan is the **spinal cord** of the operational brain.
+The high reasoning model-generated monthly plan is the **spinal cord** of the operational brain.
 
 ### 8.1 When it runs
 
@@ -403,9 +403,9 @@ If the cron fails: retry at 05:30, 06:00, 06:30.
 If still failing: alert user, fall back to previous plan.
 ```
 
-### 8.2 Inputs to Opus (10 categories)
+### 8.2 Inputs to the high reasoning model (10 categories)
 
-The full input context (~25,000 tokens) given to Opus:
+The full input context (~25,000 tokens) given to the high reasoning model:
 
 ```text
 CATEGORY 1 — User current state
@@ -479,7 +479,7 @@ CATEGORY 10 — Last week retrospective
   - Calendar modifications
 ```
 
-### 8.3 The Opus prompt (sketch)
+### 8.3 The high reasoning model prompt (sketch)
 
 ```text
 You are generating the rolling 4-week monthly plan for the user.
@@ -541,12 +541,12 @@ OUTPUT FORMAT (strict JSON):
 }
 ```
 
-### 8.4 Validation by Qwen
+### 8.4 Validation by the local model
 
-After Opus returns:
+After the high reasoning model returns:
 
 ```text
-Qwen runs sanity checks LOCALLY:
+the local model runs sanity checks LOCALLY:
   - Are sleep hours respected each day? (≥ minimum from Pulse)
   - Are mandatory prayers present every day?
   - Are calendar events not overlapping with planned missions?
@@ -562,19 +562,19 @@ If issues found: feedback loop (Section 8.5).
 ### 8.5 The fallback loop
 
 ```text
-ATTEMPT 1 — Opus generates plan.
-  Qwen validates.
+ATTEMPT 1 — the high reasoning model generates plan.
+  the local model validates.
   If OK: SAVED.
   If KO: keep the issues list.
 
-ATTEMPT 2 — Opus regenerates with the feedback.
-  Same Qwen validation.
+ATTEMPT 2 — the high reasoning model regenerates with the feedback.
+  Same local model validation.
   If OK: SAVED.
   If KO: escalate.
 
 ATTEMPT 3 — GPT-5.5 takes over.
   Same prompt + the fallback context.
-  Same Qwen validation.
+  Same local model validation.
   If OK: SAVED (logged as "fallback used").
   If KO: ABORT.
 
@@ -586,7 +586,7 @@ ABORT — Last resort.
 ```
 
 This caps the cost at approximately:
-- 2 × Opus calls (~0.40€)
+- 2 × the high reasoning model calls (~0.40€)
 - 1 × GPT-5.5 call (~0.10€)
 - Worst case total: ~0.50€ per monthly generation
 - Annual: ~26€ if always worst case (highly unlikely)
@@ -612,7 +612,7 @@ CREATE TABLE imperium_monthly_plans (
 );
 ```
 
-All plans are kept forever. They feed the WR retrospective and Opus's pattern recognition (next Monday's plan sees what was prescribed last week and what actually happened).
+All plans are kept forever. They feed the WR retrospective and the high reasoning model's pattern recognition (next Monday's plan sees what was prescribed last week and what actually happened).
 
 ---
 
@@ -631,24 +631,24 @@ Backend:
   2. Read morning checkin
   3. Read calendar events for today
   4. Read recent hooks (e.g. last night's mission failures)
-  5. Check what was already scheduled by Opus for today
+  5. Check what was already scheduled by the high reasoning model for today
 
 DECISION TREE:
 
-  IF morning context matches what Opus expected:
+  IF morning context matches what the high reasoning model expected:
     → Plan = monthly plan for today, unchanged
-    → Quick generation by QWEN local (just timing refinements)
+    → Quick generation by the local model (just timing refinements)
     → Cost: 0€ (local)
 
   ELSE (energy low, pain high, special event):
     → Plan = adapted from monthly plan
-    → QWEN considers monthly plan + current state
+    → the local model considers monthly plan + current state
     → Adjusts mission selection and timing
     → Cost: 0€ (local)
     → Logged as "adapted from monthly plan"
 ```
 
-### 9.2 Inputs to QWEN (daily generation)
+### 9.2 Inputs to the local model (daily generation)
 
 Smaller context (~5,000 tokens):
 
@@ -664,7 +664,7 @@ Smaller context (~5,000 tokens):
 
 Total: ~5,000 tokens
 Local V1 cost: 0€
-Fallback reference if Sonnet 4.6 is activated: ~0.02-0.05€/call,
+Fallback reference if the first cloud tier is activated: ~0.02-0.05€/call,
 ~18€/year
 ```
 
@@ -688,18 +688,18 @@ Throughout the day, hooks may trigger replans (per doc 43 §3).
 
 ```text
 V1 MODEL CHOICE — DAILY PLAN:
-The daily plan is generated by QWEN local in V1. Reasons: the task is light
-instantiation (timing + adaptation), Qwen is capable, it is free, and it keeps all
+The daily plan is generated by the local model in V1. Reasons: the task is light
+instantiation (timing + adaptation), the local model is capable, it is free, and it keeps all
 sensitive daily data local (privacy).
 
-FALLBACK (documented, observation-based): if, in real use, Qwen proves insufficient
+FALLBACK (documented, observation-based): if, in real use, the local model proves insufficient
 on this task (weak plans, continuity/priority errors), switch the daily plan to
-Sonnet 4.6. Cost would be ~18€/year — negligible — and justified only if a real
+the first cloud tier. Cost would be ~18€/year — negligible — and justified only if a real
 quality gap is observed. This is a deliberate test-first decision, not an a-priori
 one.
 
-MONTHLY PLAN: unchanged — the monthly strategic plan is generated by Opus 4.8.
-Only the DAILY instantiation moves to Qwen.
+MONTHLY PLAN: unchanged — the monthly strategic plan is generated by the high reasoning model.
+Only the DAILY instantiation moves to the local model.
 ```
 
 ## 9A. Local Degradation & Cloud Fallback (access-regime principle)
@@ -710,7 +710,7 @@ becomes unavailable and a cloud model takes over.
 Principle: "the cloud model replaces the local one" describes WHICH model answers, NOT
 identical data access. The replacement shifts from LOCAL to CLOUD, which changes the
 ACCESS REGIME:
-- LOCAL (Qwen, local OCR, local embedding...): reads freely - nothing leaves the
+- LOCAL (the local model, local OCR, local embedding...): reads freely - nothing leaves the
   machine, so the privacy gate does not need to filter a purely local treatment.
 - CLOUD fallback: subject to the privacy gate exactly like any external call. What may
   leave the machine is filtered/minimized before reaching the cloud model.
@@ -720,14 +720,14 @@ DEGRADES (abstention or reduced capability) rather than sending to the cloud. Co
 is never paid for in confidentiality. A degraded service is preferred over leaking
 sensitive data.
 
-This is distinct from the QUALITY fallback (§8.5, §9.4: Qwen insufficient → Sonnet).
+This is distinct from the QUALITY fallback (§8.5, §9.4: the local model insufficient → the first cloud tier).
 Here the trigger is AVAILABILITY (local is down), and the key consequence is the
 access-regime change above.
 
 Application cases (all refer back here):
-- Ephemeral working vector store: Qwen down → Sonnet reads the store under the gate
+- Ephemeral working vector store: the local model down → the first cloud tier reads the store under the gate
   (doc 38 §7-bis).
-- OCR: local OCR down → Gemini fallback under the gate (doc 37).
+- OCR: local OCR down → the OCR service fallback under the gate (doc 37).
 - LoRA training: data sent to a rented cloud GPU, de-identified, GDPR provider
   (doc 74 §9).
 - Extensible: any future local→cloud handoff follows this principle.
@@ -778,7 +778,7 @@ Modal opens chatbot:
 
 User explains in free text.
 
-Backend (Qwen analyzes):
+Backend (the local model analyzes):
   - What is the nature of the disagreement?
     * Wrong priority?
     * Wrong timing?
@@ -788,7 +788,7 @@ Backend (Qwen analyzes):
   - Store in pgvector with high weight
 
 Next monthly plan (next Monday):
-  - Opus sees this disagreement in pattern history
+  - the high reasoning model sees this disagreement in pattern history
   - Adjusts categorization or timing logic
   - Less likely to repeat
 ```
@@ -805,7 +805,7 @@ Modal opens chatbot:
 
 User explains: car broke down, no money, lacks skills, etc.
 
-Backend (Qwen analyzes):
+Backend (the local model analyzes):
   - Categorize the empêchement type:
     * Material (car, tools, equipment)
     * Financial
@@ -815,7 +815,7 @@ Backend (Qwen analyzes):
   - Store in pgvector for future reference
 
 Next monthly plan:
-  - Opus considers the empêchement type
+  - the high reasoning model considers the empêchement type
   - If material/financial: backlog the mission until 
     blocker is removed
   - If recurring blocker: adjust mission expectations
@@ -835,7 +835,7 @@ Instead:
   - AI categorizes silently
   - Wrong categorizations surface via mission failures
   - WR captures patterns over time
-  - Opus self-corrects in next monthly plan
+  - the high reasoning model self-corrects in next monthly plan
   - User intervenes only when something is wrong (refusal)
 
 This aligns with the brain unified philosophy (doc 44):
@@ -857,7 +857,7 @@ mission_outcomes table:
   - actual_end_time
   - actual_duration_minutes
   - failure_explanation (if Pas pertinent or Empêchement)
-  - failure_category (analyzed by Qwen)
+  - failure_category (analyzed by the local model)
   - completed_at | failed_at
 ```
 
@@ -982,14 +982,14 @@ CREATE TABLE mission_type_learned_durations (
 ┌──────────────────────────────────────────────────────┐
 │ TASK                          │ FREQUENCY  │ COST/YR │
 ├──────────────────────────────────────────────────────┤
-│ Monthly plan (Opus 4.8)       │ 52 × /year │ ~10€    │
-│ Plan validation (Qwen local)  │ 52 × /year │ 0€      │
+│ Monthly plan (the high reasoning model) │ 52 × /year │ ~10€    │
+│ Plan validation (the local model)       │ 52 × /year │ 0€      │
 │ Fallback GPT-5.5 (rare)       │ ~5 × /year │ ~0.50€  │
-│ Daily plan (Qwen local)       │ 365 × /year│ 0€      │
-│ Daily Sonnet fallback         │ if needed  │ ~18€    │
-│ Mission scoring (Qwen)        │ on trigger │ 0€      │
-│ Mission categorization (Qwen) │ on add     │ 0€      │
-│ Failure analysis (Qwen)       │ as needed  │ 0€      │
+│ Daily plan (the local model)       │ 365 × /year│ 0€      │
+│ Daily first cloud tier fallback         │ if needed  │ ~18€    │
+│ Mission scoring (the local model)        │ on trigger │ 0€      │
+│ Mission categorization (the local model) │ on add     │ 0€      │
+│ Failure analysis (the local model)       │ as needed  │ 0€      │
 ├──────────────────────────────────────────────────────┤
 │ BASELINE ANNUAL                             │ ~10-12€│
 └──────────────────────────────────────────────────────┘
@@ -1007,7 +1007,7 @@ For comparison: a single human life-coach session costs more.
 The hooks system from doc 43 §3 is the trigger mechanism.
 This document defines what happens when a hook fires:
 - Re-scoring of affected missions
-- Possible plan adaptation (Qwen local, with documented Sonnet fallback)
+- Possible plan adaptation (the local model, with documented first-cloud-tier fallback)
 - Update of monthly plan retrospective
 ```
 
@@ -1032,7 +1032,7 @@ all surface in the weekly review for correction.
 ```text
 Mission outcomes (especially failures with explanations)
 are vectorized for long-term pattern memory.
-Opus retrieves these on next monthly plan generation.
+The high reasoning model retrieves these on next monthly plan generation.
 ```
 
 ### 14.5 With doc 45 (User Objectives)
@@ -1066,21 +1066,21 @@ Phase 2 — Backlog management
   └─ Score recalculation on triggers
 
 Phase 3 — Monthly plan generation
-  ├─ Opus prompt template
+  ├─ high reasoning model prompt template
   ├─ Input assembly service (10 categories)
-  ├─ Qwen validation logic
-  ├─ Fallback chain (Opus → Opus → GPT-5.5)
+  ├─ local model validation logic
+  ├─ Fallback chain (the high reasoning model → the high reasoning model → GPT-5.5)
   └─ Storage of plan history
 
 Phase 4 — Daily plan instantiation
-  ├─ Qwen prompt for daily plan
+  ├─ local model prompt for daily plan
   ├─ Adaptation logic (vs monthly)
   └─ Hook integration
 
 Phase 5 — Refusal & feedback
   ├─ 4 refusal buttons in UI
   ├─ Chat opening for "Pas pertinent" / "Empêchement"
-  ├─ Qwen analyzer for explanations
+  ├─ local model analyzer for explanations
   └─ Storage in mission_outcomes + pgvector
 
 Phase 6 — Learning systems
@@ -1129,7 +1129,7 @@ The system gets sharper with every WR.
 ```text
 ❌ Asking user to validate each mission's categorization
 ❌ Manual scoring of every mission
-❌ Per-day Opus calls (too expensive)
+❌ Per-day high reasoning model calls (too expensive)
 ❌ Real-time score updates (only on triggers)
 ❌ Hidden coefficients changing without user knowing 
    the hierarchy moved
