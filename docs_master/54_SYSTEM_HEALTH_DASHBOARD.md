@@ -265,7 +265,7 @@ This is the core intelligence of the dashboard.
 - imperium_replan_events
 - imperium_morning_checkins
 - imperium_submission_completions / rejections
-- mission failure reasons (analyzed by Qwen)
+- mission failure reasons (analyzed by the local model)
 - pgvector patterns (long-term)
 ```
 
@@ -315,7 +315,7 @@ PATTERN TYPE 7 — Energy drain
 Frictions don't just describe problems — they suggest fixes.
 
 For each detected friction:
-  - Root cause analysis (Qwen)
+  - Root cause analysis (the local model)
   - Proposed actions (parameterized)
   - Expected impact estimate
   - Action button ([Modifier], [Désactiver], [Plus tard])
@@ -350,9 +350,9 @@ constant computation.
 ```text
 Once per generation:
   - SQL queries on outcomes/events (deterministic)
-  - Friction detection algorithms (deterministic + Qwen)
+  - Friction detection algorithms (deterministic + the local model)
   - Health score computation (deterministic)
-  - Suggestion phrasing (Qwen for nuance)
+  - Suggestion phrasing (the local model for nuance)
 
 Total: ~0.05€ per full generation
 Annual: < 5€ if used weekly, even less otherwise
@@ -396,7 +396,7 @@ Imperium dashboard shows a transient card:
   └──────────────────────────────────────┘
 
 GENERATION:
-- Sonnet generates the 3-4 lines
+- The first cloud tier generates the 3-4 lines
 - Pulls from today's mission_outcomes
 - Adds tomorrow's first 2-3 missions preview
 - One-shot per day, ~0.02€/day
@@ -541,9 +541,9 @@ CREATE TABLE imperium_daily_summaries (
 
 ```text
 imperium.health.compute_score      - deterministic
-imperium.health.detect_frictions   - Qwen (analyze patterns)
-imperium.health.generate_suggestions - Sonnet (suggest tunings)
-imperium.daily_summary.generate    - Sonnet (generate evening recap)
+imperium.health.detect_frictions   - the local model (analyze patterns)
+imperium.health.generate_suggestions - the first cloud tier (suggest tunings)
+imperium.daily_summary.generate    - the first cloud tier (generate evening recap)
 ```
 
 ---
@@ -553,11 +553,11 @@ imperium.daily_summary.generate    - Sonnet (generate evening recap)
 ```text
 Health dashboard generation: 
   - Health score: 0€ (deterministic)
-  - Friction detection: 0€ (Qwen local)
-  - Suggestions phrasing: ~0.05€ (Sonnet)
+  - Friction detection: 0€ (the local model)
+  - Suggestions phrasing: ~0.05€ (the first cloud tier)
 
 Daily summary:
-  - Sonnet: ~0.02€/day = ~7€/year
+  - The first cloud tier: ~0.02€/day = ~7€/year
 
 Total annual: < 15€
 ```
@@ -604,8 +604,8 @@ Imperium dashboard (after 21h):
 
 ```text
 ALL ANALYSIS LOCAL OR TRUSTED CLOUD:
-- Friction detection: Qwen local
-- Suggestion generation: Sonnet (text input only)
+- Friction detection: the local model
+- Suggestion generation: the first cloud tier (text input only)
 - No external sharing of patterns
 
 USER CONTROL:
@@ -630,7 +630,7 @@ Phase 2 — Friction detection algorithms
   ├─ services/imperium/health/plan_stability.py
   ├─ services/imperium/health/friction_detector.py
   ├─ services/imperium/health/suggestion_engine.py
-  └─ Qwen prompts for pattern analysis
+  └─ Prompts for pattern analysis by the local model
 
 Phase 3 — Health score computation
   └─ services/imperium/health/score_calculator.py
@@ -647,7 +647,7 @@ Phase 4 — API endpoints
 Phase 5 — Daily summary
   ├─ services/imperium/daily_summary/generator.py
   ├─ Cron at 21h to pre-generate
-  └─ Sonnet prompt template
+  └─ Prompt template for the first cloud tier
 
 Phase 6 — UI in Android
   ├─ Settings > Mon OS personnel screen

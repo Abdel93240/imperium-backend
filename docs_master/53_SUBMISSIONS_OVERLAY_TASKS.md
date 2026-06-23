@@ -176,7 +176,7 @@ needed. Submissions are optional and the reserve is modest and self-depleting.
 
 ## 6. The Carrier Mission Rules
 
-A mission is a "carrier" when Qwen judges that it leaves enough practical
+A mission is a "carrier" when the local model judges that it leaves enough practical
 availability to host short annex missions.
 
 ```text
@@ -199,7 +199,7 @@ Examples that prove deterministic rules fail:
 ### 6.1 The carrier categorization
 
 ```text
-At mission creation, Qwen categorizes the mission:
+At mission creation, the local model categorizes the mission:
   - Determines is_carrier_mission TRUE/FALSE based on engagement.
   - Assesses engagement_level = low | medium | high.
   - Assesses has_exploitable_pauses TRUE/FALSE.
@@ -311,7 +311,7 @@ Imperium dashboard, carrier mission active:
      * If "Pas dans la liste": this specific mission marked
        as is_overlay_eligible = FALSE
      * If "Trop de focus": signal to refine the carrier rules
-     * If "Autre": user explains in chat, Qwen analyzes
+     * If "Autre": user explains in chat, the local model analyzes
    - Stored in pgvector for future learning
 ```
 
@@ -375,13 +375,13 @@ The others wait their turn in subsequent carriers.
 ## 10. AI Tasks Touched
 
 ```text
-imperium.mission.classify_carrier   - Qwen, on mission creation
-imperium.mission.classify_overlay   - Qwen, on mission creation
-imperium.submission.analyze_refusal - Qwen, when user taps ✗
+imperium.mission.classify_carrier   - the local model, on mission creation
+imperium.mission.classify_overlay   - the local model, on mission creation
+imperium.submission.analyze_refusal - the local model, when user taps ✗
 imperium.submission.list_for_carrier - deterministic SQL query
 ```
 
-All AI calls are local (Qwen). Zero cloud cost for this feature.
+All AI calls use the local model. Zero cloud cost for this feature.
 
 ---
 
@@ -476,8 +476,8 @@ Step 1 — Backend creates the mission as usual
   - Computes intrinsic score (per doc 52)
   - Stores in imperium_missions
 
-Step 2 — Carrier classification (Qwen judgment)
-  Qwen reads the mission (title, description, estimated duration, type) and
+Step 2 — Carrier classification (judgment by the local model)
+  The local model reads the mission (title, description, estimated duration, type) and
   judges:
     - the ENGAGEMENT it demands = physical + mental + availability of hands/
       attention (NOT raw physical effort),
@@ -485,14 +485,14 @@ Step 2 — Carrier classification (Qwen judgment)
     - whether, even if engaging, it is long with exploitable pauses.
   → outputs whether the mission can be a CARRIER (can host annex missions).
 
-Step 3 — Overlay classification (Qwen)
-  Qwen receives:
+Step 3 — Overlay classification (the local model)
+  The local model receives:
     - Mission title
     - Mission description
     - Estimated duration
     - List of overlay categories from imperium_overlay_categories
   
-  Qwen outputs:
+  The local model outputs:
     {
       "is_overlay_eligible": true|false,
       "category_code": "communication" | null,
@@ -508,7 +508,7 @@ Step 4 — Mission ready for use
   - If is_overlay_eligible: will appear in carrier missions
 ```
 
-### 12.1 Qwen prompt template
+### 12.1 The Local Model Prompt Template
 
 ```text
 You are categorizing a mission for a personal task system.
@@ -544,7 +544,7 @@ OUTPUT (strict JSON):
 }
 ```
 
-### 12.2 Qwen carrier prompt template
+### 12.2 The Local Model Carrier Prompt Template
 
 ```text
 You are assessing whether a mission can be a "carrier" mission — a mission during
@@ -576,10 +576,10 @@ OUTPUT (strict JSON):
 
 Coherence note:
 
-Both classifications now use Qwen judgment on the task's nature:
+Both classifications now use judgment by the local model on the task's nature:
 carrier = availability to host; overlay = fits in a gap. This follows the
 ecosystem principle: capture raw data and let intelligence interpret, rather than
-hard thresholds. Both calls remain local Qwen calls, so the cost remains 0€.
+hard thresholds. Both calls remain calls to the local model, so the cost remains 0€.
 
 ---
 
@@ -705,7 +705,7 @@ Real-world tuning will reveal:
 
 Adjustment process:
 - Admin updates imperium_overlay_categories table
-- Re-categorization batch job runs (Qwen re-evaluates active missions)
+- Re-categorization batch job runs (the local model re-evaluates active missions)
 - Changes propagate within minutes
 ```
 
@@ -722,13 +722,13 @@ Phase 1 — Schema migrations
 
 Phase 2 — Backend services
   ├─ services/imperium/mission_categorizer.py
-  │   - is_carrier_mission classification (Qwen engagement judgment)
-  │   - is_overlay_eligible classification (Qwen call)
+  │   - is_carrier_mission classification (engagement judgment by the local model)
+  │   - is_overlay_eligible classification (call to the local model)
   └─ services/imperium/submission_selector.py
       - List submissions for an active carrier
       - Apply ordering and limits
 
-Phase 3 — Qwen prompts
+Phase 3 — Local model prompts
   └─ Add to doc 35:
      - qwen_classify_carrier.txt
      - qwen_classify_overlay.txt
@@ -762,8 +762,8 @@ Phase 7 — WR integration
 
 ```text
 PER MISSION CREATION:
-  Qwen overlay classification: 0€ (local)
-  Qwen carrier classification: 0€ (local)
+  Overlay classification by the local model: 0€ (local)
+  Carrier classification by the local model: 0€ (local)
 
 PER CARRIER ACTIVATION:
   SQL query for submissions: 0€
@@ -772,7 +772,7 @@ PER SUBMISSION COMPLETION:
   DB write: 0€
 
 PER SUBMISSION REJECTION:
-  Qwen analysis if "Other" reason: 0€ (local)
+  Analysis by the local model if "Other" reason: 0€ (local)
 
 ANNUAL COST: 0€
 ```
@@ -788,7 +788,7 @@ DATA STORED:
 - User rejection reasons (local DB)
 
 NOTHING SENT TO CLOUD AI:
-- Qwen runs locally on VPS
+- The local model runs locally on VPS
 - All learning happens internally
 
 USER CONTROL:
@@ -846,7 +846,7 @@ USER CONTROL:
 ## 21. References
 
 - `08_NON_NEGOTIABLE_RULES.md` — backend authority
-- `30_AI_ROUTING_AND_SCORING_POLICY.md` — Qwen routing
+- `30_AI_ROUTING_AND_SCORING_POLICY.md` — routing by the local model
 - `32_WR_INTERACTIVE_WORKFLOW.md` — WR feedback
 - `33_VECTOR_LOGIC_DETAIL.md` — VTC carrier context
 - `35_QWEN_SETUP_AND_PROMPTS.md` — carrier and overlay classification prompts

@@ -1129,7 +1129,7 @@ PER MONTH: ~25-40€/month with VPS upgrade
 CURRENT VPS (KVM 4 — 16 GB RAM):
 ├─ PostgreSQL: ~2 GB
 ├─ n8n + Imperium API: ~2 GB
-├─ Qwen 2.5 7B: ~6 GB
+├─ The local model: ~6 GB
 └─ Available: ~6 GB
 
 NEW STACK ADDITIONS (V6+):
@@ -1419,10 +1419,10 @@ ON highway_lane_patterns (user_id, segment_id, destination_segment_id, time_wind
 ## 15. AI Tasks Touched
 
 ```text
-vector.hud.heatmap_compute     - deterministic SQL + Qwen analysis
+vector.hud.heatmap_compute     - deterministic SQL + analysis by the local model
 vector.hud.shortcut_detect     - GPS proximity check (no AI)
 vector.hud.aviation_filter     - deterministic
-vector.hud.event_priority      - Qwen analysis of impact
+vector.hud.event_priority      - impact analysis by the local model
 vector.hud.station_recommend   - integrates with smart fuel (doc 46)
 ```
 
