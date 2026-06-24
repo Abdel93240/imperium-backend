@@ -1,14 +1,14 @@
-# 35 — Qwen Setup and Prompts
+# 35 — Local Model Setup and Prompts
 
-Qwen is the official local AI router for Imperium V1.
+The local model is the official local AI router for Imperium V1.
 
 It handles routing, triage, classification, adaptive questions, lightweight reasoning, and low-cost internal decisions.
 
-The n8n AI Agent is not part of the official V1 architecture. n8n orchestrates; Qwen reasons.
+The n8n AI Agent is not part of the official V1 architecture. n8n orchestrates; the local model reasons.
 
 ## 1. Official Deployment Choice
 
-Qwen runs through Ollama in Docker on the same Docker network as n8n and imperium-api.
+The local model runs through Ollama in Docker on the same Docker network as n8n and imperium-api.
 
 Official V1 network rule:
 
@@ -56,11 +56,11 @@ After container start:
 docker exec -it imperium-ollama ollama pull qwen3:32b
 ```
 
-If another exact Qwen tag is selected later, document the tag and keep one official production tag in the deployment notes.
+If another exact local-model tag is selected later, document the tag and keep one official production tag in the deployment notes.
 
 ## 3. n8n Call Pattern
 
-n8n calls Qwen by HTTP:
+n8n calls the local model by HTTP:
 
 ```text
 POST http://ollama:11434/api/chat
@@ -79,20 +79,20 @@ Payload shape:
 }
 ```
 
-Qwen output must be strict JSON. n8n must validate it before calling the backend.
+The local model output must be strict JSON. n8n must validate it before calling the backend.
 
-## 4. Qwen Responsibilities
+## 4. Local Model Responsibilities
 
-Qwen may decide:
+The local model may decide:
 
 - task type;
 - difficulty score;
 - whether clarification is needed;
 - which model should handle the task;
 - whether the task is safe to process locally;
-- whether to escalate to Sonnet, Opus, Fable, GPT, Gemini Vision, Whisper, or deterministic backend logic.
+- whether to escalate to the first cloud tier, the high reasoning model, the sustained long-context model, a domain specialist, the OCR service, the transcription service, or deterministic backend logic.
 
-Qwen must not:
+The local model must not:
 
 - write directly to DB;
 - make canonical decisions;
@@ -122,18 +122,18 @@ Qwen must not:
 Doc 30 is the source of truth.
 
 ```text
-0–99    -> Qwen 32B local
-100–139 -> Claude Sonnet 4.6
-140–179 -> Claude Opus 4.8
+0–99    -> the local model
+100–139 -> the first cloud tier
+140–179 -> the high reasoning model
 180–200 -> critical mechanic (doc 30 §5.6 / Patch 30-B)
 ```
 
-Qwen must not override hard-coded special routing rules such as medical files, image OCR, audio transcription, or compliance-sensitive workflows.
+The local model must not override hard-coded special routing rules such as medical files, image OCR, audio transcription, or compliance-sensitive workflows.
 
 ## 7. System Prompt
 
 ```text
-You are Qwen, the local AI router for Imperium.
+You are the local model, Imperium's local AI router.
 
 You do not own the database.
 You do not make canonical decisions.
@@ -160,7 +160,7 @@ From n8n network context:
 curl -sS http://ollama:11434/api/tags
 ```
 
-A successful response proves n8n can reach Ollama/Qwen internally.
+A successful response proves n8n can reach Ollama / the local model internally.
 
 ## 9. Carrier Classification Prompt (doc 53)
 
