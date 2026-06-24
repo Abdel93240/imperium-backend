@@ -60,9 +60,9 @@ SOLUTION CATBOOST:
   Précision 70% → 90%+ en 6 mois
 
 LLM REDÉPLOYÉ:
-  - Expliquer un score sur demande (Qwen 7B, 0€)
-  - Analyser patterns dans WR (Opus, ~0.20€/sem)
-  - Proposer révision règles cold-start (Opus, WR)
+  - Expliquer un score sur demande (the local model, 0€)
+  - Analyser patterns dans WR (the high reasoning model, ~0.20€/sem)
+  - Proposer révision règles cold-start (the high reasoning model, WR)
 ```
 
 ---
@@ -131,7 +131,7 @@ STRATÉGIE:
     - Modèle a une confiance très basse (<30%)
 
 RÉVISION DES RÈGLES:
-  Chaque semaine, dans le WR (Opus):
+  Chaque semaine, dans le WR (the high reasoning model):
     - Quelle règle a coûté combien en €/semaine?
     - Combien de courses rentables refusées à cause de X?
     - Proposition de désactiver/modifier la règle
@@ -527,8 +527,8 @@ STEP 1 — USER COLLECTS SCREENSHOTS
   - Compresses into ZIP
   - Uploads to import endpoint
 
-STEP 2 — GEMINI OCR EXTRACTION
-  - Each screenshot → Gemini Vision
+STEP 2 — THE OCR SERVICE EXTRACTION
+  - Each screenshot → the OCR service
   - Extracts: date, time, pickup, destination, distance,
     duration, price, payment method
   - JSON output per screenshot
@@ -560,7 +560,7 @@ STEP 6 — VALIDATION REPORT
   - User reviews before triggering training
 ```
 
-### 7.2 Gemini OCR prompt template
+### 7.2 The OCR service prompt template
 
 ```text
 SYSTEM PROMPT:
@@ -836,7 +836,7 @@ Vector > Settings > Import historique:
   │ Prix: 89.50€                                        │
   │ Paiement: Carte                                     │
   │                                                     │
-  │ Confiance Gemini: 82%                               │
+  │ Confiance the OCR service: 82%                      │
   │ Raison: durée manquante                             │
   │                                                     │
   │ [✓ Valider] [✗ Supprimer] [⏭ Plus tard]              │
@@ -1118,12 +1118,12 @@ class VectorRideModelTrainer:
 
 ## 10. WR Rule Revision Mechanism
 
-### 10.1 Weekly Opus analysis
+### 10.1 Weekly high reasoning model analysis
 
 ```text
 EVERY MONDAY 04:00 (after WR validation):
 
-OPUS RECEIVES:
+THE HIGH REASONING MODEL RECEIVES:
   - All rides of week
   - Each ride's: rules_triggered, model_prediction, actual_outcome
   - Aggregated per rule:
@@ -1131,7 +1131,7 @@ OPUS RECEIVES:
     * estimated_revenue_lost (model GREEN, rule RED)
     * estimated_revenue_saved (rule RED correctly)
 
-OPUS ANALYZES PER RULE:
+THE HIGH REASONING MODEL ANALYZES PER RULE:
 
   EXAMPLE FOR R1 (avoid 75008):
     - Triggered 14 times this week
@@ -1163,7 +1163,7 @@ WR > Cette semaine > Révision des règles:
   │   (moyenne 26€/h vs ta médiane 22€/h)              │
   │ • Coût estimé du refus systématique: 285€/sem      │
   │                                                     │
-  │ Recommandation Opus:                                │
+  │ Recommandation du high reasoning model:             │
   │ "Tes courses 75008 cette semaine étaient en fait    │
   │  rentables. Soit Paris a évolué, soit les hôtels    │
   │  Champs-Élysées attirent des courses longue distance.│
@@ -1187,7 +1187,7 @@ WHEN USER VALIDATES:
 4. Future rides scored without this rule
 
 HARD RULES (is_hard_rule=TRUE):
-  Cannot be auto-revised by Opus.
+  Cannot be auto-revised by the high reasoning model.
   User must manually disable in Settings.
   Examples: rules user marked "always apply".
 ```
@@ -1288,7 +1288,7 @@ PHASE 2 — FIRST MODEL (V1, week 3-4)
 PHASE 3 — TRANSITION (V2, month 2)
   ✅ Weekly training cron
   ✅ Track vector_rule_performance view
-  ✅ First WR rule revision (Opus analyzes)
+  ✅ First WR rule revision (the high reasoning model analyzes)
   ✅ User validates/disables rules
   → Model gains autonomy
 
@@ -1335,16 +1335,16 @@ INFERENCE: 0€ (CatBoost local, <1ms)
 TRAINING: 0€ (weekly cron, ~60s)
 
 BOLT IMPORT (one-time):
-├─ Gemini OCR: ~500-1000 screenshots × 0.001€ = 0.50-1€
+├─ the OCR service: ~500-1000 screenshots × 0.001€ = 0.50-1€
 ├─ Open-Meteo Historical: FREE
 ├─ Nominatim geocoding: FREE
 └─ Total bootstrap: < 2€
 
-WR RULE REVISION (weekly Opus):
+WR RULE REVISION (weekly high reasoning model):
 └─ ~0.10€/week = 0.40€/month
 
 EXPLANATIONS (on-demand):
-├─ Qwen 7B local: 0€
+├─ the local model: 0€
 └─ Sonnet deep analysis: ~1€/month
 
 TOTAL ONGOING: < 2€/month
@@ -1452,15 +1452,15 @@ WHEN DISABLED:
 The driver taps the bubble only when the Bolt wide-view map shows a surge worth
 recording. One tap, no form, no interruption to driving.
 
-### 16.4 Deferred OCR extraction (Gemini)
+### 16.4 Deferred OCR extraction (the OCR service)
 
 Capture stores only the raw image + timestamp on the spot. Interpretation is
 **deferred** and done at rest, following the same model as the Bolt history
-import (§7): capture → Gemini OCR → user review → clean data.
+import (§7): capture → the OCR service → user review → clean data.
 
 ```text
 AT REST (evening, or batch validation session):
-  Each surge screenshot → Gemini Vision
+  Each surge screenshot → the OCR service
   → reads the ENTIRE map: every surge zone + its multiplier
   → produces structured JSON per zone
 
@@ -1468,7 +1468,7 @@ AT REST (evening, or batch validation session):
   → confirmed data written to surge tables
 ```
 
-Gemini extraction target (whole-map reading):
+The OCR service extraction target (whole-map reading):
 
 ```text
 For each visible surge zone on the captured map:
@@ -1575,7 +1575,7 @@ predict.
 ```text
 V1 (now):
   - overlay capture + timestamp
-  - deferred Gemini OCR (whole map) + user validation
+  - deferred OCR service extraction (whole map) + user validation
   - store surge zone readings
   - expose enrichment features (Purpose A) to CatBoost as data accumulates
 
