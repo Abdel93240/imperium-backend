@@ -1133,7 +1133,7 @@ Conséquences :
 - aucune architecture multiplateforme n'est prévue en V1 ;
 - OCR, vision via [OCR service], routage AI et modèles locaux restent backend/orchestration ;
 - le frontend Android peut capturer ou uploader, mais il n'exécute pas l'OCR runtime V1 ;
-- [the local model] router/scorer reste côté backend, pas dans le frontend.
+- le [local model] router/scorer reste côté backend, pas dans le frontend.
 
 ---
 

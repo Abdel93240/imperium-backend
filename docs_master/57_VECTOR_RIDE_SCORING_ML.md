@@ -836,7 +836,7 @@ Vector > Settings > Import historique:
   │ Prix: 89.50€                                        │
   │ Paiement: Carte                                     │
   │                                                     │
-  │ Confiance the OCR service: 82%                      │
+  │ Confiance [OCR service]: 82%                        │
   │ Raison: durée manquante                             │
   │                                                     │
   │ [✓ Valider] [✗ Supprimer] [⏭ Plus tard]              │
