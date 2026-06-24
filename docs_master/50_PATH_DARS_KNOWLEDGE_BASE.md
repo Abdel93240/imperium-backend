@@ -79,7 +79,7 @@ CAPABILITY 2 — INDEXING
 CAPABILITY 3 — Q&A WITH SOURCE VERIFICATION
   User asks a question
   System narrows by facets, then searches markdown full-text
-  Local Q&A engine (Opus 4.7 prompt label) answers ONLY based
+  Local Q&A engine (the high reasoning model prompt) answers ONLY based
   on candidate passages
   Cites sources with clickable references
   Refuses if no relevant passages found
@@ -138,14 +138,14 @@ CAPABILITY 3 — Q&A WITH SOURCE VERIFICATION
 2. BACKEND DETECTS file type and routes:
    - Image → local OCR service (doc 37)
    - PDF → text extraction (try native first, OCR fallback)
-   - Audio → faster-whisper local
+   - Audio → the transcription service
    - Word → python-docx
    - Text → direct read
 
 3. EXTRACTED RAW TEXT goes to next step
 
 4. STRUCTURE STEP — local structuring runtime:
-   - Sonnet 4.6 prompt label retained until nomenclature pass
+   - the first cloud tier prompt
    - Identifies titles, subtitles
    - Identifies citations (Coran, hadith, scholars)
    - Identifies definitions
@@ -203,7 +203,7 @@ For a 10-page handwritten document:
   - Category metadata + full-text indexing: 1-5 seconds
 
 For a 1-hour audio recording:
-  - faster-whisper transcription: 5-10 minutes on CPU
+  - Transcription service processing: 5-10 minutes on CPU
   - Local markdown structuring: 20-30 seconds
   - Rest: similar to above
 
@@ -258,7 +258,7 @@ Tap [Rechercher]:
 
   4. ANSWER OR REFUSAL:
      - If relevant passages remain: the local Q&A engine
-       (Opus 4.7 prompt label) produces an answer in French with
+       (the high reasoning model prompt) produces an answer in French with
        citations.
      - If no relevant passage remains: the system refuses with
        the standard out-of-corpus message.
@@ -325,7 +325,7 @@ professor. The professor remains the ultimate authority.
 
 ```text
 When the candidate passages contain CONTRADICTING information,
-the local Q&A engine (Opus 4.7 prompt label) must surface this
+the local Q&A engine (the high reasoning model prompt) must surface this
 in the answer:
 
   ┌──────────────────────────────────────────┐
@@ -650,17 +650,17 @@ USING gin (to_tsvector('simple', passage_text));
 │ TASK                       │ MODEL              │ COST/YR │
 ├──────────────────────────────────────────────────────────┤
 │ OCR (manuscripts, photos)  │ Local OCR          │ 0€      │
-│ OCR fallback if allowed    │ Gemini             │ ~5€     │
-│ Audio (FR+AR cours)        │ faster-whisper     │ 0€      │
-│                            │ large-v3 local     │         │
-│ Markdown structuring       │ Sonnet 4.6 label   │ 0€      │
-│                            │ retained; local    │         │
+│ OCR fallback if allowed    │ the OCR service    │ ~5€     │
+│ Audio (FR+AR cours)        │ transcription      │ 0€      │
+│                            │ service            │         │
+│ Markdown structuring       │ the first cloud    │ 0€      │
+│                            │ tier prompt; local │         │
 │                            │ execution required │         │
 │ PDF rendering              │ weasyprint code    │ 0€      │
 │ Category indexing          │ PostgreSQL         │ 0€      │
 │ Full-text retrieval        │ PostgreSQL FTS     │ 0€      │
-│ Q&A reasoning              │ Opus 4.7 prompt    │ 0€      │
-│                            │ label retained;    │         │
+│ Q&A reasoning              │ the high reasoning │ 0€      │
+│                            │ model prompt;      │         │
 │                            │ local execution    │         │
 │                            │ required           │         │
 ├──────────────────────────────────────────────────────────┤
@@ -679,24 +679,23 @@ to a cloud model.
 ## 12. AI Task Types
 
 ```text
-dars.document.ocr               - Local OCR; Gemini fallback only if allowed
-dars.document.transcribe        - Whisper local (audio static override)
-dars.document.structure         - Local structuring; Sonnet label retained
+dars.document.ocr               - Local OCR; OCR service fallback only if allowed
+dars.document.transcribe        - the transcription service (audio static override)
+dars.document.structure         - Local structuring; the first cloud tier prompt
 dars.document.categorize        - mandatory facet prompt
 dars.document.index_metadata    - category tree + PostgreSQL full-text
 dars.question.facets            - choose / clarify domain-theme-subtheme
 dars.question.full_text_search  - deterministic markdown search
-dars.question.answer            - Opus 4.7 prompt label, local execution
+dars.question.answer            - the high reasoning model prompt, local execution
 dars.annotation.index_metadata  - category tree + PostgreSQL full-text
 ```
 
 ---
 
-## 13. The Opus Q&A Prompt
+## 13. The High Reasoning Model Q&A Prompt
 
-The prompt name is retained for now for nomenclature continuity, but the
-religious Q&A execution must remain local. The prompt is critical. Here
-is the strict template.
+The religious Q&A execution must remain local. The prompt is critical.
+Here is the strict template.
 
 ```text
 You are an assistant for religious sciences study.
@@ -803,14 +802,14 @@ Settings:
 ## 15. Privacy & Security
 
 ```text
-DATA SENT TO GEMINI:
+DATA SENT TO THE OCR SERVICE:
 - None by default for religious dars.
 - Residual cloud case only: OCR fallback if the local OCR tower is
   unavailable/down, under doc 37 privacy gate.
 - For `very_high` religious content, the system follows doc 52 §9A:
   degrade / abstain instead of sending the content to cloud.
 
-DATA SENT TO ANTHROPIC (Sonnet, Opus):
+DATA SENT TO CLOUD ROLES:
 - None by default for religious dars.
 - Structuring and Q&A must run locally for this corpus.
 - If local Q&A cannot safely answer, the system narrows deterministic
@@ -818,7 +817,7 @@ DATA SENT TO ANTHROPIC (Sonnet, Opus):
 
 DATA THAT NEVER LEAVES THE VPS:
 - Religious extracted text and markdown
-- Audio recordings (Whisper local)
+- Audio recordings (transcription service local)
 - Magisterial annotations
 - Final stored PDFs
 - Category metadata and full-text search indexes
@@ -854,18 +853,18 @@ PHASE 2 — Local infrastructure
 
 PHASE 3 — Ingestion services
   ├─ services/path/dars/ingestion.py (multi-format dispatcher)
-  ├─ services/path/dars/ocr.py (local OCR + gated Gemini fallback)
-  ├─ services/path/dars/transcribe.py (Whisper)
+  ├─ services/path/dars/ocr.py (local OCR + gated OCR service fallback)
+  ├─ services/path/dars/transcribe.py (transcription service)
   ├─ services/path/dars/parse_pdf.py (PyPDF2)
   ├─ services/path/dars/parse_word.py (python-docx)
-  ├─ services/path/dars/structure.py (local; Sonnet label retained)
+  ├─ services/path/dars/structure.py (local; first cloud tier prompt)
   ├─ services/path/dars/categorize.py (mandatory facets)
   ├─ services/path/dars/render_pdf.py (weasyprint)
   └─ services/path/dars/index_text.py (category tree + full-text)
 
 PHASE 4 — Q&A services
   ├─ services/path/dars/search.py (facets + full-text)
-  ├─ services/path/dars/answer.py (local; Opus 4.7 label retained)
+  ├─ services/path/dars/answer.py (local; high reasoning model prompt)
   └─ services/path/dars/conflict_detect.py
 
 PHASE 5 — Annotations
@@ -887,8 +886,8 @@ PHASE 6 — API endpoints
 
 PHASE 7 — Prompts
   ├─ Add to the prompt catalog:
-  │   - sonnet_dars_structure.txt (label retained; local execution)
-  │   - opus_dars_qa.txt (label retained; local execution)
+  │   - sonnet_dars_structure.txt (local execution)
+  │   - opus_dars_qa.txt (local execution)
   └─ Tested with realistic religious sciences fixtures
 
 PHASE 8 — UI in Android
@@ -911,7 +910,7 @@ PHASE 8 — UI in Android
 Some documents have French + Arabic + transliterated Arabic.
 
 Pipeline handles automatically:
-- Whisper large-v3: detects language per segment
+- The transcription service: detects language per segment
 - Local OCR: handles mixed scripts
 - Local structuring runtime: preserves original language in markdown
 - Full-text search: searches stored markdown deterministically
@@ -922,7 +921,7 @@ Pipeline handles automatically:
 ### 17.2 Very long audio (3-hour cours)
 
 ```text
-Whisper local with 3 GB RAM may struggle on 3+ hours.
+The transcription service with 3 GB RAM may struggle on 3+ hours.
 
 Mitigation:
 - Auto-split audio into 30-min chunks
@@ -999,7 +998,7 @@ User deletes a document:
 ```text
 - Auto-summarization on demand (with strong disclaimer)
 - AI-generated study quizzes from corpus
-- Voice questions with Whisper
+- Voice questions with the transcription service
 - Audio playback of Q&A answers
 - Cross-document conflict scanning (proactive)
 - Statistical analysis: "topics I've studied most"
@@ -1016,8 +1015,8 @@ User deletes a document:
 - `09_PGVECTOR_MEMORY_POLICY.md` — vector storage policy; dars religious
   content is excluded from vectorization
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — model selection
-- `36_PROMPTS_CLOUD_AI.md` — Sonnet + Opus prompts
-- `37_VISION_OCR_PROMPTS.md` — Gemini OCR prompts
+- `36_PROMPTS_CLOUD_AI.md` — first cloud tier + high reasoning model prompts
+- `37_VISION_OCR_PROMPTS.md` — OCR service prompts
 - `38_VECTORIZATION_PIPELINE.md` — embedding architecture for learning
   patterns only, not the religious corpus
 
