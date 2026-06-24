@@ -4,11 +4,11 @@
 
 Long-term objective: bring the **monthly planning** — the system's only fully
 autonomous decision — back in-house, onto the **local model**, to cut the dependency
-on a cloud model (Opus today) for the core of Imperium.
+on the high reasoning model for the core of Imperium.
 
 The means is a **LoRA** adapter carrying **the user's planning logic** (not the user's
 data — data lives in RAG / `ai_memories`), targeting the **local 70B** model (not the
-32B), running on **3× V100** (phase 4, see F10).
+current local model), running on **3× V100** (phase 4, see F10).
 
 This document owns: the autonomy objective, the two-type replanning distinction, the
 training-example collection strategy, the cloud training + local inference split, and
@@ -19,7 +19,7 @@ the privacy protection for training. It does NOT redefine vectorization (see doc
 
 ## 2. Why this matters
 
-Today the autonomous monthly plan is produced by a cloud model. That is the single
+Today the autonomous monthly plan is produced by the high reasoning model. That is the single
 point where Imperium depends on an external provider for a core cognitive function.
 A local 70B carrying the user's own planning logic (via LoRA) would close that gap.
 
@@ -32,10 +32,10 @@ possible must be collected starting now** — otherwise phase 4 arrives empty-ha
 
 - The LoRA encodes the user's **planning logic** (how they decide), learned from real
   corrections. It does NOT encode facts — facts are retrieved live via RAG.
-- Target = the **local 70B** (phase 4), not the 32B. A 70B + the user's logic is a
-  serious planning capability, much closer to Opus than the 32B alone.
+- Target = the **local 70B** (phase 4), not the current local model. A 70B + the user's logic is a
+  serious planning capability, much closer to the high reasoning model than the local model alone.
 - **Fallback value (not all-or-nothing):** even if the LoRA never fully replaces the
-  cloud model on monthly planning, it still improves the local model's daily work —
+  high reasoning model on monthly planning, it still improves the local model's daily work —
   the self-scoring (`can I answer? is this urgent?`) and the small daily decisions
   (`I'm tired → skip / shift / wait`). So the LoRA has standalone value even if the
   headline goal is not reached.
@@ -47,7 +47,7 @@ possible must be collected starting now** — otherwise phase 4 arrives empty-ha
 Every replan ("I disagree, replan this") hides two sub-cases:
 
 1. **Replan due to an UNFORESEEN event** (a client cancelled, the calendar changed).
-   Opus could not have known; nobody could. This is the randomness of life, NOT a
+   The high reasoning model could not have known; nobody could. This is the randomness of life, NOT a
    logic error → **discarded** from the training set.
 2. **Replan due to DISAGREEMENT with the plan** (the model decided X, the user's logic
    says Y). This is gold: it captures exactly where the user's decision logic differs
@@ -168,7 +168,7 @@ protected, decided now (before the data is mixed and it is too late):
 - ⚠️ Vigilance: free-text de-identification is hard (indirect re-identifying details).
   To be done carefully when the time comes, with dedicated tooling.
 
-This mirrors the cloud-fallback rule elsewhere (ephemeral store doc 38, OCR fallback
+This mirrors the cloud-fallback rule elsewhere (ephemeral store doc 38, OCR service fallback
 doc 37): going to the cloud changes the access regime; the privacy gate / de-id
 interposes. Service or capability is degraded before sensitive identity leaks.
 
@@ -187,9 +187,9 @@ the day of training; it does not affect collection.
 ## 11. Success conditions and exit door
 
 - The LoRA is worth deploying only if the local 70B + LoRA plans **at least as well**
-  as the cloud model on the monthly task.
-- **Exit door:** if local + LoRA does not match the cloud model when the time comes,
-  keep the cloud model for monthly planning. Autonomy is not worth a system that
+  as the high reasoning model on the monthly task.
+- **Exit door:** if local + LoRA does not match the high reasoning model when the time comes,
+  keep the high reasoning model for monthly planning. Autonomy is not worth a system that
   decides worse. The fallback daily value (§3) remains regardless.
 
 ---
@@ -200,7 +200,7 @@ the day of training; it does not affect collection.
   formatted example document (§6) is produced by the WR guided-output step.
 - Replan mechanics docs: the three-element capture (proposal + correction + reason)
   must be wired there.
-- Doc 30: model hierarchy (cloud model for monthly planning today; local 70B + LoRA is
+- Doc 30: model hierarchy (high reasoning model for monthly planning today; local 70B + LoRA is
   the future target).
 - F10: phase 4 hardware (local 70B on several recent Tesla cards).
 - Docs 09 / 38: vectorization and memory — distinct from the training dataset (§7).

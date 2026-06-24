@@ -181,10 +181,10 @@ This is the "Vectorization" entry of Part A. It opens a small local tool on the 
 
 ### D.1 Key distinction: the model is NOT tuned — the surroundings are
 
-The embedding model (Qwen3-Embedding 8B) and the conversational model (Qwen3-32B) are NOT
-retrained or "tuned" internally (we deliberately do not fine-tune — we use MEMORY/RAG, not
-training). The model weights never change. What IS adjustable are the parameters AROUND
-the models: how text is chunked, how many pieces are retrieved, similarity thresholds,
+The embedding service and the local model are NOT retrained or "tuned" internally (we
+deliberately do not fine-tune — we use MEMORY/RAG, not training). Their underlying
+weights never change. What IS adjustable are the parameters AROUND them: how text is chunked,
+how many pieces are retrieved, similarity thresholds,
 quantization, and inference params.
 
 ### D.2 Retrieval levers (the biggest impact)
@@ -202,7 +202,7 @@ Starting point to TEST (not final): ~400 tokens, structure-aware. Revise by test
 **Top-K (number of chunks retrieved)** — pgvector returns the K nearest chunks.
 ```text
 - Too small (e.g. 2): may miss relevant info.
-- Too large (e.g. 50): floods the 32B context, dilutes focus.
+- Too large (e.g. 50): floods the local-model context, dilutes focus.
 - Well-set (e.g. 5-10): complete but sharp.
 NOTE: maps to the user-facing "fouille depth" idea — light fouille = small K, deep
 fouille = large K. A "moment" top-K can be a PRODUCT setting in Imperium; the BASE
@@ -218,7 +218,7 @@ Parameter: min similarity (e.g. 0.75). Calibrate by observation.
 
 ### D.3 Embedding-model levers
 
-**Model choice (replaceable):** if Qwen3-Embedding 8B gives weak retrievals, it can be
+**Model choice (replaceable):** if the embedding service gives weak retrievals, it can be
 SWAPPED for another embedding model that runs on the hardware. Embedding models differ in
 quality by language (French matters here) and domain. Test candidates with the same
 inputs, keep the best.
@@ -231,7 +231,7 @@ inputs, keep the best.
 Test whether Q8 suffices or FP16 is needed for better retrieval quality.
 ```
 
-### D.4 Conversational-model (32B) levers (via call params, not prompt content)
+### D.4 Local-model levers (via call params, not prompt content)
 
 ```text
 - Temperature: creativity vs determinism. Lower = more deterministic/consistent;
@@ -263,7 +263,7 @@ types new numbers; a TEST button runs an immediate retrieval+answer loop.
 │ Top-K (base):            [  8  ]              │
 │ Similarity threshold:    [ 0.75 ]             │
 │ Quantization:            [ Q8 ▾ ]             │
-│ Temperature (32B):       [ 0.7 ]              │
+│ Temperature (local model): [ 0.7 ]            │
 │                                                │
 │ Test subject: [ "mon sommeil semaine 3"   ]   │
 │            [ RUN TEST ]                        │

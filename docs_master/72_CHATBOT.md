@@ -26,7 +26,7 @@ degraded mode. Other docs refer here for anything chatbot-related.
   question. The user defines the use, not a built-in restriction.
 - **Never acts alone.** The chatbot proposes; the user validates; only then is anything
   written. Validation is non-negotiable (see doc 08 for the inviolable rule).
-- **One interlocutor.** The user always talks to the local model (Qwen). Other models,
+- **One interlocutor.** The user always talks to the local model. Other models,
   when used, work behind the scenes — the user never converses with them directly.
 - **Minimal interface.** Conversation view + keyboard input + a mic button (voice → text
   transcription only) + send + a close (cross). Nothing else is required of the user.
@@ -35,33 +35,34 @@ degraded mode. Other docs refer here for anything chatbot-related.
 
 ## 3. Engine & Invisible Escalation
 
-The engine is the **local intelligence (Qwen)**. It is the only party the user speaks
+The engine is the **local model**. It is the only party the user speaks
 to, always.
 
 ### 3.1 Per-message scoring
 
-On every user message, the FIRST thing Qwen does is **score its own ability** to handle
+On every user message, the FIRST thing the local model does is **score its own ability** to handle
 that message (the /200 scale of doc 30). Based on the score:
-- low → Qwen answers locally, alone (free).
-- high → Qwen calls another model to answer in its place, then relays the answer itself.
+- low → the local model answers locally, alone (free).
+- high → the local model calls another model to answer in its place, then relays the answer itself.
 
 ### 3.2 Escalation is invisible (as a change of interlocutor)
 
-When Qwen escalates, the user does not switch to another model. Qwen stays the face of
-the conversation. Concretely (health example):
+When the local model escalates, the user does not switch to another model. The local
+model stays the face of the conversation. Concretely (health example):
 - User: "the training you give me isn't producing results anymore, can we discuss it?"
-- Qwen scores this high (health domain, beyond its own reliable scope).
-- Qwen routes health questions to the health cloud model (GPT today). It **anonymizes
+- The local model scores this high (health domain, beyond its own reliable scope).
+- The local model routes health questions to the health specialist. It **anonymizes
   generically** before sending: "a man of such weight, doing such exercises, with such a
   goal, who has already tried X/Y/Z and eats such things daily — what would you advise?"
-- The cloud model answers Qwen; Qwen relays the answer to the user in its own voice.
+- The health specialist answers the local model; the local model relays the answer to the
+  user in its own voice.
 - User side: it "loads a bit" while the models work, then the answer arrives in the
-  thread. The user keeps talking to Qwen.
+  thread. The user keeps talking to the local model.
 
-The **generic anonymization at escalation IS the privacy gate in action**: Qwen never
-ships the raw identified dossier to the cloud; it reformulates into an anonymous,
+The **generic anonymization at escalation IS the privacy gate in action**: the local
+model never ships the raw identified dossier to the cloud; it reformulates into an anonymous,
 generic case. See doc 52 §9A (access-regime principle) and doc 37 for the same logic
-applied to OCR.
+applied to the OCR service.
 
 ---
 
@@ -107,7 +108,7 @@ model handles this" but "does this session contain something worth learning, and
 
 ### 6.1 Three passes
 
-**Pass 1 — structured detection via an injected grid.** Qwen reads the session ONCE
+**Pass 1 — structured detection via an injected grid.** The local model reads the session ONCE
 against a closed grid of learning-element types and reports, per type, whether it is
 present and on what subject. The grid is NOT a vague "is this valuable?" judgment — it
 is classification against defined categories, which a local model does reliably.
@@ -115,21 +116,21 @@ is classification against defined categories, which a local model does reliably.
   is kept regardless.
 - If it returns elements → continue.
 
-**Pass 2 — qualification (local).** For each detected element, Qwen evaluates:
+**Pass 2 — qualification (local).** For each detected element, the local model evaluates:
 - the **domain** (vtc, sport, finance, religious, project...) — for routing and
   sensitivity;
 - **novelty vs redundancy**: is this already in `ai_memories`, or new? (a semantic
   search, not a judgment) — to avoid re-vectorizing the same thing repeatedly.
 
 **Pass 3 — extraction / escalation.** With the grid filled, the decision is mechanical:
-- simple + non-sensitive + new → Qwen extracts locally (free);
-- dense/nuanced (Qwen judges it struggles to phrase cleanly) → escalate extraction for
+- simple + non-sensitive + new → the local model extracts locally (free);
+- dense/nuanced (the local model judges it struggles to phrase cleanly) → escalate extraction for
   quality;
 - redundant → do not re-extract; reinforce the existing element's confidence instead.
 
-**The detection itself is scorable.** Before doing the analysis, Qwen can score its own
+**The detection itself is scorable.** Before doing the analysis, the local model can score its own
 ability to do it; if it judges the session too complex to analyze reliably alone, it
-escalates the ANALYSIS (typically to Sonnet — it should not exceed that for detection).
+escalates the ANALYSIS (typically to the first cloud tier — it should not exceed that for detection).
 This reuses the per-message scoring mechanism (§3.1).
 
 ### 6.2 The detection grid (editable data, not hard-coded)
@@ -147,12 +148,12 @@ behavior without touching code.
   worth of targets; removing one makes it 4. But the whole grid is injected into a
   SINGLE pass (not N separate passes), so it scales without cost explosion.
 - **How a type is added**: always by user-validated proposal, never by the chatbot on
-  its own. Typically Opus proposes one in a WR ("it would help to track the user's
+  its own. Typically the high reasoning model proposes one in a WR ("it would help to track the user's
   hesitations"); the user adds it via the chatbot ("add hesitation to the detection
   grid"); the chatbot edits the data file. Guardrail (per doc 09 open-list rule): a new
   type is added only after being checked against another model to confirm it is not
   already covered by crossing existing types (no redundancy). The list stays small by
-  construction (~5, rarely more) because Opus groups rather than multiplies.
+  construction (~5, rarely more) because the high reasoning model groups rather than multiplies.
 
 ---
 
@@ -197,12 +198,12 @@ Rules:
 - **On-demand, not imposed.** The user is never required to review for the system to
   work — the cross alone suffices. The browser is a right of inspection, not a chore.
 
-Why it matters — it makes the "bet on the 32B" **observable and reversible**. The whole
-extraction design bets that the local 32B is good enough. The browser lets the user
-SEE, session after session, what was extracted/vectorized. If Qwen extracts poorly, the
-user sees it directly → a signal that it is time to move to the 70B — and they see it
-before bad data accumulates. The bet is not blind; it is tested in real conditions and
-reversible on evidence.
+Why it matters — it makes the "bet on the local model" **observable and reversible**. The whole
+extraction design bets that the local model is good enough. The browser lets the user
+SEE, session after session, what was extracted/vectorized. If the local model extracts poorly,
+the user sees it directly → a signal that it is time to move to a stronger local model —
+and they see it before bad data accumulates. The bet is not blind; it is tested in real
+conditions and reversible on evidence.
 
 Note: this browser is described here because the chatbot is its primary consumer, but it
 is a general transparency tool (WR logs, scoring decisions, etc. may use it too). Other
@@ -225,8 +226,8 @@ docs refer here rather than redescribing it.
 
 ## 10. Degraded Mode (local engine down)
 
-If the local engine is down, the fallback is Sonnet (doc 52 §9A), but Sonnet has **no
-access to very_high data** (health, religious). So the chatbot runs in **explicit
+If the local engine is down, the fallback is the first cloud tier (doc 52 §9A), but the
+first cloud tier has **no access to very_high data** (health, religious). So the chatbot runs in **explicit
 partial mode**:
 
 - Imperium, VTC, and part of finances (non-very_high) keep working.

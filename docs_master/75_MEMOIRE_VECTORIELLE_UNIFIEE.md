@@ -75,7 +75,7 @@ indexé. Aucune information n'existe en double.
 ## 3. La table `ai_memories` (propriété : doc 09)
 
 Le doc 09 est le propriétaire unique de cette table. Le doc 38 NE définit plus de
-table — il ne garde que le *pipeline* (embedding, recherche, cron). Schéma fusionné
+table — il ne garde que le *pipeline* ([embedding service], recherche, cron). Schéma fusionné
 (base = schéma `ai_memories` existant de doc 09, enrichi des champs utiles de l'ex
 `pgvector_memory`) :
 
@@ -266,8 +266,8 @@ marqué faux) et le **privacy gate** (niveau non autorisé pour le workflow).
 
 `privacy_level` est présent et obligatoire sur **chaque** ligne. La recherche ne
 retourne que les niveaux autorisés pour le workflow et le réglage utilisateur. Pour le
-contenu sensible (médical, financier, religieux), l'embedding par un fournisseur cloud
-externe est interdit sauf autorisation explicite (cf. doc 09 §Privacy Gate). C'était
+contenu sensible (médical, financier, religieux), le recours à l'[embedding service] via
+un fournisseur cloud externe est interdit sauf autorisation explicite (cf. doc 09 §Privacy Gate). C'était
 le trou de l'ex-`pgvector_memory` (pas de `privacy_level`) — définitivement bouché.
 
 ---
@@ -283,7 +283,7 @@ le trou de l'ex-`pgvector_memory` (pas de `privacy_level`) — définitivement b
   ciblés, vérifiés un par un (ne rien casser).
 - **Doc 38** : retirer la section « The pgvector_memory Table » ; la remplacer par un
   renvoi « table canonique = `ai_memories`, voir doc 09 » ; conserver tout le reste du
-  doc 38 (pipeline d'embedding, recherche, cron) en remplaçant les références au nom.
+  doc 38 (pipeline de l'[embedding service], recherche, cron) en remplaçant les références au nom.
 - **Doc 09** : adopter le schéma de §3 ci-dessus (ajout de `source_table`/`source_id`
   comme chemin explicite si absents ; confirmation que `weight` n'existe pas).
 - **Doc 05** : ne définit aucune des deux tables aujourd'hui (vérifié). Si une table
@@ -295,11 +295,10 @@ le trou de l'ex-`pgvector_memory` (pas de `privacy_level`) — définitivement b
 
 - **Le contenu exact de l'audit de sortie du WR** (structure, sections obligatoires) →
   doc WR (32 / 47). Ce doc pose seulement l'exigence « WR riche et autosuffisant » (§6).
-- **Le pipeline d'embedding** (chunking, modèle, quantification Q8/FP16, hardware) →
+- **Le pipeline de l'[embedding service]** (chunking, modèle, quantification Q8/FP16, hardware) →
   doc 38 (qui garde ce rôle).
 - **La cascade d'agrégation temporelle des signaux** → doc 09 (PATCH 08 déjà déployé) ;
   distincte de la présente table de patterns.
 - **La vitesse de décroissance / calibration** → SANS OBJET désormais (decay supprimé).
   Aucun paramètre de demi-vie à régler.
 ```
-
