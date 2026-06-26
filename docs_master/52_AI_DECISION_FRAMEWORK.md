@@ -101,6 +101,96 @@ The asymmetric distribution (10/8/5/4) ensures:
 
 ---
 
+## 3A. Multi-Domain Request Orchestration
+
+A single user question can contain **several independent requests**.
+
+Example:
+
+```text
+"Give me my financial results"
++ "I feel numb right now"
+```
+
+These requests belong to different domains, such as finances and health, and
+may be handled by different specialists. This mechanism defines **how they are
+ordered and recombined**.
+
+### 3A.1 Decomposition
+
+The local model reads the user question and identifies the distinct requests
+contained inside it.
+
+The goal is not to force every sentence into one domain. The goal is to detect
+whether the user is asking for multiple independent outputs in the same message.
+
+### 3A.2 Deterministic ordering
+
+Independent requests are processed in the order of the user's domain hierarchy.
+
+This order is **deterministic**. It is not chosen by the model at runtime.
+
+The canonical source is `imperium_user_priorities` (see Section 3 and Patch
+7G), the same hierarchy used to weight mission scoring. The domain coefficients
+defined in Section 3.2 (×10 / ×8 / ×5 / ×4) are used here as the processing
+order for independent requests.
+
+Reason:
+
+Letting the local model choose the order would make the behavior
+non-reproducible and difficult to justify. There is always a possible reason to
+prefer one order over another, but proving that it is **the best** order exceeds
+what a local model should decide on the fly.
+
+The order therefore comes from the user's already-defined life priorities, not
+from an ad hoc model judgment.
+
+### 3A.3 Request processing
+
+Each request goes through the normal `/200` scoring process defined in doc 30.
+
+If the request is simple, the local model may answer directly.
+
+If the request is heavy, risky, ambiguous, or requires real cross-domain
+reasoning, the scoring detects this and escalates to a more capable model.
+
+Important distinction:
+
+A deep cross-domain interaction is **not** an ordering problem. It is a
+capability problem.
+
+That capability problem is handled by scoring and escalation, or by memory
+patterns when the issue belongs to long-term pattern recognition (doc 75 / WR).
+This orchestration mechanism only handles **independent requests** that must be
+ordered and recombined.
+
+### 3A.4 Recombination
+
+The local model assembles the specialist outputs into one final answer, using
+the deterministic hierarchy order.
+
+The local model remains the single voice toward the user (see doc 72,
+CHATBOT).
+
+### 3A.5 Guiding principle
+
+The **order** is deterministic: it comes from the user's priority hierarchy.
+
+The **content**, cross-domain reasoning, and escalation are model judgments
+handled through scoring.
+
+This removes arbitrariness while preserving intelligence.
+
+References:
+
+- Section 3 — user-defined domain hierarchy and Patch 7G
+- Section 3.2 — domain coefficients
+- Doc 30 — `/200` scoring
+- Doc 72 — single chatbot voice
+- Doc 75 — memory patterns for cross-domain links
+
+---
+
 ## 4. Mission Intrinsic Scoring (0-100)
 
 Each mission candidate receives a **deterministic intrinsic score** between 0 and 100, computed from 5 measurable criteria.
