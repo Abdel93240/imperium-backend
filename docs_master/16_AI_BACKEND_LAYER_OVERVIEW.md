@@ -110,6 +110,74 @@ Every AI interaction in the system flows through these tables, whatever the sour
 
 ---
 
+## 4A. Concurrency — Priority Queue & Session Lock
+
+Multiple AI tasks can request the local resource, especially the GPU, at the same time.
+
+Example: the user is working out and has an interactive AI task in progress. Tuesday 20:00 arrives and the Weekly Review entry audit, which is an automatic task, wants to run. Without orchestration, both tasks compete for the same local resource.
+
+The GPU itself does not crash because of concurrency. It can queue work natively. The missing rule is not technical survival, but priority: who is allowed to run first, and when.
+
+This mechanism defines that rule while extending the existing `ai_task` lifecycle from Section 4. It does not replace the existing `queued`, `postponed`, or `failed` statuses.
+
+### 4A.1 Priority On Each `ai_task`
+
+Each `ai_task` carries a priority level:
+
+- `INTERACTIVE`: high priority. The user is waiting for an answer now, such as chatbot use, conversational interaction, or a direct question.
+- `BACKGROUND`: low priority. Nothing is urgent and nobody is waiting in front of the screen, such as WR audit, session update, or automatic categorization.
+
+### 4A.2 Priority Queue
+
+The queue serves high priority first.
+
+Interactive tasks run before background tasks. When two tasks have the same priority, which should be rare, the queue uses arrival order: first in, first out.
+
+This extends the existing status system. A task can still be `queued` or `postponed`; the priority level decides its order inside that lifecycle.
+
+### 4A.3 Session Lock
+
+A multi-step sequence reserves the local resource for its full duration.
+
+Example: replanning can involve local scoring, a cloud model call, vectorization, and a local synthesis step. The sequence keeps the session lock even during gaps where the local GPU is temporarily idle, such as while waiting for the cloud response.
+
+Without this lock, a low-priority background task, such as the WR audit, could see the GPU as free during the cloud gap and interleave itself in the middle of the sequence.
+
+The session lock prevents that interleaving. The resource remains reserved for the sequence from start to finish. The system reasons by session, not by isolated GPU task.
+
+### 4A.4 Tuesday 20:00 Case
+
+The WR audit is not force-started exactly at Tuesday 20:00.
+
+It is queued with low priority:
+
+- if the GPU is free, it starts immediately
+- if the user is in an interactive session, it waits until the resource is released
+
+The UX impact is invisible: the active user does not feel the background audit, and the WR audit has no second-level urgency.
+
+### 4A.5 Link With Multi-Domain Orchestration
+
+A multi-request question is itself a processing sequence.
+
+Per doc 52 Section 3A, multi-domain orchestration can split one question into several requests, process them, then recombine the result. That full sequence also takes a session lock until all requests have been processed and recombined.
+
+### 4A.6 Architecture Note
+
+This concurrency problem is not solved by multi-GPU.
+
+Multi-GPU capacity, such as the LoRA 70B horizon described in doc 74, can reduce hardware contention. It does not remove the logical dependencies between steps inside a sequence.
+
+The software session lock solves the problem in V1 without additional hardware. Multi-GPU remains a future performance comfort, not the concurrency solution.
+
+References:
+
+- Section 4: `ai_task` lifecycle
+- doc 52 Section 3A: multi-domain orchestration
+- doc 74: multi-GPU / LoRA horizon
+
+---
+
 ## 5. Where Each Component Lives
 
 ### 5.1 Backend code structure
