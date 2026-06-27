@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | ai_memories | 0017 | (c) divergent | réaligner sur doc 75 (table vide, schéma vectoriel manquant) | audité, à corriger |
 | missions | 0005,0019,0020,0021,0023 | (c) divergent — MAIS module SAIN : cœur du scoring codé (`intrinsic_score`, `domain_coefficient` ×10/8/5/4, `mission_type_category` cat_a-i, index "1 seule active/user" conforme). Écarts = renommages + couches futures non codées + 1 choix design. | réconcilier docs 52/43 et schéma missions/scores; créer ou déclasser outcomes/durations | schéma audité (partie 2a). Reste : logique service `missions.py` (partie 2b) |
-| vault | 0007,0024,0025 | — | — | à auditer |
+| vault | 0007,0024,0025,0026 | (c) divergent — deux ledgers actifs (`vault_transactions` et `imperium_vault_transactions`), deux surfaces API branchées, propriétaire de schéma non unique | trancher ledger canonique; réécrire/proclamer le doc propriétaire; déprécier ou fusionner la surface legacy | audité, à corriger |
 | path | 0008,0027 | — | — | à auditer |
 | daily_plans | 0009 | — | — | à auditer |
 | weekly_review | 0010,0013,0014,0015,0016 | — | — | à auditer |
