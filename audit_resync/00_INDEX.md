@@ -9,7 +9,7 @@
 | Module | Migration(s) | Verdict | Action | Statut |
 |---|---|---|---|---|
 | ai_memories | 0017 | (c) divergent | réaligner sur doc 75 (table vide, schéma vectoriel manquant) | audité, à corriger |
-| missions | 0005,0019,0020,0021,0023 | (c) divergent | réconcilier docs 52/43 et schéma missions/scores; créer ou déclasser outcomes/durations | schéma audité |
+| missions | 0005,0019,0020,0021,0023 | (c) divergent — MAIS module SAIN : cœur du scoring codé (`intrinsic_score`, `domain_coefficient` ×10/8/5/4, `mission_type_category` cat_a-i, index "1 seule active/user" conforme). Écarts = renommages + couches futures non codées + 1 choix design. | réconcilier docs 52/43 et schéma missions/scores; créer ou déclasser outcomes/durations | schéma audité (partie 2a). Reste : logique service `missions.py` (partie 2b) |
 | vault | 0007,0024,0025 | — | — | à auditer |
 | path | 0008,0027 | — | — | à auditer |
 | daily_plans | 0009 | — | — | à auditer |
@@ -22,3 +22,37 @@
 | fondation (skeleton/security/guards) | 0001,0002,0003 | — | — | à auditer |
 
 Verdicts : (a) conforme / (b) léger décalage / (c) divergent.
+
+## Décisions transverses à trancher
+
+Ces décisions se tranchent une fois le diagnostic complet, car plusieurs sont transverses (statuts, domaines, propriété de schéma) et valent mieux d'être réglées d'un coup que module par module.
+
+### Vocabulaire des domaines
+
+Code = `religious`/`business`/`finance`/`health` (anglais). Doc 52 §6 = `religieux`/`business`/`finances`/`santé` (français), mais Patch 17A = anglais.
+
+→ Trancher UNE langue canonique pour les valeurs de domaine, partout.
+
+### Liste canonique des statuts de mission
+
+Code = `backlog`/`active`/`completed`/`failed`/`abandoned`/`cancelled` (anglais). Doc 43 §5 = `active`/`faite`/`ratée`/`annulée`/`expirée`/`stashed` (français, ancien). Doc 52 patch 17A = mentionne `backlog`, pas `abandoned`.
+
+→ Établir UNE liste canonique de statuts, dans une langue, et aligner doc 43 + doc 52 + code dessus. Le code semble le plus à jour ; doc 43 est en dette.
+
+### final_score vs weighted_score
+
+Doc 52 §12 = `final_score`. Code = `weighted_score` (même concept).
+
+→ Choisir un nom.
+
+### Propriétaire du schéma missions
+
+`05_DATABASE_SCHEMA.md` ne définit PAS réellement les tables missions. Doc 52 est de fait le propriétaire.
+
+→ Acter officiellement que doc 52 possède le schéma missions/scoring, OU réécrire le 05. Question plus large : qui possède quoi entre 05 et les docs métier ?
+
+### Schéma imperium_mission_scores : compact (code) vs détaillé (doc §12)
+
+Code = compact (`intrinsic_score` + `domain_coefficient` + `weighted_score` + `explanation` JSONB). Doc §12 = détaillé (`criterion_a`..`criterion_e` en colonnes dédiées, `computed_at`...).
+
+→ Décision design : option A (aligner code sur doc, colonnes par critère) ou option B (garder le code compact V1 et documenter, si le JSONB `explanation` contient déjà le détail des critères). À vérifier : que contient `explanation` ?
