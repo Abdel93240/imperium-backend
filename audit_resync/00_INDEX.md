@@ -16,7 +16,7 @@
 | missions | 0005,0019,0020,0021,0023 | (c) divergent — MAIS module SAIN : cœur du scoring codé (`intrinsic_score`, `domain_coefficient` ×10/8/5/4, `mission_type_category` cat_a-i, index "1 seule active/user" conforme). Écarts = renommages + couches futures non codées + 1 choix design. | réconcilier docs 52/43 et schéma missions/scores; créer ou déclasser outcomes/durations | schéma audité (partie 2a). Reste : logique service `missions.py` (partie 2b) |
 | vault | 0007,0024,0025,0026 | (c) divergent — DEUX LEDGERS coexistent et sont TOUS DEUX actifs : `vault_transactions` (legacy, `/api/vault`, decimal, doc 27) ET `imperium_vault_transactions` (récent, `/api/imperium/vault`, cents, reversals, doc 04). ⚠️ RISQUE : `dashboard.py` et `weekly_report.py` lisent encore l'ANCIEN ledger → chiffres financiers potentiellement incohérents selon l'écran. Le ledger récent est bien fait (reversals, append-only API, 1 reversal/original garanti). | choisir `imperium_vault_transactions` comme canonique, migrer les lecteurs restants, supprimer le legacy (tables vides) | audité, à corriger (décision ledger requise) |
 | path | 0008,0027 | (b) léger décalage — module SAIN. Path V1 habits/check-ins propre : code cohérent, invariants codés (pas de check-in auto, pending exclu des stats, missed requires reason, unicité user/habit/date), COHÉRENCE RELIGIEUSE RESPECTÉE (déterministe, aucun appel IA/cloud/pgvector/embedding, conforme docs 41/50). Pas de doublon (`path_items` vs habits = responsabilités distinctes). SEUL BÉMOL : dette legacy `imperium_path_items` déprécié mais encore branché (routes + lecteurs dashboard/weekly/daily_plans) — à débrancher, sans risque (pas un doublon dangereux). Schéma non documenté colonne/colonne. | écrire le schéma Path réel dans `05` ou doc dédié; débrancher `imperium_path_items` legacy après confirmation du canonique | audité |
-| daily_plans | 0009 | (c) divergent — DEUX SURFACES ACTIVES : `daily_plan.py` (singulier) = snapshot read-only moderne expose par `GET /api/imperium/daily-plan`, sans table ni IA ; `daily_plans.py` (pluriel) = CRUD persistant `imperium_daily_plans` expose par `/api/imperium/day/plan...`. Schema execute proprietaire = migration 0009 + ORM `ImperiumDailyPlan`, doc 28 alignee ; doc 52 §9/§12 decrit une future vraie instanciation IA depuis monthly plan non implementee. Dette legacy : le flux persistant lit encore `ImperiumPathItem`; le snapshot moderne lit Path habits/check-ins et Vault canonique via dashboard foundation. | trancher V1 snapshot vs plan persiste; renommer/isoler le service pluriel; debrancher `ImperiumPathItem` si le flux persistant reste actif; marquer doc52 daily instantiation future ou implementer plus tard avec tests | audité, à corriger |
+| daily_plans | 0009 | (c) divergent — DEUX services à rôles DIFFÉRENTS, pas un doublon : `daily_plan.py` (singulier) = SNAPSHOT read-only, propre, sources canoniques, `GET /api/imperium/daily-plan` ; `daily_plans.py` (pluriel) = CRUD persistant, statuts `draft`→`active`→`completed`, lit encore le legacy `ImperiumPathItem`, `/api/imperium/day/plan...`. ÉCART MAJEUR : le daily plan "cerveau" du doc 52 §9 (génération intelligente : lit plan mensuel, score les missions, génère via modèle local) N'EST PAS CODÉ — seul l'échafaudage snapshot + CRUD existe. Normal : la génération intelligente attendait le GPU. Positifs : snapshot propre, garde-fou 1 mission active (409), priorités canoniques (`get_canonical_priority_order`, plus de `imperium_priority_rules`). Doc 28 ≠ doc 52 §12 sur les noms de colonnes. | trancher produit V1 : simple snapshot/CRUD foundation maintenant, ou vrai générateur intelligent doc 52 §9 à coder quand le GPU/local model est en place ; si le CRUD reste actif, rebrancher Path V1 habits/check-ins | audité |
 | weekly_review | 0010,0013,0014,0015,0016 | — | — | à auditer |
 | ai_tasks_results | 0012 | — | — | à auditer |
 | decision_framework | 0019 | — | — | à auditer |
@@ -65,11 +65,27 @@ Doc 52 §12 = `final_score`. Code = `weighted_score` (même concept).
 
 Deux tables/routes/services pour la finance. Décision : `imperium_vault_transactions` (récent, moderne) = canonique probable ; `vault_transactions` (legacy) = à supprimer. Impact : migrer `weekly_report` + ancien dashboard, déprécier doc 27. Risque de chiffres incohérents tant que non résolu.
 
+### DÉCISION PRODUIT — Qu'est-ce que le daily plan en V1 ?
+
+Le doc 52 §9 décrit le daily plan comme un CERVEAU qui GÉNÈRE le plan du jour : il lit le plan mensuel, score les missions via doc 52, planifie horaires/trajets, et génère via le modèle local.
+
+Le code actuel ne fait PAS ça : il a un snapshot read-only + un CRUD persistant, sans génération intelligente, sans scoring, sans modèle local, sans lecture du plan mensuel.
+
+→ Trancher : daily plan V1 = simple snapshot/CRUD (ce qui est codé) OU vrai générateur intelligent (doc 52 §9, à coder une fois le GPU en place) ? C'est une décision de produit, pas seulement d'alignement.
+
+Décision probable : foundation maintenant, cerveau quand le modèle local tourne.
+
 ### Dette legacy à débrancher (s'accumule)
 
-Du code déprécié reste branché et lu : vault (`vault_transactions` + lecteurs), path (`imperium_path_items` + lecteurs dashboard/weekly/daily_plans). Pattern : refonte faite, ancien jamais débranché.
+Du code déprécié reste branché et lu : vault (`vault_transactions` + lecteurs), path (`imperium_path_items` + lecteurs dashboard/weekly/daily_plans). `daily_plans.py` (CRUD persistant) lit encore `ImperiumPathItem` → à rebrancher sur Path V1 habits/check-ins si ce service reste actif. Pattern : refonte faite, ancien jamais débranché.
 
 → Lister tout le legacy actif et le débrancher proprement (tables vides, donc sans risque) une fois les canoniques confirmés.
+
+### Contradiction doc 28 vs doc 52 §12 (schéma imperium_daily_plans)
+
+Noms de colonnes divergents : `local_date` (28/code) vs `date` (52), `plan_status` (28/code) vs `status` (52), `plan_blocks` (28/code) vs `plan_json` (52). Le code suit le doc 28.
+
+→ Doc 52 §12 est soit futur, soit à corriger pour suivre le doc 28.
 
 ### Schéma imperium_mission_scores : compact (code) vs détaillé (doc §12)
 
