@@ -9,7 +9,7 @@
 | Module | Migration(s) | Verdict | Action | Statut |
 |---|---|---|---|---|
 | ai_memories | 0017 | (c) divergent | réaligner sur doc 75 (table vide, schéma vectoriel manquant) | audité, à corriger |
-| missions | 0005,0006,0020,0021 | — | — | à auditer |
+| missions | 0005,0019,0020,0021,0023 | (c) divergent | réconcilier docs 52/43 et schéma missions/scores; créer ou déclasser outcomes/durations | schéma audité |
 | vault | 0007,0024,0025 | — | — | à auditer |
 | path | 0008,0027 | — | — | à auditer |
 | daily_plans | 0009 | — | — | à auditer |
