@@ -17,7 +17,7 @@
 | vault | 0007,0024,0025,0026 | (c) divergent — DEUX LEDGERS coexistent et sont TOUS DEUX actifs : `vault_transactions` (legacy, `/api/vault`, decimal, doc 27) ET `imperium_vault_transactions` (récent, `/api/imperium/vault`, cents, reversals, doc 04). ⚠️ RISQUE : `dashboard.py` et `weekly_report.py` lisent encore l'ANCIEN ledger → chiffres financiers potentiellement incohérents selon l'écran. Le ledger récent est bien fait (reversals, append-only API, 1 reversal/original garanti). | choisir `imperium_vault_transactions` comme canonique, migrer les lecteurs restants, supprimer le legacy (tables vides) | audité, à corriger (décision ledger requise) |
 | path | 0008,0027 | (b) léger décalage — module SAIN. Path V1 habits/check-ins propre : code cohérent, invariants codés (pas de check-in auto, pending exclu des stats, missed requires reason, unicité user/habit/date), COHÉRENCE RELIGIEUSE RESPECTÉE (déterministe, aucun appel IA/cloud/pgvector/embedding, conforme docs 41/50). Pas de doublon (`path_items` vs habits = responsabilités distinctes). SEUL BÉMOL : dette legacy `imperium_path_items` déprécié mais encore branché (routes + lecteurs dashboard/weekly/daily_plans) — à débrancher, sans risque (pas un doublon dangereux). Schéma non documenté colonne/colonne. | écrire le schéma Path réel dans `05` ou doc dédié; débrancher `imperium_path_items` legacy après confirmation du canonique | audité |
 | daily_plans | 0009 | (c) divergent — DEUX services à rôles DIFFÉRENTS, pas un doublon : `daily_plan.py` (singulier) = SNAPSHOT read-only, propre, sources canoniques, `GET /api/imperium/daily-plan` ; `daily_plans.py` (pluriel) = CRUD persistant, statuts `draft`→`active`→`completed`, lit encore le legacy `ImperiumPathItem`, `/api/imperium/day/plan...`. ÉCART MAJEUR : le daily plan "cerveau" du doc 52 §9 (génération intelligente : lit plan mensuel, score les missions, génère via modèle local) N'EST PAS CODÉ — seul l'échafaudage snapshot + CRUD existe. Normal : la génération intelligente attendait le GPU. Positifs : snapshot propre, garde-fou 1 mission active (409), priorités canoniques (`get_canonical_priority_order`, plus de `imperium_priority_rules`). Doc 28 ≠ doc 52 §12 sur les noms de colonnes. | trancher produit V1 : simple snapshot/CRUD foundation maintenant, ou vrai générateur intelligent doc 52 §9 à coder quand le GPU/local model est en place ; si le CRUD reste actif, rebrancher Path V1 habits/check-ins | audité |
-| weekly_review | 0010,0013,0014,0015,0016 | (b) léger décalage — schéma WR globalement sain et conforme au doc 32 (sessions/messages/final_reports/decisions), mais propriétaire colonne-par-colonne absent dans doc 05; lien WR→mémoire cohérent avec le code actuel mais dépend de `ai_memories` déjà audité (c) divergent face aux docs 75/09. | ne pas toucher au schéma WR avant WR-b/WR-c; documenter le schéma WR dans 05 ou doc 32; réaligner `ai_memories` avant le commit mémoire WR | schéma audité (WR-a), reste logique |
+| weekly_review | 0010,0013,0014,0015,0016 | WR-a (SCHÉMA) : (b) léger décalage — schéma WR SAIN et fidèle au doc 32. Session backend-owned, messages ordonnés, rapports historisés (`draft`/`approved`/`stored`/`superseded`), décisions mémoire SÉPARÉES des mémoires (principe "décision ≠ mémoire" respecté, AUCUN write auto en mémoire). Pas de `pgvector_memory`. Petits écarts : rôles messages contiennent `qwen`/`opus` (nomenclature à généraliser), `analysis_status` vestige, vocabulaire "active" flou. ⚠️ DÉPENDANCE CLÉ : le lien WR→mémoire pointe vers `ai_memories` en mode WR-spécifique (`source_decision_id`/`report_id`/`session_id`), PAS le générique `source_table`/`source_id` du doc 75. Donc le WR est prisonnier d'`ai_memories`. | ne pas toucher au schéma WR avant WR-b/WR-c; corriger `ai_memories` avant le commit mémoire WR; documenter le schéma WR dans 05 ou doc 32 | schéma audité (WR-a). Reste : WR-b (états), WR-c (logique conversation, 3728 l., découpée en blocs) |
 | ai_tasks_results | 0012 | — | — | à auditer |
 | decision_framework | 0019 | — | — | à auditer |
 | pulse | 0028 | — | — | à auditer |
@@ -36,6 +36,13 @@ Ces décisions se tranchent une fois le diagnostic complet, car plusieurs sont t
 Code = `religious`/`business`/`finance`/`health` (anglais). Doc 52 §6 = `religieux`/`business`/`finances`/`santé` (français), mais Patch 17A = anglais.
 
 → Trancher UNE langue canonique pour les valeurs de domaine, partout.
+
+### Nomenclature dans le CODE (pas que les docs)
+
+Le code contient encore des noms de modèles concrets : rôles de messages WR = `qwen`/`opus`.
+La grande passe nomenclature a traité les DOCS ; le CODE n'a pas suivi.
+
+→ Prévoir une passe nomenclature CODE (rôles génériques) une fois les alignements de schéma faits. Mineur, à grouper.
 
 ### Liste canonique des statuts de mission
 
@@ -60,6 +67,12 @@ Doc 52 §12 = `final_score`. Code = `weighted_score` (même concept).
 `05_DATABASE_SCHEMA.md` devrait être LE dictionnaire de schéma, mais il contient des notes hétérogènes, pas les vraies tables. Du coup chaque module a son schéma dispersé dans des docs métier (52 pour missions, 04/27 pour vault), sans propriétaire clair.
 
 → Décision majeure et prioritaire : soit réécrire 05 comme vrai dictionnaire de schéma (toutes les tables, colonne par colonne), soit acter que chaque doc métier possède son schéma et que le 05 est déprécié. À trancher AVANT les corrections : cette décision conditionne toutes les corrections, car elle définit où vit la vérité du schéma. Les tables sans propriétaire documenté s'accumulent à chaque module.
+
+### ORDRE DES CORRECTIONS — ai_memories est la pièce maîtresse (à corriger EN PREMIER)
+
+Plusieurs modules dépendent du schéma `ai_memories` : le WR y branche son lien mémoire (`source_decision_id`...). Si on réaligne `ai_memories` sur le générique doc 75 (`source_table`/`source_id`, `privacy_level`, `embedding`...), le WR devra rebrancher dessus.
+
+→ CONSÉQUENCE : trancher et corriger `ai_memories` AVANT le commit mémoire du WR, sinon le lien WR→mémoire serait recodé deux fois. `ai_memories` n'est pas un module isolé, c'est un HUB. À traiter en priorité dans la phase de correction.
 
 ### Ledgers Vault en double (lié au point ci-dessus)
 
