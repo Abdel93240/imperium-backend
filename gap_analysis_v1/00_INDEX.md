@@ -19,13 +19,25 @@ L'audit Pulse révèle une catégorie plus fine que le simple couple déterminis
 
 Cette triple catégorie est à généraliser. Pour les domaines à données sensibles, par exemple Path religieux ou santé Pulse, garder une catégorie "sensible" distincte du simple déterministe.
 
+Note positive de campagne gap : la catégorie "sensible" est précieuse et bien gérée. Pulse côté médical et Path côté religieux ont un cadre de respect documenté de bout en bout, y compris sur les surfaces non codées. C'est rassurant pour la phase de codage future.
+
+### ⚠️ Calculs religieux = déterministe mais EXACT (pas juste fonctionnel)
+
+Certaines features Path V1 calculent du religieux : temps de prière (MAWAQIT + moteur fallback type Adhan), calendrier Hijri, direction Qibla, score Path pondéré.
+
+Techniquement, ces features sont déterministes. Mais une erreur touche la pratique religieuse de l'utilisateur : prière à la mauvaise heure, Qibla fausse, date Hijri erronée.
+
+Conclusion pour le codage futur : sources reconnues, méthodes de calcul validées, validation humaine recommandée. Catégorie à traiter comme "déterministe qui doit être EXACT", distincte du déterministe ordinaire.
+
 ### DÉCISION — Périmètre réel du "V1" (le label V1 de la doc ≠ premier livrable)
 
 La doc 40 étiquette "V1" un module santé complet mélangeant déterministe, médical sensible et IA. Ce n'est pas un premier jet réaliste.
 
 Décision à trancher : le V1 Pulse livrable = probablement le NOYAU DÉTERMINISTE (suivi alimentaire, hydratation, stock, workouts), tandis que le médical et l'IA deviennent des phases ultérieures.
 
-Ce constat vaut probablement pour d'autres domaines : le label "V1" des docs désigne souvent la VISION cible, pas le MVP. À garder en tête pour tous les domaines suivants : distinguer "V1 documenté" (vision) de "V1 livrable" (ce qu'on code en premier).
+Ce constat vaut désormais pour un troisième domaine. Le label "V1" des docs désigne souvent la VISION cible, pas le premier livrable. Path le confirme : le "Path V1" documenté est un module religieux complet, alors que le codé actuel n'est que le squelette habits/check-ins. Idem Pulse.
+
+Conclusion de campagne : une passe de REDÉFINITION V1/V2/V3 des docs devient de plus en plus clairement utile, à faire après la campagne gap. À garder en tête pour tous les domaines suivants : distinguer "V1 documenté" (vision) de "V1 livrable" (ce qu'on code en premier).
 
 ## Tableau de bord
 
@@ -33,7 +45,7 @@ Ce constat vaut probablement pour d'autres domaines : le label "V1" des docs dé
 |---|---:|---:|---:|---|
 | Vault / Finance | Audité. ✅ CODÉ V1 : ledger de base (transactions, reversals, summary). 🔲 GAP V1 : 8 features déterministes réclamées en V1 mais PAS codées — (1) deux livres business/perso, (2) wallet snapshots cash/bank/crypto manuels, (3) dépenses récurrentes/upcoming + alertes, (4) score de pression financière 0-100 (doc 11, formule déterministe), (5) objectifs journaliers min/comfortable/optimal, (6) corrections manuelles de pression, (7) base sadaqa = profit business réel, (8) consommation Imperium complète (pressure+alerts). TOUTES DÉTERMINISTES = codables sans GPU. 11 items "V1 ? à confirmer" (décisions de version pour le user). Conflits doc : pression 0-10 (doc 42) vs 0-100 (doc 11) ; n8n exclu (doc 27) vs décrit (doc 42). | Ledger de base code | 8 GAP V1 confirmés + 11 V1 ? à confirmer | Rapport créé: `GAP_vault.md` |
 | Pulse / Santé | Audité. ✅ CODÉ : table minimale `imperium_pulse_entries` (6 champs métier). 🔲 GAP V1 ÉNORME : 13 gaps. Le "Pulse V1" de la doc 40 = un système santé COMPLET : repas+macros, hydratation, stock+péremption, workouts détaillés, pain logs, body snapshots, documents médicaux, règles médicales, recommandations IA. La triple catégorie révèle 3 niveaux de maturité : DÉTERMINISTE codable MAINTENANT (hydratation+jeûne, stock CRUD+péremption, repas confirmation manuelle+macros, décrément stock, workouts manuels détaillés) ; MÉDICAL SENSIBLE, avec cadre RGPD/consentement requis AVANT (body snapshots, pain logs, documents médicaux, règles médicales) ; IA/GPU, qui attend un modèle local/cloud approprié (estimation repas, recommandations, extraction médicale). F08 dossier médical = hors V1, sujet séparé du doc 34, à implémenter plus tard. | Table minimale codee | 13 GAP V1 + décision globale de périmètre | Rapport créé: `GAP_pulse.md` |
-| Path / Religieux | Audité. ✅ CODÉ : noyau `imperium_path_habits` + `imperium_path_check_ins`, sain et déterministe, sans IA/cloud/pgvector/embedding. 🔲 GAP V1 : le doc 41 réclame un Path religieux beaucoup plus large que le noyau codé : prières obligatoires + MAWAQIT/fallback, fasting, sadaqa/carry/Vault handoff, ghusl/adresses, adhkar, invocations, Quran, score Path, Hijri/Qibla, events/offline/common memory. Triple catégorie adaptée au religieux : DÉTERMINISTE codable MAINTENANT (CRUD/logs/calculs/idempotency), RELIGIEUX SENSIBLE (corpus, arabe, invocations, dons, ghusl, mosquées/GPS, wording), IA/GPU (replans Imperium, advice, WR, optional voice/STT). Règle d'or confirmée : religieux jamais envoyé au cloud non protégé, corpus religieux jamais vectorisé. Dars doc 50 = HORS V1 en bloc (V3). YouTube doc 49 = HORS V1 en bloc (V3). F04 défi religieux = HORS V1/future spec. | Habits/check-ins Path code | 12 familles GAP V1 + 10 V1 ? à confirmer | Rapport créé: `GAP_path.md` |
+| Path / Religieux | Audité. ✅ CODÉ : habits/check-ins GÉNÉRIQUES (le squelette sain d'hier). 🔲 GAP V1 GROS (surprise) : tout le RELIGIEUX SPÉCIFIQUE V1 non codé — 12 gaps : (1) events/idempotency Path, (2) temps de prière MAWAQIT+cache+fallback calcul, (3) marquage 5 prières (`prayer_logs`), (4) jeûne (`fasting_logs`)+contrainte Pulse, (5) sadaqa hebdo+dons+report+handoff Vault, (6) ghusl+adresses, (7) adhkar compteurs, (8) invocations/rappels, (9) progression Coran, (10) score Path pondéré, (11) Hijri/Qibla foundation, (12) intégrations common memory. QUASI TOUT DÉTERMINISTE = codable sans GPU (8/12 priorisés codables tout de suite). ⏳ HORS V1 confirmé EN BLOC : Dars (doc 50, V3), YouTube (doc 49, V3), F04 défi (futur). Règle d'or Path RESPECTÉE dans toute la doc : pas de cloud religieux, pas de vectorisation corpus, arabe non interprété, wording non jugeant. | Habits/check-ins Path code | 12 familles GAP V1 + V1 ? à confirmer | Rapport créé: `GAP_path.md` |
 
 ## Décisions de version à trancher (V1 ?)
 
@@ -74,12 +86,12 @@ Pour Pulse, la vraie question n'est pas item par item mais globale : où coupe-t
 
 ### Path / Religieux
 
-1. Architecture fallback MAWAQIT exacte après investigation de l'API MAWAQIT réelle.
-2. Prayer mission awareness zones dans le daily planning : V1 livrable ou phase IA/cross-module ultérieure ?
-3. Mosque dynamic selection pendant VTC/day continuity : V1 livrable ou après fondation geo/planning ?
-4. Ghusl Imperium AI replan : activer en V1 ou garder seulement le state/event déterministe d'abord ?
+1. MAWAQIT fallback exact : architecture fallback après investigation de l'API MAWAQIT réelle + moteur type Adhan validé.
+2. Missioning dynamique prières : prayer mission awareness zones dans le daily planning, V1 livrable ou phase IA/cross-module ultérieure ?
+3. Sélection mosquée dynamique pendant VTC/day continuity : V1 livrable ou après fondation geo/planning ?
+4. Replan ghusl IA : activer en V1 ou garder seulement le state/event déterministe d'abord ?
 5. Feed IA / Nourrir l'IA pour invocations : V1 ou après validation du mécanisme doc 70 ?
-6. Path AI task catalog minimal : WR contribution, routine adjustment, sadaqa strategy.
+6. AI task catalog Path minimal : WR contribution, routine adjustment, sadaqa strategy.
 7. Sadaqa strategy advice : V1 ou phase conseil spirituel/financier ultérieure ?
 8. Routine adjustment advice : V1 ou après usage réel des adhkar routines ?
 9. WR contribution from Path : traité dans Path V1 ou dans le domaine Weekly Review ?
