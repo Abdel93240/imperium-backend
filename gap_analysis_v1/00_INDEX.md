@@ -33,6 +33,7 @@ Ce constat vaut probablement pour d'autres domaines : le label "V1" des docs dé
 |---|---:|---:|---:|---|
 | Vault / Finance | Audité. ✅ CODÉ V1 : ledger de base (transactions, reversals, summary). 🔲 GAP V1 : 8 features déterministes réclamées en V1 mais PAS codées — (1) deux livres business/perso, (2) wallet snapshots cash/bank/crypto manuels, (3) dépenses récurrentes/upcoming + alertes, (4) score de pression financière 0-100 (doc 11, formule déterministe), (5) objectifs journaliers min/comfortable/optimal, (6) corrections manuelles de pression, (7) base sadaqa = profit business réel, (8) consommation Imperium complète (pressure+alerts). TOUTES DÉTERMINISTES = codables sans GPU. 11 items "V1 ? à confirmer" (décisions de version pour le user). Conflits doc : pression 0-10 (doc 42) vs 0-100 (doc 11) ; n8n exclu (doc 27) vs décrit (doc 42). | Ledger de base code | 8 GAP V1 confirmés + 11 V1 ? à confirmer | Rapport créé: `GAP_vault.md` |
 | Pulse / Santé | Audité. ✅ CODÉ : table minimale `imperium_pulse_entries` (6 champs métier). 🔲 GAP V1 ÉNORME : 13 gaps. Le "Pulse V1" de la doc 40 = un système santé COMPLET : repas+macros, hydratation, stock+péremption, workouts détaillés, pain logs, body snapshots, documents médicaux, règles médicales, recommandations IA. La triple catégorie révèle 3 niveaux de maturité : DÉTERMINISTE codable MAINTENANT (hydratation+jeûne, stock CRUD+péremption, repas confirmation manuelle+macros, décrément stock, workouts manuels détaillés) ; MÉDICAL SENSIBLE, avec cadre RGPD/consentement requis AVANT (body snapshots, pain logs, documents médicaux, règles médicales) ; IA/GPU, qui attend un modèle local/cloud approprié (estimation repas, recommandations, extraction médicale). F08 dossier médical = hors V1, sujet séparé du doc 34, à implémenter plus tard. | Table minimale codee | 13 GAP V1 + décision globale de périmètre | Rapport créé: `GAP_pulse.md` |
+| Path / Religieux | Audité. ✅ CODÉ : noyau `imperium_path_habits` + `imperium_path_check_ins`, sain et déterministe, sans IA/cloud/pgvector/embedding. 🔲 GAP V1 : le doc 41 réclame un Path religieux beaucoup plus large que le noyau codé : prières obligatoires + MAWAQIT/fallback, fasting, sadaqa/carry/Vault handoff, ghusl/adresses, adhkar, invocations, Quran, score Path, Hijri/Qibla, events/offline/common memory. Triple catégorie adaptée au religieux : DÉTERMINISTE codable MAINTENANT (CRUD/logs/calculs/idempotency), RELIGIEUX SENSIBLE (corpus, arabe, invocations, dons, ghusl, mosquées/GPS, wording), IA/GPU (replans Imperium, advice, WR, optional voice/STT). Règle d'or confirmée : religieux jamais envoyé au cloud non protégé, corpus religieux jamais vectorisé. Dars doc 50 = HORS V1 en bloc (V3). YouTube doc 49 = HORS V1 en bloc (V3). F04 défi religieux = HORS V1/future spec. | Habits/check-ins Path code | 12 familles GAP V1 + 10 V1 ? à confirmer | Rapport créé: `GAP_path.md` |
 
 ## Décisions de version à trancher (V1 ?)
 
@@ -71,6 +72,19 @@ Pour Pulse, la vraie question n'est pas item par item mais globale : où coupe-t
 13. Medical document flow timing : en V1 livrable ou phase ultérieure après cadre RGPD/consentement/sécurité ?
 14. Relation F08 vs doc 40: doc 40 renvoie à doc 34; F08 semble future/hors V1.
 
+### Path / Religieux
+
+1. Architecture fallback MAWAQIT exacte après investigation de l'API MAWAQIT réelle.
+2. Prayer mission awareness zones dans le daily planning : V1 livrable ou phase IA/cross-module ultérieure ?
+3. Mosque dynamic selection pendant VTC/day continuity : V1 livrable ou après fondation geo/planning ?
+4. Ghusl Imperium AI replan : activer en V1 ou garder seulement le state/event déterministe d'abord ?
+5. Feed IA / Nourrir l'IA pour invocations : V1 ou après validation du mécanisme doc 70 ?
+6. Path AI task catalog minimal : WR contribution, routine adjustment, sadaqa strategy.
+7. Sadaqa strategy advice : V1 ou phase conseil spirituel/financier ultérieure ?
+8. Routine adjustment advice : V1 ou après usage réel des adhkar routines ?
+9. WR contribution from Path : traité dans Path V1 ou dans le domaine Weekly Review ?
+10. Split backend vs Android pour PAT-01..PAT-12 : quels contrats backend exacts doivent être livrés avant UI ?
+
 ## Enrichissement catalogue
 
-En attente. Ne pas encore appliquer l'enrichissement catalogue des docs 27/42/11 ni 40/34/F08 ; tous les enrichissements catalogue seront appliqués en une passe à la fin de la campagne gap.
+En attente. Ne pas encore appliquer l'enrichissement catalogue des docs 27/42/11, 40/34/F08, ni 41/50/49/F04 ; tous les enrichissements catalogue seront appliqués en une passe à la fin de la campagne gap.
