@@ -57,13 +57,29 @@ SETTINGS — Priorités de vie (drag-to-reorder):
 
 User can:
 - Reorder positions anytime
-- Choices stored in user_priorities table
+- Choices stored in `imperium_user_priorities`
 - Changes propagate instantly to next plan generation
 ```
 
 The 4 default domains are: Religieux, Business, Finances, Santé.
 
 The hierarchy is **fully user-controllable**. If the user decides tomorrow that finances must come first, that's their right.
+
+Canonical storage/API vocabulary is English:
+
+```text
+religious | business | finance | health
+```
+
+French names are UI labels only:
+
+```text
+Religieux | Business | Finances | Santé
+```
+
+Backend services may accept French aliases for user convenience, but persisted
+values and API contracts remain English. No table rename is required for this
+decision.
 
 ### Patch 7G — Priority Reconciliation
 
@@ -295,7 +311,10 @@ score_intrinsèque = A + B + C + D + E
                   = entre 0 et 100
 ```
 
-Stored in `imperium_mission_scores` along with each criterion's value (for transparency and debugging).
+Stored in `imperium_mission_scores` with the compact internal score fields and
+an `explanation` JSONB payload containing the A-E breakdown (for transparency
+and debugging). The A-E details do not require dedicated `criterion_a` through
+`criterion_e` columns in V1.
 
 ---
 
@@ -422,7 +441,7 @@ These brackets are tunable. They translate the continuous score into actionable 
 ```text
 Each mission carries:
   - id, title
-  - domain (religieux | business | finances | santé)
+  - domain (religious | business | finance | health)
   - estimated_duration_minutes
   - required_location (text or coordinates if specific)
   - required_skills (rare, e.g. need a car)
@@ -431,10 +450,10 @@ Each mission carries:
   - source (ai_planner | path | vector | manual | calendar)
   - deadline_at (if any)
   - is_recurrent + recurrence_rrule
-  - intrinsic_criteria_a, _b, _c, _d, _e
   - intrinsic_score
   - domain_coefficient
-  - final_score
+  - weighted_score
+  - explanation JSONB (A-E breakdown)
   - priority_level (1-10)
   - status (per doc 43 §5)
 ```
@@ -606,7 +625,7 @@ OUTPUT FORMAT (strict JSON):
           "missions": [
             {
               "title": "Fajr",
-              "domain": "religieux",
+              "domain": "religious",
               "scheduled_at": "06:30",
               "duration_minutes": 15,
               "from_backlog": false,
@@ -996,32 +1015,37 @@ These patterns feed the next monthly plan as Category 6 inputs.
 ## 12. Database Schema
 
 ```sql
-CREATE TABLE user_priorities (
+CREATE TABLE imperium_user_priorities (
   id              UUID PK,
-  user_id         UUID FK UNIQUE,
-  position_1      VARCHAR(32) NOT NULL, -- e.g. 'religieux'
-  position_2      VARCHAR(32) NOT NULL,
-  position_3      VARCHAR(32) NOT NULL,
-  position_4      VARCHAR(32) NOT NULL,
+  user_id         UUID FK,
+  domain          VARCHAR(32) NOT NULL, -- religious | business | finance | health
+  position        INTEGER NOT NULL,     -- 1..4
+  coefficient     INTEGER NOT NULL,     -- 10 | 8 | 5 | 4
+  is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ,
   updated_at      TIMESTAMPTZ
 );
 
 CREATE TABLE imperium_mission_scores (
   id                       UUID PK,
+  user_id                  UUID FK,
   mission_id               UUID FK,
-  criterion_a              INTEGER, -- deadline proximity 0-30
-  criterion_b              INTEGER, -- impact gravity 0-30
-  criterion_c_category     VARCHAR(2), -- 'A' to 'I'
-  criterion_c              INTEGER, -- 0-20 from category
-  criterion_d              INTEGER, -- dependency 0-10
-  criterion_e              INTEGER, -- recurrence 0-10
+  domain                   VARCHAR(32), -- religious | business | finance | health
   intrinsic_score          INTEGER, -- 0-100
-  domain                   VARCHAR(32),
-  domain_coefficient       INTEGER,
-  final_score              INTEGER, -- intrinsic × coef
-  priority_level           INTEGER, -- 1-10
-  computed_at              TIMESTAMPTZ
+  domain_coefficient       INTEGER, -- internal, not public API
+  weighted_score           INTEGER, -- intrinsic × coef, internal
+  source                   VARCHAR(64),
+  explanation              JSONB,   -- A-E breakdown, priority_bucket, reason codes, inputs
+  created_at               TIMESTAMPTZ,
+  updated_at               TIMESTAMPTZ
 );
+
+`imperium_mission_scores` deliberately stays compact in V1. The detailed
+criteria A-E live inside `explanation` (`DecisionFrameworkScoreExplanation` /
+`_build_breakdown`) instead of dedicated `criterion_a`..`criterion_e` columns.
+`weighted_score` is the stored internal score-final concept; public mission
+surfaces compute and expose the bucket/label summary, not the coefficient or
+weighted score.
 
 CREATE TABLE imperium_monthly_plans (
   -- per Section 8.6
@@ -1147,7 +1171,7 @@ The framework plans AROUND them, never on top.
 
 ```text
 Phase 1 — Core scoring system
-  ├─ user_priorities table & UI
+  ├─ imperium_user_priorities table & UI
   ├─ Mission scoring service (criteria A-E)
   ├─ Domain coefficient logic
   └─ Score storage and retrieval

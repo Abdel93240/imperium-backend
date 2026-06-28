@@ -19,7 +19,7 @@
 | daily_plans | 0009 | (c) divergent — DEUX services à rôles DIFFÉRENTS, pas un doublon : `daily_plan.py` (singulier) = SNAPSHOT read-only, propre, sources canoniques, `GET /api/imperium/daily-plan` ; `daily_plans.py` (pluriel) = CRUD persistant, statuts `draft`→`active`→`completed`, lit encore le legacy `ImperiumPathItem`, `/api/imperium/day/plan...`. ÉCART MAJEUR : le daily plan "cerveau" du doc 52 §9 (génération intelligente : lit plan mensuel, score les missions, génère via modèle local) N'EST PAS CODÉ — seul l'échafaudage snapshot + CRUD existe. Normal : la génération intelligente attendait le GPU. Positifs : snapshot propre, garde-fou 1 mission active (409), priorités canoniques (`get_canonical_priority_order`, plus de `imperium_priority_rules`). Doc 28 ≠ doc 52 §12 sur les noms de colonnes. | trancher produit V1 : simple snapshot/CRUD foundation maintenant, ou vrai générateur intelligent doc 52 §9 à coder quand le GPU/local model est en place ; si le CRUD reste actif, rebrancher Path V1 habits/check-ins | audité |
 | weekly_review | 0010,0013,0014,0015,0016 | WR-a (SCHÉMA) : (b) léger décalage — schéma WR SAIN et fidèle au doc 32. Session backend-owned, messages ordonnés, rapports historisés (`draft`/`approved`/`stored`/`superseded`), décisions mémoire SÉPARÉES des mémoires. WR-b (ÉTATS) : (c) divergent DE PÉRIMÈTRE — `weekly_review_state.py` est une couche BANNER/READINESS, pas la machine WR. WR-c (LOGIQUE) : conversation/session (b), MÉMOIRE/commit (c). Machine conversationnelle V1 fonctionnelle et prudente (backend-owned, idempotente, validation user explicite, aucune écriture mémoire auto). MAIS le commit mémoire écrit dans `ai_memories` divergent (`source_decision_id`, `kind/scope/status/visibility`) SANS embedding (le code le dit : "No embeddings were generated") et SANS `privacy_level` (doc 75 = non négociable). Confirme : `ai_memories` = HUB à corriger AVANT de rebrancher le commit WR. Autres : routage doc 30 PAS implémenté (pas de scoring `/200`, pas de `router_decision`, pas d'audit entrée/sortie — le cerveau attend le GPU) ; risque "fallback candidates" (dérive résumé→apprentissage, à durcir vs doc 75) ; noms modèles concrets dans le code (`qwen2.5:7b-instruct` = reste du 7B !, rôles `opus`/`qwen`). Statut : WR COMPLET (a+b+c audités). | corriger `ai_memories` AVANT le commit mémoire WR; rebrancher le commit sur `source_table/source_id`, `privacy_level`, embedding, `memory_type/learning_element_type`; durcir les fallback candidates; centraliser les transitions WR; remplacer les noms de modèles concrets par des rôles; aligner doc 32 sur l'existence du commit mémoire réel | WR COMPLET audité (WR-a schéma, WR-b readiness/états, WR-c logique conversation/mémoire) |
 | ai_tasks_results | 0012 | (c) divergent DE PÉRIMÈTRE, fondation SAINE — à coder, pas à réparer. Fondation storage/callback solide : idempotence task + result, HMAC callbacks, résultats non canoniques, validations explicites, provider Qwen dry-run structuré. MAIS contrat V1 complet doc 31 §7 pas codé : colonnes routage requêtables (`difficulty_score`, `selected_model`, `routing_model`...) manquantes ; `router_decision` en JSONB seulement. ⭐ CONFIRME la concurrence doc 16 §4A : priorité `INTERACTIVE/BACKGROUND`, statut `postponed`, file à priorités, verrou de session = TOUS ABSENTS = à coder. L'extension gravée ce matin n'est pas en conflit, c'est la prochaine couche. Routage `/200` pas branché au lifecycle. | coder la queue IA V1 : ajouter priorité + `postponed` + claim interne atomique + session lock; brancher le scoring `/200` Qwen dans le lifecycle; aligner le provider/config/workflows/tests sur Qwen 32B ou alias `local_router`; décider si doc 31 §7 est obligatoire ou backlog futur | audité |
-| decision_framework | 0019 | (b) léger décalage — FONDATION DÉTERMINISTE SAINE : `imperium_user_priorities` est bien la source canonique Patch 7G (positions 1-4, unicité active domaine/position, coef internes ×10/×8/×5/×4 non exposés). Le scoring A-E est réellement codé et fidèle au doc 52 : deadline, gravité, CAT A-I, dépendance, récurrence ; `weighted_score = intrinsic × coefficient`; bucket public conforme ; `explanation` contient bien le détail A-E. Aucun appel IA/n8n/pgvector/embedding. Nuance : ce n'est pas encore le cerveau complet (pas de catégorisation IA, routage doc 30, planning mensuel/journalier). Écarts mineurs : vocabulaire domaines anglais en code/API vs libellés FR doc, endpoint `decision-framework/score-preview` plus détaillé que les surfaces mission publiques §5.3, restes legacy `imperium_priority_rules` compat-only. | acter anglais en base/API + FR UI; clarifier `score-preview` debug/fondation vs surface publique; garder puis supprimer `imperium_priority_rules` en phase legacy; ne pas recoder le scoring | audité |
+| decision_framework | 0019 | (b) léger décalage — MEILLEUR MODULE de la campagne. Le SCORING DÉTERMINISTE du doc 52 est CODÉ, FIDÈLE et TESTÉ : critères A-E avec barèmes exacts (deadline today=30, CAT A=20, etc.), coef ×10/8/5/4, score final = intrins×coef, bucket public 10 niveaux (seuils §6.1). Exposition §5.3 respectée (`weighted_score`/coef NON exposés, tests verrouillent). Orchestration §3A supportée (`get_canonical_priority_order` lit `imperium_user_priorities`, POST priorities legacy = 410 Gone). Déterminisme garanti+testé (`real_ai_enabled=False`). Écarts mineurs : vocabulaire domaines (`religious`/religieux), statut endpoint `score-preview` (debug vs public), legacy `imperium_priority_rules` (compat-only). Statut : audité. | ne pas recoder le scoring; acter anglais en base/API + FR UI; documenter schéma compact `imperium_mission_scores`; clarifier `score-preview` debug/fondation vs surface publique; garder puis supprimer `imperium_priority_rules` en phase legacy | audité |
 | pulse | 0028 | — | — | à auditer |
 | events | 0011,0029,0030,0031 | — | — | à auditer |
 | calendar | 0022 | — | — | à auditer |
@@ -35,7 +35,7 @@ Ces décisions se tranchent une fois le diagnostic complet, car plusieurs sont t
 
 Code = `religious`/`business`/`finance`/`health` (anglais). Doc 52 §6 = `religieux`/`business`/`finances`/`santé` (français), mais Patch 17A = anglais.
 
-→ Trancher UNE langue canonique pour les valeurs de domaine, partout.
+→ RECOMMANDATION TRANCHEE : anglais canonique en base/API (`religious`/`business`/`finance`/`health`), français uniquement en libellés UI (`Religieux`/`Business`/`Finances`/`Santé`). Le service accepte déjà les alias FR et stocke l'anglais. Acter dans doc 52 + doc 05, sans renommage de tables.
 
 ### Nomenclature dans le CODE (pas que les docs)
 
@@ -53,9 +53,9 @@ Code = `backlog`/`active`/`completed`/`failed`/`abandoned`/`cancelled` (anglais)
 
 ### final_score vs weighted_score
 
-Doc 52 §12 = `final_score`. Code = `weighted_score` (même concept).
+Ancien doc 52 §12 = `final_score`. Code = `weighted_score` (même concept).
 
-→ Choisir un nom.
+→ Décision : garder `weighted_score` comme nom interne stocké; `score_final` reste un concept métier/prose. Les surfaces publiques exposent le bucket/label, pas le score pondéré.
 
 ### Propriétaire du schéma missions
 
@@ -77,7 +77,9 @@ Plusieurs modules dépendent du schéma `ai_memories` : le WR y branche son lien
 
 ### Pattern global — routage intelligent doc 30 pas encore construit
 
-Le routage intelligent doc 30 (scoring `/200` branché, audit entrée/sortie, `router_decision` persisté, choix dynamique de modèle) n'est codé NULLE PART encore dans les modules audités (`daily_plan`, WR, `ai_tasks`). C'est LA grande couche "cerveau" qui attend le modèle local/GPU.
+Le cerveau a 2 couches. (1) DÉTERMINISTE : scoring/priorités/buckets = CODÉ, fidèle, testé ✅. Le calculable est calculé. (2) IA : routage `/200` branché, génération, catégorisation automatique, plan mensuel/journalier = pas encore codé, attend le GPU/V100.
+
+Le routage intelligent doc 30 (scoring `/200` branché, audit entrée/sortie, `router_decision` persisté, choix dynamique de modèle) n'est codé NULLE PART encore dans les modules audités (`daily_plan`, WR, `ai_tasks`). C'est LA grande couche IA du "cerveau" qui attend le modèle local/GPU.
 
 `ai_tasks` a la fondation pour l'accueillir (`provider Qwen` + champ `router_decision`), mais le branchement reste à faire : score `/200` non intégré au lifecycle, choix de modèle non propagé en colonnes requêtables, pas de routage effectif avant exécution.
 
@@ -121,6 +123,6 @@ Noms de colonnes divergents : `local_date` (28/code) vs `date` (52), `plan_statu
 
 ### Schéma imperium_mission_scores : compact (code) vs détaillé (doc §12)
 
-Code = compact (`intrinsic_score` + `domain_coefficient` + `weighted_score` + `explanation` JSONB). Doc §12 = détaillé (`criterion_a`..`criterion_e` en colonnes dédiées, `computed_at`...).
+Code = compact (`intrinsic_score` + `domain_coefficient` + `weighted_score` + `explanation` JSONB). Ancien doc §12 = détaillé (`criterion_a`..`criterion_e` en colonnes dédiées, `computed_at`...).
 
-→ Décision design : option A (aligner code sur doc, colonnes par critère) ou option B (garder le code compact V1 et documenter, si le JSONB `explanation` contient déjà le détail des critères). À vérifier : que contient `explanation` ?
+→ TRANCHÉE : OPTION B, garder compact. Raison : le détail A-E vit dans le JSONB `explanation` (`DecisionFrameworkScoreExplanation` + `_build_breakdown`). Le code compact suffit; pas de colonnes `criterion_a`..`criterion_e` dédiées en V1. Mettre à jour doc 52 §12 pour refléter le schéma compact réel.

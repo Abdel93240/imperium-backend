@@ -432,3 +432,27 @@ Weekly Review
 Internal backend readers must use `app/services/imperium/event_readers.py`.
 The public list route returns `count = page_count = len(items)` and does not expose a total_count.
 The internal reader uses `limit + 1`, `has_more`, and `next_offset`.
+
+## Canonical Domain Vocabulary
+
+Storage and API contracts use English domain values:
+
+```text
+religious
+business
+finance
+health
+```
+
+French domain names are UI labels only:
+
+```text
+Religieux
+Business
+Finances
+Santé
+```
+
+Services may accept French aliases at input boundaries for convenience, but
+database rows and API responses must normalize to the English canonical values.
+This is a vocabulary decision only; it does not require table renames.
