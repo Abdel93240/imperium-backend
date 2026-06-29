@@ -60,6 +60,28 @@ PRIORITÉ V1 (ordre, sans attendre l'IA/GPU) :
 
 Créer plus tard une liste de contrôle des handoffs cross-module, car c'est le point d'intégration critique. Les gaps déterministes des AUTRES modules (events sortants) doivent matcher les consumers d'Imperium (events entrants).
 
+### ⚠️ Le commit mémoire est CODÉ mais NON CONFORME — dette en cours d'accumulation
+
+Le WR écrit DÉJÀ dans `ai_memories`, mais la cible diverge du modèle vectoriel canonique : PAS de `privacy_level`, PAS d'embedding, PAS de `source_table`/`source_id`, PAS de `memory_type`.
+
+Ce n'est pas un "il manque" : c'est du code qui écrit au MAUVAIS endroit/format. Résultat : accumulation de dette mémoire, avec des souvenirs mal formés et difficiles à migrer plus tard.
+
+PRIORITÉ : corriger le hub `ai_memories` AVANT de brancher le cerveau IA du WR, qui produira encore plus de souvenirs. Sinon on industrialise la dette. Cela confirme la priorité `ai_memories` déjà identifiée par l'utilisateur.
+
+### ⚠️ Pattern transverse critique — le WR parle, mais personne n'écoute encore
+
+Après Imperium, le WR confirme le 2e grand domaine touché par le même pattern : les handoffs WR -> Imperium, WR -> Vector et WR -> mémoire sont DOCUMENTÉS mais SANS répondant codé.
+
+Comme Imperium, le WR "parle" mais personne n'écoute encore. L'INTÉGRATION CROSS-MODULE est donc LE grand chantier transversal du V1, plus important que toute feature isolée.
+
+Exemple critique : le WR révise les règles R1-R11 de Vector, mais rien côté Vector ne sait recevoir ces révisions.
+
+### Note positive WR — plomberie d'abord, cerveau ensuite
+
+La séparation plomberie/cerveau est nette. L'infrastructure du WR (fenêtres, collecte, pré-calcul, états) est CODABLE SANS GPU. On prépare toute la plomberie, puis on branche le cerveau IA quand le GPU arrive.
+
+Bon réflexe doc à préserver : pré-calculer les chiffres AVANT le raisonnement IA. Le cerveau doit recevoir des faits préparés, pas improviser du SQL.
+
 ## Tableau de bord
 
 | Domaine | Features V1 reclamees | Codees | GAP V1 | Statut |
@@ -68,6 +90,7 @@ Créer plus tard une liste de contrôle des handoffs cross-module, car c'est le 
 | Pulse / Santé | Audité. ✅ CODÉ : table minimale `imperium_pulse_entries` (6 champs métier). 🔲 GAP V1 ÉNORME : 13 gaps. Le "Pulse V1" de la doc 40 = un système santé COMPLET : repas+macros, hydratation, stock+péremption, workouts détaillés, pain logs, body snapshots, documents médicaux, règles médicales, recommandations IA. La triple catégorie révèle 3 niveaux de maturité : DÉTERMINISTE codable MAINTENANT (hydratation+jeûne, stock CRUD+péremption, repas confirmation manuelle+macros, décrément stock, workouts manuels détaillés) ; MÉDICAL SENSIBLE, avec cadre RGPD/consentement requis AVANT (body snapshots, pain logs, documents médicaux, règles médicales) ; IA/GPU, qui attend un modèle local/cloud approprié (estimation repas, recommandations, extraction médicale). F08 dossier médical = hors V1, sujet séparé du doc 34, à implémenter plus tard. | Table minimale codee | 13 GAP V1 + décision globale de périmètre | Rapport créé: `GAP_pulse.md` |
 | Path / Religieux | Audité. ✅ CODÉ : habits/check-ins GÉNÉRIQUES (le squelette sain d'hier). 🔲 GAP V1 GROS (surprise) : tout le RELIGIEUX SPÉCIFIQUE V1 non codé — 12 gaps : (1) events/idempotency Path, (2) temps de prière MAWAQIT+cache+fallback calcul, (3) marquage 5 prières (`prayer_logs`), (4) jeûne (`fasting_logs`)+contrainte Pulse, (5) sadaqa hebdo+dons+report+handoff Vault, (6) ghusl+adresses, (7) adhkar compteurs, (8) invocations/rappels, (9) progression Coran, (10) score Path pondéré, (11) Hijri/Qibla foundation, (12) intégrations common memory. QUASI TOUT DÉTERMINISTE = codable sans GPU (8/12 priorisés codables tout de suite). ⏳ HORS V1 confirmé EN BLOC : Dars (doc 50, V3), YouTube (doc 49, V3), F04 défi (futur). Règle d'or Path RESPECTÉE dans toute la doc : pas de cloud religieux, pas de vectorisation corpus, arabe non interprété, wording non jugeant. | Habits/check-ins Path code | 12 familles GAP V1 + V1 ? à confirmer | Rapport créé: `GAP_path.md` |
 | Imperium / Orchestrateur | Audité. ✅ CODÉ : decision_framework déterministe SAIN (priorités, scoring A-E, score pondéré). 🔲 GAP V1 : 21 gaps. CONSTAT MAJEUR — Imperium est documenté comme le CHEF d'orchestre mais le code ne prouve AUCUN consommateur des handoffs cross-module. Tous les modules (Vault/Pulse/Path/Vector) envoient des signaux VERS Imperium (ghusl→replan, pression→replan, prière>course, smart fuel→replan...) mais le "living plan", les hooks, les replan_events et l'arbitrage runtime ne sont PAS codés. → "Les modules produisent des signaux sans chef effectif." C'est le gap le plus important de toute la campagne. De plus, le daily_plan a 2 surfaces DIVERGENTES (snapshot read-only moderne + legacy persistante), aucune ne fait la génération/replanification. QUASI TOUT LE GAP EST DÉTERMINISTE = codable maintenant sans GPU. L'IA (génération plan, replan intelligent) vient PAR-DESSUS la fondation déterministe. | Decision framework déterministe + daily-plan foundations divergentes | 21 GAP V1 + décisions Imperium à trancher | Rapport créé: `GAP_imperium.md` |
+| Weekly Review / WR | Audité. ✅ CODÉ : le PLUS avancé en plomberie conversationnelle — sessions/messages/final reports, cycle approval -> store explicite, read models, décisions mémoire, commit réel vers `ai_memories`. 🔲 GAP V1 EN 2 COUCHES : DÉTERMINISTE codable maintenant — fenêtres 7j strictes fermées (règle existe, pas centralisée), mardi 20h backend-enforced (timing PAS garanti actuellement), collecte/agrégation semaine, pré-calcul des chiffres avant raisonnement IA, state machine centralisée (aujourd'hui dispersée), trail de versions des règles révisées, contrats `wr.validated` -> `apply`. IA/GPU — summary by exception, questions réflexives, rolling 4-week re-planning, audit de sortie, génération révisions règles + patterns mémoire. | WR conversationnel + final reports + décisions mémoire + commit `ai_memories` réel | GAP déterministe plomberie WR + GAP IA/GPU cerveau WR + dette `ai_memories` non conforme | Rapport WR à créer/relier après consolidation |
 
 ## Décisions de version à trancher (V1 ?)
 
