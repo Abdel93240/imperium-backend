@@ -82,6 +82,24 @@ La séparation plomberie/cerveau est nette. L'infrastructure du WR (fenêtres, c
 
 Bon réflexe doc à préserver : pré-calculer les chiffres AVANT le raisonnement IA. Le cerveau doit recevoir des faits préparés, pas improviser du SQL.
 
+### 🔑 Le socle explique les handoffs orphelins d'Imperium et du WR
+
+La racine du "les modules parlent mais personne n'écoute" = (1) deux event stores au vocabulaire incompatible, (2) aucun consumer. Résoudre le socle events = débloquer l'intégration de TOUT le système. C'est le chantier transversal le plus structurant.
+
+Le rapport recommande 3 catalogues centraux à créer :
+
+- `76_INFRA_MEMORY_AI_EVENTS_CONTRACT` : contrat socle unique.
+- `77_EVENT_TYPE_CATALOG_V1` : vocabulaire d'events stable -> résout les 2 stores.
+- `78_AI_TASK_CATALOG_V1` : vocabulaire `task_type` -> évite que chaque workflow invente.
+
+Raison : règles éparpillées sur docs 06/09/30/31/38/45/75 + code déjà divergé. Un catalogue unique évite de recoder un socle incohérent.
+
+### ✅ Campagne gap V1 complète
+
+La campagne est maintenant complète : 8 domaines traités, incluant Vault, Pulse, Path, Vector (chantier dédié séparé), Imperium, Weekly Review et infra/socle mémoire-AI-events.
+
+Statut : prêt pour la SYNTHÈSE GLOBALE.
+
 ## Tableau de bord
 
 | Domaine | Features V1 reclamees | Codees | GAP V1 | Statut |
@@ -91,7 +109,7 @@ Bon réflexe doc à préserver : pré-calculer les chiffres AVANT le raisonnemen
 | Path / Religieux | Audité. ✅ CODÉ : habits/check-ins GÉNÉRIQUES (le squelette sain d'hier). 🔲 GAP V1 GROS (surprise) : tout le RELIGIEUX SPÉCIFIQUE V1 non codé — 12 gaps : (1) events/idempotency Path, (2) temps de prière MAWAQIT+cache+fallback calcul, (3) marquage 5 prières (`prayer_logs`), (4) jeûne (`fasting_logs`)+contrainte Pulse, (5) sadaqa hebdo+dons+report+handoff Vault, (6) ghusl+adresses, (7) adhkar compteurs, (8) invocations/rappels, (9) progression Coran, (10) score Path pondéré, (11) Hijri/Qibla foundation, (12) intégrations common memory. QUASI TOUT DÉTERMINISTE = codable sans GPU (8/12 priorisés codables tout de suite). ⏳ HORS V1 confirmé EN BLOC : Dars (doc 50, V3), YouTube (doc 49, V3), F04 défi (futur). Règle d'or Path RESPECTÉE dans toute la doc : pas de cloud religieux, pas de vectorisation corpus, arabe non interprété, wording non jugeant. | Habits/check-ins Path code | 12 familles GAP V1 + V1 ? à confirmer | Rapport créé: `GAP_path.md` |
 | Imperium / Orchestrateur | Audité. ✅ CODÉ : decision_framework déterministe SAIN (priorités, scoring A-E, score pondéré). 🔲 GAP V1 : 21 gaps. CONSTAT MAJEUR — Imperium est documenté comme le CHEF d'orchestre mais le code ne prouve AUCUN consommateur des handoffs cross-module. Tous les modules (Vault/Pulse/Path/Vector) envoient des signaux VERS Imperium (ghusl→replan, pression→replan, prière>course, smart fuel→replan...) mais le "living plan", les hooks, les replan_events et l'arbitrage runtime ne sont PAS codés. → "Les modules produisent des signaux sans chef effectif." C'est le gap le plus important de toute la campagne. De plus, le daily_plan a 2 surfaces DIVERGENTES (snapshot read-only moderne + legacy persistante), aucune ne fait la génération/replanification. QUASI TOUT LE GAP EST DÉTERMINISTE = codable maintenant sans GPU. L'IA (génération plan, replan intelligent) vient PAR-DESSUS la fondation déterministe. | Decision framework déterministe + daily-plan foundations divergentes | 21 GAP V1 + décisions Imperium à trancher | Rapport créé: `GAP_imperium.md` |
 | Weekly Review / WR | Audité. ✅ CODÉ : le PLUS avancé en plomberie conversationnelle — sessions/messages/final reports, cycle approval -> store explicite, read models, décisions mémoire, commit réel vers `ai_memories`. 🔲 GAP V1 EN 2 COUCHES : DÉTERMINISTE codable maintenant — fenêtres 7j strictes fermées (règle existe, pas centralisée), mardi 20h backend-enforced (timing PAS garanti actuellement), collecte/agrégation semaine, pré-calcul des chiffres avant raisonnement IA, state machine centralisée (aujourd'hui dispersée), trail de versions des règles révisées, contrats `wr.validated` -> `apply`. IA/GPU — summary by exception, questions réflexives, rolling 4-week re-planning, audit de sortie, génération révisions règles + patterns mémoire. | WR conversationnel + final reports + décisions mémoire + commit `ai_memories` réel | GAP déterministe plomberie WR + GAP IA/GPU cerveau WR + dette `ai_memories` non conforme | Rapport WR à créer/relier après consolidation |
-| Infra / Socle mémoire-AI-events | Audité. ✅ CODÉ : fondation réelle `ai_tasks/ai_results/ai_result_validations` avec callback HMAC, validation explicite et Qwen dry-run; stockage `ai_memories` réel depuis WR; deux journaux events (`events` dotted + `imperium_events` append-only snake_case). 🔲 GAP V1 organisé en 3 sous-systèmes : A. Mémoire — `ai_memories` actif mais NON conforme au canon pgvector (pas d'embedding, pas de privacy_level, pas de memory_type/learning_element_type, trop WR-centré); B. AI-tasks — task catalog/apply contracts/router Qwen non branchés au cycle réel; C. Events — double event store à clarifier, pas encore de consumers cross-module, catalogue events absent. | Socle technique partiel code | GAP V1 mémoire + AI-tasks + events, 10 décisions V1 ? à confirmer | Rapport créé: `GAP_infra_memory_events.md` |
+| Infra / Socle mémoire-AI-events | Audité. ✅ CODÉ : `ai_tasks`/`ai_results`/`ai_result_validations` (scope, idempotency, HMAC), Qwen adapter dry-run, `ai_memories` comme stockage WR, event store générique `events` + journal `imperium_events`. 🔲 GAP V1 en 3 sous-systèmes : A. MÉMOIRE (priorité n°1) : `ai_memories` NON CONFORME au canon pgvector — manque `embedding vector(1024)`, `embedding_model`, `privacy_level`, `memory_type`, `is_active`, `expires_at`, `source_app`/`source_table`/`source_id` canoniques, index HNSW, recherche sémantique. Pipeline embedding absent + privacy gate absent + mémoire encore WR-only (pas cross-module). DETTE qui s'accumule à chaque commit WR. B. AI-TASKS : catalogue `task_type` pas enforced (chaque workflow invente son vocabulaire), routing/scoring Qwen pas branché au cycle des tâches, contrats `apply` métier manquants (validation existe mais pas l'application), orchestration n8n encore WR-centrée. C. EVENTS : DEUX event stores CONCURRENTS incompatibles (`events` dotted vs `imperium_events` snake_case), AUCUN consumer cross-module (events stockés mais non traités), catalogue d'events absent, sécurité interne n8n à clarifier. | Socle technique partiel code | GAP V1 mémoire + AI-tasks + events, décisions socle à trancher | Rapport créé: `GAP_infra_memory_events.md` |
 
 ## Décisions de version à trancher (V1 ?)
 
@@ -150,6 +168,15 @@ Pour Pulse, la vraie question n'est pas item par item mais globale : où coupe-t
 3. Daily AI Advice : V1 avec WR vectorisé, ou après pipeline memory/WR validé ?
 4. Monthly rolling plan : doc 43 le marque V2, mais c'est la seule décision vraiment autonome rappelée par le user.
 5. Data model Operations exact : projets/routines à réconcilier avec doc 05.
+
+### Infra / Socle mémoire-AI-events
+
+1. Event store canonique : un seul event store ? lequel ?
+2. Format `event_type` : dotted partout ?
+3. Qwen V1 exact : 7B vs 32B — incohérence instructions/doc30/code à lever.
+4. Mémoire : text-only transitoire ou bloquer les commits jusqu'à migration ?
+5. Contrats `apply` V1 : memory/report seulement ou aussi mission/replan ?
+6. Ephemeral vector store : V1 ou V1.5 ?
 
 ## Enrichissement catalogue
 
