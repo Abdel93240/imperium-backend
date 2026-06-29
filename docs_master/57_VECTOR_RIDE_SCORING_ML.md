@@ -1173,6 +1173,22 @@ WR > Cette semaine > Révision des règles:
   └─────────────────────────────────────────────────────┘
 ```
 
+### 10.2.1 Guardrail against misleading €/h averages
+
+Never let Vector collapse rides into a single average when a Type 2 variable that
+changes the economics is missing.
+
+If the course value depends on a context variable such as event exit, airport
+window, rail disruption, or scheduled ride state, and that feature is absent,
+the correct output is abstention:
+
+```text
+Haute incertitude, à toi de juger.
+```
+
+This is strictly safer than a false average such as `Boissy 6h ≈ 50€` when the
+true value is either return trip or event exit pickup.
+
 ### 10.3 Override mechanics
 
 ```text

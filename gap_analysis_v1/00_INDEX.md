@@ -39,6 +39,8 @@ Ce constat vaut désormais pour un troisième domaine. Le label "V1" des docs d�
 
 Conclusion de campagne : une passe de REDÉFINITION V1/V2/V3 des docs devient de plus en plus clairement utile, à faire après la campagne gap. À garder en tête pour tous les domaines suivants : distinguer "V1 documenté" (vision) de "V1 livrable" (ce qu'on code en premier).
 
+- Vector / VTC : SUSPENDU — gap classique écarté. Vector nécessite un chantier dédié : la matrice des variables métier (récurrence × impact), à faire en conversation neuve. Voir `gap_analysis_v1/DECISIONS_vector_discussion.md`. La doc 57 est mûre mais son classement V1/V2 des features est à refaire sur le bon critère.
+
 ## Tableau de bord
 
 | Domaine | Features V1 reclamees | Codees | GAP V1 | Statut |

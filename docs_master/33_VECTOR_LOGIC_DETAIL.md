@@ -78,6 +78,26 @@ profitability_score = hourly_rate_estimate
 
 The result is advisory only.
 
+### 4.1 No deceptive averaging when context is incomplete
+
+If the value of a ride depends on a Type 2 variable and that variable is missing,
+Vector must not collapse the situation into a generic average. It must abstain.
+
+Examples of Type 2 variables in practice:
+
+- event exit / no event exit;
+- airport window / no airport window;
+- rail disruption present / absent;
+- scheduled ride present / absent.
+
+If the feature is missing, the model must return:
+
+```text
+Haute incertitude, à toi de juger.
+```
+
+That is better than a biased hourly-rate average.
+
 The ride-offer evaluation (accept-a-ride feature) is **binary**. There are only two real actions when working: take it or don't.
 
 ```text
