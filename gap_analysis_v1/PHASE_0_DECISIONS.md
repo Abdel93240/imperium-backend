@@ -117,3 +117,38 @@ Carte des domaines :
 Application : la convention est ACTÉE maintenant, APPLIQUÉE au fil de l'eau (domaine
 par domaine, dans le même geste que la correction du domaine + ses tests), PAS en un
 grand renommage risqué d'un coup
+
+## DÉCISIONS MÉMOIRE (ai_memories — hub central, priorité n°1)
+Date : 2026-06-30. Suite à relecture des docs 75 (conception) et 09 (politique).
+
+### Propriété (application de D1)
+- SCHÉMA de ai_memories → DOC 05 (dictionnaire central).
+- POLITIQUE d'usage (write/retrieval/privacy/correction/deletion/cascade/exemples)
+  → reste DOC 09.
+- CONCEPTION (3 étages, le pourquoi, confidence sans decay) → reste DOC 75.
+- Les docs 09 et 75 renvoient au 05 pour le schéma.
+
+### Deux axes conservés (version doc 09 ; le doc 75 avait fusionné à tort)
+- memory_type = le DOMAINE (de quoi parle le souvenir) — enum semi-stable.
+- learning_element_type = la NATURE (insight/decision/pattern/win/blocker) — axe OUVERT.
+- Règle de sûreté : le type est purement DESCRIPTIF, aucune logique ne branche sur une
+  valeur de type. Tous les éléments sont vectorisés/cherchés/privacy-gatés identiquement.
+- ACTION : corriger le §3 du doc 75 (qui fusionnait element_type dans memory_type).
+
+### Renommage source_app → source_domain (application D3 + convention nommage)
+- Valeurs = domaines génériques (finance, worship, health, rides, planning...),
+  JAMAIS de noms d'apps (vault/path/vector/imperium).
+- À vérifier au moment d'écrire : aligner l'enum memory_type du doc 09
+  (vtc_zone_pattern, financial_pattern...) sur la convention de nommage.
+
+### Cible technique (rappel, va dans le doc 05)
+- embedding vector(1024) + embedding_model ; confidence (preuve, PAS de decay) ;
+  privacy_level obligatoire ; is_active + supersedes_memory_id + correction_reason ;
+  expires_at ; source_table/source_id (pointeurs) ; index HNSW cosine + index composites.
+
+### Principes de conception verrouillés (issus du 75, validés)
+- 3 étages : data brute (tables) → on ne vectorise QUE les éléments d'apprentissage.
+- Pas de decay temporel ; confidence monte avec la preuve, ne descend jamais seule.
+- Patterns contradictoires COEXISTENT (le plus prouvé domine, l'ancien survit en trace).
+- Confidence TRIE, n'EXCLUT jamais (seuls supersession + privacy gate excluent).
+- privacy_level sur chaque ligne, non négociable.
