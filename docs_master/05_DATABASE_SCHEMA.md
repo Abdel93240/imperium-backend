@@ -1007,3 +1007,207 @@ Regles religieuses et limites d'automatisation :
   invocations et memoire doivent rester des contrats explicites separes. Ils ne
   doivent pas etre caches dans `imperium_path_habits`,
   `imperium_path_check_ins` ou `imperium_path_items`.
+
+## DECISION
+
+Tables d'arbitrage et scoring :
+`imperium_user_priorities`, `imperium_mission_scores`.
+
+Convention D1 : le domaine cible est `decision`. Les noms cibles sont
+documentes ici pour le dictionnaire central, mais le code garde les noms actuels
+jusqu'a une migration explicite future. Ne pas renommer les tables dans les
+modeles, migrations ou services sans chantier dedie.
+
+### decision_user_priorities
+
+Nom actuel : `imperium_user_priorities`
+Nom cible : `decision_user_priorities`
+Source code : migration `20260504_0019_decision_framework_foundation.py`,
+modele `backend/app/models/imperium.py::ImperiumUserPriority`
+
+Role : source canonique active de l'ordre de priorite utilisateur pour le
+Decision Framework. Cette table remplace `imperium_priority_rules` pour
+l'arbitrage moderne.
+
+Schema reel :
+
+```text
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id      UUID NOT NULL FK users.id
+domain       TEXT NOT NULL
+position     INTEGER NOT NULL
+coefficient  INTEGER NOT NULL
+is_active    BOOLEAN NOT NULL DEFAULT true
+created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_user_priorities.id`
+- FK : `imperium_user_priorities.user_id -> users.id`
+- Check : `domain IN ('religious', 'business', 'finance', 'health')`
+- Check : `position >= 1 AND position <= 4`
+- Check position/coefficient :
+  - `position = 1` impose `coefficient = 10`
+  - `position = 2` impose `coefficient = 8`
+  - `position = 3` impose `coefficient = 5`
+  - `position = 4` impose `coefficient = 4`
+- Index unique partiel :
+  `imperium_user_priorities_active_domain_unique_idx` sur `(user_id, domain)`
+  WHERE `is_active = true`
+- Index unique partiel :
+  `imperium_user_priorities_active_position_unique_idx` sur
+  `(user_id, position)` WHERE `is_active = true`
+- Index : `imperium_user_priorities_user_active_position_idx` sur
+  `(user_id, is_active, position)`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste `imperium_user_priorities`; le
+  nom cible documente est `decision_user_priorities`.
+- La migration 0019 met `id` en default serveur `gen_random_uuid()`; le mixin
+  ORM genere aussi un UUID cote Python avec `uuid4`.
+- Les colonnes, types, nullabilites, FK, checks et index sont alignes entre la
+  migration 0019 et le modele ORM.
+- Les noms de checks apparaissent en ORM sous leur nom logique court, puis sont
+  rendus avec la convention SQLAlchemy (`ck_<table>_<name>`) comme dans la
+  migration.
+
+### decision_mission_scores
+
+Nom actuel : `imperium_mission_scores`
+Nom cible : `decision_mission_scores`
+Source code : migration `20260504_0019_decision_framework_foundation.py`,
+modele `backend/app/models/imperium.py::ImperiumMissionScore`
+
+Role : stockage backend des scores Decision Framework des missions. La version
+retenue est COMPACTE : les colonnes detaillees `criterion_a`..`criterion_e`
+n'existent pas en V1 ; le detail A-E vit dans `explanation` JSONB.
+
+Schema reel :
+
+```text
+id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id             UUID NOT NULL FK users.id
+mission_id          UUID NOT NULL FK imperium_missions.id ON DELETE CASCADE
+domain              TEXT NOT NULL
+intrinsic_score     NUMERIC(5,2) NOT NULL
+domain_coefficient  INTEGER NOT NULL
+weighted_score      NUMERIC(7,2) NOT NULL
+explanation         JSONB NOT NULL DEFAULT '{}'::jsonb
+source              TEXT NOT NULL DEFAULT 'decision_framework_v1'
+created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_mission_scores.id`
+- FK : `imperium_mission_scores.user_id -> users.id`
+- FK :
+  `imperium_mission_scores.mission_id -> imperium_missions.id`
+  avec `ON DELETE CASCADE`
+- Check : `domain IN ('religious', 'business', 'finance', 'health')`
+- Check : `intrinsic_score >= 0 AND intrinsic_score <= 100`
+- Check : `domain_coefficient IN (10, 8, 5, 4)`
+- Check : `weighted_score >= 0`
+- Check : `source IN ('decision_framework_v1')`
+- Index : `imperium_mission_scores_user_weighted_idx` sur
+  `(user_id, weighted_score)`
+- Index : `imperium_mission_scores_user_domain_idx` sur `(user_id, domain)`
+- Index : `imperium_mission_scores_mission_idx` sur `(mission_id)`
+- Index unique ORM uniquement :
+  `imperium_mission_scores_user_mission_source_unique_idx` sur
+  `(user_id, mission_id, source)`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste `imperium_mission_scores`; le nom
+  cible documente est `decision_mission_scores`.
+- La migration 0019 met `id` en default serveur `gen_random_uuid()`; le mixin
+  ORM genere aussi un UUID cote Python avec `uuid4`.
+- Divergence migration/ORM : le modele ORM declare l'index unique
+  `imperium_mission_scores_user_mission_source_unique_idx` sur
+  `(user_id, mission_id, source)`, mais la migration 0019 ne le cree pas.
+- Les autres colonnes, types, nullabilites, FK, checks et index sont alignes
+  entre la migration 0019 et le modele ORM.
+- Les noms de checks apparaissent en ORM sous leur nom logique court, puis sont
+  rendus avec la convention SQLAlchemy (`ck_<table>_<name>`) comme dans la
+  migration.
+
+### imperium_priority_rules
+
+Nom actuel : `imperium_priority_rules`
+Nom cible : aucun. Table DEPRECIEE, legacy, a supprimer apres migration du
+dernier lecteur.
+Source code : migration `20260426_0006_imperium_priority_rules.py`, modele
+`backend/app/models/imperium.py::ImperiumPriorityRule`
+
+Role legacy : ancienne hierarchie de priorites Imperium. La decision actee est :
+`imperium_user_priorities` est CANONIQUE pour le Decision Framework ;
+`imperium_priority_rules` est deprecie, ses writes sont bloques en `410 Gone`,
+et le dernier lecteur connu a migrer est
+`backend/app/services/imperium/weekly_report.py`.
+
+Schema reel bref :
+
+```text
+id                   UUID PRIMARY KEY
+user_id              UUID NOT NULL FK users.id
+priority_key         TEXT NOT NULL
+label                TEXT NOT NULL
+rank_order           INTEGER NOT NULL
+importance_score     INTEGER NULL
+is_active            BOOLEAN NOT NULL
+updated_by_event_id  UUID NULL FK events.id
+created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_priority_rules.id`
+- FK : `imperium_priority_rules.user_id -> users.id`
+- FK : `imperium_priority_rules.updated_by_event_id -> events.id`
+- Check : `rank_order > 0`
+- Check :
+  `importance_score IS NULL OR (importance_score >= 1 AND importance_score <= 100)`
+- Index unique partiel :
+  `imperium_priority_rules_active_rank_unique_idx` sur `(user_id, rank_order)`
+  WHERE `is_active = true`
+- Index unique partiel :
+  `imperium_priority_rules_active_key_unique_idx` sur `(user_id, priority_key)`
+  WHERE `is_active = true`
+- Index : `imperium_priority_rules_user_active_rank_idx` sur
+  `(user_id, is_active, rank_order)`
+
+Notes legacy :
+- Ne pas ajouter de nouveau developpement sur cette table.
+- La route legacy de lecture `/api/imperium/priorities` reste une projection de
+  compatibilite et annonce `canonical_source = imperium_user_priorities`.
+- La route legacy d'ecriture `/api/imperium/priorities` est bloquee en
+  `410 Gone`; les ecritures doivent passer par
+  `/api/imperium/decision-framework/priorities`.
+- Lecteur a migrer avant suppression : `weekly_report`.
+
+Regles metier du Decision Framework :
+- L'ordre de domaines vient de `imperium_user_priorities`, source canonique
+  active. `imperium_priority_rules` ne doit plus etre considere comme source de
+  verite.
+- Les domaines stockes/API sont en anglais :
+  `religious`, `business`, `finance`, `health`. Les labels francais restent UI.
+- Les coefficients sont internes et derives de la position utilisateur :
+  position 1 = x10, position 2 = x8, position 3 = x5, position 4 = x4.
+- Le scoring mission est deterministe et backend-only : memes entrees, meme
+  score. Il ne declenche aucun appel IA, n8n, pgvector, embedding, memoire,
+  calendrier ou replanning automatique.
+- Le score intrinseque A-E est calcule de 0 a 100 :
+  A deadline proximity, B impact gravity, C mission type, D dependency,
+  E recurrence. En V1, ces details sont stockes dans `explanation` JSONB et non
+  dans des colonnes `criterion_a`..`criterion_e`.
+- Le score pondere est interne :
+  `weighted_score = intrinsic_score * domain_coefficient`.
+- Les surfaces publiques ne doivent pas exposer `domain_coefficient`,
+  `weighted_score`, `final_weighted_score`, `position_to_coefficient` ou la
+  formule interne. Elles exposent un resume public, notamment `priority_bucket`
+  et les labels/reason codes autorises.
+- Le `priority_bucket` public est derive par brackets fixes du score pondere :
+  `>=700 => 10`, `600-699 => 9`, `500-599 => 8`, `400-499 => 7`,
+  `300-399 => 6`, `200-299 => 5`, `100-199 => 4`, `50-99 => 3`,
+  `20-49 => 2`, `0-19 => 1`.
