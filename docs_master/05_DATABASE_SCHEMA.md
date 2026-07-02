@@ -662,6 +662,135 @@ Notes legacy :
   `backend/app/api/v1/routes/vault.py` avec service
   `backend/app/services/vault/transactions.py`.
 
+## HEALTH
+
+Tables health :
+`imperium_pulse_entries` (canonique actuel, nom cible `health_entries`).
+
+Regle de lecture pour cette section :
+- La seule table Pulse/Health reellement codee en V1 est
+  `imperium_pulse_entries`.
+- Le nom cible documentaire est `health_entries`, conforme a la convention D1 :
+  prefixe de domaine, pas nom d'application.
+- Ce document ne renomme aucune table dans le code.
+- Les autres sous-domaines Pulse annonces par les docs 40/34 sont futurs et non
+  codes ; ils ne sont pas definis ici tant qu'ils ne sont pas implementes.
+
+### health_entries
+
+Nom actuel : `imperium_pulse_entries`
+Nom cible : `health_entries`
+Source code : migration `20260525_0028_imperium_pulse_entries.py`, modele
+`backend/app/models/imperium.py::ImperiumPulseEntry`
+
+Role : journal quotidien Health/Pulse V1 minimal. Il stocke les signaux
+confirmes par l'utilisateur pour une date donnee : sommeil, energie, fatigue,
+poids, workout realise et note libre.
+
+Schema reel :
+
+```text
+id             UUID PRIMARY KEY
+user_id        UUID NOT NULL FK users.id
+entry_date     DATE NOT NULL
+sleep_hours    NUMERIC(4, 2) NULL
+energy_level   SMALLINT NULL
+fatigue_level  SMALLINT NULL
+weight_kg      NUMERIC(5, 2) NULL
+workout_done   BOOLEAN NULL
+workout_type   VARCHAR(80) NULL
+notes          VARCHAR(1000) NULL
+created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_pulse_entries.id`
+- FK : `imperium_pulse_entries.user_id -> users.id`
+- Unique : `imperium_pulse_entries_user_entry_date_unique` sur
+  `(user_id, entry_date)`
+- Check `imperium_pulse_entries_sleep_hours_range` :
+  `sleep_hours IS NULL OR (sleep_hours >= 0 AND sleep_hours <= 24)`
+- Check `imperium_pulse_entries_energy_level_range` :
+  `energy_level IS NULL OR (energy_level >= 1 AND energy_level <= 10)`
+- Check `imperium_pulse_entries_fatigue_level_range` :
+  `fatigue_level IS NULL OR (fatigue_level >= 1 AND fatigue_level <= 10)`
+- Check `imperium_pulse_entries_weight_kg_positive` :
+  `weight_kg IS NULL OR weight_kg > 0`
+- Check `imperium_pulse_entries_workout_type_requires_workout_done` :
+  `workout_done IS DISTINCT FROM false OR workout_type IS NULL`
+- Index : `imperium_pulse_entries_user_entry_date_desc_idx` sur
+  `(user_id, entry_date DESC)`
+
+Regles metier Health/Pulse V1 :
+- Une seule entree Health/Pulse existe par `(user_id, entry_date)`. Cette regle
+  est portee par la contrainte unique DB.
+- L'entree est creee explicitement par l'utilisateur ou par un endpoint valide
+  cote backend. Il n'y a pas de creation automatique d'entree Pulse.
+- `sleep_hours`, `energy_level`, `fatigue_level`, `weight_kg`, `workout_done`,
+  `workout_type` et `notes` sont des signaux simples. Ils ne constituent pas un
+  diagnostic, un health check, un health score ou une recommandation.
+- `workout_type` est interdit lorsque `workout_done = false`. Il peut rester
+  nul lorsque `workout_done = true` si le type n'est pas connu.
+- Les endpoints de lecture `GET /api/imperium/pulse/today` et
+  `GET /api/imperium/pulse/stats/summary` sont des surfaces de lecture simples
+  et scopees par l'utilisateur courant.
+- Pulse summary stats 11c est deterministe et read-only : il calcule des
+  compteurs/moyennes a partir des lignes existantes, sans scoring, coaching,
+  recommandation, orchestration n8n, appel IA, OCR, pgvector write, embeddings,
+  commit memoire automatique, replanning automatique ou creation de mission.
+- La table ne cree aucune liaison automatique mission/vault/path. Les liens
+  inter-domaines restent des decisions explicites du backend cerveau, pas de
+  l'application Pulse.
+
+Garde-fous sante sensible :
+- Le medical n'est pas active en V1 dans le schema code ci-dessus. La privacy est
+  securisee par absence : aucun document medical, pain log interprete, body photo
+  ou snapshot medical sensible n'est code dans cette table.
+- Les futurs documents medicaux, pain logs interpretes, body snapshots et profils
+  biologiques relevent de donnees de sante sensibles. Avant activation, il faut
+  definir le cadre RGPD, le consentement explicite, la retention, le chiffrement,
+  l'export/suppression et les controles d'acces.
+- Aucune donnee sante sensible brute ne doit etre vectorisee. Le privacy gate du
+  doc 09 doit s'appliquer : seules des syntheses minimales, utiles et validees
+  peuvent eventuellement devenir des elements de memoire, jamais les documents ou
+  donnees brutes.
+- Pulse ne diagnostique pas, ne prescrit pas et ne remplace pas un professionnel
+  de sante. Les futures recommandations Health devront rester explicites,
+  validables et tracees.
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `created_at` et `updated_at` ont des defaults serveur en migration et en ORM.
+  `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Les colonnes, types, nullabilites, contraintes et index sont alignes entre la
+  migration 0028 et le modele ORM.
+- Divergence de nommage : la table codee reste `imperium_pulse_entries`; le nom
+  cible documente est `health_entries`.
+
+Sous-domaines Health/Pulse futurs non codes :
+- `meals` / repas : FUTUR / NON CODE. Schema a definir au moment du chantier
+  repas, sans reprendre les exemples non autoritatifs des docs 40/34 comme
+  definition DB.
+- Hydratation : FUTUR / NON CODE. Schema a definir au moment du chantier
+  hydratation.
+- Food stock / stock alimentaire : FUTUR / NON CODE. Schema a definir au moment
+  du chantier stock.
+- Workouts : FUTUR / NON CODE. Schema a definir au moment du chantier workouts.
+- Pain logs : FUTUR / NON CODE. Schema a definir au moment du chantier pain,
+  avec garde-fous sante sensible.
+- Body snapshots et profils biologiques : FUTUR / NON CODE. Schema a definir au
+  moment du chantier body/biological profiles, avec cadre RGPD/consentement
+  avant activation.
+- Health scores : FUTUR / NON CODE. Aucun score sante n'est calcule ou stocke
+  par la V1 codee.
+- Medical documents et medical rules : FUTUR / NON CODE. Les docs 34/40
+  annoncent le besoin, mais le schema doit etre redessine ici au moment du
+  chantier avec consentement, retention, chiffrement et privacy gate.
+- Recommandations : FUTUR / NON CODE. Schema a definir au moment du chantier
+  recommandations ; aucune recommandation automatique n'est stockee en V1.
+
 ## WORSHIP
 
 Tables worship :
