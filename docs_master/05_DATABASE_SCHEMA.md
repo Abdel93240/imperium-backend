@@ -661,3 +661,220 @@ Notes legacy :
 - Ancien chemin API encore present :
   `backend/app/api/v1/routes/vault.py` avec service
   `backend/app/services/vault/transactions.py`.
+
+## WORSHIP
+
+Tables worship :
+`imperium_path_habits` (canonique actuel, nom cible `worship_habits`),
+`imperium_path_check_ins` (canonique actuel, nom cible
+`worship_check_ins`) et `imperium_path_items` (legacy deprecie).
+
+Regle de lecture pour cette section :
+- Le noyau Path/Worship V1 canonique est le couple
+  `imperium_path_habits` + `imperium_path_check_ins`.
+- Les noms cibles documentaires sont `worship_habits` et
+  `worship_check_ins`, conformes a la convention D1 : prefixe de domaine, pas
+  nom d'application.
+- `imperium_path_items` est legacy. Il reste lu par compatibilite et ne doit pas
+  recevoir de nouveau developpement.
+- Ce document ne renomme aucune table dans le code.
+
+### worship_habits
+
+Nom actuel : `imperium_path_habits`
+Nom cible : `worship_habits`
+Source code : migration `20260525_0027_imperium_path_habits_check_ins.py`,
+modele `backend/app/models/imperium.py::ImperiumPathHabit`
+
+Role : definition des habitudes/routines Path V1 suivies par check-in explicite.
+La table est generique mais devient le socle canonique Worship tant que les
+tables religieuses specialisees ne sont pas codees.
+
+Schema reel :
+
+```text
+id           UUID PRIMARY KEY
+user_id      UUID NOT NULL FK users.id
+title        VARCHAR(120) NOT NULL
+description  VARCHAR(500) NULL
+domain       VARCHAR(80) NULL
+frequency    VARCHAR(20) NOT NULL
+is_active    BOOLEAN NOT NULL DEFAULT true
+created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_path_habits.id`
+- FK : `imperium_path_habits.user_id -> users.id`
+- Check `imperium_path_habits_frequency_check` :
+  `frequency IN ('daily', 'weekly')`
+- Index : `imperium_path_habits_user_active_created_idx` sur
+  `(user_id, is_active, created_at)`
+- Index : `imperium_path_habits_user_domain_idx` sur `(user_id, domain)`
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `is_active`, `created_at` et `updated_at` ont des defaults serveur en
+  migration et en ORM. `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Les colonnes, types, nullabilites, contraintes et index sont alignes entre la
+  migration 0027 et le modele ORM.
+- Divergence de nommage : la table codee reste `imperium_path_habits`; le nom
+  cible documente est `worship_habits`.
+
+### worship_check_ins
+
+Nom actuel : `imperium_path_check_ins`
+Nom cible : `worship_check_ins`
+Source code : migration `20260525_0027_imperium_path_habits_check_ins.py`,
+modele `backend/app/models/imperium.py::ImperiumPathCheckIn`
+
+Role : enregistrement explicite d'un check-in utilisateur pour une habitude Path
+sur une date donnee. Aucune ligne n'est creee automatiquement pour un etat
+`pending`.
+
+Schema reel :
+
+```text
+id          UUID PRIMARY KEY
+user_id     UUID NOT NULL FK users.id
+habit_id    UUID NOT NULL FK imperium_path_habits.id
+check_date  DATE NOT NULL
+status      VARCHAR(20) NOT NULL
+reason      VARCHAR(500) NULL
+note        VARCHAR(500) NULL
+created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_path_check_ins.id`
+- FK : `imperium_path_check_ins.user_id -> users.id`
+- FK :
+  `imperium_path_check_ins.habit_id -> imperium_path_habits.id`
+- Check `imperium_path_check_ins_status_check` :
+  `status IN ('done', 'missed')`
+- Unique : `imperium_path_check_ins_user_habit_date_unique` sur
+  `(user_id, habit_id, check_date)`
+- Index : `imperium_path_check_ins_user_check_date_desc_idx` sur
+  `(user_id, check_date DESC)`
+- Index : `imperium_path_check_ins_user_habit_check_date_idx` sur
+  `(user_id, habit_id, check_date)`
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `created_at` et `updated_at` ont des defaults serveur en migration et en ORM.
+  `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Les colonnes, types, nullabilites, contraintes et index sont alignes entre la
+  migration 0027 et le modele ORM.
+- `pending` n'est pas une valeur stockee : c'est un etat de lecture calcule par
+  `PathTodayResponse` quand aucune ligne de check-in n'existe pour
+  `(user_id, habit_id, check_date)`.
+- `missed` exige une `reason` dans le schema API
+  `backend/app/schemas/path.py::PathCheckInCreate`, mais cette regle n'est pas
+  encore portee par une contrainte SQL. La colonne reste nullable en base.
+- Divergence de nommage : la table codee reste `imperium_path_check_ins`; le nom
+  cible documente est `worship_check_ins`.
+
+### imperium_path_items
+
+Nom actuel : `imperium_path_items`
+Nom cible : aucun. Table DEPRECIEE, legacy, a supprimer apres migration des
+lecteurs restants.
+Source code : migration `20260426_0008_imperium_path_items.py`, modele
+`backend/app/models/imperium.py::ImperiumPathItem`
+
+Role legacy : ancien modele d'items Path planifies. Il est remplace pour Path V1
+par le couple canonique `imperium_path_habits` + `imperium_path_check_ins`.
+Ne pas creer de nouveau developpement dessus.
+
+Schema reel bref :
+
+```text
+id             UUID PRIMARY KEY
+user_id        UUID NOT NULL FK users.id
+local_date     DATE NOT NULL
+timezone       TEXT NOT NULL DEFAULT 'Europe/Paris'
+title          TEXT NOT NULL
+description    TEXT NULL
+category       TEXT NULL
+priority_key   TEXT NULL
+planned_start  TIMESTAMPTZ NULL
+planned_end    TIMESTAMPTZ NULL
+status         TEXT NOT NULL
+source         TEXT NOT NULL DEFAULT 'manual'
+sort_order     INTEGER NOT NULL DEFAULT 0
+skip_reason    TEXT NULL
+completed_at   TIMESTAMPTZ NULL
+skipped_at     TIMESTAMPTZ NULL
+cancelled_at   TIMESTAMPTZ NULL
+metadata       JSONB NOT NULL DEFAULT '{}'::jsonb
+created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_path_items.id`
+- FK : `imperium_path_items.user_id -> users.id`
+- Check `imperium_path_items_status_check` :
+  `status IN ('planned', 'in_progress', 'completed', 'skipped', 'cancelled')`
+- Check `imperium_path_items_source_check` :
+  `source IN ('manual', 'system', 'ai_planned')`
+- Index : `imperium_path_items_user_local_date_idx` sur
+  `(user_id, local_date)`
+- Index : `imperium_path_items_user_status_idx` sur `(user_id, status)`
+- Index : `imperium_path_items_user_planned_start_idx` sur
+  `(user_id, planned_start)`
+- Index : `imperium_path_items_user_local_date_sort_idx` sur
+  `(user_id, local_date, sort_order)`
+
+Notes legacy :
+- Cette table melange planification, statut, source systeme/IA et metadonnees.
+  Elle ne represente pas le noyau Worship V1 canonique.
+- Lecteurs a migrer avant suppression :
+  `backend/app/services/imperium/dashboard.py`,
+  `backend/app/services/imperium/daily_plans.py` et
+  `backend/app/services/imperium/weekly_report.py`.
+- Anciennes surfaces encore presentes :
+  `backend/app/api/v1/routes/imperium.py` et
+  `backend/app/services/imperium/path_items.py`.
+
+Regles metier du noyau Worship canonique :
+- Fondation Path 10a : habits + check-ins seulement. Les vues "today", detail
+  habit, detail check-in et stats summary lisent cette fondation.
+- Tous les ecritures Path/Worship canoniques requierent une action utilisateur
+  explicite, une validation backend et une `Idempotency-Key`.
+- Aucun check-in n'est cree automatiquement. Une absence de ligne reste un
+  `pending` de lecture et ne doit pas entrer dans les statistiques.
+- Les stats ne comptent que les lignes stockees `done` et `missed`; `pending`
+  est exclu du denominateur.
+- Une seule ligne de check-in peut exister par `(user_id, habit_id, check_date)`.
+- `missed` doit porter une raison cote API/service. `done` ne porte pas de
+  `reason`; les commentaires vont dans `note`.
+- Les habitudes archivees (`is_active = false`) ne peuvent plus recevoir de
+  nouveaux check-ins via le service canonique, mais leur historique reste lisible.
+- Le domaine `worship` est une valeur API supportee pour les habitudes Path.
+  Les valeurs francaises restent des labels UI, pas des valeurs stockees.
+
+Regles religieuses et limites d'automatisation :
+- Path/Worship n'est pas une autorite religieuse. Il ne donne pas de fatwa, ne
+  deduit pas une obligation et ne transforme pas le silence de l'utilisateur en
+  jugement religieux.
+- Le wording doit rester non jugeant : l'interface peut dire "non marquee comme
+  accomplie", mais ne doit pas culpabiliser l'utilisateur.
+- Les actions religieuses ne sont jamais marquees comme accomplies par inference
+  depuis la localisation, l'heure, le calendrier, l'activite telephone, une IA ou
+  un workflow.
+- Pour cette fondation 10a : pas d'appel IA/cloud, pas de n8n, pas de scoring,
+  pas de calendrier, pas d'ecriture pgvector, pas d'embeddings, pas de commit
+  memoire automatique, pas de replanning automatique et pas de liaison
+  automatique mission/Vault/Pulse.
+- Les textes arabes, invocations ou contenus religieux futurs ne doivent pas etre
+  interpretes par l'IA sans cadre religieux explicite, source et validation
+  utilisateur. Le socle habits/check-ins ne stocke pas d'interpretation arabe.
+- Les futurs liens sadaqa, calendrier religieux, ghusl, prieres, fasting,
+  invocations et memoire doivent rester des contrats explicites separes. Ils ne
+  doivent pas etre caches dans `imperium_path_habits`,
+  `imperium_path_check_ins` ou `imperium_path_items`.
