@@ -182,3 +182,33 @@ Décisions qui en découlent :
 Note : Fable 5 de retour (01/07/2026) après levée des contrôles export. En appels API
 directs (pas CLI), pas concerné par le rollout abonnements. Classificateurs de sécurité
 Fable = cyber/bio/chimie → non déclenchés par les usages Imperium.
+
+## CHANTIER — Test papier de charge (à faire APRÈS doc 05 + doc 77)
+Date d'ajout : 2026-07-02.
+
+Objectif : chiffrer la charge réelle de contexte pour trancher les modèles et la
+stratégie de raisonnement. NE PEUT se faire qu'une fois les tables (doc 05) et les
+events (doc 77) définis (il faut savoir ce qu'on stocke pour estimer ce qu'on charge).
+
+Méthode :
+1. Simuler des journées-types du PIRE cas (journée bien pleine : courses, refus,
+   passages pompe, repas, sport loupé, douleur, sieste, mission ratée, replan en
+   cascade, hydratation, appels... cf. exemple pneu crevé).
+2. Pour une analyse lourde (daily plan génération, WR), estimer TOUT ce qui doit être
+   chargé dans la fenêtre : résumés (journalier/hebdo/mensuel), patterns récupérés
+   via RAG, contexte permanent, historique pertinent.
+3. Convertir en tokens.
+
+Décisions qui en découlent :
+- MODÈLE de raisonnement lourd : si la charge tient sous ~120-140k tokens (≈50-60%
+  de la fenêtre 200k d'Opus 4.8, seuil de bon raisonnement) → Opus suffit. Si ça
+  dépasse (contextes longs, gros historique) → Fable 5 (endurance long contexte,
+  redisponible depuis le 01/07/2026) se justifie. Décision différée au test papier,
+  pas prise par principe.
+- STRATÉGIE de raisonnement : calibrer le nombre de passes ; repérage large en LOCAL
+  gratuit (V100) → croisement final UNIQUE sur le modèle cloud (cf. chantier
+  profondeur-de-corrélation). Le test papier alimente ce réglage.
+
+Note : Fable 5 de retour (01/07/2026) après levée des contrôles export. En appels API
+directs (pas CLI), pas concerné par le rollout abonnements. Classificateurs de sécurité
+Fable = cyber/bio/chimie → non déclenchés par les usages Imperium.
