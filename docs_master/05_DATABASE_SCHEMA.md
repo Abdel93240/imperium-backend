@@ -1008,6 +1008,307 @@ Regles religieuses et limites d'automatisation :
   doivent pas etre caches dans `imperium_path_habits`,
   `imperium_path_check_ins` ou `imperium_path_items`.
 
+## PLANNING
+
+Tables planning codees :
+`imperium_missions` (nom cible `planning_missions`),
+`imperium_daily_plans` (nom cible `planning_daily_plans`) et
+`imperium_day_reviews` (nom cible `planning_day_reviews`).
+
+Regle de lecture pour cette section :
+- Le domaine cible est `planning`, conformement a D1 : prefixe de domaine, pas
+  nom d'application.
+- Ce document ne renomme aucune table dans le code. Les noms cibles documentent
+  la direction canonique future.
+- Le schema reel ci-dessous vient des migrations Alembic et des modeles
+  SQLAlchemy. Les surfaces API/snapshot sont mentionnees seulement quand elles
+  clarifient le role de la table.
+- La regle produit non negociable reste : une seule mission active a la fois.
+
+### planning_missions
+
+Nom actuel : `imperium_missions`
+Nom cible : `planning_missions`
+Source code : migrations `20260426_0005_imperium_missions.py`,
+`20260511_0020_imperium_missions_decision_fields.py`,
+`20260525_0023_imperium_mission_abandoned_status.py`, modele
+`backend/app/models/imperium.py::ImperiumMission`
+
+Role : stocker les missions planning courantes, en backlog et historiques. Cette
+table est le garde-fou backend de la mission active unique.
+
+Schema reel :
+
+```text
+id                      UUID PRIMARY KEY
+user_id                 UUID NOT NULL FK users.id
+title                   TEXT NOT NULL
+category                TEXT NULL
+domain                  TEXT NULL
+priority_level          INTEGER NULL
+mission_type_category   TEXT NULL
+status                  TEXT NOT NULL
+planned_start_at        TIMESTAMPTZ NULL
+planned_end_at          TIMESTAMPTZ NULL
+started_at              TIMESTAMPTZ NOT NULL
+ended_at                TIMESTAMPTZ NULL
+completion_note         TEXT NULL
+failure_reason          TEXT NULL
+user_reported_signals   JSONB NULL
+ai_usable_reason        BOOLEAN NULL
+created_by_event_id     UUID NULL FK events.id
+ended_by_event_id       UUID NULL FK events.id
+created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_missions.id`
+- FK : `imperium_missions.user_id -> users.id`
+- FK : `imperium_missions.created_by_event_id -> events.id`
+- FK : `imperium_missions.ended_by_event_id -> events.id`
+- Check `imperium_missions_status_check` :
+  `status IN ('backlog', 'active', 'completed', 'failed', 'abandoned', 'cancelled')`
+- Check `imperium_missions_domain_check` :
+  `domain IS NULL OR domain IN ('religious', 'business', 'finance', 'health')`
+- Check `imperium_missions_priority_level_range` :
+  `priority_level IS NULL OR (priority_level >= 1 AND priority_level <= 10)`
+- Check `imperium_missions_mission_type_category_check` :
+  `mission_type_category IS NULL OR mission_type_category IN ('cat_a', 'cat_b',
+  'cat_c', 'cat_d', 'cat_e', 'cat_f', 'cat_g', 'cat_h', 'cat_i')`
+- Index unique partiel : `imperium_missions_one_active_per_user_idx` sur
+  `user_id` WHERE `status = 'active'`
+- Index : `imperium_missions_user_status_idx` sur `(user_id, status)`
+- Index : `imperium_missions_started_at_idx` sur `started_at`
+- Index : `imperium_missions_user_domain_idx` sur `(user_id, domain)`
+- Index partiel : `imperium_missions_user_backlog_priority_created_idx` sur
+  `(user_id, priority_level, created_at)` WHERE `status = 'backlog'`
+- Index : `imperium_missions_user_mission_type_category_idx` sur
+  `(user_id, mission_type_category)`
+
+Regles metier planning :
+- Une seule mission peut etre `active` par utilisateur. La regle est portee par
+  l'index unique partiel et doit aussi etre gardee par tous les services,
+  snapshots et futurs replans.
+- Le lifecycle code accepte `backlog`, `active`, `completed`, `failed`,
+  `abandoned` et `cancelled`. Les documents metier historiques parlent aussi
+  d'expiration et de stash ; ces etats ne sont pas codes dans la contrainte
+  actuelle. `stashed` est hors V1.
+- Une mission demarree devient `active`. Une mission de backlog peut etre
+  promue seulement si aucune autre mission active n'existe.
+- Les transitions codees exigent une mission `active` pour terminer, echouer ou
+  abandonner. `failed` et `abandoned` portent une raison cote schema API.
+- `failure_reason`, `user_reported_signals` et `ai_usable_reason` conservent la
+  realite rapportee par l'utilisateur pour apprentissage futur ; V1 ne juge pas
+  et ne reinterprete pas automatiquement ces raisons.
+- Les colonnes `created_by_event_id` et `ended_by_event_id` pointent vers le
+  journal canonique `events`, pas vers `imperium_events`.
+- La table ne porte pas encore les attributs futurs annonces par la doc 43 comme
+  `source`, `source_ref`, `replan_version`, `deadline_at`, `expired_at` ou
+  `stashed_at`.
+
+Notes migration/ORM :
+- La migration initiale creeait les statuts `active`, `completed`, `failed`,
+  `cancelled`; `20260511_0020` a ajoute `backlog`, `domain` et
+  `mission_type_category`; `20260525_0023` a ajoute `abandoned`.
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `created_at` et `updated_at` ont des defaults serveur en migration et en ORM.
+  `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Les colonnes, types, nullabilites, contraintes et index courants sont alignes
+  entre migrations et modele ORM.
+- Divergence de nommage : la table codee reste `imperium_missions`; le nom
+  cible documente est `planning_missions`.
+
+### planning_daily_plans
+
+Nom actuel : `imperium_daily_plans`
+Nom cible : `planning_daily_plans`
+Source code : migration `20260426_0009_imperium_daily_plans.py`, modele
+`backend/app/models/imperium.py::ImperiumDailyPlan`
+
+Role reel code : plan quotidien persistant, cree manuellement/deterministement a
+partir de verites backend existantes. Role cible D4 : base persistante du living
+plan versionne.
+
+Schema reel :
+
+```text
+id                  UUID PRIMARY KEY
+user_id             UUID NOT NULL FK users.id
+local_date          DATE NOT NULL
+timezone            TEXT NOT NULL DEFAULT 'Europe/Paris'
+plan_status         TEXT NOT NULL DEFAULT 'draft'
+title               TEXT NULL
+summary             TEXT NULL
+focus_priority_key  TEXT NULL
+current_mission_id  UUID NULL FK imperium_missions.id
+generated_from      JSONB NOT NULL DEFAULT '{}'::jsonb
+plan_blocks         JSONB NOT NULL DEFAULT '[]'::jsonb
+notes               TEXT NULL
+created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_daily_plans.id`
+- FK : `imperium_daily_plans.user_id -> users.id`
+- FK :
+  `imperium_daily_plans.current_mission_id -> imperium_missions.id`
+- Unique : `imperium_daily_plans_user_local_date_unique` sur
+  `(user_id, local_date)`
+- Check `imperium_daily_plans_status_check` :
+  `plan_status IN ('draft', 'active', 'completed', 'cancelled')`
+- Check `imperium_daily_plans_plan_blocks_array_check` :
+  `jsonb_typeof(plan_blocks) = 'array'`
+- Index : `imperium_daily_plans_user_local_date_idx` sur
+  `(user_id, local_date)`
+- Index : `imperium_daily_plans_user_status_idx` sur
+  `(user_id, plan_status)`
+
+Contrat D4 daily plan vivant :
+- `imperium_daily_plans` est la base persistante qui doit devenir le support du
+  living plan. La journee n'est pas un JSON oublie ni un plan ecrase : elle doit
+  etre stockee en tables, lisible par Imperium, et signalee par events.
+- Le module `backend/app/services/imperium/daily_plan.py` et l'endpoint moderne
+  `GET /api/imperium/daily-plan` sont un snapshot / une vue de LECTURE. Ils
+  consolident dashboard, mission active, Path et Pulse ; ils ne persistent pas
+  de ligne `imperium_daily_plans` et ne definissent pas une table concurrente.
+- La surface persistante actuelle `/api/imperium/day/plan...` cree, lit,
+  active, complete et annule des lignes `imperium_daily_plans`. Elle est
+  utile comme fondation, mais ne code pas encore la generation IA, le replan
+  vivant, la validation de proposition ou l'historique de versions.
+- La future table `planning_daily_plan_versions` est FUTURE / NON CODEE. Sa
+  raison d'etre est le versionnement D4 : chaque replan cree une nouvelle
+  version avec sa raison, archive l'ancienne version et nourrit l'apprentissage
+  futur / LoRA. Ne pas inventer son schema detaille avant le chantier D4.
+- On VERSIONNE, on n'ecrase pas. Un replan futur ne doit pas masquer la raison
+  de changement ni detruire l'historique de la journee.
+- Le plan vivant doit respecter la garde globale "une seule mission active a la
+  fois". Il ne peut pas creer une mission active concurrente.
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `timezone`, `plan_status`, `generated_from`, `plan_blocks`, `created_at` et
+  `updated_at` ont des defaults serveur en migration et en ORM.
+- `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Les colonnes, types, nullabilites, contraintes et index sont alignes entre la
+  migration 0009 et le modele ORM.
+- Divergence de nommage : la table codee reste `imperium_daily_plans`; le nom
+  cible documente est `planning_daily_plans`.
+
+### planning_day_reviews
+
+Nom actuel : `imperium_day_reviews`
+Nom cible : `planning_day_reviews`
+Source code : migration `20260426_0004_imperium_day_reviews.py`, modele
+`backend/app/models/imperium.py::ImperiumDayReview`
+
+Role : bilan de journee. Cette table capture le statut global du jour, les
+signaux ressentis, les items termines/manques et les notes utilisateur pour
+alimenter les lectures, les reviews et l'apprentissage futur.
+
+Schema reel :
+
+```text
+id                 UUID PRIMARY KEY
+user_id            UUID NOT NULL FK users.id
+local_date         DATE NOT NULL
+timezone           TEXT NOT NULL
+day_status         TEXT NOT NULL
+energy_level       INTEGER NULL
+fatigue_level      INTEGER NULL
+sleep_quality      INTEGER NULL
+stress_level       INTEGER NULL
+mood               TEXT NULL
+main_win           TEXT NULL
+main_problem       TEXT NULL
+completed_items    JSONB NOT NULL DEFAULT '[]'
+missed_items       JSONB NOT NULL DEFAULT '[]'
+notes              TEXT NULL
+free_text          TEXT NULL
+source_event_id    TEXT NULL
+created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_day_reviews.id`
+- FK : `imperium_day_reviews.user_id -> users.id`
+- Unique : `imperium_day_reviews_user_local_date_unique` sur
+  `(user_id, local_date)`
+- Index : `imperium_day_reviews_user_created_idx` sur
+  `(user_id, created_at)`
+
+Regles metier planning :
+- Une seule day review peut exister par utilisateur et date locale. Un second
+  finish-day non idempotent est rejete par le service.
+- `day_status` est valide par le schema API `FinishDayRequest` avec les valeurs
+  `completed`, `partial`, `failed`, mais la base ne porte pas encore de check SQL
+  equivalent.
+- `energy_level`, `fatigue_level`, `sleep_quality` et `stress_level` sont
+  bornes de 1 a 10 cote schema API, mais la base ne porte pas encore de check SQL
+  equivalent.
+- `completed_items` et `missed_items` stockent des listes JSON issues du bilan
+  utilisateur. `missed_items` peut porter une raison et un signal rapporte par
+  l'utilisateur.
+- `source_event_id` stocke l'identifiant metier de l'event `day.finished`, mais
+  n'est pas une FK vers `events.id`.
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `completed_items` et `missed_items` ont des defaults serveur en migration et
+  des defaults Python `list` en ORM.
+- `created_at` et `updated_at` ont des defaults serveur en migration et en ORM.
+  `updated_at` porte en plus `onupdate=func.now()` cote ORM.
+- Divergence de durcissement : la validation des valeurs `day_status` et des
+  niveaux 1-10 est portee par les schemas API, pas par des contraintes SQL.
+- Divergence de durcissement : aucune contrainte SQL ne verifie que
+  `completed_items` et `missed_items` sont des tableaux JSON.
+- Divergence de nommage : la table codee reste `imperium_day_reviews`; le nom
+  cible documente est `planning_day_reviews`.
+
+Invariants planning reintegres :
+- Imperium reste le command center : les apps affichent, collectent et
+  declenchent ; le backend cerveau decide et valide.
+- La mission active unique est un garde-fou partout : DB, services, snapshots,
+  read models, futurs hooks et replans. Une anomalie de plusieurs missions
+  actives doit etre detectee et exposee comme erreur, pas masquee.
+- Le mission lifecycle V1 code est volontairement simple : backlog -> active ->
+  terminal (`completed`, `failed`, `abandoned`, `cancelled`). Les notions
+  `expired`, `stashed`, missions annexes et overlay restent hors schema code
+  actuel.
+- Les projets actifs et routines d'Operations sont la source future de missions,
+  mais leurs tables planning canoniques ne sont pas encore codees. La regle
+  documentee par la doc 71 est V1 cible : viser deux projets actifs quand la
+  pile le permet, garder une liste non-active distincte, auto-promouvoir apres
+  completion et rendre un projet incomplet inerte en "Attention requise".
+- Les routines quotidiennes simples sont FUTURES / NON CODEES dans le domaine
+  planning. Elles devront alimenter l'arbitrage et le daily plan, sans devenir
+  une logique UI autonome.
+- Le bilan de journee (`planning_day_reviews`) sert a expliquer ce qui s'est
+  passe : victoires, problemes, items manques, fatigue, humeur et signaux. Il
+  ne remplace pas l'historique de missions ni les events.
+
+Tables planning futures / non codees :
+- `planning_daily_plan_versions` : FUTUR / NON CODE. Versionnement du living
+  plan D4 ; chaque replan cree une nouvelle version et conserve la raison.
+- `planning_replan_events` : FUTUR / NON CODE. Capture des triggers de replan,
+  debounce/batching, statut et lien futur vers tache IA / version de plan.
+- Morning check-ins : FUTUR / NON CODE. La doc 43 annonce le check-in du matin
+  comme premier replan de la journee ; aucune table canonique `planning_*` n'est
+  encore definie ici.
+- Projets Operations : FUTUR / NON CODE. Le nom canonique reste a definir dans
+  ce dictionnaire avant migration ; ne pas reprendre `projects` comme schema
+  officiel sans chantier dedie.
+- Routines recurrentes et checks quotidiens : FUTUR / NON CODE. Les noms cibles
+  restent a definir dans ce dictionnaire avant implementation.
+- Expiration de mission, notes de mission, `source/source_ref`,
+  `replan_version` et liens objectifs -> missions : FUTUR / NON CODE dans les
+  tables planning actuelles.
+
 ## DECISION
 
 Tables d'arbitrage et scoring :
