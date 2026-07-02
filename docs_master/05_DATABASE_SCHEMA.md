@@ -1902,3 +1902,142 @@ Invariants metier WR reintegres :
   decisions et idempotency keys. Quand les prompts/regles evoluent, la version
   applicable doit etre visible dans les payloads ou dans un champ dedie futur,
   pas implicite dans le code.
+
+## CALENDAR
+
+Tables calendar :
+`imperium_calendar_events` (canonique actuel, nom cible `calendar_events`).
+
+Regle de lecture pour cette section :
+- Le module Calendar code aujourd'hui est la fondation minimale Patch 7H :
+  stockage backend-owned de contraintes calendrier, creation/liste/suppression
+  manuelles et validation deterministe.
+- Le nom cible documentaire est `calendar_events`, conforme a la convention D1 :
+  prefixe de domaine, pas nom d'application.
+- Ce document ne renomme aucune table dans le code.
+- Le Calendar complet du doc 51 est V3 FUTUR / NON CODE. Ses champs/tables ne
+  deviennent pas schema canonique tant qu'un chantier dedie ne les implemente
+  pas.
+
+### calendar_events
+
+Nom actuel : `imperium_calendar_events`
+Nom cible : `calendar_events`
+Source code : migration
+`20260512_0022_imperium_calendar_events_foundation.py`, modele
+`backend/app/models/imperium.py::ImperiumCalendarEvent`
+
+Role : fondation Calendar V1 minimale et deterministe. La table stocke des
+evenements/deadlines/vacances manuels appartenant a l'utilisateur courant, pour
+que le backend puisse disposer plus tard de contraintes calendaires sans
+inventer un stockage sous pression.
+
+Schema reel :
+
+```text
+id           UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id      UUID NOT NULL FK users.id
+event_type   TEXT NOT NULL
+title        TEXT NOT NULL
+starts_at    TIMESTAMPTZ NOT NULL
+ends_at      TIMESTAMPTZ NULL
+blocks_time  BOOLEAN NOT NULL DEFAULT true
+location     TEXT NULL
+notes        TEXT NULL
+created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `pk_imperium_calendar_events` sur `id`
+- FK : `fk_imperium_calendar_events_user_id_users`,
+  `imperium_calendar_events.user_id -> users.id`
+- Check SQL rendu
+  `ck_imperium_calendar_events_imperium_calendar_events_event_type_check`
+  (nom logique ORM `imperium_calendar_events_event_type_check`) :
+  `event_type IN ('event', 'deadline', 'vacation')`
+- Check SQL rendu
+  `ck_imperium_calendar_events_imperium_calendar_events_date_range_check`
+  (nom logique ORM `imperium_calendar_events_date_range_check`) :
+  `ends_at IS NULL OR ends_at >= starts_at`
+- Index : `imperium_calendar_events_user_starts_at_idx` sur
+  `(user_id, starts_at)`
+- Index : `imperium_calendar_events_user_event_type_idx` sur
+  `(user_id, event_type)`
+
+Regles metier Calendar Patch 7H :
+- Le module est deterministe. Il ne planifie pas, ne score pas, ne replanifie
+  pas et ne demande pas a l'IA de choisir une strategie.
+- Les seuls `event_type` codes sont `event`, `deadline` et `vacation`.
+- La creation est manuelle via `POST /api/imperium/calendar/events` et requiert
+  `Idempotency-Key`.
+- La creation est user-scoped et cree aussi un event canonique
+  `calendar.event.created` dans `events` avec `privacy_level = medium`.
+- La liste `GET /api/imperium/calendar/events` est user-scoped, triee par
+  `starts_at ASC, created_at ASC`, et accepte les filtres `from`, `to` et
+  `event_type`.
+- Le filtre `to` ne peut pas etre inferieur a `from`.
+- La suppression `DELETE /api/imperium/calendar/events/{event_id}` est
+  user-scoped. Elle supprime physiquement la ligne calendar en V1. Elle ne cree
+  pas d'event `calendar.event.deleted` et ne requiert pas d'idempotency key.
+- `ends_at` peut etre nul ; s'il est fourni, il doit etre superieur ou egal a
+  `starts_at`.
+- `blocks_time` vaut `true` par defaut. La table ne deduit pas encore les
+  conflits ou indisponibilites dans le daily plan.
+- Aucun champ de recurrence, statut, deadline specialisee, geo precise,
+  urgence, impact applicatif, override d'occurrence ou synchronisation externe
+  n'existe dans le schema code actuel.
+
+Non-objectifs explicites de la fondation 7H :
+- Pas de recurrence fields, pas de moteur de recurrence et pas de RRULE en V1.
+- Pas d'automatic replanning, pas d'AI scheduling, pas d'appel IA, pas de n8n AI
+  Agent, pas d'ecriture DB par n8n.
+- Pas d'ecriture pgvector, pas d'embeddings et pas de commit memoire
+  automatique.
+- Pas de notifications.
+- Pas de sync Google/Apple/Samsung calendar.
+- Pas d'implementation mobile/frontend dediee.
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste `imperium_calendar_events`; le
+  nom cible documente est `calendar_events`.
+- Divergence mineure : la migration met `id` en default serveur
+  `gen_random_uuid()`, tandis que le mixin ORM genere aussi un UUID cote Python.
+- `blocks_time`, `created_at` et `updated_at` ont des defaults serveur en
+  migration et en ORM. `updated_at` porte en plus `onupdate=func.now()` cote
+  ORM.
+- Les colonnes, types, nullabilites, FK, checks et index sont alignes entre la
+  migration 0022 et le modele ORM.
+- Les noms de checks apparaissent en ORM sous leur nom logique court, puis sont
+  rendus avec la convention SQLAlchemy (`ck_<table>_<name>`) dans la migration.
+
+Capacites Calendar futures / non codees :
+- Calendar V3 complet : FUTUR / NON CODE. Le doc 51 annonce un calendrier
+  personnel structure qui informe les decisions du cerveau, mais il n'est pas
+  implemente par la fondation 7H.
+- Types futurs annonces : `periode_bloquee` et `evenement_religieux` sont V3 /
+  NON CODES dans cette table. Le calendrier religieux Path reste un domaine
+  specifique separe et ne doit pas etre cache dans le schema minimal actuel.
+- Schema V3 riche : FUTUR / NON CODE. Le doc 51 annonce notamment
+  `precisions`, `deadline_at`, `estimated_duration_min`, `urgency`,
+  `location_name`, `location_lat`, `location_lng`, impacts applicatifs
+  (`pause_vtc`, `pause_pulse`, `pause_path`), `status`, `cancelled_at` et
+  champs de recurrence. Ces colonnes n'existent pas aujourd'hui.
+- Recurrence avancee : FUTUR / NON CODE. Le doc 51 annonce des recurrences
+  daily/weekly/monthly/yearly/custom, stockage interne au format RFC 5545
+  RRULE, dates sautees, limite de recurrence et overrides par occurrence.
+- `calendar_event_overrides` : FUTUR / NON CODE. Le doc 51 donne une table
+  cible pour skip/reschedule/modify d'occurrences, mais aucune migration ni
+  modele ne l'implemente aujourd'hui.
+- Seuil 7 jours, hooks et replanning : FUTUR / NON CODE. Le doc 51 annonce des
+  hooks `user.calendar.*`, une reevaluation quand un evenement entre dans la
+  fenetre de 7 jours, et une consommation par le daily plan. La V1 codee stocke
+  seulement les contraintes.
+- WR integration : FUTUR / NON CODE. Le doc 51 annonce que le Weekly Review
+  pourra interroger et mettre a jour le calendrier ; aucun flux WR calendar
+  n'est code dans le schema actuel.
+- Notifications/rappels : FUTUR / NON CODE. La fondation 7H les exclut
+  explicitement.
+- Sync externe/native calendar : NON CODE et non canonique pour V3 selon le doc
+  51. La fondation 7H exclut Google/Apple/Samsung calendar sync, et le principe
+  V3 annonce un calendrier propre au systeme plutot qu'une integration native.
