@@ -1512,3 +1512,393 @@ Regles metier du Decision Framework :
   `>=700 => 10`, `600-699 => 9`, `500-599 => 8`, `400-499 => 7`,
   `300-399 => 6`, `200-299 => 5`, `100-199 => 4`, `50-99 => 3`,
   `20-49 => 2`, `0-19 => 1`.
+
+## REVIEW
+
+Tables Weekly Review :
+`imperium_weekly_review_sessions`, `imperium_weekly_review_messages`,
+`imperium_weekly_review_final_reports`, `imperium_weekly_review_states`,
+`imperium_memory_candidate_decisions`.
+
+Convention D1 : le domaine cible est `review`. Les noms cibles sont
+documentes ici pour le dictionnaire central, mais le code garde les noms actuels
+jusqu'a une migration explicite future. Ne pas renommer les tables dans les
+modeles, migrations ou services sans chantier dedie.
+
+Nommage cible acte :
+- `imperium_weekly_review_sessions` -> `review_sessions`
+- `imperium_weekly_review_messages` -> `review_messages`
+- `imperium_weekly_review_final_reports` -> `review_final_reports`
+- `imperium_weekly_review_states` -> `review_states` (À CLARIFIER)
+- `imperium_memory_candidate_decisions` -> `review_memory_decisions`
+
+WR signifie Weekly Review, pas Weekly Report. Le Weekly Report du doc 29 est un
+rapport deterministe read-only ; le Weekly Review du doc 32 est la conversation
+interactive IA, backend-owned, qui transforme la semaine en rapport final
+valide par l'utilisateur.
+
+### review_sessions
+
+Nom actuel : `imperium_weekly_review_sessions`
+Nom cible : `review_sessions`
+Source code : migrations `20260430_0013_weekly_review_conversation.py` et
+`20260501_0016_wr_chatbot_flow_constraints.py`, modele
+`backend/app/models/imperium.py::ImperiumWeeklyReviewSession`
+
+Role : machine conversationnelle WR canonique. Cette table porte la session
+interactive, le statut courant, la fenetre de semaine et les pointeurs vers les
+taches/resultats IA associes.
+
+Schema reel :
+
+```text
+id                    UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id               UUID NOT NULL FK users.id
+week_start            DATE NOT NULL
+week_end              DATE NOT NULL
+status                TEXT NOT NULL DEFAULT 'ready'
+launched_at           TIMESTAMPTZ NULL
+completed_at          TIMESTAMPTZ NULL
+failed_at             TIMESTAMPTZ NULL
+error_code            TEXT NULL
+error_message         TEXT NULL
+current_ai_task_id    UUID NULL FK ai_tasks.id
+initial_ai_result_id  UUID NULL FK ai_results.id
+final_ai_result_id    UUID NULL FK ai_results.id
+created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_weekly_review_sessions.id`
+- FK : `imperium_weekly_review_sessions.user_id -> users.id`
+- FK :
+  `imperium_weekly_review_sessions.current_ai_task_id -> ai_tasks.id`
+- FK :
+  `imperium_weekly_review_sessions.initial_ai_result_id -> ai_results.id`
+- FK :
+  `imperium_weekly_review_sessions.final_ai_result_id -> ai_results.id`
+- Unique : `imperium_weekly_review_sessions_user_week_unique` sur
+  `(user_id, week_start)`
+- Check `imperium_weekly_review_sessions_status_check` :
+  `ready`, `launched`, `preparing_initial_summary`,
+  `initial_summary_ready`, `waiting_for_user_answer`,
+  `conversation_active`, `integrating_answers`, `draft_ready`,
+  `revision_requested`, `final_ready`, `approved`, `stored`, `cancelled`,
+  `failed`
+- Index : `imperium_weekly_review_sessions_user_status_idx` sur
+  `(user_id, status)`
+- Index : `imperium_weekly_review_sessions_user_week_start_idx` sur
+  `(user_id, week_start)`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste
+  `imperium_weekly_review_sessions`; le nom cible documente est
+  `review_sessions`.
+- La migration met `id` en default serveur `gen_random_uuid()` ; le mixin ORM
+  genere aussi un UUID cote Python.
+- La migration 0013 creait la machine sans `conversation_active`; la migration
+  0016 ajoute ce statut au check. Le modele ORM est aligne sur l'etat courant.
+- `week_start` est valide cote schemas/services comme un lundi. Il n'existe pas
+  de check SQL qui impose le lundi.
+- `week_end` est stocke comme date de fin affichee de semaine
+  (`week_start + 6 jours`), pas comme borne SQL exclusive. Il n'existe pas de
+  check SQL qui impose `week_end = week_start + 6`.
+
+### review_messages
+
+Nom actuel : `imperium_weekly_review_messages`
+Nom cible : `review_messages`
+Source code : migrations `20260430_0013_weekly_review_conversation.py` et
+`20260501_0016_wr_chatbot_flow_constraints.py`, modele
+`backend/app/models/imperium.py::ImperiumWeeklyReviewMessage`
+
+Role : journal des messages de la conversation WR. Les messages sont rattaches
+a une session et peuvent pointer vers une tache IA ou un resultat IA.
+
+Schema reel :
+
+```text
+id            UUID PRIMARY KEY DEFAULT gen_random_uuid()
+session_id    UUID NOT NULL FK imperium_weekly_review_sessions.id ON DELETE CASCADE
+user_id       UUID NOT NULL FK users.id
+role          TEXT NOT NULL
+message_type  TEXT NOT NULL
+content       TEXT NULL
+payload       JSONB NULL
+ai_task_id    UUID NULL FK ai_tasks.id
+ai_result_id  UUID NULL FK ai_results.id
+created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_weekly_review_messages.id`
+- FK :
+  `imperium_weekly_review_messages.session_id -> imperium_weekly_review_sessions.id`
+  avec `ON DELETE CASCADE`
+- FK : `imperium_weekly_review_messages.user_id -> users.id`
+- FK : `imperium_weekly_review_messages.ai_task_id -> ai_tasks.id`
+- FK : `imperium_weekly_review_messages.ai_result_id -> ai_results.id`
+- Check `imperium_weekly_review_messages_role_check` :
+  `user`, `qwen`, `system`, `opus`, `backend`
+- Check `imperium_weekly_review_messages_type_check` :
+  `user_answer`, `clarification_question`, `initial_summary`, `draft`,
+  `revision_request`, `final_report`, `system_note`, `chat_message`,
+  `assistant_followup`, `final_report_draft`
+- Index : `imperium_weekly_review_messages_session_created_idx` sur
+  `(session_id, created_at)`
+- Index : `imperium_weekly_review_messages_user_created_idx` sur
+  `(user_id, created_at)`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste
+  `imperium_weekly_review_messages`; le nom cible documente est
+  `review_messages`.
+- La migration met `id` en default serveur `gen_random_uuid()` ; le mixin ORM
+  genere aussi un UUID cote Python.
+- La migration 0013 creait les types initiaux ; la migration 0016 ajoute
+  `chat_message`, `assistant_followup` et `final_report_draft`. Le modele ORM
+  est aligne sur l'etat courant.
+- Il n'existe pas de contrainte SQL qui impose que `user_id` du message soit le
+  meme que `user_id` de la session. Cette coherence est portee par les services.
+
+### review_final_reports
+
+Nom actuel : `imperium_weekly_review_final_reports`
+Nom cible : `review_final_reports`
+Source code : migrations `20260430_0013_weekly_review_conversation.py` et
+`20260430_0014_wr_final_report_candidate_history.py`, modele
+`backend/app/models/imperium.py::ImperiumWeeklyReviewFinalReport`
+
+Role : candidats de rapport final WR. Les lignes historisent les drafts,
+approbations, stockages et candidats superseded. Un candidat n'est pas
+canonique tant qu'il n'a pas ete explicitement approuve puis stocke par le
+backend.
+
+Schema reel :
+
+```text
+id                   UUID PRIMARY KEY DEFAULT gen_random_uuid()
+session_id           UUID NOT NULL FK imperium_weekly_review_sessions.id ON DELETE CASCADE
+user_id              UUID NOT NULL FK users.id
+week_start           DATE NOT NULL
+week_end             DATE NOT NULL
+status               TEXT NOT NULL DEFAULT 'draft'
+report_payload       JSONB NOT NULL
+report_markdown      TEXT NOT NULL
+memory_candidates    JSONB NULL
+approved_at          TIMESTAMPTZ NULL
+stored_at            TIMESTAMPTZ NULL
+source_ai_result_id  UUID NULL FK ai_results.id
+created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_weekly_review_final_reports.id`
+- FK :
+  `imperium_weekly_review_final_reports.session_id -> imperium_weekly_review_sessions.id`
+  avec `ON DELETE CASCADE`
+- FK : `imperium_weekly_review_final_reports.user_id -> users.id`
+- FK :
+  `imperium_weekly_review_final_reports.source_ai_result_id -> ai_results.id`
+- Check `imperium_weekly_review_final_reports_status_check` :
+  `draft`, `approved`, `stored`, `superseded`
+- Index : `imperium_weekly_review_final_reports_user_status_idx` sur
+  `(user_id, status)`
+- Index : `imperium_weekly_review_final_reports_user_week_idx` sur
+  `(user_id, week_start)`
+- Index unique partiel : `uq_wr_final_reports_active_session` sur
+  `session_id` WHERE `status IN ('draft', 'approved', 'stored')`
+- Index unique partiel : `uq_wr_final_reports_active_user_week` sur
+  `(user_id, week_start)` WHERE `status IN ('draft', 'approved', 'stored')`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste
+  `imperium_weekly_review_final_reports`; le nom cible documente est
+  `review_final_reports`.
+- La migration 0013 creait deux contraintes uniques strictes :
+  `session_id` unique et `(user_id, week_start)` unique. La migration 0014 les
+  remplace par des index uniques partiels pour autoriser l'historique des
+  candidats `superseded`.
+- Le modele ORM est aligne sur les index partiels courants.
+- La migration met `id` en default serveur `gen_random_uuid()` ; le mixin ORM
+  genere aussi un UUID cote Python.
+- Il n'existe pas de contrainte SQL qui impose que `week_start/week_end` soient
+  identiques a ceux de la session. Cette coherence est portee par les services.
+
+### review_states
+
+Nom actuel : `imperium_weekly_review_states`
+Nom cible : `review_states` (À CLARIFIER)
+Source code : migration `20260427_0010_imperium_weekly_review_states.py`,
+modele `backend/app/models/imperium.py::ImperiumWeeklyReviewState`
+
+Role actuel : couche readiness/banniere WR au nom trompeur. Cette table a ete
+codee avant la vraie machine conversationnelle WR. Elle porte `ready`,
+`launched` et `analysis_status` pour l'affichage/dashboard, mais
+`imperium_weekly_review_sessions` est la machine conversationnelle canonique.
+
+À CLARIFIER au moment de coder/reprendre le WR : verifier ce que
+`imperium_weekly_review_states` porte d'utile que `imperium_weekly_review_sessions`
+n'a pas. Ne pas trancher maintenant. Ne pas renommer ni supprimer cette table
+dans le code dans ce chantier documentaire.
+
+Schema reel :
+
+```text
+id                     UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id                UUID NOT NULL FK users.id ON DELETE CASCADE
+week_start             DATE NOT NULL
+ready                  BOOLEAN NOT NULL DEFAULT false
+ready_at               TIMESTAMPTZ NULL
+launched               BOOLEAN NOT NULL DEFAULT false
+launched_at            TIMESTAMPTZ NULL
+analysis_status        VARCHAR(32) NOT NULL DEFAULT 'pending'
+analysis_completed_at  TIMESTAMPTZ NULL
+created_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_weekly_review_states.id`
+- FK : `imperium_weekly_review_states.user_id -> users.id`
+  avec `ON DELETE CASCADE`
+- Unique : `imperium_weekly_review_states_user_week_start_unique` sur
+  `(user_id, week_start)`
+- Index : `imperium_weekly_review_states_user_week_start_idx` sur
+  `(user_id, week_start)`
+- Index partiel : `imperium_weekly_review_states_user_ready_true_idx` sur
+  `(user_id, ready)` WHERE `ready = TRUE`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste
+  `imperium_weekly_review_states`; le nom cible documente est `review_states`,
+  mais son role est À CLARIFIER.
+- La migration met `id` en default serveur `gen_random_uuid()` ; le mixin ORM
+  genere aussi un UUID cote Python.
+- `week_start` est valide cote service comme un lundi. Il n'existe pas de check
+  SQL qui impose le lundi.
+- `analysis_status` n'a pas de check SQL. Le code ecrit notamment `pending` et
+  `running`.
+- Cette table ne contient pas `week_end`, pas de pointeurs `ai_tasks` /
+  `ai_results`, pas les statuts riches de conversation, et pas de liens vers les
+  rapports finaux. Ces attributs vivent dans `review_sessions` /
+  `review_final_reports`.
+
+### review_memory_decisions
+
+Nom actuel : `imperium_memory_candidate_decisions`
+Nom cible : `review_memory_decisions`
+Source code : migration `20260501_0015_memory_candidate_decisions.py`, modele
+`backend/app/models/imperium.py::ImperiumMemoryCandidateDecision`
+
+Role : decisions utilisateur/backend issues de la reflexion WR sur des
+candidats memoire. Cette table garde une valeur haute : elle ne doit pas devenir
+un log memoire banal. Elle enregistre si un candidat issu d'un rapport WR est
+approuve, rejete ou edite, avec la version originale et la version eventuellement
+editee.
+
+Schema reel :
+
+```text
+id                  UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id             UUID NOT NULL FK users.id
+report_id           UUID NOT NULL FK imperium_weekly_review_final_reports.id ON DELETE CASCADE
+session_id          UUID NOT NULL FK imperium_weekly_review_sessions.id ON DELETE CASCADE
+candidate_id        TEXT NOT NULL
+decision            TEXT NOT NULL
+source              TEXT NOT NULL DEFAULT 'weekly_review'
+original_candidate  JSONB NOT NULL
+edited_candidate    JSONB NULL
+reason              TEXT NULL
+payload             JSONB NULL
+idempotency_key     TEXT NULL
+created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_memory_candidate_decisions.id`
+- FK :
+  `imperium_memory_candidate_decisions.report_id -> imperium_weekly_review_final_reports.id`
+  avec `ON DELETE CASCADE`
+- FK :
+  `imperium_memory_candidate_decisions.session_id -> imperium_weekly_review_sessions.id`
+  avec `ON DELETE CASCADE`
+- FK : `imperium_memory_candidate_decisions.user_id -> users.id`
+- Unique : `uq_mem_candidate_decision_user_report_candidate` sur
+  `(user_id, report_id, candidate_id)`
+- Check `imperium_memory_candidate_decisions_decision_check` :
+  `approved`, `rejected`, `edited`
+- Check `imperium_memory_candidate_decisions_source_check` :
+  `source IN ('weekly_review')`
+- Index : `imperium_memory_candidate_decisions_user_created_idx` sur
+  `(user_id, created_at DESC)` dans la migration
+- Index : `imperium_memory_candidate_decisions_user_decision_idx` sur
+  `(user_id, decision)`
+- Index : `imperium_memory_candidate_decisions_report_idx` sur `report_id`
+- Index : `imperium_memory_candidate_decisions_session_idx` sur `session_id`
+- Index : `imperium_memory_candidate_decisions_candidate_idx` sur
+  `candidate_id`
+
+Notes migration/ORM :
+- Divergence de nommage : la table codee reste
+  `imperium_memory_candidate_decisions`; le nom cible documente est
+  `review_memory_decisions`.
+- La migration met `id` en default serveur `gen_random_uuid()` ; le mixin ORM
+  genere aussi un UUID cote Python.
+- Divergence migration/ORM : la migration cree
+  `imperium_memory_candidate_decisions_user_created_idx` avec `created_at DESC`,
+  tandis que le modele ORM declare l'index sur `(user_id, created_at)` sans
+  ordre explicite.
+- Il n'existe pas de contrainte SQL qui impose que `report_id`, `session_id` et
+  `user_id` appartiennent au meme utilisateur/session. Cette coherence est
+  portee par les services.
+
+Point critique D5 :
+- Les commits memoire WR sont BLOQUÉS jusqu'a correction de `ai_memories` au
+  schema canonique du present doc 05 et des docs 09/75. Le code contient encore
+  un chemin de commit WR vers `ai_memories`; ce chemin est NON CONFORME tant que
+  `ai_memories` garde le schema actuel (`source_module`, `kind`, `scope`,
+  pointeurs WR, etc.).
+- A rebrancher seulement apres correction de `ai_memories`. Ordre verrouille :
+  bloquer les commits memoire WR, corriger `ai_memories`, rebrancher le commit
+  WR, puis durcir les fallback candidates.
+- `review_memory_decisions` conserve sa valeur propre : decisions issues de la
+  reflexion WR. Ce n'est ni un simple log d'ecriture memoire ni un substitut a
+  `ai_memories`.
+
+Invariants metier WR reintegres :
+- Le WR est backend-owned. L'app affiche et collecte ; n8n orchestre seulement
+  des taches preparees/signees ; les modeles IA retournent des propositions via
+  le backend. Aucun modele, n8n workflow ou frontend ne doit ecrire directement
+  PostgreSQL.
+- Fenetre temporelle : `week_start` doit etre un lundi. La fenetre metier est
+  stricte de 7 jours en timezone Europe/Paris, du lundi au dimanche inclus pour
+  l'utilisateur. Pour les requetes temporelles, la borne technique recommandee
+  est demi-ouverte `[week_start, week_start + 7 jours)` afin d'eviter les erreurs
+  de precision ; la colonne `week_end` stocke la date affichee du dimanche
+  (`week_start + 6 jours`).
+- Activation : chaque mardi a 20h Europe/Paris, la banniere WR passe de
+  passive a active. Cette regle doit etre backend-enforced. n8n n'est pas
+  proprietaire de cette activation.
+- Machine d'etat : `review_sessions` est la source canonique de l'etat
+  conversationnel. Les statuts fermes/terminaux empechent les mutations
+  ordinaires ; `stored`, `cancelled` et `failed` ferment la session. `approved`
+  represente une approbation utilisateur, mais `approved != stored`.
+- Cycle validation -> stockage : un resultat IA, un draft ou un final candidate
+  n'est jamais canonique automatiquement. Le cycle attendu est :
+  proposition IA -> conversation utilisateur -> candidat draft/final ->
+  approbation explicite -> stockage explicite. Le stockage WR V1 marque le
+  rapport comme `stored`; il ne cree pas de memoire vectorielle tant que D5 n'est
+  pas resolu.
+- Historique des candidats : les drafts/revisions doivent conserver un trail de
+  versions. Les anciens candidats passent en `superseded`; un seul candidat
+  actif (`draft`, `approved` ou `stored`) est autorise par session et par
+  utilisateur/semaine.
+- Trail de regles : les regles utilisees pour produire, reviser, approuver et
+  stocker un WR doivent rester tracables via les payloads, rapports, statuts,
+  decisions et idempotency keys. Quand les prompts/regles evoluent, la version
+  applicable doit etre visible dans les payloads ou dans un champ dedie futur,
+  pas implicite dans le code.
