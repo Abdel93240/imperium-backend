@@ -478,3 +478,186 @@ Notes cible :
   cet existant est non conforme a la cible ci-dessus et doit etre migre dans un
   chantier dedie.
 
+## FINANCE
+
+Tables finance :
+`imperium_vault_transactions` (canonique actuel, nom cible
+`finance_transactions`) et `vault_transactions` (legacy deprecie).
+
+Regle de lecture pour cette section :
+- Le ledger canonique fonctionnel est `imperium_vault_transactions`.
+- Le nom cible documentaire est `finance_transactions`, conforme a la convention
+  D1 : prefixe de domaine, pas nom d'application.
+- Ce document ne renomme aucune table dans le code.
+
+### finance_transactions
+
+Nom actuel : `imperium_vault_transactions`
+Nom cible : `finance_transactions`
+Source code : migrations `20260525_0024_imperium_vault_ledger_foundation.py`,
+`20260525_0025_imperium_vault_transaction_reversals.py`,
+`20260525_0026_imperium_vault_local_date_timezone.py`, modele
+`backend/app/models/vault.py::ImperiumVaultTransaction`
+
+Role : ledger finance canonique. Montants en cents, append-only, corrections par
+reversal.
+
+Schema reel :
+
+```text
+id                          UUID PRIMARY KEY
+user_id                     UUID NOT NULL FK users.id
+transaction_type            TEXT NOT NULL
+amount_cents                INTEGER NOT NULL
+currency                    TEXT NOT NULL DEFAULT 'EUR'
+occurred_at                 TIMESTAMPTZ NOT NULL
+local_date                  DATE NOT NULL
+timezone                    TEXT NOT NULL
+category                    TEXT NULL
+source                      TEXT NULL
+note                        TEXT NULL
+external_ref                TEXT NULL
+is_reversal                 BOOLEAN NOT NULL DEFAULT false
+reversal_of_transaction_id  UUID NULL FK imperium_vault_transactions.id
+reversal_reason             VARCHAR(500) NULL
+created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `imperium_vault_transactions.id`
+- FK : `imperium_vault_transactions.user_id -> users.id`
+- FK :
+  `imperium_vault_transactions.reversal_of_transaction_id -> imperium_vault_transactions.id`
+- Check `imperium_vault_transactions_transaction_type_check` :
+  `transaction_type IN ('income', 'expense')`
+- Check `imperium_vault_transactions_amount_positive` :
+  `amount_cents > 0`
+- Check `imperium_vault_transactions_currency_length_check` :
+  `length(currency) = 3`
+- Check `imperium_vault_transactions_reversal_link_check` :
+  `is_reversal = true` impose `reversal_of_transaction_id IS NOT NULL` ;
+  `is_reversal = false` impose `reversal_of_transaction_id IS NULL`
+- Index :
+  `imperium_vault_transactions_user_occurred_at_idx` sur
+  `(user_id, occurred_at DESC)`
+- Index :
+  `imperium_vault_transactions_user_local_date_idx` sur
+  `(user_id, local_date DESC)`
+- Index :
+  `imperium_vault_transactions_user_transaction_type_idx` sur
+  `(user_id, transaction_type)`
+- Index :
+  `imperium_vault_transactions_user_reversal_of_idx` sur
+  `(user_id, reversal_of_transaction_id)`
+- Index unique partiel :
+  `imperium_vault_transactions_one_reversal_per_original_idx` sur
+  `reversal_of_transaction_id` WHERE `is_reversal = true`
+
+Regles metier du ledger canonique :
+- Ledger append-only : une transaction est immutable apres insertion.
+- Aucune correction par UPDATE ou DELETE. Les corrections s'ecrivent par ajout
+  d'une ligne de reversal via
+  `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- Une reversal est une nouvelle transaction liee a l'originale par
+  `reversal_of_transaction_id`.
+- Une transaction originale ne peut avoir qu'une seule reversal. Cette regle est
+  portee par le service et par l'index unique partiel ajoute en patch 9f/9g.
+- Une ligne de reversal ne peut pas etre reversee a son tour.
+- `occurred_at` est la seule source temporelle autoritative pour les summaries,
+  filtres et regroupements finance V1. La semantique temporelle de V1 est UTC.
+- `local_date` et `timezone` servent de convention de date utilisateur. La
+  convention par defaut produit attendue est `Europe/Paris`; une date fournie en
+  query/payload peut surcharger cette convention selon le contrat d'endpoint.
+- `currency` accepte exactement 3 lettres ASCII et est normalisee en majuscule
+  par les schemas API. V1 ne valide pas l'existence ISO-4217 de la devise.
+- Les endpoints de creation et de reversal exigent `Idempotency-Key`.
+- Les endpoints finance sont scopes par l'utilisateur courant.
+- Les endpoints de summary partagent le meme contrat de devise. Une devise
+  inconnue ou inutilisee sans transaction retourne des totaux a zero, sans
+  masquer une erreur de validation.
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `currency` et `is_reversal` ont des defaults serveur en migration et des
+  defaults Python equivalents en ORM.
+- `created_at` et `updated_at` ont des defaults serveur en migration ; le modele
+  declare aussi `server_default=func.now()`. `updated_at` porte en plus
+  `onupdate=func.now()` cote ORM, mais la regle metier interdit de modifier les
+  transactions apres insert.
+- Divergence de durcissement : les regles append-only sont appliquees par le
+  service/API et la doc, mais il n'existe pas encore de trigger DB
+  UPDATE/DELETE/TRUNCATE sur `imperium_vault_transactions` dans les migrations
+  0024/0025/0026.
+- Divergence de nommage : la table codee reste
+  `imperium_vault_transactions`; le nom cible documente est
+  `finance_transactions`.
+
+Lecteurs et contrats actifs :
+- API canonique actuelle :
+  `backend/app/api/v1/routes/imperium_vault.py`
+- Service d'ecriture/reversal :
+  `backend/app/services/imperium/vault_transactions.py`
+- Services de lecture/summaries :
+  `backend/app/services/imperium/vault.py`
+
+### vault_transactions
+
+Nom actuel : `vault_transactions`
+Nom cible : aucun. Table DEPRECIEE, legacy, a supprimer apres migration des
+lecteurs restants.
+Source code : migration `20260426_0007_vault_transactions.py`, modele
+`backend/app/models/vault.py::VaultTransaction`
+
+Role legacy : ancien ledger Vault, remplace par le ledger canonique ci-dessus.
+Ne pas creer de nouveau developpement dessus.
+
+Schema reel bref :
+
+```text
+id                UUID PRIMARY KEY
+user_id           UUID NOT NULL FK users.id
+event_id          UUID NULL FK events.id
+occurred_at       TIMESTAMPTZ NOT NULL
+local_date        DATE NOT NULL
+timezone          TEXT NOT NULL
+transaction_type  TEXT NOT NULL
+wallet            TEXT NOT NULL
+category          TEXT NOT NULL
+label             TEXT NULL
+amount            NUMERIC(12, 2) NOT NULL
+currency          TEXT NOT NULL DEFAULT 'EUR'
+notes             TEXT NULL
+source_app        TEXT NOT NULL DEFAULT 'vault'
+created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Contraintes et index :
+- PK : `vault_transactions.id`
+- FK : `vault_transactions.user_id -> users.id`
+- FK : `vault_transactions.event_id -> events.id`
+- Check `vault_transactions_transaction_type_check` :
+  `transaction_type IN ('income', 'expense', 'correction')`
+- Check `vault_transactions_wallet_check` :
+  `wallet IN ('cash', 'bank')`
+- Check `vault_transactions_amount_positive` : `amount > 0`
+- Index : `vault_transactions_user_local_date_idx` sur `(user_id, local_date)`
+- Index : `vault_transactions_user_occurred_at_idx` sur
+  `(user_id, occurred_at DESC)`
+- Index : `vault_transactions_user_transaction_type_idx` sur
+  `(user_id, transaction_type)`
+
+Notes legacy :
+- Cette table utilise `NUMERIC(12, 2)` au lieu de `amount_cents`.
+- Elle porte `wallet`, `label`, `notes`, `source_app` et `event_id`, absents du
+  ledger canonique actuel.
+- Elle autorise `transaction_type = 'correction'`, alors que le canonique
+  represente les corrections par reversal append-only.
+- Lecteurs a migrer avant suppression :
+  `backend/app/services/imperium/dashboard.py` et
+  `backend/app/services/imperium/weekly_report.py`.
+- Ancien chemin API encore present :
+  `backend/app/api/v1/routes/vault.py` avec service
+  `backend/app/services/vault/transactions.py`.
