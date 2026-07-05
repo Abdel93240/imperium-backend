@@ -3029,11 +3029,13 @@ def _memory_commit_item(
         memory_id=memory.id,
         decision_id=decision.id,
         candidate_id=decision.candidate_id,
-        status=memory.status,
-        title=memory.title,
-        kind=memory.kind,
-        scope=memory.scope,
-        confidence=float(memory.confidence),
+        is_active=memory.is_active,
+        content=memory.content,
+        memory_type=memory.memory_type,
+        learning_element_type=memory.learning_element_type,
+        source_domain=memory.source_domain,
+        confidence=float(memory.confidence) if memory.confidence is not None else None,
+        privacy_level=memory.privacy_level,
         created_at=memory.created_at,
     )
 

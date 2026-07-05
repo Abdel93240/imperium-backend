@@ -1219,6 +1219,14 @@ def test_ai_memories_schema_is_unified_vector_memory_and_wr_commit_stays_disable
     assert "create_ai_memory_from_draft" not in wr_service_text.split(
         "def commit_weekly_review_memory_candidates", maxsplit=1
     )[1].split("\ndef ", maxsplit=1)[0]
+    wr_commit_item_text = wr_service_text.split("def _memory_commit_item", maxsplit=1)[1].split("\ndef ", maxsplit=1)[0]
+    assert "memory.status" not in wr_commit_item_text
+    assert "memory.title" not in wr_commit_item_text
+    assert "memory.kind" not in wr_commit_item_text
+    assert "memory.scope" not in wr_commit_item_text
+    assert "memory.is_active" in wr_commit_item_text
+    assert "memory.memory_type" in wr_commit_item_text
+    assert "memory.source_domain" in wr_commit_item_text
     assert "WR_MEMORY_COMMIT_DISABLED_REASON" in wr_service_text
     assert "weekly_review_memory_commit_waits_for_embedding_service" in service_text
     assert '@router.get("/memories/schema"' in route_text

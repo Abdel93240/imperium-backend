@@ -328,11 +328,13 @@ class WeeklyReviewMemoryCommitItem(BaseModel):
     memory_id: UUID
     decision_id: UUID
     candidate_id: str
-    status: str
-    title: str
-    kind: str
-    scope: str
-    confidence: float
+    is_active: bool
+    content: str
+    memory_type: str
+    learning_element_type: str | None = None
+    source_domain: str
+    confidence: float | None = None
+    privacy_level: str
     created_at: datetime
 
 

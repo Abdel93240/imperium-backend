@@ -150,7 +150,7 @@ def _idempotency_from_added(db: FakeDb, key: str) -> IdempotencyKey | None:
 def test_ai_memory_model_matches_unified_vector_schema() -> None:
     columns = set(AIMemory.__table__.columns.keys())
 
-    assert {
+    assert columns == {
         "id",
         "user_id",
         "content",
@@ -171,11 +171,7 @@ def test_ai_memory_model_matches_unified_vector_schema() -> None:
         "updated_at",
         "metadata",
         "idempotency_key",
-    }.issubset(columns)
-    assert "source_module" not in columns
-    assert "kind" not in columns
-    assert "scope" not in columns
-    assert "status" not in columns
+    }
     assert AIMemory.__table__.columns["embedding"].type.get_col_spec() == "vector(1024)"
 
 
