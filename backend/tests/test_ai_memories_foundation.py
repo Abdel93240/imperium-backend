@@ -12,15 +12,17 @@ from app.api.v1.routes import imperium
 from app.models.ai import AIMemory
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMemoryCandidateDecision
-from app.schemas.ai import AIMemoryArchiveRequest, AIMemorySupersedeRequest
+from app.schemas.ai import AIMemoryArchiveRequest, AIMemoryDraftRead, AIMemorySupersedeRequest
 from app.services.ai import memories
 from app.services.ai.memories import (
     AIMemoryDuplicateSourceError,
     AIMemoryIdempotencyConflictError,
     AIMemoryOwnershipError,
     AIMemoryValidationError,
+    WR_MEMORY_COMMIT_DISABLED_REASON,
     archive_ai_memory,
     build_memory_draft_from_weekly_review_decision,
+    create_ai_memory_from_draft,
     ensure_memory_source_not_committed,
     get_ai_memory_schema_health,
     supersede_ai_memory,
@@ -72,7 +74,11 @@ def _user() -> SimpleNamespace:
     return SimpleNamespace(id=uuid4())
 
 
-def _decision(user_id, *, decision: str = "approved", candidate: dict | None = None) -> ImperiumMemoryCandidateDecision:
+def _embedding() -> list[float]:
+    return [0.0] * 1024
+
+
+def _decision(user_id, *, decision: str = "approved") -> ImperiumMemoryCandidateDecision:
     now = datetime.now(UTC)
     return ImperiumMemoryCandidateDecision(
         id=uuid4(),
@@ -82,8 +88,7 @@ def _decision(user_id, *, decision: str = "approved", candidate: dict | None = N
         candidate_id="wrmem_candidate_1",
         decision=decision,
         source="weekly_review",
-        original_candidate=candidate
-        or {
+        original_candidate={
             "kind": "weekly_commitment",
             "title": "Protect focus blocks",
             "content": "Keep two protected focus blocks next week.",
@@ -96,28 +101,42 @@ def _decision(user_id, *, decision: str = "approved", candidate: dict | None = N
     )
 
 
-def _memory(user_id, *, status: str = "active") -> AIMemory:
+def _memory(user_id, *, is_active: bool = True) -> AIMemory:
     now = datetime.now(UTC)
     return AIMemory(
         id=uuid4(),
         user_id=user_id,
-        source_module="weekly_review",
-        source_type="memory_candidate_decision",
+        content="Memory content about fatigue.",
+        embedding=_embedding(),
+        embedding_model="qwen3-embedding-1024",
+        memory_type="planning_insight",
+        learning_element_type="insight",
+        source_domain="review",
+        source_table="imperium_memory_candidate_decisions",
         source_id=str(uuid4()),
-        source_report_id=uuid4(),
-        source_session_id=uuid4(),
-        source_candidate_id="candidate",
-        source_decision_id=uuid4(),
-        kind="weekly_commitment",
-        scope="weekly_review",
-        title="Memory title",
-        content="Memory content",
-        confidence=Decimal("0.7"),
-        status=status,
-        visibility="private",
+        confidence=Decimal("0.7000"),
+        privacy_level="private",
+        is_active=is_active,
         metadata_json={"source": "test"},
         created_at=now,
         updated_at=now,
+    )
+
+
+def _draft(user_id) -> AIMemoryDraftRead:
+    return AIMemoryDraftRead(
+        user_id=user_id,
+        content="Keep sport before long VTC shifts.",
+        embedding=_embedding(),
+        embedding_model="qwen3-embedding-1024",
+        memory_type="planning_insight",
+        learning_element_type="pattern",
+        source_domain="review",
+        source_table="imperium_weekly_review_final_reports",
+        source_id=str(uuid4()),
+        confidence=Decimal("0.8000"),
+        privacy_level="private",
+        metadata={"raw_payload": "DROP_ME", "safe": True},
     )
 
 
@@ -128,26 +147,49 @@ def _idempotency_from_added(db: FakeDb, key: str) -> IdempotencyKey | None:
     return None
 
 
-def test_ai_memory_model_has_no_vector_column() -> None:
+def test_ai_memory_model_matches_unified_vector_schema() -> None:
     columns = set(AIMemory.__table__.columns.keys())
 
-    assert "embedding" not in columns
-    assert "vector" not in columns
-    assert "metadata" in columns
-    assert "metadata_json" not in columns
+    assert {
+        "id",
+        "user_id",
+        "content",
+        "embedding",
+        "embedding_model",
+        "memory_type",
+        "learning_element_type",
+        "source_domain",
+        "source_table",
+        "source_id",
+        "confidence",
+        "privacy_level",
+        "is_active",
+        "supersedes_memory_id",
+        "correction_reason",
+        "expires_at",
+        "created_at",
+        "updated_at",
+        "metadata",
+        "idempotency_key",
+    }.issubset(columns)
+    assert "source_module" not in columns
+    assert "kind" not in columns
+    assert "scope" not in columns
+    assert "status" not in columns
+    assert AIMemory.__table__.columns["embedding"].type.get_col_spec() == "vector(1024)"
 
 
-def test_ai_memory_schema_health_is_disabled() -> None:
+def test_ai_memory_schema_health_reports_vector_schema_but_disabled_writes() -> None:
     health = get_ai_memory_schema_health()
 
-    assert health.storage_enabled is True
+    assert health.storage_enabled is False
     assert health.table_defined is True
     assert health.embeddings_enabled is False
-    assert health.pgvector_enabled is False
-    assert "weekly_commitment" in health.supported_kinds
-    assert "weekly_review" in health.supported_scopes
-    assert "active" in health.supported_statuses
-    assert health.supported_visibility == ["private"]
+    assert health.pgvector_enabled is True
+    assert "planning_insight" in health.supported_memory_types
+    assert "review" in health.supported_source_domains
+    assert health.supported_privacy_levels == ["private"]
+    assert health.commit_endpoint is None
 
 
 def test_memories_schema_endpoint_requires_auth() -> None:
@@ -160,7 +202,7 @@ def test_memories_schema_endpoint_requires_auth() -> None:
     assert response.status_code == 401
 
 
-def test_memories_schema_endpoint_returns_enabled_contract_without_embeddings() -> None:
+def test_memories_schema_endpoint_returns_disabled_commit_contract() -> None:
     app = FastAPI()
     app.include_router(imperium.router, prefix="/imperium")
     app.dependency_overrides[get_current_user] = _user
@@ -170,20 +212,20 @@ def test_memories_schema_endpoint_returns_enabled_contract_without_embeddings() 
 
     assert response.status_code == 200
     body = response.json()
-    assert body["storage_enabled"] is True
+    assert body["storage_enabled"] is False
     assert body["table_defined"] is True
     assert body["embeddings_enabled"] is False
-    assert body["pgvector_enabled"] is False
-    assert body["commit_endpoint"] == "/api/imperium/weekly-review/memory-candidates/commit"
-    assert "weekly_review" in body["supported_scopes"]
+    assert body["pgvector_enabled"] is True
+    assert body["commit_endpoint"] is None
+    assert "review" in body["supported_source_domains"]
 
 
-def test_memories_index_returns_only_current_user_memories() -> None:
+def test_memories_index_returns_only_current_user_active_memories() -> None:
     current_user = _user()
     own_memory = _memory(current_user.id)
     foreign_memory = _memory(uuid4())
-    archived_memory = _memory(current_user.id, status="archived")
-    db = FakeDb(scalars_result=[own_memory, foreign_memory, archived_memory])
+    inactive_memory = _memory(current_user.id, is_active=False)
+    db = FakeDb(scalars_result=[own_memory, foreign_memory, inactive_memory])
     app = FastAPI()
     app.include_router(imperium.router, prefix="/imperium")
     app.dependency_overrides[get_current_user] = lambda: current_user
@@ -196,29 +238,23 @@ def test_memories_index_returns_only_current_user_memories() -> None:
     assert response.status_code == 200
     assert body["count"] == 1
     assert body["items"][0]["id"] == str(own_memory.id)
+    assert body["items"][0]["embedding_model"] == "qwen3-embedding-1024"
     assert "raw_payload" not in response.text
 
 
-def test_memories_index_filters_kind_scope_source_and_search() -> None:
+def test_memories_index_filters_type_source_privacy_and_search() -> None:
     current_user = _user()
-    report_id = uuid4()
-    session_id = uuid4()
-    decision_id = uuid4()
     matching = _memory(current_user.id)
-    matching.kind = "risk"
-    matching.scope = "strategy"
-    matching.source_module = "weekly_review"
-    matching.source_type = "memory_candidate_decision"
-    matching.source_report_id = report_id
-    matching.source_session_id = session_id
-    matching.source_candidate_id = "candidate-a"
-    matching.source_decision_id = decision_id
-    matching.title = "Driver risk"
+    matching.memory_type = "failure_pattern"
+    matching.learning_element_type = "blocker"
+    matching.source_domain = "review"
+    matching.source_table = "imperium_memory_candidate_decisions"
+    matching.source_id = "decision-a"
+    matching.privacy_level = "private"
     matching.content = "Fatigue risk should be watched."
-    wrong_kind = _memory(current_user.id)
-    wrong_kind.kind = "weekly_commitment"
-    wrong_kind.title = "Driver risk"
-    db = FakeDb(scalars_result=[matching, wrong_kind])
+    wrong_type = _memory(current_user.id)
+    wrong_type.memory_type = "planning_insight"
+    db = FakeDb(scalars_result=[matching, wrong_type])
     app = FastAPI()
     app.include_router(imperium.router, prefix="/imperium")
     app.dependency_overrides[get_current_user] = lambda: current_user
@@ -228,14 +264,12 @@ def test_memories_index_filters_kind_scope_source_and_search() -> None:
     response = client.get(
         "/imperium/memories",
         params={
-            "kind": "risk",
-            "scope": "strategy",
-            "source_module": "weekly_review",
-            "source_type": "memory_candidate_decision",
-            "source_report_id": str(report_id),
-            "source_session_id": str(session_id),
-            "source_candidate_id": "candidate-a",
-            "source_decision_id": str(decision_id),
+            "memory_type": "failure_pattern",
+            "learning_element_type": "blocker",
+            "source_domain": "review",
+            "source_table": "imperium_memory_candidate_decisions",
+            "source_id": "decision-a",
+            "privacy_level": "private",
             "q": "fatigue",
         },
     )
@@ -260,11 +294,37 @@ def test_memory_detail_404s_for_foreign_memory() -> None:
     assert response.status_code == 404
 
 
-def test_archive_memory_is_idempotent_and_hides_from_default_index(monkeypatch) -> None:
+def test_create_memory_from_draft_requires_vector_embedding_and_sanitizes_metadata() -> None:
+    user = _user()
+    db = FakeDb()
+
+    memory = create_ai_memory_from_draft(db, draft=_draft(user.id), idempotency_key="create-key")
+
+    assert memory.embedding == _embedding()
+    assert memory.embedding_model == "qwen3-embedding-1024"
+    assert memory.memory_type == "planning_insight"
+    assert memory.source_domain == "review"
+    assert memory.metadata_json == {"safe": True}
+    assert memory.idempotency_key == "create-key"
+
+
+def test_create_memory_rejects_wrong_embedding_dimensions() -> None:
+    draft = _draft(_user().id)
+    draft.embedding = [0.0]
+
+    with pytest.raises(AIMemoryValidationError):
+        create_ai_memory_from_draft(FakeDb(), draft=draft)
+
+
+def test_archive_memory_is_idempotent_and_deactivates_memory(monkeypatch) -> None:
     current_user = _user()
     memory = _memory(current_user.id)
     db = FakeDb(objects={(AIMemory, memory.id): memory})
-    monkeypatch.setattr(memories, "_get_existing_idempotency", lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key))
+    monkeypatch.setattr(
+        memories,
+        "_get_existing_idempotency",
+        lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key),
+    )
 
     first, duplicate = archive_ai_memory(
         db,
@@ -287,15 +347,15 @@ def test_archive_memory_is_idempotent_and_hides_from_default_index(monkeypatch) 
 
     assert duplicate is False
     assert replay_duplicate is True
-    assert first.status == "archived"
-    assert replay.status == "archived"
-    assert memory.archived_at is not None
+    assert first.is_active is False
+    assert replay.is_active is False
+    assert memory.correction_reason == "old"
     assert len([item for item in db.added if isinstance(item, IdempotencyKey)]) == 1
 
 
-def test_archive_memory_rejects_terminal_with_new_key() -> None:
+def test_archive_memory_rejects_inactive_with_new_key() -> None:
     current_user = _user()
-    memory = _memory(current_user.id, status="archived")
+    memory = _memory(current_user.id, is_active=False)
     db = FakeDb(objects={(AIMemory, memory.id): memory})
 
     with pytest.raises(AIMemoryValidationError):
@@ -310,22 +370,28 @@ def test_archive_memory_rejects_terminal_with_new_key() -> None:
         )
 
 
-def test_supersede_memory_creates_new_memory_and_marks_old(monkeypatch) -> None:
+def test_supersede_memory_creates_vector_memory_and_deactivates_old(monkeypatch) -> None:
     current_user = _user()
     memory = _memory(current_user.id)
     db = FakeDb(objects={(AIMemory, memory.id): memory})
-    monkeypatch.setattr(memories, "_get_existing_idempotency", lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key))
+    monkeypatch.setattr(
+        memories,
+        "_get_existing_idempotency",
+        lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key),
+    )
 
     result, duplicate = supersede_ai_memory(
         db,
         current_user=current_user,
         memory_id=memory.id,
         payload=AIMemorySupersedeRequest(
-            title="Updated memory",
             content="Updated safe memory content.",
-            kind="strategy_note",
-            scope="strategy",
-            confidence=Decimal("0.9"),
+            embedding=_embedding(),
+            embedding_model="qwen3-embedding-1024",
+            memory_type="correction",
+            learning_element_type="decision",
+            source_domain="review",
+            confidence=Decimal("0.9000"),
             reason="more precise",
             payload={"raw_payload": "DROP_ME", "safe": True},
         ),
@@ -337,27 +403,33 @@ def test_supersede_memory_creates_new_memory_and_marks_old(monkeypatch) -> None:
 
     assert duplicate is False
     assert result.id == new_memory.id
-    assert result.title == "Updated memory"
-    assert result.kind == "strategy_note"
-    assert result.scope == "strategy"
-    assert memory.status == "superseded"
-    assert memory.superseded_by_id == new_memory.id
-    assert new_memory.source_type == "memory_supersession"
+    assert result.memory_type == "correction"
+    assert result.learning_element_type == "decision"
+    assert memory.is_active is False
+    assert new_memory.supersedes_memory_id == memory.id
     assert new_memory.metadata_json["previous_memory_id"] == str(memory.id)
     assert "raw_payload" not in result.model_dump_json()
 
 
-def test_supersede_memory_rejects_terminal_and_conflicting_replay(monkeypatch) -> None:
+def test_supersede_memory_rejects_inactive_and_conflicting_replay(monkeypatch) -> None:
     current_user = _user()
     memory = _memory(current_user.id)
     db = FakeDb(objects={(AIMemory, memory.id): memory})
-    monkeypatch.setattr(memories, "_get_existing_idempotency", lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key))
+    monkeypatch.setattr(
+        memories,
+        "_get_existing_idempotency",
+        lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key),
+    )
 
     supersede_ai_memory(
         db,
         current_user=current_user,
         memory_id=memory.id,
-        payload=AIMemorySupersedeRequest(content="Updated once."),
+        payload=AIMemorySupersedeRequest(
+            content="Updated once.",
+            embedding=_embedding(),
+            embedding_model="qwen3-embedding-1024",
+        ),
         idempotency_key="supersede-conflict",
         request_method="POST",
         request_path=f"/api/imperium/memories/{memory.id}/supersede",
@@ -366,157 +438,71 @@ def test_supersede_memory_rejects_terminal_and_conflicting_replay(monkeypatch) -
         db,
         current_user=current_user,
         memory_id=memory.id,
-        payload=AIMemorySupersedeRequest(content="Updated once."),
+        payload=AIMemorySupersedeRequest(
+            content="Updated once.",
+            embedding=_embedding(),
+            embedding_model="qwen3-embedding-1024",
+        ),
         idempotency_key="supersede-conflict",
         request_method="POST",
         request_path=f"/api/imperium/memories/{memory.id}/supersede",
     )
 
     assert duplicate is True
-    assert replay.status == "active"
+    assert replay.is_active is True
     with pytest.raises(AIMemoryIdempotencyConflictError):
         supersede_ai_memory(
             db,
             current_user=current_user,
             memory_id=memory.id,
-            payload=AIMemorySupersedeRequest(content="Different."),
+            payload=AIMemorySupersedeRequest(
+                content="Different.",
+                embedding=_embedding(),
+                embedding_model="qwen3-embedding-1024",
+            ),
             idempotency_key="supersede-conflict",
             request_method="POST",
             request_path=f"/api/imperium/memories/{memory.id}/supersede",
         )
     with pytest.raises(AIMemoryValidationError):
         supersede_ai_memory(
-            FakeDb(objects={(AIMemory, memory.id): _memory(current_user.id, status="archived")}),
+            FakeDb(objects={(AIMemory, memory.id): _memory(current_user.id, is_active=False)}),
             current_user=current_user,
             memory_id=memory.id,
-            payload=AIMemorySupersedeRequest(content="Nope."),
-            idempotency_key="supersede-archived",
+            payload=AIMemorySupersedeRequest(
+                content="Nope.",
+                embedding=_embedding(),
+                embedding_model="qwen3-embedding-1024",
+            ),
+            idempotency_key="supersede-inactive",
             request_method="POST",
             request_path=f"/api/imperium/memories/{memory.id}/supersede",
         )
 
 
-def test_memory_draft_accepts_approved_decision_without_insert() -> None:
-    user = _user()
-    decision = _decision(user.id)
-
-    draft = build_memory_draft_from_weekly_review_decision(decision, current_user_id=user.id)
-
-    assert draft.user_id == user.id
-    assert draft.source_module == "weekly_review"
-    assert draft.source_type == "memory_candidate_decision"
-    assert draft.source_decision_id == decision.id
-    assert draft.kind == "weekly_commitment"
-    assert draft.scope == "weekly_review"
-    assert draft.confidence == Decimal("0.8000")
-
-
-def test_memory_draft_uses_edited_candidate() -> None:
-    user = _user()
-    decision = _decision(user.id, decision="edited")
-    decision.edited_candidate = {
-        "kind": "preference",
-        "title": "Morning planning",
-        "content": "Prefer reviewing operational priorities before 09:00.",
-        "confidence": 1.4,
-        "proposed_memory_scope": "user_preference",
-    }
-
-    draft = build_memory_draft_from_weekly_review_decision(decision, current_user_id=user.id)
-
-    assert draft.kind == "preference"
-    assert draft.scope == "user_preference"
-    assert draft.title == "Morning planning"
-    assert draft.confidence == Decimal("1")
-
-
-def test_memory_draft_rejects_rejected_and_undecided_decisions() -> None:
+def test_weekly_review_memory_draft_is_disabled_until_embedding_service() -> None:
     user = _user()
 
-    with pytest.raises(AIMemoryValidationError):
-        build_memory_draft_from_weekly_review_decision(_decision(user.id, decision="rejected"), current_user_id=user.id)
-    with pytest.raises(AIMemoryValidationError):
-        build_memory_draft_from_weekly_review_decision(_decision(user.id, decision="pending"), current_user_id=user.id)
+    with pytest.raises(AIMemoryValidationError, match=WR_MEMORY_COMMIT_DISABLED_REASON):
+        build_memory_draft_from_weekly_review_decision(_decision(user.id), current_user_id=user.id)
 
 
-def test_memory_draft_rejects_foreign_decision() -> None:
+def test_weekly_review_memory_draft_still_rejects_foreign_decision() -> None:
     user = _user()
-    decision = _decision(uuid4())
 
     with pytest.raises(AIMemoryOwnershipError):
-        build_memory_draft_from_weekly_review_decision(decision, current_user_id=user.id)
-
-
-def test_memory_draft_rejects_empty_and_unknown_fields() -> None:
-    user = _user()
-    with pytest.raises(AIMemoryValidationError):
-        build_memory_draft_from_weekly_review_decision(
-            _decision(
-                user.id,
-                candidate={
-                    "kind": "weekly_commitment",
-                    "title": " ",
-                    "content": "Missing title",
-                    "confidence": 0.5,
-                    "proposed_memory_scope": "weekly_review",
-                },
-            ),
-            current_user_id=user.id,
-        )
-    with pytest.raises(AIMemoryValidationError):
-        build_memory_draft_from_weekly_review_decision(
-            _decision(
-                user.id,
-                candidate={
-                    "kind": "unknown",
-                    "title": "Title",
-                    "content": "Content",
-                    "confidence": 0.5,
-                    "proposed_memory_scope": "weekly_review",
-                },
-            ),
-            current_user_id=user.id,
-        )
+        build_memory_draft_from_weekly_review_decision(_decision(uuid4()), current_user_id=user.id)
 
 
 def test_duplicate_memory_source_is_prevented() -> None:
     user = _user()
-    memory = AIMemory(
-        id=uuid4(),
-        user_id=user.id,
-        source_module="weekly_review",
-        source_type="memory_candidate_decision",
-        source_id="source",
-        source_decision_id=uuid4(),
-        kind="weekly_commitment",
-        scope="weekly_review",
-        title="Title",
-        content="Content",
-        confidence=Decimal("0.5"),
-        status="active",
-        visibility="private",
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
+    memory = _memory(user.id)
 
     with pytest.raises(AIMemoryDuplicateSourceError):
         ensure_memory_source_not_committed(
             FakeDb(memory),
             user_id=user.id,
-            source_module="weekly_review",
-            source_type="memory_candidate_decision",
-            source_decision_id=memory.source_decision_id,
+            source_domain=memory.source_domain,
+            source_table=memory.source_table,
             source_id=memory.source_id,
         )
-
-
-def test_memory_read_schema_strips_unsafe_payloads() -> None:
-    user = _user()
-    decision = _decision(user.id)
-    decision.original_candidate["raw_payload"] = {"secret": "DO_NOT_EXPOSE"}
-
-    draft = build_memory_draft_from_weekly_review_decision(decision, current_user_id=user.id)
-    serialized = draft.model_dump_json()
-
-    assert "raw_payload" not in serialized
-    assert "DO_NOT_EXPOSE" not in serialized

@@ -1184,31 +1184,43 @@ def test_wr_memory_candidate_decision_migration_and_model_are_scoped() -> None:
     assert "class ImperiumMemoryCandidateDecision" in model_text
 
 
-def test_ai_memories_commit_has_no_vector_embedding_or_n8n_path() -> None:
-    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260502_0017_ai_memories_foundation.py"
+def test_ai_memories_schema_is_unified_vector_memory_and_wr_commit_stays_disabled() -> None:
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260705_0032_ai_memories_unified_vector_schema.py"
     model_path = BACKEND_ROOT / "app" / "models" / "ai.py"
     service_path = BACKEND_ROOT / "app" / "services" / "ai" / "memories.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium.py"
+    wr_service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "weekly_review_conversation.py"
     migration_text = migration_path.read_text(encoding="utf-8")
     model_text = model_path.read_text(encoding="utf-8")
     service_text = service_path.read_text(encoding="utf-8")
     route_text = route_path.read_text(encoding="utf-8")
+    wr_service_text = wr_service_path.read_text(encoding="utf-8")
 
-    assert 'revision: str = "20260502_0017"' in migration_text
-    assert 'down_revision: str | None = "20260501_0016"' in migration_text
+    assert 'revision: str = "20260705_0032"' in migration_text
+    assert 'down_revision: str | None = "20260526_0031"' in migration_text
+    assert 'op.drop_table("ai_memories")' in migration_text
     assert "ai_memories" in migration_text
-    assert "uq_ai_memories_source_decision" in migration_text
-    assert "source_decision_id IS NOT NULL" in migration_text
-    assert "confidence >= 0 AND confidence <= 1" in migration_text
-    assert "pgvector" not in migration_text.lower()
-    assert "embedding" not in migration_text.lower()
+    assert "vector(1024)" in migration_text
+    assert "vector_cosine_ops" in migration_text
+    assert 'postgresql_using="hnsw"' in migration_text
+    assert "source_domain" in migration_text
+    assert "memory_type" in migration_text
+    assert "privacy_level" in migration_text
+    assert "supersedes_memory_id" in migration_text
+    assert "source_module" not in migration_text.split("def upgrade", maxsplit=1)[1].split("def downgrade", maxsplit=1)[0]
+    assert "confidence IS NULL OR (confidence >= 0 AND confidence <= 1)" in migration_text
     assert "class AIMemory" in model_text
+    assert "Vector1024" in model_text
+    assert "embedding_model" in model_text
     assert "metadata_json" in model_text
     assert "mapped_column(\"metadata\"" in model_text
     assert "trigger_n8n" not in service_text
     assert "QwenClient" not in service_text
-    assert "pgvector" not in service_text.lower().replace("pgvector_enabled", "")
-    assert "embedding" not in service_text.lower().replace("embeddings_enabled", "")
+    assert "create_ai_memory_from_draft" not in wr_service_text.split(
+        "def commit_weekly_review_memory_candidates", maxsplit=1
+    )[1].split("\ndef ", maxsplit=1)[0]
+    assert "WR_MEMORY_COMMIT_DISABLED_REASON" in wr_service_text
+    assert "weekly_review_memory_commit_waits_for_embedding_service" in service_text
     assert '@router.get("/memories/schema"' in route_text
     assert '@router.get("/memories"' in route_text
     assert '@router.get("/memories/{memory_id}"' in route_text
@@ -1317,7 +1329,9 @@ def test_commit_memory_candidates_uses_sql_user_id_filter() -> None:
     # the next top-level def.
     after_def = service_text.split("def commit_weekly_review_memory_candidates", maxsplit=1)[1]
     function_body = after_def.split("\ndef ", maxsplit=1)[0]
-    assert "ImperiumMemoryCandidateDecision.user_id == current_user.id" in function_body
+    assert "WR_MEMORY_COMMIT_DISABLED_REASON" in function_body
+    assert "db.scalars" not in function_body
+    assert "create_ai_memory_from_draft" not in function_body
     assert '"foreign"' not in function_body
 
 

@@ -31,31 +31,33 @@ ALLOWED_AI_RESULT_TYPES = frozenset(
     }
 )
 
-SUPPORTED_AI_MEMORY_KINDS = frozenset(
+SUPPORTED_AI_MEMORY_TYPES = frozenset(
     {
-        "behavior_pattern",
-        "blocker",
-        "weekly_commitment",
-        "preference",
-        "operational_signal",
-        "risk",
-        "achievement",
-        "constraint",
-        "strategy_note",
+        "user_preference",
+        "behavioral_pattern",
+        "failure_pattern",
+        "planning_insight",
+        "vtc_zone_pattern",
+        "financial_pattern",
+        "sport_adaptation",
+        "worship_preference",
+        "correction",
+        "system_note",
     }
 )
 
-SUPPORTED_AI_MEMORY_SCOPES = frozenset(
+SUPPORTED_AI_MEMORY_SOURCE_DOMAINS = frozenset(
     {
-        "user_profile",
-        "operating_pattern",
-        "weekly_review",
-        "module_signal",
-        "user_preference",
-        "strategy",
-        "health",
         "finance",
-        "vtc",
+        "worship",
+        "health",
+        "rides",
+        "planning",
+        "decision",
+        "review",
+        "calendar",
+        "vehicle",
+        "system",
     }
 )
 
@@ -168,13 +170,9 @@ class AIResultValidationRead(BaseModel):
 
 
 class AIMemorySourceRead(BaseModel):
-    source_module: str
-    source_type: str
-    source_id: str
-    source_report_id: UUID | None = None
-    source_session_id: UUID | None = None
-    source_candidate_id: str | None = None
-    source_decision_id: UUID | None = None
+    source_domain: str
+    source_table: str | None = None
+    source_id: str | None = None
 
 
 class AIMemoryRead(BaseModel):
@@ -182,25 +180,24 @@ class AIMemoryRead(BaseModel):
 
     id: UUID
     user_id: UUID
-    source_module: str
-    source_type: str
-    source_id: str
-    source_report_id: UUID | None
-    source_session_id: UUID | None
-    source_candidate_id: str | None
-    source_decision_id: UUID | None
-    kind: str
-    scope: str
-    title: str
     content: str
-    confidence: Decimal
-    status: str
-    visibility: str
-    metadata_json: dict | None = None
+    embedding: list[float]
+    embedding_model: str
+    memory_type: str
+    learning_element_type: str | None
+    source_domain: str
+    source_table: str | None
+    source_id: str | None
+    confidence: Decimal | None
+    privacy_level: str
+    is_active: bool
+    supersedes_memory_id: UUID | None
+    correction_reason: str | None
+    expires_at: datetime | None
+    metadata: dict | None = Field(default=None, validation_alias="metadata_json")
+    idempotency_key: str | None = None
     created_at: datetime
     updated_at: datetime
-    archived_at: datetime | None
-    superseded_by_id: UUID | None
 
 
 class AIMemoryListResponse(BaseModel):
@@ -217,47 +214,50 @@ class AIMemoryArchiveRequest(BaseModel):
 
 
 class AIMemorySupersedeRequest(BaseModel):
-    title: str | None = None
     content: str = Field(min_length=1)
-    kind: str | None = None
-    scope: str | None = None
+    embedding: list[float] = Field(min_length=1024, max_length=1024)
+    embedding_model: str = Field(min_length=1)
+    memory_type: str | None = None
+    learning_element_type: str | None = None
+    source_domain: str | None = None
     confidence: Decimal | None = Field(default=None, ge=0, le=1)
+    privacy_level: str | None = None
     reason: str | None = None
     payload: dict | None = None
 
 
 class AIMemoryDraftRead(BaseModel):
     user_id: UUID
-    source_module: str
-    source_type: str
-    source_id: str
-    source_report_id: UUID | None = None
-    source_session_id: UUID | None = None
-    source_candidate_id: str | None = None
-    source_decision_id: UUID | None = None
-    kind: str
-    scope: str
-    title: str
     content: str
-    confidence: Decimal = Field(ge=0, le=1)
-    status: str = "active"
-    visibility: str = "private"
-    metadata_json: dict | None = None
+    embedding: list[float] = Field(min_length=1024, max_length=1024)
+    embedding_model: str
+    memory_type: str
+    learning_element_type: str | None = None
+    source_domain: str
+    source_table: str | None = None
+    source_id: str | None = None
+    confidence: Decimal | None = Field(default=None, ge=0, le=1)
+    privacy_level: str = "private"
+    is_active: bool = True
+    supersedes_memory_id: UUID | None = None
+    correction_reason: str | None = None
+    expires_at: datetime | None = None
+    metadata: dict | None = None
+    idempotency_key: str | None = None
 
 
 class AIMemorySchemaHealth(BaseModel):
-    storage_enabled: bool = True
+    storage_enabled: bool = False
     table_defined: bool = True
     embeddings_enabled: bool = False
-    pgvector_enabled: bool = False
-    supported_kinds: list[str]
-    supported_scopes: list[str]
-    supported_statuses: list[str]
-    supported_visibility: list[str]
-    commit_endpoint: str = "/api/imperium/weekly-review/memory-candidates/commit"
+    pgvector_enabled: bool = True
+    supported_memory_types: list[str]
+    supported_source_domains: list[str]
+    supported_privacy_levels: list[str]
+    commit_endpoint: str | None = None
     index_endpoint: str = "/api/imperium/memories"
     detail_endpoint: str = "/api/imperium/memories/{memory_id}"
-    note: str = "Explicit user-triggered memory commit is enabled. No embeddings are generated."
+    note: str = "Vector memory schema is defined. Canonical writes wait for the embedding service."
 
 
 class AIResultCallbackResponse(BaseModel):

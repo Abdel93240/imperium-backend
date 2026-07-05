@@ -15,22 +15,20 @@ from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMemoryCandidateDecision
 from app.schemas.ai import (
     AIMemoryArchiveRequest,
+    AIMemoryDraftRead,
     AIMemoryListResponse,
     AIMemoryRead,
-    AIMemoryDraftRead,
     AIMemorySchemaHealth,
     AIMemorySupersedeRequest,
-    SUPPORTED_AI_MEMORY_KINDS,
-    SUPPORTED_AI_MEMORY_SCOPES,
+    SUPPORTED_AI_MEMORY_SOURCE_DOMAINS,
+    SUPPORTED_AI_MEMORY_TYPES,
 )
 
 T = TypeVar("T")
 
-MEMORY_STORAGE_ENABLED_NOTE = "Explicit user-triggered memory commit is enabled. Semantic vector indexing is disabled."
-SUPPORTED_AI_MEMORY_STATUSES = frozenset({"active", "archived", "superseded", "deleted"})
-SUPPORTED_AI_MEMORY_VISIBILITY = frozenset({"private"})
-DEFAULT_MEMORY_KIND = "operational_signal"
-DEFAULT_MEMORY_SCOPE = "weekly_review"
+MEMORY_STORAGE_ENABLED_NOTE = "Vector memory schema is defined. Canonical writes wait for the embedding service."
+SUPPORTED_AI_MEMORY_PRIVACY_LEVELS = frozenset({"private"})
+WR_MEMORY_COMMIT_DISABLED_REASON = "weekly_review_memory_commit_waits_for_embedding_service"
 
 
 class AIMemoryValidationError(ValueError):
@@ -55,14 +53,13 @@ class AIMemoryIdempotencyConflictError(ValueError):
 
 def get_ai_memory_schema_health() -> AIMemorySchemaHealth:
     return AIMemorySchemaHealth(
-        storage_enabled=True,
+        storage_enabled=False,
         table_defined=True,
         embeddings_enabled=False,
-        pgvector_enabled=False,
-        supported_kinds=sorted(SUPPORTED_AI_MEMORY_KINDS),
-        supported_scopes=sorted(SUPPORTED_AI_MEMORY_SCOPES),
-        supported_statuses=sorted(SUPPORTED_AI_MEMORY_STATUSES),
-        supported_visibility=sorted(SUPPORTED_AI_MEMORY_VISIBILITY),
+        pgvector_enabled=True,
+        supported_memory_types=sorted(SUPPORTED_AI_MEMORY_TYPES),
+        supported_source_domains=sorted(SUPPORTED_AI_MEMORY_SOURCE_DOMAINS),
+        supported_privacy_levels=sorted(SUPPORTED_AI_MEMORY_PRIVACY_LEVELS),
         note=MEMORY_STORAGE_ENABLED_NOTE,
     )
 
@@ -73,41 +70,34 @@ def get_ai_memories(
     current_user: User,
     limit: int = 20,
     offset: int = 0,
-    status: str | None = "active",
-    kind: str | None = None,
-    scope: str | None = None,
-    source_module: str | None = None,
-    source_type: str | None = None,
-    source_report_id: UUID | None = None,
-    source_session_id: UUID | None = None,
-    source_candidate_id: str | None = None,
-    source_decision_id: UUID | None = None,
+    is_active: bool | None = True,
+    memory_type: str | None = None,
+    learning_element_type: str | None = None,
+    source_domain: str | None = None,
+    source_table: str | None = None,
+    source_id: str | None = None,
+    privacy_level: str | None = None,
     q: str | None = None,
 ) -> AIMemoryListResponse:
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
     query = select(AIMemory).where(AIMemory.user_id == current_user.id)
-    if status and status != "all":
-        query = query.where(AIMemory.status == status)
-    if kind:
-        query = query.where(AIMemory.kind == kind)
-    if scope:
-        query = query.where(AIMemory.scope == scope)
-    if source_module:
-        query = query.where(AIMemory.source_module == source_module)
-    if source_type:
-        query = query.where(AIMemory.source_type == source_type)
-    if source_report_id:
-        query = query.where(AIMemory.source_report_id == source_report_id)
-    if source_session_id:
-        query = query.where(AIMemory.source_session_id == source_session_id)
-    if source_candidate_id:
-        query = query.where(AIMemory.source_candidate_id == source_candidate_id)
-    if source_decision_id:
-        query = query.where(AIMemory.source_decision_id == source_decision_id)
+    if is_active is not None:
+        query = query.where(AIMemory.is_active == is_active)
+    if memory_type:
+        query = query.where(AIMemory.memory_type == memory_type)
+    if learning_element_type:
+        query = query.where(AIMemory.learning_element_type == learning_element_type)
+    if source_domain:
+        query = query.where(AIMemory.source_domain == source_domain)
+    if source_table:
+        query = query.where(AIMemory.source_table == source_table)
+    if source_id:
+        query = query.where(AIMemory.source_id == source_id)
+    if privacy_level:
+        query = query.where(AIMemory.privacy_level == privacy_level)
     if q and q.strip():
-        pattern = f"%{q.strip()}%"
-        query = query.where(AIMemory.title.ilike(pattern) | AIMemory.content.ilike(pattern))
+        query = query.where(AIMemory.content.ilike(f"%{q.strip()}%"))
     query = query.order_by(AIMemory.created_at.desc()).offset(offset).limit(limit + 1)
     memories = [
         memory
@@ -115,15 +105,13 @@ def get_ai_memories(
         if _memory_matches_filters(
             memory,
             user_id=current_user.id,
-            status=status,
-            kind=kind,
-            scope=scope,
-            source_module=source_module,
-            source_type=source_type,
-            source_report_id=source_report_id,
-            source_session_id=source_session_id,
-            source_candidate_id=source_candidate_id,
-            source_decision_id=source_decision_id,
+            is_active=is_active,
+            memory_type=memory_type,
+            learning_element_type=learning_element_type,
+            source_domain=source_domain,
+            source_table=source_table,
+            source_id=source_id,
+            privacy_level=privacy_level,
             q=q,
         )
     ]
@@ -163,12 +151,13 @@ def archive_ai_memory(
         return _handle_idempotency(existing_key, request_hash, AIMemoryRead, request_path=request_path), True
 
     memory = _get_memory_for_update(db, current_user=current_user, memory_id=memory_id)
-    if memory.status != "active":
+    if not memory.is_active:
         raise AIMemoryValidationError("Only active memories can be archived.")
     now = datetime.now(UTC)
-    memory.status = "archived"
-    memory.archived_at = now
+    memory.is_active = False
     memory.updated_at = now
+    if payload.reason:
+        memory.correction_reason = _bounded_text(_clean_text(payload.reason), 500)
     response = AIMemoryRead.model_validate(memory)
     _store_idempotency(
         db,
@@ -200,40 +189,36 @@ def supersede_ai_memory(
         return _handle_idempotency(existing_key, request_hash, AIMemoryRead, request_path=request_path), True
 
     memory = _get_memory_for_update(db, current_user=current_user, memory_id=memory_id)
-    if memory.status != "active":
+    if not memory.is_active:
         raise AIMemoryValidationError("Only active memories can be superseded.")
 
-    kind = payload.kind or memory.kind
-    scope = payload.scope or memory.scope
-    confidence = _clamped_confidence(payload.confidence if payload.confidence is not None else memory.confidence)
     draft = AIMemoryDraftRead(
         user_id=current_user.id,
-        source_module=memory.source_module,
-        source_type="memory_supersession",
-        source_id=str(memory.id),
-        source_report_id=memory.source_report_id,
-        source_session_id=memory.source_session_id,
-        source_candidate_id=memory.source_candidate_id,
-        source_decision_id=None,
-        kind=kind,
-        scope=scope,
-        title=_bounded_text(_clean_text(payload.title), 160) or memory.title,
         content=_bounded_text(_clean_text(payload.content), 1200) or "",
-        confidence=confidence,
-        status="active",
-        visibility="private",
-        metadata_json=_sanitize_memory_metadata(
+        embedding=payload.embedding,
+        embedding_model=_clean_text(payload.embedding_model) or "",
+        memory_type=_clean_text(payload.memory_type) or memory.memory_type,
+        learning_element_type=_clean_text(payload.learning_element_type) or memory.learning_element_type,
+        source_domain=_clean_text(payload.source_domain) or memory.source_domain,
+        source_table=memory.source_table,
+        source_id=memory.source_id,
+        confidence=_clamped_confidence(payload.confidence if payload.confidence is not None else memory.confidence),
+        privacy_level=_clean_text(payload.privacy_level) or memory.privacy_level,
+        is_active=True,
+        supersedes_memory_id=memory.id,
+        correction_reason=_bounded_text(_clean_text(payload.reason), 500),
+        metadata=_sanitize_memory_metadata(
             {
                 "previous_memory_id": str(memory.id),
                 "supersession_reason": payload.reason,
                 "payload": payload.payload,
             }
         ),
+        idempotency_key=idempotency_key,
     )
-    new_memory = create_ai_memory_from_draft(db, draft=draft, idempotency_key=idempotency_key)
+    new_memory = create_ai_memory_from_draft(db, draft=draft)
     now = datetime.now(UTC)
-    memory.status = "superseded"
-    memory.superseded_by_id = new_memory.id
+    memory.is_active = False
     memory.updated_at = now
     response = AIMemoryRead.model_validate(new_memory)
     _store_idempotency(
@@ -256,63 +241,23 @@ def build_memory_draft_from_weekly_review_decision(
 ) -> AIMemoryDraftRead:
     if decision.user_id != current_user_id:
         raise AIMemoryOwnershipError("Memory candidate decision not found.")
-    if decision.decision == "rejected":
-        raise AIMemoryValidationError("Rejected memory candidate decisions cannot become memory.")
-    if decision.decision not in {"approved", "edited"}:
-        raise AIMemoryValidationError("Only approved or edited memory candidate decisions can become memory.")
-
-    candidate = decision.edited_candidate if decision.decision == "edited" and decision.edited_candidate else decision.original_candidate
-    if not isinstance(candidate, dict):
-        raise AIMemoryValidationError("Memory candidate payload is invalid.")
-
-    kind = _clean_text(candidate.get("kind")) or DEFAULT_MEMORY_KIND
-    scope = _clean_text(candidate.get("proposed_memory_scope")) or DEFAULT_MEMORY_SCOPE
-    title = _bounded_text(_clean_text(candidate.get("title")), 160)
-    content = _bounded_text(_clean_text(candidate.get("content")), 1200)
-    confidence = _clamped_confidence(candidate.get("confidence"))
-
-    draft = AIMemoryDraftRead(
-        user_id=decision.user_id,
-        source_module="weekly_review",
-        source_type="memory_candidate_decision",
-        source_id=str(decision.id),
-        source_report_id=decision.report_id,
-        source_session_id=decision.session_id,
-        source_candidate_id=decision.candidate_id,
-        source_decision_id=decision.id,
-        kind=kind,
-        scope=scope,
-        title=title or "",
-        content=content or "",
-        confidence=confidence,
-        status="active",
-        visibility="private",
-        metadata_json=_sanitize_memory_metadata(
-            {
-                "decision": decision.decision,
-                "decision_source": decision.source,
-                "candidate_id": decision.candidate_id,
-            }
-        ),
-    )
-    validate_memory_draft(draft)
-    return draft
+    raise AIMemoryValidationError(WR_MEMORY_COMMIT_DISABLED_REASON)
 
 
 def validate_memory_draft(draft: AIMemoryDraftRead) -> None:
-    if not draft.title.strip():
-        raise AIMemoryValidationError("Memory title is required.")
     if not draft.content.strip():
         raise AIMemoryValidationError("Memory content is required.")
-    if draft.kind not in SUPPORTED_AI_MEMORY_KINDS:
-        raise AIMemoryValidationError("Unsupported memory kind.")
-    if draft.scope not in SUPPORTED_AI_MEMORY_SCOPES:
-        raise AIMemoryValidationError("Unsupported memory scope.")
-    if draft.status not in SUPPORTED_AI_MEMORY_STATUSES:
-        raise AIMemoryValidationError("Unsupported memory status.")
-    if draft.visibility not in SUPPORTED_AI_MEMORY_VISIBILITY:
-        raise AIMemoryValidationError("Unsupported memory visibility.")
-    if draft.confidence < 0 or draft.confidence > 1:
+    if not draft.embedding_model.strip():
+        raise AIMemoryValidationError("Embedding model is required.")
+    if len(draft.embedding) != 1024:
+        raise AIMemoryValidationError("Memory embedding must contain exactly 1024 dimensions.")
+    if not draft.memory_type.strip():
+        raise AIMemoryValidationError("Memory type is required.")
+    if not draft.source_domain.strip():
+        raise AIMemoryValidationError("Source domain is required.")
+    if not draft.privacy_level.strip():
+        raise AIMemoryValidationError("Privacy level is required.")
+    if draft.confidence is not None and (draft.confidence < 0 or draft.confidence > 1):
         raise AIMemoryValidationError("Memory confidence must be between 0 and 1.")
 
 
@@ -325,22 +270,22 @@ def create_ai_memory_from_draft(
     validate_memory_draft(draft)
     memory = AIMemory(
         user_id=draft.user_id,
-        source_module=draft.source_module,
-        source_type=draft.source_type,
-        source_id=draft.source_id,
-        source_report_id=draft.source_report_id,
-        source_session_id=draft.source_session_id,
-        source_candidate_id=draft.source_candidate_id,
-        source_decision_id=draft.source_decision_id,
-        kind=draft.kind,
-        scope=draft.scope,
-        title=draft.title.strip(),
         content=draft.content.strip(),
+        embedding=draft.embedding,
+        embedding_model=draft.embedding_model.strip(),
+        memory_type=draft.memory_type.strip(),
+        learning_element_type=_clean_text(draft.learning_element_type),
+        source_domain=draft.source_domain.strip(),
+        source_table=_clean_text(draft.source_table),
+        source_id=_clean_text(draft.source_id),
         confidence=draft.confidence,
-        status=draft.status,
-        visibility=draft.visibility,
-        metadata_json=_sanitize_memory_metadata(draft.metadata_json or {}),
-        idempotency_key=idempotency_key,
+        privacy_level=draft.privacy_level.strip(),
+        is_active=draft.is_active,
+        supersedes_memory_id=draft.supersedes_memory_id,
+        correction_reason=_clean_text(draft.correction_reason),
+        expires_at=draft.expires_at,
+        metadata_json=_sanitize_memory_metadata(draft.metadata or {}),
+        idempotency_key=idempotency_key or draft.idempotency_key,
     )
     db.add(memory)
     db.flush()
@@ -351,21 +296,17 @@ def ensure_memory_source_not_committed(
     db: Session,
     *,
     user_id: UUID,
-    source_module: str,
-    source_type: str,
-    source_decision_id: UUID | None,
-    source_id: str,
+    source_domain: str,
+    source_table: str | None,
+    source_id: str | None,
 ) -> None:
-    query = select(AIMemory).where(
-        AIMemory.user_id == user_id,
-        AIMemory.source_module == source_module,
-        AIMemory.source_type == source_type,
-    )
-    if source_decision_id is not None:
-        query = query.where(AIMemory.source_decision_id == source_decision_id)
-    else:
-        query = query.where(AIMemory.source_id == source_id)
-    if db.scalar(query) is not None:
+    if get_existing_memory_for_source(
+        db,
+        user_id=user_id,
+        source_domain=source_domain,
+        source_table=source_table,
+        source_id=source_id,
+    ) is not None:
         raise AIMemoryDuplicateSourceError("Memory source has already been committed.")
 
 
@@ -373,20 +314,16 @@ def get_existing_memory_for_source(
     db: Session,
     *,
     user_id: UUID,
-    source_module: str,
-    source_type: str,
-    source_decision_id: UUID | None,
-    source_id: str,
+    source_domain: str,
+    source_table: str | None,
+    source_id: str | None,
 ) -> AIMemory | None:
     query = select(AIMemory).where(
         AIMemory.user_id == user_id,
-        AIMemory.source_module == source_module,
-        AIMemory.source_type == source_type,
+        AIMemory.source_domain == source_domain,
+        AIMemory.source_table == source_table,
+        AIMemory.source_id == source_id,
     )
-    if source_decision_id is not None:
-        query = query.where(AIMemory.source_decision_id == source_decision_id)
-    else:
-        query = query.where(AIMemory.source_id == source_id)
     return db.scalar(query)
 
 
@@ -403,11 +340,13 @@ def _bounded_text(value: str | None, limit: int) -> str | None:
     return value[:limit].strip()
 
 
-def _clamped_confidence(value: object) -> Decimal:
+def _clamped_confidence(value: object) -> Decimal | None:
+    if value is None:
+        return None
     try:
-        confidence = Decimal(str(value if value is not None else "0.5"))
+        confidence = Decimal(str(value))
     except (InvalidOperation, ValueError):
-        confidence = Decimal("0.5")
+        return Decimal("0.5")
     if confidence < 0:
         return Decimal("0")
     if confidence > 1:
@@ -415,13 +354,11 @@ def _clamped_confidence(value: object) -> Decimal:
     return confidence.quantize(Decimal("0.0001"))
 
 
-def _sanitize_memory_metadata(value: dict) -> dict:
+def _sanitize_memory_metadata(value: dict | None) -> dict:
+    if not value:
+        return {}
     unsafe_keys = {"raw_payload", "secret", "secret_prompt", "internal_prompt", "hidden_reasoning"}
-    return {
-        key: _sanitize_memory_metadata_value(item)
-        for key, item in value.items()
-        if key not in unsafe_keys
-    }
+    return {key: _sanitize_memory_metadata_value(item) for key, item in value.items() if key not in unsafe_keys}
 
 
 def _sanitize_memory_metadata_value(value):
@@ -443,41 +380,33 @@ def _memory_matches_filters(
     memory: AIMemory,
     *,
     user_id: UUID,
-    status: str | None,
-    kind: str | None,
-    scope: str | None,
-    source_module: str | None,
-    source_type: str | None,
-    source_report_id: UUID | None,
-    source_session_id: UUID | None,
-    source_candidate_id: str | None,
-    source_decision_id: UUID | None,
+    is_active: bool | None,
+    memory_type: str | None,
+    learning_element_type: str | None,
+    source_domain: str | None,
+    source_table: str | None,
+    source_id: str | None,
+    privacy_level: str | None,
     q: str | None,
 ) -> bool:
     if memory.user_id != user_id:
         return False
-    if status and status != "all" and memory.status != status:
+    if is_active is not None and memory.is_active != is_active:
         return False
-    if kind and memory.kind != kind:
+    if memory_type and memory.memory_type != memory_type:
         return False
-    if scope and memory.scope != scope:
+    if learning_element_type and memory.learning_element_type != learning_element_type:
         return False
-    if source_module and memory.source_module != source_module:
+    if source_domain and memory.source_domain != source_domain:
         return False
-    if source_type and memory.source_type != source_type:
+    if source_table and memory.source_table != source_table:
         return False
-    if source_report_id and memory.source_report_id != source_report_id:
+    if source_id and memory.source_id != source_id:
         return False
-    if source_session_id and memory.source_session_id != source_session_id:
+    if privacy_level and memory.privacy_level != privacy_level:
         return False
-    if source_candidate_id and memory.source_candidate_id != source_candidate_id:
+    if q and q.strip() and q.strip().lower() not in (memory.content or "").lower():
         return False
-    if source_decision_id and memory.source_decision_id != source_decision_id:
-        return False
-    if q and q.strip():
-        needle = q.strip().lower()
-        if needle not in (memory.title or "").lower() and needle not in (memory.content or "").lower():
-            return False
     return True
 
 

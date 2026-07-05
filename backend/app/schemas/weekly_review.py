@@ -350,8 +350,8 @@ class WeeklyReviewMemoryCommitRead(BaseModel):
     memories: list[WeeklyReviewMemoryCommitItem]
     already_committed: list[WeeklyReviewMemoryAlreadyCommittedItem]
     blocked: list[dict]
-    storage_enabled: bool = True
-    note: str = "Committed approved memory candidates to ai_memories. No embeddings were generated."
+    storage_enabled: bool = False
+    note: str = "Weekly Review memory commit is disabled until the embedding service is available."
 
 
 class WeeklyReviewMemoryCommitDryRunRead(BaseModel):

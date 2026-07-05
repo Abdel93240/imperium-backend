@@ -2,13 +2,21 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
+from sqlalchemy.types import UserDefinedType
 
 from app.db.base import Base, UUIDPrimaryKeyMixin
+
+
+class Vector1024(UserDefinedType):
+    cache_ok = True
+
+    def get_col_spec(self, **_kw) -> str:
+        return "vector(1024)"
 
 
 class AITask(UUIDPrimaryKeyMixin, Base):
@@ -160,72 +168,41 @@ class AIResultValidation(UUIDPrimaryKeyMixin, Base):
 class AIMemory(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "ai_memories"
     __table_args__ = (
-        CheckConstraint("source_module IN ('weekly_review')", name="ai_memories_source_module_check"),
-        CheckConstraint(
-            "kind IN ("
-            "'behavior_pattern', 'blocker', 'weekly_commitment', 'preference', "
-            "'operational_signal', 'risk', 'achievement', 'constraint', 'strategy_note'"
-            ")",
-            name="ai_memories_kind_check",
-        ),
-        CheckConstraint(
-            "scope IN ("
-            "'user_profile', 'operating_pattern', 'weekly_review', 'module_signal', "
-            "'user_preference', 'strategy', 'health', 'finance', 'vtc'"
-            ")",
-            name="ai_memories_scope_check",
-        ),
-        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ai_memories_confidence_range"),
-        CheckConstraint("status IN ('active', 'archived', 'superseded', 'deleted')", name="ai_memories_status_check"),
-        CheckConstraint("visibility IN ('private')", name="ai_memories_visibility_check"),
-        Index("ai_memories_user_created_idx", "user_id", text("created_at DESC")),
-        Index("ai_memories_user_status_created_idx", "user_id", "status", text("created_at DESC")),
-        Index("ai_memories_user_kind_idx", "user_id", "kind"),
-        Index("ai_memories_user_scope_idx", "user_id", "scope"),
-        Index("ai_memories_source_module_type_idx", "source_module", "source_type"),
-        Index("ai_memories_source_report_idx", "source_report_id"),
-        Index("ai_memories_source_session_idx", "source_session_id"),
-        Index("ai_memories_source_candidate_idx", "source_candidate_id"),
-        Index("ai_memories_source_decision_idx", "source_decision_id"),
+        CheckConstraint("confidence IS NULL OR (confidence >= 0 AND confidence <= 1)", name="ai_memories_confidence_range"),
         Index(
-            "uq_ai_memories_source_decision",
-            "user_id",
-            "source_module",
-            "source_type",
-            "source_decision_id",
-            unique=True,
-            postgresql_where=text("source_decision_id IS NOT NULL"),
+            "ai_memories_embedding_hnsw_idx",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
         ),
+        Index("ai_memories_user_source_domain_type_active_idx", "user_id", "source_domain", "memory_type", "is_active"),
+        Index("ai_memories_user_privacy_active_idx", "user_id", "privacy_level", "is_active"),
+        Index("ai_memories_source_table_id_idx", "source_table", "source_id"),
+        Index("ai_memories_expires_at_idx", "expires_at"),
+        Index("ai_memories_user_created_idx", "user_id", text("created_at DESC")),
     )
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    source_module: Mapped[str] = mapped_column(Text, nullable=False)
-    source_type: Mapped[str] = mapped_column(Text, nullable=False)
-    source_id: Mapped[str] = mapped_column(Text, nullable=False)
-    source_report_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("imperium_weekly_review_final_reports.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    source_session_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("imperium_weekly_review_sessions.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    source_candidate_id: Mapped[str | None] = mapped_column(Text, nullable=True)
-    source_decision_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("imperium_memory_candidate_decisions.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    kind: Mapped[str] = mapped_column(Text, nullable=False)
-    scope: Mapped[str] = mapped_column(Text, nullable=False)
-    title: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    confidence: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
-    status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
-    visibility: Mapped[str] = mapped_column(Text, nullable=False, default="private", server_default=text("'private'"))
+    embedding: Mapped[list[float]] = mapped_column(Vector1024(), nullable=False)
+    embedding_model: Mapped[str] = mapped_column(Text, nullable=False)
+    memory_type: Mapped[str] = mapped_column(Text, nullable=False)
+    learning_element_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_domain: Mapped[str] = mapped_column(Text, nullable=False)
+    source_table: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
+    privacy_level: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    supersedes_memory_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("ai_memories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    correction_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     metadata_json: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -237,10 +214,3 @@ class AIMemory(UUIDPrimaryKeyMixin, Base):
         onupdate=func.now(),
         nullable=False,
     )
-    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    superseded_by_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("ai_memories.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -3186,7 +3186,7 @@ def test_memory_commit_dry_run_same_key_different_payload_conflicts(monkeypatch)
         )
 
 
-def test_memory_commit_creates_ai_memories_from_approved_and_edited_decisions(monkeypatch) -> None:
+def test_memory_commit_is_blocked_until_embedding_service(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="stored")
@@ -3213,19 +3213,16 @@ def test_memory_commit_creates_ai_memories_from_approved_and_edited_decisions(mo
         request_path="/api/imperium/weekly-review/memory-candidates/commit",
     )
 
-    memories = [item for item in db.added if isinstance(item, AIMemory)]
     assert duplicate is False
     assert result.requested_count == 2
-    assert result.committed_count == 2
+    assert result.committed_count == 0
     assert result.already_committed_count == 0
-    assert result.blocked_count == 0
-    assert result.storage_enabled is True
-    assert len(memories) == 2
-    assert {memory.source_module for memory in memories} == {"weekly_review"}
-    assert {memory.source_type for memory in memories} == {"memory_candidate_decision"}
-    assert {memory.source_decision_id for memory in memories} == {approved.id, edited.id}
-    assert memories[1].title == "Edited win"
-    assert memories[1].content == "Completed report and stored the outcome."
+    assert result.blocked_count == 2
+    assert result.storage_enabled is False
+    assert {item["reason"] for item in result.blocked} == {
+        "weekly_review_memory_commit_waits_for_embedding_service"
+    }
+    assert not any(isinstance(item, AIMemory) for item in db.added)
     assert "raw_payload" not in result.model_dump_json()
 
 
@@ -3255,10 +3252,11 @@ def test_memory_commit_blocks_rejected_undecided_foreign_and_missing(monkeypatch
         request_path="/api/imperium/weekly-review/memory-candidates/commit",
     )
 
-    reasons = {item["reason"] for item in result.blocked}
     assert result.committed_count == 0
     assert result.blocked_count == 4
-    assert reasons == {"rejected", "not_approved_or_edited", "not_found"}
+    assert {item["reason"] for item in result.blocked} == {
+        "weekly_review_memory_commit_waits_for_embedding_service"
+    }
     assert not any(isinstance(item, AIMemory) for item in db.added)
 
 
@@ -3269,28 +3267,7 @@ def test_memory_commit_duplicate_source_returns_existing_memory(monkeypatch) -> 
     report = _final_report(session, status="stored")
     candidate = wr._build_weekly_review_memory_candidates(report, session)[0]
     decision = _memory_decision(current_user, report, candidate, decision="approved")
-    existing_memory = AIMemory(
-        id=uuid4(),
-        user_id=current_user.id,
-        source_module="weekly_review",
-        source_type="memory_candidate_decision",
-        source_id=str(decision.id),
-        source_decision_id=decision.id,
-        source_report_id=report.id,
-        source_session_id=session.id,
-        source_candidate_id=decision.candidate_id,
-        kind="weekly_commitment",
-        scope="weekly_review",
-        title="Existing",
-        content="Existing content",
-        confidence=0.5,
-        status="active",
-        visibility="private",
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
     db.scalars_results = [[decision]]
-    db.scalar_results = [existing_memory]
     monkeypatch.setattr(wr, "_get_existing_idempotency", lambda _db, *, user_id, idempotency_key: _idempotency_from_added(db, idempotency_key))
 
     result, _ = wr.commit_weekly_review_memory_candidates(
@@ -3303,8 +3280,9 @@ def test_memory_commit_duplicate_source_returns_existing_memory(monkeypatch) -> 
     )
 
     assert result.committed_count == 0
-    assert result.already_committed_count == 1
-    assert result.already_committed[0].memory_id == existing_memory.id
+    assert result.already_committed_count == 0
+    assert result.blocked_count == 1
+    assert result.blocked[0]["reason"] == "weekly_review_memory_commit_waits_for_embedding_service"
     assert not any(isinstance(item, AIMemory) for item in db.added)
 
 
@@ -3338,7 +3316,7 @@ def test_memory_commit_idempotency_replay_and_payload_conflict(monkeypatch) -> N
     assert duplicate is False
     assert replay_duplicate is True
     assert replay.committed_count == first.committed_count
-    assert len([item for item in db.added if isinstance(item, AIMemory)]) == 1
+    assert not any(isinstance(item, AIMemory) for item in db.added)
     with pytest.raises(wr.WeeklyReviewIdempotencyConflictError, match="different payload"):
         wr.commit_weekly_review_memory_candidates(
             db,

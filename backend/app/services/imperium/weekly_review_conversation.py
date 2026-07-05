@@ -67,13 +67,7 @@ from app.schemas.weekly_review import (
     week_end_for,
 )
 from app.schemas.ai import AIResultCallback
-from app.services.ai.memories import (
-    AIMemoryOwnershipError,
-    AIMemoryValidationError,
-    build_memory_draft_from_weekly_review_decision,
-    create_ai_memory_from_draft,
-    get_existing_memory_for_source,
-)
+from app.services.ai.memories import WR_MEMORY_COMMIT_DISABLED_REASON
 from app.services.ai.tasks import receive_ai_result
 from app.services.integrations.n8n_client import (
     N8NConfigurationError,
@@ -1885,62 +1879,12 @@ def commit_weekly_review_memory_candidates(
         return _handle_idempotency(existing_key, request_hash, WeeklyReviewMemoryCommitRead, request_path=request_path), True
 
     requested_ids = list(dict.fromkeys(payload.decision_ids))
-    decisions = list(
-        db.scalars(
-            select(ImperiumMemoryCandidateDecision).where(
-                ImperiumMemoryCandidateDecision.id.in_(requested_ids),
-                ImperiumMemoryCandidateDecision.user_id == current_user.id,
-            )
-        )
-    )
-    decisions_by_id = {decision.id: decision for decision in decisions}
     memories: list[WeeklyReviewMemoryCommitItem] = []
     already_committed: list[WeeklyReviewMemoryAlreadyCommittedItem] = []
-    blocked: list[dict] = []
-
-    for decision_id in requested_ids:
-        decision = decisions_by_id.get(decision_id)
-        if decision is None:
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="not_found"))
-            continue
-        if decision.user_id != current_user.id:
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="not_found"))
-            continue
-        if decision.decision == "rejected":
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="rejected"))
-            continue
-        if decision.decision not in {"approved", "edited"}:
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="not_approved_or_edited"))
-            continue
-
-        try:
-            draft = build_memory_draft_from_weekly_review_decision(decision, current_user_id=current_user.id)
-        except AIMemoryOwnershipError:
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="not_found"))
-            continue
-        except AIMemoryValidationError:
-            blocked.append(_blocked_memory_commit(decision_id=decision_id, reason="invalid_candidate"))
-            continue
-
-        existing_memory = get_existing_memory_for_source(
-            db,
-            user_id=current_user.id,
-            source_module=draft.source_module,
-            source_type=draft.source_type,
-            source_decision_id=draft.source_decision_id,
-            source_id=draft.source_id,
-        )
-        if existing_memory is not None:
-            already_committed.append(
-                WeeklyReviewMemoryAlreadyCommittedItem(
-                    memory_id=existing_memory.id,
-                    decision_id=decision.id,
-                )
-            )
-            continue
-
-        memory = create_ai_memory_from_draft(db, draft=draft, idempotency_key=idempotency_key)
-        memories.append(_memory_commit_item(memory=memory, decision=decision))
+    blocked = [
+        _blocked_memory_commit(decision_id=decision_id, reason=WR_MEMORY_COMMIT_DISABLED_REASON)
+        for decision_id in requested_ids
+    ]
 
     response = WeeklyReviewMemoryCommitRead(
         requested_count=len(payload.decision_ids),
@@ -1950,8 +1894,8 @@ def commit_weekly_review_memory_candidates(
         memories=memories,
         already_committed=already_committed,
         blocked=blocked,
-        storage_enabled=True,
-        note="Committed approved memory candidates to ai_memories. No embeddings were generated.",
+        storage_enabled=False,
+        note="Weekly Review memory commit is disabled until the embedding service is available.",
     )
     _store_idempotency(
         db,
