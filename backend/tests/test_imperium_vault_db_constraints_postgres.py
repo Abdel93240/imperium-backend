@@ -79,6 +79,13 @@ def _expect_constraint_failure(exc: Exception) -> None:
     )
 
 
+def _expect_append_only_failure(exc: Exception) -> None:
+    msg = str(exc).lower()
+    assert "append-only" in msg or "trigger" in msg or "forbidden" in msg, (
+        f"Expected append-only trigger error, got: {exc!r}"
+    )
+
+
 def test_imperium_vault_transactions_reject_non_positive_amount_cents(engine) -> None:
     with pytest.raises(Exception) as excinfo:
         with engine.begin() as conn:
@@ -86,6 +93,56 @@ def test_imperium_vault_transactions_reject_non_positive_amount_cents(engine) ->
             _insert_vault_transaction(conn, user_id=user_id, amount_cents=0)
 
     _expect_constraint_failure(excinfo.value)
+
+
+def test_imperium_vault_transactions_insert_is_allowed(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        transaction_id = _insert_vault_transaction(conn, user_id=user_id)
+        stored_id = conn.execute(
+            text("SELECT id FROM imperium_vault_transactions WHERE id = :id"),
+            {"id": transaction_id},
+        ).scalar_one()
+
+    assert str(stored_id) == transaction_id
+
+
+def test_imperium_vault_transactions_update_is_rejected_by_trigger(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        transaction_id = _insert_vault_transaction(conn, user_id=user_id)
+
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE imperium_vault_transactions SET amount_cents = 2000 WHERE id = :id"),
+                {"id": transaction_id},
+            )
+
+    _expect_append_only_failure(excinfo.value)
+
+
+def test_imperium_vault_transactions_delete_is_rejected_by_trigger(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        transaction_id = _insert_vault_transaction(conn, user_id=user_id)
+
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM imperium_vault_transactions WHERE id = :id"),
+                {"id": transaction_id},
+            )
+
+    _expect_append_only_failure(excinfo.value)
+
+
+def test_imperium_vault_transactions_truncate_is_rejected_by_trigger(engine) -> None:
+    with pytest.raises(Exception) as excinfo:
+        with engine.begin() as conn:
+            conn.execute(text("TRUNCATE TABLE imperium_vault_transactions"))
+
+    _expect_append_only_failure(excinfo.value)
 
 
 def test_imperium_vault_transactions_reject_incoherent_reversal_link(engine) -> None:

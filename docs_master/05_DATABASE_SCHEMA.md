@@ -556,13 +556,19 @@ Contraintes et index :
 
 Regles metier du ledger canonique :
 - Ledger append-only : une transaction est immutable apres insertion.
+- Vault ledger is append-only ; transactions are immutable.
 - Aucune correction par UPDATE ou DELETE. Les corrections s'ecrivent par ajout
   d'une ligne de reversal via
   `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- No PUT/PATCH/DELETE endpoint is allowed for `/api/imperium/vault/transactions`.
+- Corrections must be written by appending a reversal row through `POST /api/imperium/vault/transactions/{transaction_id}/reverse`.
+- The original transaction must never be updated or deleted.
+- The reversal transaction is a new row linked to the original transaction.
 - Une reversal est une nouvelle transaction liee a l'originale par
   `reversal_of_transaction_id`.
 - Une transaction originale ne peut avoir qu'une seule reversal. Cette regle est
   portee par le service et par l'index unique partiel ajoute en patch 9f/9g.
+- Patch 9f/9g allow one and only one reversal per original transaction.
 - Une ligne de reversal ne peut pas etre reversee a son tour.
 - `occurred_at` est la seule source temporelle autoritative pour les summaries,
   filtres et regroupements finance V1. La semantique temporelle de V1 est UTC.
@@ -585,11 +591,11 @@ Notes migration/ORM :
 - `created_at` et `updated_at` ont des defaults serveur en migration ; le modele
   declare aussi `server_default=func.now()`. `updated_at` porte en plus
   `onupdate=func.now()` cote ORM, mais la regle metier interdit de modifier les
-  transactions apres insert.
-- Divergence de durcissement : les regles append-only sont appliquees par le
-  service/API et la doc, mais il n'existe pas encore de trigger DB
-  UPDATE/DELETE/TRUNCATE sur `imperium_vault_transactions` dans les migrations
-  0024/0025/0026.
+  transactions apres insert. `updated_at` remains a generic row timestamp.
+- Trigger append-only : `imperium_vault_transactions_append_only_guard`
+  interdit UPDATE/DELETE.
+- Trigger append-only : `imperium_vault_transactions_append_only_truncate_guard`
+  interdit TRUNCATE.
 - Divergence de nommage : la table codee reste
   `imperium_vault_transactions`; le nom cible documente est
   `finance_transactions`.
