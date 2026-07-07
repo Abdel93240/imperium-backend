@@ -44,32 +44,6 @@ CONTRACT_INDEX_GROUPS: tuple[ContractIndexGroup, ...] = (
         ],
     ),
     ContractIndexGroup(
-        name="events",
-        endpoints=[
-            ContractIndexEndpoint(
-                method="GET",
-                path="/api/imperium/events",
-                purpose="Read Imperium events.",
-                read_only=True,
-                idempotency_key_required=False,
-            ),
-            ContractIndexEndpoint(
-                method="POST",
-                path="/api/imperium/events",
-                purpose="Append Imperium event.",
-                read_only=False,
-                idempotency_key_required=True,
-            ),
-            ContractIndexEndpoint(
-                method="GET",
-                path="/api/imperium/events/{event_id}",
-                purpose="Read Imperium event detail.",
-                read_only=True,
-                idempotency_key_required=False,
-            ),
-        ],
-    ),
-    ContractIndexGroup(
         name="mission",
         endpoints=[
             ContractIndexEndpoint(

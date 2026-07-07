@@ -147,13 +147,12 @@ def test_frontend_metadata_contracts_are_deterministic_and_declarative() -> None
     ]
     assert home["backend_version"] == "v1"
     assert [group["name"] for group in contracts_index["groups"]] == [
-        "home",
-        "dashboard",
-        "daily_plan",
-        "events",
-        "mission",
-        "vault",
-        "path",
+            "home",
+            "dashboard",
+            "daily_plan",
+            "mission",
+            "vault",
+            "path",
         "pulse",
         "frontend",
     ]

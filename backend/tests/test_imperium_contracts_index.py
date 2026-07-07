@@ -91,32 +91,6 @@ def test_contracts_index_contract_shape_and_exact_groups() -> None:
                 ],
             },
             {
-                "name": "events",
-                "endpoints": [
-                    {
-                        "method": "GET",
-                        "path": "/api/imperium/events",
-                        "purpose": "Read Imperium events.",
-                        "read_only": True,
-                        "idempotency_key_required": False,
-                    },
-                    {
-                        "method": "POST",
-                        "path": "/api/imperium/events",
-                        "purpose": "Append Imperium event.",
-                        "read_only": False,
-                        "idempotency_key_required": True,
-                    },
-                    {
-                        "method": "GET",
-                        "path": "/api/imperium/events/{event_id}",
-                        "purpose": "Read Imperium event detail.",
-                        "read_only": True,
-                        "idempotency_key_required": False,
-                    },
-                ],
-            },
-            {
                 "name": "mission",
                 "endpoints": [
                     {
@@ -352,7 +326,6 @@ def test_contracts_index_groups_order_is_deterministic() -> None:
         "home",
         "dashboard",
         "daily_plan",
-        "events",
         "mission",
         "vault",
         "path",

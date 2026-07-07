@@ -17,7 +17,6 @@ IMPERIUM_ROUTE_PREFIXES = {
     APP_ROOT / "api/v1/routes/imperium_contracts.py": "/api/imperium",
     APP_ROOT / "api/v1/routes/imperium_daily_plan.py": "/api/imperium",
     APP_ROOT / "api/v1/routes/imperium_dashboard.py": "/api/imperium",
-    APP_ROOT / "api/v1/routes/imperium_events.py": "/api/imperium",
     APP_ROOT / "api/v1/routes/imperium_frontend.py": "/api/imperium",
     APP_ROOT / "api/v1/routes/imperium_home.py": "/api/imperium",
 }

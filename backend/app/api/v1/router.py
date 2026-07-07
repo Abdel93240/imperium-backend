@@ -11,7 +11,6 @@ from app.api.v1.routes import (
     imperium_contracts,
     imperium_home,
     imperium,
-    imperium_events,
     imperium_dashboard,
     imperium_path,
     imperium_pulse,
@@ -30,7 +29,6 @@ api_router.include_router(imperium_dashboard.router, prefix="/imperium", tags=["
 api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])
 api_router.include_router(imperium_contracts.router, prefix="/imperium", tags=["imperium-contracts"])
 api_router.include_router(imperium_home.router, prefix="/imperium", tags=["imperium-home"])
-api_router.include_router(imperium_events.router, prefix="/imperium", tags=["imperium-events"])
 api_router.include_router(imperium_frontend.router, prefix="/imperium", tags=["imperium-frontend"])
 api_router.include_router(imperium_path.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_pulse.router, prefix="/imperium/pulse", tags=["imperium-pulse"])
