@@ -532,6 +532,10 @@ class ImperiumPathCheckIn(UUIDPrimaryKeyMixin, Base):
             "status IN ('done', 'missed')",
             name="imperium_path_check_ins_status_check",
         ),
+        CheckConstraint(
+            "status <> 'missed' OR (reason IS NOT NULL AND trim(reason) <> '')",
+            name="imperium_path_check_ins_missed_requires_reason",
+        ),
         UniqueConstraint(
             "user_id",
             "habit_id",

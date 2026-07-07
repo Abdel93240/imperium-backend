@@ -591,6 +591,11 @@ def test_create_path_check_in_rejects_invalid_reason_status_payloads_before_serv
             {"check_date": "2026-05-25", "status": "missed"},
             "reason is required when status is missed",
         ),
+        (
+            "path-check-in-invalid-missed-empty-reason",
+            {"check_date": "2026-05-25", "status": "missed", "reason": "   "},
+            "reason is required when status is missed",
+        ),
     ]
 
     for idempotency_key, payload, expected_error in invalid_payloads:

@@ -146,6 +146,52 @@ def test_imperium_path_check_ins_reject_invalid_status(engine) -> None:
     _expect_constraint_failure(excinfo.value)
 
 
+def test_imperium_path_check_ins_require_reason_when_missed_but_not_when_done(engine) -> None:
+    with engine.begin() as conn:
+        user_id = _make_user(conn)
+        habit_id = _insert_path_habit(conn, user_id=user_id)
+
+        done_check_in_id = _insert_path_check_in(
+            conn,
+            user_id=user_id,
+            habit_id=habit_id,
+            check_date=date(2026, 5, 25),
+            status="done",
+            reason=None,
+        )
+        missed_check_in_id = _insert_path_check_in(
+            conn,
+            user_id=user_id,
+            habit_id=habit_id,
+            check_date=date(2026, 5, 26),
+            status="missed",
+            reason="Driving shift overran",
+        )
+
+        assert done_check_in_id is not None
+        assert missed_check_in_id is not None
+
+    invalid_cases = [
+        (date(2026, 5, 27), None),
+        (date(2026, 5, 28), "   "),
+    ]
+    for check_date, reason in invalid_cases:
+        with pytest.raises(Exception) as excinfo:
+            with engine.begin() as conn:
+                user_id = _make_user(conn)
+                habit_id = _insert_path_habit(conn, user_id=user_id)
+                _insert_path_check_in(
+                    conn,
+                    user_id=user_id,
+                    habit_id=habit_id,
+                    check_date=check_date,
+                    status="missed",
+                    reason=reason,
+                )
+
+        _expect_constraint_failure(excinfo.value)
+
+
 def test_imperium_path_check_ins_reject_missing_habit_fk(engine) -> None:
     with pytest.raises(Exception) as excinfo:
         with engine.begin() as conn:
