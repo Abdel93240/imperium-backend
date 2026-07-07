@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -14,6 +14,7 @@ from app.models.enums import PrivacyLevel, SourceApp
 class Event(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "events"
     __table_args__ = (
+        CheckConstraint("depth IS NULL OR depth >= 1", name="depth_positive_check"),
         UniqueConstraint("user_id", "event_id", name="events_user_event_id_unique"),
         UniqueConstraint("user_id", "idempotency_key", name="events_user_idempotency_unique"),
         Index("events_user_event_type_occurred_idx", "user_id", "event_type", "occurred_at"),
@@ -40,6 +41,7 @@ class Event(UUIDPrimaryKeyMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     correlation_id: Mapped[str] = mapped_column(Text, nullable=False)
     causation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    depth: Mapped[int | None] = mapped_column(Integer, nullable=True)
     privacy_level: Mapped[PrivacyLevel] = mapped_column(
         Enum(PrivacyLevel, name="privacy_level"),
         nullable=False,

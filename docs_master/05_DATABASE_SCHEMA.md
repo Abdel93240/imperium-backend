@@ -242,6 +242,7 @@ user_id                UUID NOT NULL FK users.id
 idempotency_key        TEXT NOT NULL
 correlation_id         TEXT NOT NULL
 causation_id           TEXT NULL
+depth                  INTEGER NULL
 privacy_level          privacy_level NOT NULL
 payload                JSONB NOT NULL
 duplicate_of_event_id  TEXT NULL
@@ -257,6 +258,7 @@ Contraintes, index et triggers :
 - Enum `privacy_level` : `low`, `medium`, `high`, `very_high`
 - Unique : `events_user_event_id_unique` sur `(user_id, event_id)`
 - Unique : `events_user_idempotency_unique` sur `(user_id, idempotency_key)`
+- Check : `ck_events_depth_positive_check` (`depth IS NULL OR depth >= 1`)
 - Index : `events_user_event_type_occurred_idx` sur
   `(user_id, event_type, occurred_at)`
 - Index : `events_user_correlation_idx` sur `(user_id, correlation_id)`

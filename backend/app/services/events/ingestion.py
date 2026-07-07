@@ -70,6 +70,7 @@ def ingest_event(
         idempotency_key=envelope.idempotency_key,
         correlation_id=envelope.correlation_id,
         causation_id=envelope.causation_id,
+        depth=envelope.depth,
         privacy_level=envelope.privacy_level,
         payload=envelope.payload,
     )
@@ -82,5 +83,7 @@ def ingest_event(
 
 def _hash_envelope(envelope: EventEnvelope) -> str:
     payload = envelope.model_dump(mode="json")
+    if payload.get("depth") is None:
+        payload.pop("depth", None)
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

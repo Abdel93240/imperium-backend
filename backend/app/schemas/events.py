@@ -18,6 +18,7 @@ class EventEnvelope(BaseModel):
     idempotency_key: str = Field(min_length=1)
     correlation_id: str = Field(min_length=1)
     causation_id: str | None = None
+    depth: int | None = Field(default=None, ge=1)
     privacy_level: PrivacyLevel
     payload: dict
 

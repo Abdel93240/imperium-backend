@@ -266,7 +266,7 @@ ce fichier.
    `vault.*` vers `finance.*`, `path.*` vers `worship.*`,
    `mission.*` et `day.*` vers `planning.*`,
    `priority.*` vers `decision.*`.
-2. Ajouter le champ `profondeur` à la table `events`.
+2. Calculer et remplir `events.depth` dans le chaînage réel des événements.
 3. Normaliser les formats dotted en `domaine.sujet.action`, avec domaines
    génériques.
 4. Résoudre `mission.failed` selon E1 : remplacer le double émetteur par
