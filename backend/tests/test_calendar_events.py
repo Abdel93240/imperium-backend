@@ -11,7 +11,7 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumCalendarEvent
 from app.schemas.imperium import CalendarEventCreate, CalendarEventRead, CalendarEventType
-from app.services.imperium.calendar import create_calendar_event, list_calendar_events
+from app.services.imperium.calendar import create_calendar_event, delete_calendar_event, list_calendar_events
 
 
 class FakeDb:
@@ -186,6 +186,17 @@ def test_calendar_event_list_user_scoped() -> None:
     assert "imperium_calendar_events.starts_at >=" in query_text
     assert "imperium_calendar_events.starts_at <=" in query_text
     assert "imperium_calendar_events.event_type" in query_text
+    assert "imperium_calendar_events.deleted_at IS NULL" in query_text
+
+
+def test_calendar_event_list_excludes_soft_deleted_events() -> None:
+    current_user = _user()
+    db = FakeDb(scalars_result=[])
+
+    result = list_calendar_events(db, current_user=current_user)
+
+    assert result == []
+    assert "imperium_calendar_events.deleted_at IS NULL" in str(db.queries[-1])
 
 
 def test_delete_calendar_event() -> None:
@@ -194,12 +205,42 @@ def test_delete_calendar_event() -> None:
     db = FakeDb(scalar_results=[event])
     client = _client(db, current_user)
 
-    response = client.delete(f"/imperium/calendar/events/{event.id}")
+    response = client.delete(f"/imperium/calendar/events/{event.id}", params={"reason": "duplicate entry"})
 
     assert response.status_code == 200
     assert response.json() == {"id": str(event.id), "status": "deleted"}
-    assert db.deleted == [event]
+    assert db.deleted == []
+    assert event.deleted_at is not None
+    assert event.deleted_by == "user"
+    assert event.deletion_reason == "duplicate entry"
+    assert event.updated_by == "user"
+    deleted_events = [item for item in db.added if isinstance(item, Event) and item.event_type == "calendar.event.deleted"]
+    assert len(deleted_events) == 1
+    assert deleted_events[0].payload == {
+        "calendar_event_id": str(event.id),
+        "deleted_by": "user",
+        "reason": "duplicate entry",
+    }
     assert db.committed is True
+
+
+def test_delete_calendar_event_service_supports_ai_actor_and_blank_reason() -> None:
+    current_user = _user()
+    event = _calendar_event(current_user.id)
+    db = FakeDb(scalar_results=[event])
+
+    deleted_id = delete_calendar_event(db, current_user=current_user, event_id=event.id, deleted_by="ai", reason="  ")
+
+    assert deleted_id == event.id
+    assert event.deleted_at is not None
+    assert event.deleted_by == "ai"
+    assert event.deletion_reason is None
+    deleted_event = next(item for item in db.added if isinstance(item, Event) and item.event_type == "calendar.event.deleted")
+    assert deleted_event.payload == {
+        "calendar_event_id": str(event.id),
+        "deleted_by": "ai",
+        "reason": None,
+    }
 
 
 def test_delete_calendar_event_other_user_not_found() -> None:

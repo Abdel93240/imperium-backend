@@ -460,12 +460,16 @@ def delete_calendar_event_route(
     event_id: UUID,
     current_user: CurrentUserDep,
     db: SessionDep,
+    reason: str | None = None,
 ) -> CalendarEventDeleteResponse:
     try:
-        deleted_id = delete_calendar_event(db, current_user=current_user, event_id=event_id)
+        deleted_id = delete_calendar_event(db, current_user=current_user, event_id=event_id, reason=reason)
     except CalendarEventNotFoundError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except CalendarEventValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     return CalendarEventDeleteResponse(id=deleted_id, status="deleted")
 
 

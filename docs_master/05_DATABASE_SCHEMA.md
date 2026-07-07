@@ -263,6 +263,9 @@ Contraintes, index et triggers :
 - Index : `events_causation_id_idx` sur `causation_id`
 - Trigger append-only : `events_append_only_guard` interdit UPDATE/DELETE
 - Trigger append-only : `events_append_only_truncate_guard` interdit TRUNCATE
+- Contract read V1 : no projections, no cross-module writes, strict CurrentUserDep,
+  no user_id exposed ; les endpoints exposent la forme publique
+  documentee, sans `user_id` dans les responses.
 
 Notes migration/ORM :
 - La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
@@ -1930,7 +1933,8 @@ Regle de lecture pour cette section :
 Nom actuel : `imperium_calendar_events`
 Nom cible : `calendar_events`
 Source code : migration
-`20260512_0022_imperium_calendar_events_foundation.py`, modele
+`20260512_0022_imperium_calendar_events_foundation.py` +
+`20260707_0035_calendar_events_soft_delete_traceability.py`, modele
 `backend/app/models/imperium.py::ImperiumCalendarEvent`
 
 Role : fondation Calendar V1 minimale et deterministe. La table stocke des
@@ -1941,17 +1945,22 @@ inventer un stockage sous pression.
 Schema reel :
 
 ```text
-id           UUID PRIMARY KEY DEFAULT gen_random_uuid()
-user_id      UUID NOT NULL FK users.id
-event_type   TEXT NOT NULL
-title        TEXT NOT NULL
-starts_at    TIMESTAMPTZ NOT NULL
-ends_at      TIMESTAMPTZ NULL
-blocks_time  BOOLEAN NOT NULL DEFAULT true
-location     TEXT NULL
-notes        TEXT NULL
-created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id          UUID NOT NULL FK users.id
+event_type       TEXT NOT NULL
+title            TEXT NOT NULL
+starts_at        TIMESTAMPTZ NOT NULL
+ends_at          TIMESTAMPTZ NULL
+blocks_time      BOOLEAN NOT NULL DEFAULT true
+location         TEXT NULL
+notes            TEXT NULL
+deleted_at       TIMESTAMPTZ NULL
+deleted_by       TEXT NULL
+deletion_reason  TEXT NULL
+created_by       TEXT NULL
+updated_by       TEXT NULL
+created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 Contraintes et index :
@@ -1981,11 +1990,14 @@ Regles metier Calendar Patch 7H :
   `calendar.event.created` dans `events` avec `privacy_level = medium`.
 - La liste `GET /api/imperium/calendar/events` est user-scoped, triee par
   `starts_at ASC, created_at ASC`, et accepte les filtres `from`, `to` et
-  `event_type`.
+  `event_type`. Elle exclut par defaut les lignes soft-deleted
+  (`deleted_at IS NULL`).
 - Le filtre `to` ne peut pas etre inferieur a `from`.
 - La suppression `DELETE /api/imperium/calendar/events/{event_id}` est
-  user-scoped. Elle supprime physiquement la ligne calendar en V1. Elle ne cree
-  pas d'event `calendar.event.deleted` et ne requiert pas d'idempotency key.
+  user-scoped. Elle soft-delete la ligne calendar (`deleted_at`, `deleted_by`,
+  `deletion_reason`) et cree un event canonique `calendar.event.deleted` dans
+  `events` avec payload `{ calendar_event_id, deleted_by, reason }`. Elle ne
+  requiert pas d'idempotency key cote API.
 - `ends_at` peut etre nul ; s'il est fourni, il doit etre superieur ou egal a
   `starts_at`.
 - `blocks_time` vaut `true` par defaut. La table ne deduit pas encore les

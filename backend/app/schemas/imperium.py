@@ -668,6 +668,11 @@ class CalendarEventRead(BaseModel):
     blocks_time: bool
     location: str | None
     notes: str | None
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
+    deletion_reason: str | None = None
+    created_by: str | None = None
+    updated_by: str | None = None
     created_at: datetime
     updated_at: datetime
 

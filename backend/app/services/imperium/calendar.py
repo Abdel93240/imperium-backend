@@ -49,6 +49,8 @@ def create_calendar_event(
         blocks_time=payload.blocks_time,
         location=payload.location,
         notes=payload.notes,
+        created_by="user",
+        updated_by="user",
     )
     db.add(calendar_event)
     db.flush()
@@ -58,7 +60,9 @@ def create_calendar_event(
         _build_event(
             current_user=current_user,
             event_id=event_id,
+            event_type="calendar.event.created",
             idempotency_key=idempotency_key,
+            correlation_slug="created",
             payload={
                 "calendar_event_id": str(calendar_event.id),
                 **payload.model_dump(mode="json", exclude_none=True),
@@ -92,7 +96,10 @@ def list_calendar_events(
     if starts_from is not None and starts_to is not None and starts_to < starts_from:
         raise CalendarEventValidationError("to must be greater than or equal to from.")
 
-    query = select(ImperiumCalendarEvent).where(ImperiumCalendarEvent.user_id == current_user.id)
+    query = select(ImperiumCalendarEvent).where(
+        ImperiumCalendarEvent.user_id == current_user.id,
+        ImperiumCalendarEvent.deleted_at.is_(None),
+    )
     if starts_from is not None:
         query = query.where(ImperiumCalendarEvent.starts_at >= starts_from)
     if starts_to is not None:
@@ -103,13 +110,41 @@ def list_calendar_events(
     return list(db.scalars(query))
 
 
-def delete_calendar_event(db: Session, *, current_user: User, event_id: UUID) -> UUID:
+def delete_calendar_event(
+    db: Session,
+    *,
+    current_user: User,
+    event_id: UUID,
+    deleted_by: str = "user",
+    reason: str | None = None,
+) -> UUID:
     calendar_event = _get_user_calendar_event(db, current_user=current_user, event_id=event_id)
     if calendar_event is None:
         raise CalendarEventNotFoundError("Calendar event not found.")
 
+    normalized_deleted_by = _normalize_actor(deleted_by)
+    normalized_reason = _normalize_optional_text(reason)
+    now = datetime.now(UTC)
     deleted_id = calendar_event.id
-    db.delete(calendar_event)
+    calendar_event.deleted_at = now
+    calendar_event.deleted_by = normalized_deleted_by
+    calendar_event.deletion_reason = normalized_reason
+    calendar_event.updated_by = normalized_deleted_by
+    calendar_event.updated_at = now
+    db.add(
+        _build_event(
+            current_user=current_user,
+            event_id=f"evt_{uuid4().hex}",
+            event_type="calendar.event.deleted",
+            idempotency_key=f"calendar.event.deleted:{deleted_id}:{uuid4().hex}",
+            correlation_slug="deleted",
+            payload={
+                "calendar_event_id": str(deleted_id),
+                "deleted_by": normalized_deleted_by,
+                "reason": normalized_reason,
+            },
+        )
+    )
     db.commit()
     return deleted_id
 
@@ -149,6 +184,7 @@ def _get_user_calendar_event(
         select(ImperiumCalendarEvent).where(
             ImperiumCalendarEvent.id == event_id,
             ImperiumCalendarEvent.user_id == current_user.id,
+            ImperiumCalendarEvent.deleted_at.is_(None),
         )
     )
 
@@ -157,13 +193,15 @@ def _build_event(
     *,
     current_user: User,
     event_id: str,
+    event_type: str,
     idempotency_key: str,
+    correlation_slug: str,
     payload: dict,
 ) -> Event:
     now = datetime.now(UTC)
     return Event(
         event_id=event_id,
-        event_type="calendar.event.created",
+        event_type=event_type,
         schema_version="1.0",
         occurred_at=now,
         received_at=now,
@@ -171,7 +209,7 @@ def _build_event(
         device_id=None,
         user_id=current_user.id,
         idempotency_key=idempotency_key,
-        correlation_id=f"corr_calendar_event_created_{uuid4().hex}",
+        correlation_id=f"corr_calendar_event_{correlation_slug}_{uuid4().hex}",
         causation_id=None,
         privacy_level=PrivacyLevel.medium,
         payload=payload,
@@ -209,3 +247,17 @@ def _hash_request(action: str, payload: dict) -> str:
         separators=(",", ":"),
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _normalize_actor(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in {"user", "ai"}:
+        raise CalendarEventValidationError("deleted_by must be user or ai.")
+    return normalized
+
+
+def _normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
