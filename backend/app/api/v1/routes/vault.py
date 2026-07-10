@@ -17,6 +17,7 @@ from app.services.vault.transactions import (
     create_transaction,
     get_recent_transactions,
     get_weekly_summary,
+    transaction_to_response,
 )
 
 router = APIRouter()
@@ -72,7 +73,7 @@ def recent_transactions_route(
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> list[VaultTransactionResponse]:
     transactions = get_recent_transactions(db, current_user=current_user, limit=limit)
-    return [VaultTransactionResponse.model_validate(transaction) for transaction in transactions]
+    return [transaction_to_response(transaction) for transaction in transactions]
 
 
 @router.get("/summary/week", response_model=VaultWeeklySummaryResponse)

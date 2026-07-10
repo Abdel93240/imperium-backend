@@ -387,10 +387,11 @@ vault v1 uses utc temporal semantics
 summary endpoints share the same currency contract
 exactly three ascii letters are accepted
 accepted values are normalized uppercase
-none of the vault 9h routes persist ai, n8n, ocr, sadaqa, wallet, balance
+none of the vault 9h routes persist ai, n8n, ocr, sadaqa, or balance workflows
+wallet is a canonical transaction field, not a separate balance workflow
 transaction_count desc
 absolute net magnitude desc
-no ai/n8n/ocr/sadaqa/wallet/balance workflows
+no ai/n8n/ocr/sadaqa/balance workflows
 yyyy-mm
 utc `occurred_at` month and the public `yyyy-mm` format
 groups by the utc month of `occurred_at` and returns `yyyy-mm`
@@ -426,7 +427,8 @@ vault v1 uses utc temporal semantics
 summary endpoints share the same currency contract
 exactly three ascii letters are accepted
 accepted values are normalized uppercase
-none of the vault 9h routes persist ai, n8n, ocr, sadaqa, wallet, balance
+none of the vault 9h routes persist ai, n8n, ocr, sadaqa, or balance workflows
+wallet is a canonical transaction field, not a separate balance workflow
 
 ## Path Contracts
 

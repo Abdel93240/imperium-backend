@@ -80,6 +80,7 @@ def _payload(**overrides) -> dict:
         "transaction_type": "income",
         "amount_cents": 123400,
         "currency": "EUR",
+        "wallet": "cash",
         "occurred_at": "2026-05-25T09:30:00+00:00",
         "category": "vtc",
         "source": "manual",
@@ -99,6 +100,7 @@ def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 123400),
         currency=overrides.pop("currency", "EUR"),
+        wallet=overrides.pop("wallet", "cash"),
         occurred_at=occurred_at,
         local_date=overrides.pop("local_date", occurred_at.date()),
         timezone=overrides.pop("timezone", "UTC"),
@@ -143,10 +145,12 @@ def test_post_creates_income_transaction() -> None:
     assert body["transaction_type"] == "income"
     assert body["amount_cents"] == 123400
     assert body["currency"] == "EUR"
+    assert body["wallet"] == "cash"
     assert "user_id" not in body
     transaction = next(item for item in db.added if isinstance(item, ImperiumVaultTransaction))
     assert transaction.user_id == current_user.id
     assert transaction.transaction_type == "income"
+    assert transaction.wallet == "cash"
     assert transaction.local_date.isoformat() == "2026-05-25"
     assert transaction.timezone == "UTC"
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
@@ -164,6 +168,7 @@ def test_post_creates_expense_transaction() -> None:
             transaction_type="expense",
             amount_cents=5490,
             currency="eur",
+            wallet=" bank ",
             category=" fuel ",
             note=" diesel ",
         ),
@@ -174,6 +179,7 @@ def test_post_creates_expense_transaction() -> None:
     assert body["transaction_type"] == "expense"
     assert body["amount_cents"] == 5490
     assert body["currency"] == "EUR"
+    assert body["wallet"] == "bank"
     assert body["category"] == "fuel"
     assert body["note"] == "diesel"
 
@@ -247,6 +253,7 @@ def test_post_idempotent_same_key_and_payload_returns_same_response() -> None:
         "transaction_type": "income",
         "amount_cents": 123400,
         "currency": "EUR",
+        "wallet": "cash",
         "occurred_at": "2026-05-25T09:30:00Z",
         "local_date": "2026-05-25",
         "timezone": "UTC",
@@ -254,6 +261,9 @@ def test_post_idempotent_same_key_and_payload_returns_same_response() -> None:
         "source": "manual",
         "note": "Monday revenue",
         "external_ref": "bolt-shift-1",
+        "is_reversal": False,
+        "reversal_of_transaction_id": None,
+        "reversal_reason": None,
         "created_at": "2026-05-25T09:31:00Z",
     }
     existing_key = _idempotency_for(current_user=current_user, payload=payload, response_body=response_body)
@@ -280,16 +290,20 @@ def test_post_same_key_with_different_payload_returns_conflict() -> None:
         response_body={
             "id": str(uuid4()),
             "transaction_type": "income",
-            "amount_cents": 123400,
-            "currency": "EUR",
-            "occurred_at": "2026-05-25T09:30:00Z",
+                "amount_cents": 123400,
+                "currency": "EUR",
+                "wallet": "cash",
+                "occurred_at": "2026-05-25T09:30:00Z",
             "local_date": "2026-05-25",
             "timezone": "UTC",
             "category": "vtc",
             "source": "manual",
             "note": "Monday revenue",
-            "external_ref": "bolt-shift-1",
-            "created_at": "2026-05-25T09:31:00Z",
+                "external_ref": "bolt-shift-1",
+                "is_reversal": False,
+                "reversal_of_transaction_id": None,
+                "reversal_reason": None,
+                "created_at": "2026-05-25T09:31:00Z",
         },
     )
     db = FakeDb(scalar_results=[existing_key])
@@ -414,6 +428,8 @@ def test_imperium_vault_transaction_model_constraints_match_patch_9a() -> None:
     assert "'income'" in type_constraint
     assert "'expense'" in type_constraint
     assert any(name.endswith("imperium_vault_transactions_currency_length_check") for name in constraints)
+    assert "wallet" in ImperiumVaultTransaction.__table__.columns
+    assert not any("wallet" in str(sql) for sql in constraints.values())
 
     index_names = {index.name for index in ImperiumVaultTransaction.__table__.indexes}
     assert "imperium_vault_transactions_user_occurred_at_idx" in index_names

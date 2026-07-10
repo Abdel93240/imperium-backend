@@ -501,11 +501,12 @@ Nom actuel : `imperium_vault_transactions`
 Nom cible : `finance_transactions`
 Source code : migrations `20260525_0024_imperium_vault_ledger_foundation.py`,
 `20260525_0025_imperium_vault_transaction_reversals.py`,
-`20260525_0026_imperium_vault_local_date_timezone.py`, modele
+`20260525_0026_imperium_vault_local_date_timezone.py`,
+`20260710_0037_imperium_vault_wallet.py`, modele
 `backend/app/models/vault.py::ImperiumVaultTransaction`
 
 Role : ledger finance canonique. Montants en cents, append-only, corrections par
-reversal.
+reversal. Le wallet est conserve dans le canonique comme texte ouvert.
 
 Schema reel :
 
@@ -515,6 +516,7 @@ user_id                     UUID NOT NULL FK users.id
 transaction_type            TEXT NOT NULL
 amount_cents                INTEGER NOT NULL
 currency                    TEXT NOT NULL DEFAULT 'EUR'
+wallet                      TEXT NOT NULL DEFAULT 'cash'
 occurred_at                 TIMESTAMPTZ NOT NULL
 local_date                  DATE NOT NULL
 timezone                    TEXT NOT NULL
@@ -540,6 +542,9 @@ Contraintes et index :
   `amount_cents > 0`
 - Check `imperium_vault_transactions_currency_length_check` :
   `length(currency) = 3`
+- Aucune CheckConstraint fermee sur `wallet`. Valeurs applicatives de base :
+  `cash`, `bank`; la colonne reste extensible pour crypto/comptes futurs sans
+  migration de contrainte.
 - Check `imperium_vault_transactions_reversal_link_check` :
   `is_reversal = true` impose `reversal_of_transaction_id IS NOT NULL` ;
   `is_reversal = false` impose `reversal_of_transaction_id IS NULL`
@@ -582,6 +587,16 @@ Regles metier du ledger canonique :
   query/payload peut surcharger cette convention selon le contrat d'endpoint.
 - `currency` accepte exactement 3 lettres ASCII et est normalisee en majuscule
   par les schemas API. V1 ne valide pas l'existence ISO-4217 de la devise.
+- `wallet` est un texte ouvert, normalise/controle cote applicatif. Les valeurs
+  de base sont `cash` et `bank`, mais la base n'enferme pas la liste.
+- Les montants declares en euros par les anciennes surfaces Vault sont convertis
+  en centimes avant insertion canonique. Les affichages legacy reconvertissent
+  `amount_cents` en euros.
+- Le type `correction` n'existe pas dans le canonique. Les annulations sont des
+  transactions inverses liees a l'originale par `is_reversal`,
+  `reversal_of_transaction_id` et `reversal_reason`.
+- Les summaries comptent les reversals dans income/expense selon leur sens et
+  exposent separement leur total et leur compteur pour eviter toute boite noire.
 - Les endpoints de creation et de reversal exigent `Idempotency-Key`.
 - Les endpoints finance sont scopes par l'utilisateur courant.
 - Les endpoints de summary partagent le meme contrat de devise. Une devise
@@ -591,7 +606,7 @@ Regles metier du ledger canonique :
 Notes migration/ORM :
 - La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
   UUID cote Python.
-- `currency` et `is_reversal` ont des defaults serveur en migration et des
+- `currency`, `wallet` et `is_reversal` ont des defaults serveur en migration et des
   defaults Python equivalents en ORM.
 - `created_at` et `updated_at` ont des defaults serveur en migration ; le modele
   declare aussi `server_default=func.now()`. `updated_at` porte en plus
@@ -612,6 +627,10 @@ Lecteurs et contrats actifs :
   `backend/app/services/imperium/vault_transactions.py`
 - Services de lecture/summaries :
   `backend/app/services/imperium/vault.py`
+- Les anciens lecteurs directs `backend/app/services/imperium/dashboard.py` et
+  `backend/app/services/imperium/weekly_report.py` lisent aussi le canonique.
+- L'ancien endpoint `backend/app/api/v1/routes/vault.py` ecrit desormais dans le
+  canonique via `backend/app/services/vault/transactions.py`.
 
 ### vault_transactions
 
@@ -619,10 +638,12 @@ Nom actuel : `vault_transactions`
 Nom cible : aucun. Table DEPRECIEE, legacy, a supprimer apres migration des
 lecteurs restants.
 Source code : migration `20260426_0007_vault_transactions.py`, modele
-`backend/app/models/vault.py::VaultTransaction`
+ORM actif retire. La classe `VaultTransaction` n'existe plus dans
+`backend/app/models/vault.py`.
 
 Role legacy : ancien ledger Vault, remplace par le ledger canonique ci-dessus.
-Ne pas creer de nouveau developpement dessus.
+Ne pas creer de nouveau developpement dessus. La table reste en base pour
+historique/deprecation mais ne doit plus recevoir d'ecriture applicative.
 
 Schema reel bref :
 
@@ -662,16 +683,18 @@ Contraintes et index :
 
 Notes legacy :
 - Cette table utilise `NUMERIC(12, 2)` au lieu de `amount_cents`.
-- Elle porte `wallet`, `label`, `notes`, `source_app` et `event_id`, absents du
-  ledger canonique actuel.
+- Elle porte `label`, `notes`, `source_app` et `event_id`, absents du ledger
+  canonique actuel. `wallet` a ete reintegre au canonique sous forme de texte
+  ouvert.
 - Elle autorise `transaction_type = 'correction'`, alors que le canonique
   represente les corrections par reversal append-only.
-- Lecteurs a migrer avant suppression :
-  `backend/app/services/imperium/dashboard.py` et
-  `backend/app/services/imperium/weekly_report.py`.
-- Ancien chemin API encore present :
-  `backend/app/api/v1/routes/vault.py` avec service
+- Lecteurs migrés vers le canonique :
+  `backend/app/services/imperium/dashboard.py`,
+  `backend/app/services/imperium/weekly_report.py`,
   `backend/app/services/vault/transactions.py`.
+- Ancien chemin API encore present pour compatibilite :
+  `backend/app/api/v1/routes/vault.py`; il convertit les montants euros en
+  centimes et ecrit dans `imperium_vault_transactions`.
 
 ## HEALTH
 

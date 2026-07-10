@@ -14,7 +14,7 @@ from app.models.imperium import (
     ImperiumPathItem,
     ImperiumUserPriority,
 )
-from app.models.vault import VaultTransaction
+from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import (
     DashboardDayReview,
     DashboardMission,
@@ -162,10 +162,10 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
     )
     vault_transactions = list(
         db.scalars(
-            select(VaultTransaction).where(
-                VaultTransaction.user_id == current_user.id,
-                VaultTransaction.local_date >= week_start,
-                VaultTransaction.local_date <= week_end,
+            select(ImperiumVaultTransaction).where(
+                ImperiumVaultTransaction.user_id == current_user.id,
+                ImperiumVaultTransaction.local_date >= week_start,
+                ImperiumVaultTransaction.local_date <= week_end,
             )
         )
     )
@@ -288,32 +288,40 @@ def _dashboard_day_review(review: ImperiumDayReview) -> DashboardDayReview:
 def _dashboard_vault_week(
     week_start: date,
     week_end: date,
-    transactions: list[VaultTransaction],
+    transactions: list[ImperiumVaultTransaction],
 ) -> DashboardVaultWeek:
     income_total = ZERO
     expense_total = ZERO
-    correction_total = ZERO
+    reversal_total = ZERO
+    reversal_count = 0
 
     for transaction in transactions:
-        amount = _money(transaction.amount)
+        amount = _cents_to_money(transaction.amount_cents)
         if transaction.transaction_type == "income":
             income_total += amount
         elif transaction.transaction_type == "expense":
             expense_total += amount
-        elif transaction.transaction_type == "correction":
-            correction_total += amount
+        if transaction.is_reversal:
+            reversal_total += amount
+            reversal_count += 1
 
     income_total = _money(income_total)
     expense_total = _money(expense_total)
-    correction_total = _money(correction_total)
+    reversal_total = _money(reversal_total)
     return DashboardVaultWeek(
         week_start=week_start,
         week_end=week_end,
         income_total=income_total,
         expense_total=expense_total,
-        net_total=_money(income_total - expense_total + correction_total),
+        reversal_total=reversal_total,
+        reversal_count=reversal_count,
+        net_total=_money(income_total - expense_total),
         transaction_count=len(transactions),
     )
+
+
+def _cents_to_money(amount_cents: int) -> Decimal:
+    return _money(Decimal(amount_cents) / Decimal("100"))
 
 
 def _money(value: Decimal) -> Decimal:

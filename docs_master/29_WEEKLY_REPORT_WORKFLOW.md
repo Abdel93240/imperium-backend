@@ -44,7 +44,7 @@ The report reads:
 - `imperium_day_reviews`
 - `imperium_missions`
 - `imperium_priority_rules`
-- `vault_transactions`
+- `imperium_vault_transactions`
 - `imperium_path_items`
 - `imperium_daily_plans`
 
@@ -95,9 +95,12 @@ No migration is required.
   "vault": {
     "income_total": "0.00",
     "expense_total": "0.00",
+    "reversal_total": "0.00",
+    "reversal_count": 0,
     "net_total": "0.00",
     "currency": "EUR",
-    "by_category": []
+    "by_category": [],
+    "by_wallet": []
   },
   "priorities": [],
   "signals": {
@@ -108,6 +111,18 @@ No migration is required.
   }
 }
 ```
+
+Finance rules:
+
+- Amounts are read from canonical `amount_cents` and formatted as euro strings.
+- `vault_transactions` is deprecated and is not a report source.
+- The canonical ledger has no `correction` transaction type.
+- Corrections are represented by reversal rows in
+  `imperium_vault_transactions`.
+- Reversal rows are included in income/expense according to their opposite
+  transaction type and exposed separately through `reversal_total` and
+  `reversal_count`.
+- `by_wallet` is grouped from the canonical open-text `wallet` column.
 
 ## Deterministic Signals
 

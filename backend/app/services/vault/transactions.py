@@ -1,7 +1,7 @@
 import hashlib
 import json
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -11,7 +11,7 @@ from app.models.auth import User
 from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
-from app.models.vault import VaultTransaction
+from app.models.vault import ImperiumVaultTransaction
 from app.schemas.vault import (
     CreateVaultTransactionRequest,
     VaultTransactionResponse,
@@ -44,19 +44,20 @@ def create_transaction(
     if existing_key is not None:
         return _handle_existing_idempotency(existing_key, request_hash), True
 
-    transaction = VaultTransaction(
+    transaction = ImperiumVaultTransaction(
         user_id=current_user.id,
+        transaction_type=payload.transaction_type.value,
+        amount_cents=_amount_to_cents(payload.amount),
+        currency=payload.currency,
+        wallet=payload.wallet,
         occurred_at=payload.occurred_at,
         local_date=payload.local_date,
         timezone=payload.timezone,
-        transaction_type=payload.transaction_type.value,
-        wallet=payload.wallet.value,
         category=payload.category,
-        label=payload.label,
-        amount=payload.amount,
-        currency=payload.currency,
-        notes=payload.notes,
-        source_app=SourceApp.vault.value,
+        source=SourceApp.vault.value,
+        note=payload.notes,
+        external_ref=None,
+        is_reversal=False,
     )
     db.add(transaction)
     db.flush()
@@ -73,9 +74,6 @@ def create_transaction(
         payload=event_payload,
     )
     db.add(event)
-    db.flush()
-
-    transaction.event_id = event.id
     db.flush()
 
     response = _write_response(
@@ -105,12 +103,15 @@ def get_recent_transactions(
     *,
     current_user: User,
     limit: int,
-) -> list[VaultTransaction]:
+) -> list[ImperiumVaultTransaction]:
     return list(
         db.scalars(
-            select(VaultTransaction)
-            .where(VaultTransaction.user_id == current_user.id)
-            .order_by(VaultTransaction.occurred_at.desc(), VaultTransaction.created_at.desc())
+            select(ImperiumVaultTransaction)
+            .where(ImperiumVaultTransaction.user_id == current_user.id)
+            .order_by(
+                ImperiumVaultTransaction.occurred_at.desc(),
+                ImperiumVaultTransaction.created_at.desc(),
+            )
             .limit(limit)
         )
     )
@@ -128,43 +129,54 @@ def get_weekly_summary(
     week_end = week_start + timedelta(days=6)
     transactions = list(
         db.scalars(
-            select(VaultTransaction).where(
-                VaultTransaction.user_id == current_user.id,
-                VaultTransaction.local_date >= week_start,
-                VaultTransaction.local_date <= week_end,
+            select(ImperiumVaultTransaction).where(
+                ImperiumVaultTransaction.user_id == current_user.id,
+                ImperiumVaultTransaction.local_date >= week_start,
+                ImperiumVaultTransaction.local_date <= week_end,
             )
         )
     )
 
     income_total = ZERO
     expense_total = ZERO
-    correction_total = ZERO
-    by_wallet: dict[str, dict[str, Decimal]] = {}
-    by_category: dict[str, dict[str, Decimal]] = {}
+    reversal_total = ZERO
+    reversal_count = 0
+    by_wallet: dict[str, dict[str, Decimal | int]] = {}
+    by_category: dict[str, dict[str, Decimal | int]] = {}
 
     for transaction in transactions:
-        amount = _money(transaction.amount)
+        amount = _cents_to_money(transaction.amount_cents)
         if transaction.transaction_type == "income":
             income_total += amount
         elif transaction.transaction_type == "expense":
             expense_total += amount
-        elif transaction.transaction_type == "correction":
-            correction_total += amount
+        if transaction.is_reversal:
+            reversal_total += amount
+            reversal_count += 1
 
         _add_summary_amount(by_wallet, transaction.wallet, transaction.transaction_type, amount)
-        _add_summary_amount(by_category, transaction.category, transaction.transaction_type, amount)
+        _add_summary_amount(
+            by_category,
+            _category_label(transaction.category),
+            transaction.transaction_type,
+            amount,
+        )
+        if transaction.is_reversal:
+            _add_reversal_amount(by_wallet, transaction.wallet, amount)
+            _add_reversal_amount(by_category, _category_label(transaction.category), amount)
 
     income_total = _money(income_total)
     expense_total = _money(expense_total)
-    correction_total = _money(correction_total)
-    net_total = _money(income_total - expense_total + correction_total)
+    reversal_total = _money(reversal_total)
+    net_total = _money(income_total - expense_total)
 
     return VaultWeeklySummaryResponse(
         week_start=week_start,
         week_end=week_end,
         income_total=income_total,
         expense_total=expense_total,
-        correction_total=correction_total,
+        reversal_total=reversal_total,
+        reversal_count=reversal_count,
         net_total=net_total,
         by_wallet=by_wallet,
         by_category=by_category,
@@ -223,13 +235,12 @@ def _build_event(
 
 def _write_response(
     *,
-    transaction: VaultTransaction,
+    transaction: ImperiumVaultTransaction,
     event_id: str,
     idempotency_key: str,
     status_text: str,
 ) -> VaultTransactionWriteResponse:
-    transaction_response = VaultTransactionResponse.model_validate(transaction)
-    transaction_response.idempotency_key = idempotency_key
+    transaction_response = transaction_to_response(transaction, idempotency_key=idempotency_key)
     return VaultTransactionWriteResponse(
         transaction=transaction_response,
         event_id=event_id,
@@ -244,7 +255,7 @@ def _hash_payload(payload: CreateVaultTransactionRequest) -> str:
 
 
 def _add_summary_amount(
-    summary: dict[str, dict[str, Decimal]],
+    summary: dict[str, dict[str, Decimal | int]],
     key: str,
     transaction_type: str,
     amount: Decimal,
@@ -254,20 +265,79 @@ def _add_summary_amount(
         {
             "income_total": ZERO,
             "expense_total": ZERO,
-            "correction_total": ZERO,
+            "reversal_total": ZERO,
+            "reversal_count": 0,
             "net_total": ZERO,
         },
     )
     if transaction_type == "income":
-        bucket["income_total"] = _money(bucket["income_total"] + amount)
+        bucket["income_total"] = _money(Decimal(bucket["income_total"]) + amount)
     elif transaction_type == "expense":
-        bucket["expense_total"] = _money(bucket["expense_total"] + amount)
-    elif transaction_type == "correction":
-        bucket["correction_total"] = _money(bucket["correction_total"] + amount)
+        bucket["expense_total"] = _money(Decimal(bucket["expense_total"]) + amount)
 
     bucket["net_total"] = _money(
-        bucket["income_total"] - bucket["expense_total"] + bucket["correction_total"]
+        Decimal(bucket["income_total"]) - Decimal(bucket["expense_total"])
     )
+
+
+def _add_reversal_amount(
+    summary: dict[str, dict[str, Decimal | int]],
+    key: str,
+    amount: Decimal,
+) -> None:
+    bucket = summary.setdefault(
+        key,
+        {
+            "income_total": ZERO,
+            "expense_total": ZERO,
+            "reversal_total": ZERO,
+            "reversal_count": 0,
+            "net_total": ZERO,
+        },
+    )
+    bucket["reversal_total"] = _money(Decimal(bucket["reversal_total"]) + amount)
+    bucket["reversal_count"] = int(bucket["reversal_count"]) + 1
+
+
+def transaction_to_response(
+    transaction: ImperiumVaultTransaction,
+    *,
+    idempotency_key: str | None = None,
+) -> VaultTransactionResponse:
+    return VaultTransactionResponse(
+        id=transaction.id,
+        occurred_at=transaction.occurred_at,
+        local_date=transaction.local_date,
+        timezone=transaction.timezone,
+        transaction_type=transaction.transaction_type,
+        wallet=transaction.wallet,
+        category=_category_label(transaction.category),
+        label=None,
+        amount=_cents_to_money(transaction.amount_cents),
+        currency=transaction.currency,
+        notes=transaction.note,
+        is_reversal=transaction.is_reversal,
+        reversal_of_transaction_id=transaction.reversal_of_transaction_id,
+        reversal_reason=transaction.reversal_reason,
+        created_at=transaction.created_at,
+        event_id=None,
+        idempotency_key=idempotency_key,
+    )
+
+
+def _amount_to_cents(amount: Decimal) -> int:
+    return int((amount * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def _cents_to_money(amount_cents: int) -> Decimal:
+    return _money(Decimal(amount_cents) / Decimal("100"))
+
+
+def _category_label(category: str | None) -> str:
+    if category is None:
+        return "uncategorized"
+    stripped = category.strip()
+    return stripped or "uncategorized"
 
 
 def _money(value: Decimal) -> Decimal:

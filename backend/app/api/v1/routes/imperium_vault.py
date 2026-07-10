@@ -138,7 +138,6 @@ def get_imperium_vault_transaction_detail_route(
 @router.post(
     "/transactions",
     response_model=ImperiumVaultTransactionRead,
-    response_model_exclude_defaults=True,
     status_code=status.HTTP_201_CREATED,
 )
 def create_imperium_vault_transaction_route(

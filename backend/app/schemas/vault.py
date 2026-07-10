@@ -10,12 +10,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class TransactionType(StrEnum):
     income = "income"
     expense = "expense"
-    correction = "correction"
-
-
-class WalletType(StrEnum):
-    cash = "cash"
-    bank = "bank"
 
 
 class CreateVaultTransactionRequest(BaseModel):
@@ -23,14 +17,14 @@ class CreateVaultTransactionRequest(BaseModel):
     local_date: date
     timezone: str = Field(min_length=1)
     transaction_type: TransactionType
-    wallet: WalletType
+    wallet: str = Field(default="cash", min_length=1, max_length=80)
     category: str = Field(min_length=1, max_length=120)
     label: str | None = Field(default=None, max_length=200)
     amount: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=2)
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     notes: str | None = None
 
-    @field_validator("timezone", "category", "label", "currency", "notes")
+    @field_validator("timezone", "wallet", "category", "label", "currency", "notes")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -60,6 +54,9 @@ class VaultTransactionResponse(BaseModel):
     amount: Decimal
     currency: str
     notes: str | None
+    is_reversal: bool = False
+    reversal_of_transaction_id: UUID | None = None
+    reversal_reason: str | None = None
     created_at: datetime
     event_id: UUID | None = None
     idempotency_key: str | None = None
@@ -77,10 +74,11 @@ class VaultWeeklySummaryResponse(BaseModel):
     week_end: date
     income_total: Decimal
     expense_total: Decimal
-    correction_total: Decimal
+    reversal_total: Decimal
+    reversal_count: int
     net_total: Decimal
-    by_wallet: dict[str, dict[str, Decimal]]
-    by_category: dict[str, dict[str, Decimal]]
+    by_wallet: dict[str, dict[str, Decimal | int]]
+    by_category: dict[str, dict[str, Decimal | int]]
 
 
 class ImperiumVaultTransactionCreate(BaseModel):
@@ -89,6 +87,7 @@ class ImperiumVaultTransactionCreate(BaseModel):
     transaction_type: Literal["income", "expense"]
     amount_cents: int = Field(gt=0)
     currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
+    wallet: str = Field(default="cash", min_length=1, max_length=80)
     occurred_at: datetime
     timezone: str | None = Field(default=None, min_length=1, max_length=80)
     category: str | None = Field(default=None, max_length=80)
@@ -112,7 +111,7 @@ class ImperiumVaultTransactionCreate(BaseModel):
             raise ValueError("occurred_at must include timezone information.")
         return value
 
-    @field_validator("timezone", "category", "source", "note", "external_ref")
+    @field_validator("wallet", "timezone", "category", "source", "note", "external_ref")
     @classmethod
     def strip_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -130,6 +129,7 @@ class ImperiumVaultTransactionRead(BaseModel):
     transaction_type: Literal["income", "expense"]
     amount_cents: int
     currency: str
+    wallet: str = "cash"
     occurred_at: datetime
     local_date: date
     timezone: str
@@ -146,6 +146,11 @@ class ImperiumVaultTransactionRead(BaseModel):
     @classmethod
     def default_is_reversal(cls, value: bool | None) -> bool:
         return False if value is None else value
+
+    @field_validator("wallet", mode="before")
+    @classmethod
+    def default_wallet(cls, value: str | None) -> str:
+        return "cash" if value is None else value
 
 
 class ImperiumVaultTransactionListResponse(BaseModel):

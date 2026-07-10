@@ -1841,8 +1841,8 @@ def test_patch_9b_vault_summary_route_is_read_only_and_has_no_ai_n8n_or_persiste
     assert "calendar" not in lowered
     assert "ocr" not in lowered
     assert "sadaqa" not in lowered
-    assert "wallet" not in lowered
     assert "balance" not in lowered
+    assert "vault_wallet_snapshots" not in lowered
 
 
 def test_patch_9c_vault_category_summary_route_is_read_only_and_has_no_ai_n8n_or_persistent_wallet_side_effects() -> None:
@@ -1890,12 +1890,12 @@ def test_patch_9c_vault_category_summary_route_is_read_only_and_has_no_ai_n8n_or
     assert "calendar" not in lowered_code
     assert "ocr" not in lowered_code
     assert "sadaqa" not in lowered_code
-    assert "wallet" not in lowered_code
     assert "balance" not in lowered_code
+    assert "vault_wallet_snapshots" not in lowered_code
     assert "uncategorized" in lowered_code
     assert "transaction_count desc" in lowered_docs
     assert "absolute net magnitude desc" in lowered_docs
-    assert "no ai/n8n/ocr/sadaqa/wallet/balance workflows" in lowered_docs
+    assert "no ai/n8n/ocr/sadaqa/balance workflows" in lowered_docs
 
 
 def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_persistent_wallet_side_effects() -> None:
@@ -1940,7 +1940,7 @@ def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_
     assert "patch 9d" in lowered_docs
     assert "read-only" in lowered_docs
     assert "grouped by month" in lowered_docs
-    assert "no ai/n8n/ocr/sadaqa/wallet/balance workflows" in lowered_docs
+    assert "no ai/n8n/ocr/sadaqa/balance workflows" in lowered_docs
     assert "QwenClient" not in lowered_code
     assert "n8n_client" not in lowered_code
     assert "trigger_n8n" not in lowered_code
@@ -1950,8 +1950,8 @@ def test_patch_9d_vault_monthly_summary_route_is_read_only_and_has_no_ai_n8n_or_
     assert "calendar" not in lowered_code
     assert "ocr" not in lowered_code
     assert "sadaqa" not in lowered_code
-    assert "wallet" not in lowered_code
     assert "balance" not in lowered_code
+    assert "vault_wallet_snapshots" not in lowered_code
 
 
 def test_backlog_path_has_no_ai_provider_imports() -> None:
@@ -2415,9 +2415,13 @@ def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> 
     assert 'pattern=r"^[A-Z]{3}$"' in create_schema_section
     assert "def normalize_currency" in create_schema_section
     assert "return value.strip().upper()" in create_schema_section
+    assert "wallet: str = Field(default=\"cash\"" in create_schema_section
     assert "normalized_currency = currency.strip().upper()" in service_text
     assert "currency=original.currency" in transaction_service_text
-    assert "none of the vault 9h routes persist ai, n8n, ocr, sadaqa, wallet, balance" in lowered_docs
+    assert "wallet=payload.wallet" in transaction_service_text
+    assert "wallet=original.wallet" in transaction_service_text
+    assert "none of the vault 9h routes persist ai, n8n, ocr, sadaqa, or balance workflows" in lowered_docs
+    assert "wallet is a canonical transaction field, not a separate balance workflow" in lowered_docs
 
     for forbidden in (
         "openai",
@@ -2434,9 +2438,9 @@ def test_patch_9h_vault_contract_consolidation_is_explicit_and_audit_ready() -> 
         "calendar replanning",
         "ocr",
         "sadaqa",
-        "wallet",
         "balance",
         "wallet persistence",
+        "vault_wallet_snapshots",
     ):
         assert forbidden not in lowered_code
 

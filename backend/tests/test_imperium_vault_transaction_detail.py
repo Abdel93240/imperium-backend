@@ -57,6 +57,7 @@ def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 1234),
         currency=overrides.pop("currency", "EUR"),
+        wallet=overrides.pop("wallet", "cash"),
         occurred_at=occurred_at,
         local_date=overrides.pop("local_date", occurred_at.date()),
         timezone=overrides.pop("timezone", "UTC"),
@@ -80,6 +81,7 @@ def test_get_transaction_detail_returns_current_user_transaction() -> None:
     body = response.json()
     assert body["transaction"]["id"] == str(own.id)
     assert body["transaction"]["amount_cents"] == own.amount_cents
+    assert body["transaction"]["wallet"] == "cash"
     assert body["transaction"]["local_date"] == own.local_date.isoformat()
     assert body["transaction"]["timezone"] == "UTC"
     assert body["safe_explanation"] == "Vault transaction detail for current user."

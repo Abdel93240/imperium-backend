@@ -13,7 +13,7 @@ from app.models.imperium import (
     ImperiumPathItem,
     ImperiumPriorityRule,
 )
-from app.models.vault import VaultTransaction
+from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import (
     WeeklyReportDailyPlans,
     WeeklyReportDays,
@@ -25,6 +25,7 @@ from app.schemas.imperium import (
     WeeklyReportSignals,
     WeeklyReportVault,
     WeeklyReportVaultCategory,
+    WeeklyReportVaultWallet,
 )
 
 PARIS_TIMEZONE = "Europe/Paris"
@@ -90,10 +91,10 @@ def get_weekly_report(
     )
     transactions = list(
         db.scalars(
-            select(VaultTransaction).where(
-                VaultTransaction.user_id == current_user.id,
-                VaultTransaction.local_date >= week_start,
-                VaultTransaction.local_date < week_end_exclusive,
+            select(ImperiumVaultTransaction).where(
+                ImperiumVaultTransaction.user_id == current_user.id,
+                ImperiumVaultTransaction.local_date >= week_start,
+                ImperiumVaultTransaction.local_date < week_end_exclusive,
             )
         )
     )
@@ -198,64 +199,132 @@ def _build_daily_plans(daily_plans: list[ImperiumDailyPlan]) -> WeeklyReportDail
     )
 
 
-def _build_vault(transactions: list[VaultTransaction]) -> WeeklyReportVault:
+def _build_vault(transactions: list[ImperiumVaultTransaction]) -> WeeklyReportVault:
     income_total = ZERO
     expense_total = ZERO
-    correction_total = ZERO
-    by_category: dict[str, dict[str, Decimal]] = {}
+    reversal_total = ZERO
+    reversal_count = 0
+    by_category: dict[str, dict[str, Decimal | int]] = {}
+    by_wallet: dict[str, dict[str, Decimal | int]] = {}
     currency = "EUR"
 
     for transaction in transactions:
         currency = transaction.currency or currency
-        amount = _money(transaction.amount)
-        category = transaction.category
-        bucket = by_category.setdefault(
-            category,
-            {
-                "income_total": ZERO,
-                "expense_total": ZERO,
-                "correction_total": ZERO,
-            },
-        )
-
+        amount = _cents_to_money(transaction.amount_cents)
+        category = _label_or_uncategorized(transaction.category)
+        wallet = _label_or_default(transaction.wallet, "cash")
+        category_bucket = _summary_bucket(by_category, category)
+        wallet_bucket = _summary_bucket(by_wallet, wallet)
+        category_bucket["transaction_count"] = int(category_bucket["transaction_count"]) + 1
+        wallet_bucket["transaction_count"] = int(wallet_bucket["transaction_count"]) + 1
         if transaction.transaction_type == "income":
             income_total += amount
-            bucket["income_total"] += amount
+            category_bucket["income_total"] = Decimal(category_bucket["income_total"]) + amount
+            wallet_bucket["income_total"] = Decimal(wallet_bucket["income_total"]) + amount
+            category_bucket["income_count"] = int(category_bucket["income_count"]) + 1
+            wallet_bucket["income_count"] = int(wallet_bucket["income_count"]) + 1
         elif transaction.transaction_type == "expense":
             expense_total += amount
-            bucket["expense_total"] += amount
-        elif transaction.transaction_type == "correction":
-            correction_total += amount
-            bucket["correction_total"] += amount
+            category_bucket["expense_total"] = Decimal(category_bucket["expense_total"]) + amount
+            wallet_bucket["expense_total"] = Decimal(wallet_bucket["expense_total"]) + amount
+            category_bucket["expense_count"] = int(category_bucket["expense_count"]) + 1
+            wallet_bucket["expense_count"] = int(wallet_bucket["expense_count"]) + 1
+        if transaction.is_reversal:
+            reversal_total += amount
+            reversal_count += 1
+            category_bucket["reversal_total"] = Decimal(category_bucket["reversal_total"]) + amount
+            category_bucket["reversal_count"] = int(category_bucket["reversal_count"]) + 1
+            wallet_bucket["reversal_total"] = Decimal(wallet_bucket["reversal_total"]) + amount
+            wallet_bucket["reversal_count"] = int(wallet_bucket["reversal_count"]) + 1
 
     income_total = _money(income_total)
     expense_total = _money(expense_total)
-    correction_total = _money(correction_total)
-    net_total = _money(income_total - expense_total + correction_total)
+    reversal_total = _money(reversal_total)
+    net_total = _money(income_total - expense_total)
 
     categories = []
     for category, totals in sorted(by_category.items()):
-        category_income = _money(totals["income_total"])
-        category_expense = _money(totals["expense_total"])
-        category_correction = _money(totals["correction_total"])
-        category_net = _money(category_income - category_expense + category_correction)
+        category_income = _money(Decimal(totals["income_total"]))
+        category_expense = _money(Decimal(totals["expense_total"]))
+        category_reversal = _money(Decimal(totals["reversal_total"]))
+        category_net = _money(category_income - category_expense)
         categories.append(
             WeeklyReportVaultCategory(
                 category=category,
                 income_total=_money_str(category_income),
                 expense_total=_money_str(category_expense),
-                correction_total=_money_str(category_correction),
+                reversal_total=_money_str(category_reversal),
+                reversal_count=int(totals["reversal_count"]),
+                transaction_count=int(totals["transaction_count"]),
+                income_count=int(totals["income_count"]),
+                expense_count=int(totals["expense_count"]),
                 net_total=_money_str(category_net),
+            )
+        )
+
+    wallets = []
+    for wallet, totals in sorted(by_wallet.items()):
+        wallet_income = _money(Decimal(totals["income_total"]))
+        wallet_expense = _money(Decimal(totals["expense_total"]))
+        wallet_reversal = _money(Decimal(totals["reversal_total"]))
+        wallet_net = _money(wallet_income - wallet_expense)
+        wallets.append(
+            WeeklyReportVaultWallet(
+                wallet=wallet,
+                income_total=_money_str(wallet_income),
+                expense_total=_money_str(wallet_expense),
+                reversal_total=_money_str(wallet_reversal),
+                reversal_count=int(totals["reversal_count"]),
+                transaction_count=int(totals["transaction_count"]),
+                income_count=int(totals["income_count"]),
+                expense_count=int(totals["expense_count"]),
+                net_total=_money_str(wallet_net),
             )
         )
 
     return WeeklyReportVault(
         income_total=_money_str(income_total),
         expense_total=_money_str(expense_total),
+        reversal_total=_money_str(reversal_total),
+        reversal_count=reversal_count,
         net_total=_money_str(net_total),
         currency=currency,
         by_category=categories,
+        by_wallet=wallets,
     )
+
+
+def _summary_bucket(
+    summary: dict[str, dict[str, Decimal | int]],
+    key: str,
+) -> dict[str, Decimal | int]:
+    return summary.setdefault(
+        key,
+        {
+            "income_total": ZERO,
+            "expense_total": ZERO,
+            "reversal_total": ZERO,
+            "reversal_count": 0,
+            "transaction_count": 0,
+            "income_count": 0,
+            "expense_count": 0,
+        },
+    )
+
+
+def _cents_to_money(amount_cents: int) -> Decimal:
+    return _money(Decimal(amount_cents) / Decimal("100"))
+
+
+def _label_or_uncategorized(value: str | None) -> str:
+    return _label_or_default(value, "uncategorized")
+
+
+def _label_or_default(value: str | None, default: str) -> str:
+    if value is None:
+        return default
+    stripped = value.strip()
+    return stripped or default
 
 
 def _build_signals(

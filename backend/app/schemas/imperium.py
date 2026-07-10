@@ -831,6 +831,7 @@ class ImperiumVaultTransactionDetailRead(BaseModel):
     transaction_type: Literal["income", "expense"]
     amount_cents: int
     currency: str
+    wallet: str = "cash"
     occurred_at: datetime
     local_date: date
     timezone: str
@@ -847,6 +848,11 @@ class ImperiumVaultTransactionDetailRead(BaseModel):
     @classmethod
     def default_is_reversal(cls, value: bool | None) -> bool:
         return False if value is None else value
+
+    @field_validator("wallet", mode="before")
+    @classmethod
+    def default_wallet(cls, value: str | None) -> str:
+        return "cash" if value is None else value
 
 
 class ImperiumVaultTransactionDetailResponse(BaseModel):
@@ -1063,6 +1069,8 @@ class DashboardVaultWeek(BaseModel):
     week_end: date
     income_total: Decimal
     expense_total: Decimal
+    reversal_total: Decimal
+    reversal_count: int
     net_total: Decimal
     transaction_count: int
 
@@ -1165,16 +1173,35 @@ class WeeklyReportVaultCategory(BaseModel):
     category: str
     income_total: str
     expense_total: str
-    correction_total: str
+    reversal_total: str
+    reversal_count: int
+    transaction_count: int
+    income_count: int
+    expense_count: int
+    net_total: str
+
+
+class WeeklyReportVaultWallet(BaseModel):
+    wallet: str
+    income_total: str
+    expense_total: str
+    reversal_total: str
+    reversal_count: int
+    transaction_count: int
+    income_count: int
+    expense_count: int
     net_total: str
 
 
 class WeeklyReportVault(BaseModel):
     income_total: str
     expense_total: str
+    reversal_total: str
+    reversal_count: int
     net_total: str
     currency: str
     by_category: list[WeeklyReportVaultCategory]
+    by_wallet: list[WeeklyReportVaultWallet]
 
 
 class WeeklyReportPriority(BaseModel):

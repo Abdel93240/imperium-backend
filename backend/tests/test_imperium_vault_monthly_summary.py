@@ -439,7 +439,7 @@ def test_get_vault_monthly_summary_is_read_only_and_has_no_ai_n8n_or_persistent_
     assert "patch 9d" in lowered_docs
     assert "read-only" in lowered_docs
     assert "grouped by month" in lowered_docs
-    assert "no ai/n8n/ocr/sadaqa/wallet/balance workflows" in lowered_docs
+    assert "no ai/n8n/ocr/sadaqa/balance workflows" in lowered_docs
     assert "QwenClient" not in combined_code
     assert "n8n_client" not in combined_code
     assert "trigger_n8n" not in combined_code

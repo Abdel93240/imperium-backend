@@ -83,6 +83,7 @@ def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
         transaction_type=overrides.pop("transaction_type", "income"),
         amount_cents=overrides.pop("amount_cents", 123400),
         currency=overrides.pop("currency", "EUR"),
+        wallet=overrides.pop("wallet", "cash"),
         occurred_at=occurred_at,
         local_date=overrides.pop("local_date", occurred_at.date()),
         timezone=overrides.pop("timezone", "UTC"),
@@ -141,6 +142,7 @@ def test_reverse_income_creates_expense_same_amount_and_currency() -> None:
     assert reversal.transaction_type == "expense"
     assert reversal.amount_cents == original.amount_cents
     assert reversal.currency == original.currency
+    assert reversal.wallet == original.wallet
     assert reversal.category == original.category
     assert reversal.source == "reversal"
     assert reversal.external_ref is None
@@ -236,6 +238,7 @@ def test_reverse_idempotent_same_key_and_payload_returns_same_response() -> None
             "transaction_type": "expense",
             "amount_cents": 100000,
             "currency": "EUR",
+            "wallet": "cash",
             "occurred_at": "2026-05-25T10:00:00Z",
             "local_date": "2026-05-25",
             "timezone": "UTC",
@@ -293,6 +296,7 @@ def test_reverse_same_key_with_different_payload_returns_conflict() -> None:
                 "transaction_type": "expense",
                 "amount_cents": 100000,
                 "currency": "EUR",
+                "wallet": "cash",
                 "occurred_at": "2026-05-25T10:00:00Z",
                 "local_date": "2026-05-25",
                 "timezone": "UTC",
@@ -355,6 +359,7 @@ def test_reverse_original_transaction_is_not_modified() -> None:
         "transaction_type": original.transaction_type,
         "amount_cents": original.amount_cents,
         "currency": original.currency,
+        "wallet": original.wallet,
         "occurred_at": original.occurred_at,
         "local_date": original.local_date,
         "timezone": original.timezone,
@@ -379,6 +384,7 @@ def test_reverse_original_transaction_is_not_modified() -> None:
         "transaction_type": original.transaction_type,
         "amount_cents": original.amount_cents,
         "currency": original.currency,
+        "wallet": original.wallet,
         "occurred_at": original.occurred_at,
         "local_date": original.local_date,
         "timezone": original.timezone,
@@ -428,6 +434,7 @@ def test_get_list_and_detail_show_reversal_fields_without_user_id() -> None:
     assert listed["is_reversal"] is True
     assert listed["reversal_of_transaction_id"] == str(original_id)
     assert listed["reversal_reason"] == "duplicate"
+    assert listed["wallet"] == "cash"
     assert "user_id" not in listed
 
     assert detail_response.status_code == 200
@@ -435,4 +442,5 @@ def test_get_list_and_detail_show_reversal_fields_without_user_id() -> None:
     assert detailed["is_reversal"] is True
     assert detailed["reversal_of_transaction_id"] == str(original_id)
     assert detailed["reversal_reason"] == "duplicate"
+    assert detailed["wallet"] == "cash"
     assert "user_id" not in detailed

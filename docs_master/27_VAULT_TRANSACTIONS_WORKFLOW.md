@@ -18,31 +18,41 @@ The backend remains source of truth. The Vault stores declared financial reality
 
 ## Database Table
 
-Canonical table: `vault_transactions`
+Canonical table: `imperium_vault_transactions`.
+
+Deprecated legacy table: `vault_transactions`.
+
+The legacy table remains in the database for historical compatibility, but the
+active ORM model has been removed and no new application write should target it.
+The compatibility endpoint `/api/vault/transactions` now writes into the
+canonical ledger.
 
 Columns:
 
 - `id`: UUID primary key
 - `user_id`: canonical user FK
-- `event_id`: nullable FK to `events.id`
+- `transaction_type`: `income` or `expense`
+- `amount_cents`: integer amount in cents, positive
+- `currency`: defaults to `EUR`
+- `wallet`: open wallet label, defaults to `cash`
 - `occurred_at`: transaction timestamp
 - `local_date`: user-local date
 - `timezone`: user timezone
-- `transaction_type`: `income`, `expense`, or `correction`
-- `wallet`: `cash` or `bank`
-- `category`: required category
-- `label`: optional display label
-- `amount`: numeric `12,2`, positive
-- `currency`: defaults to `EUR`
-- `notes`: optional notes
-- `source_app`: defaults to `vault`
+- `category`: optional category
+- `source`: optional source label
+- `note`: optional note
+- `external_ref`: optional external reference
+- `is_reversal`: boolean, defaults to `false`
+- `reversal_of_transaction_id`: nullable FK to `imperium_vault_transactions.id`
+- `reversal_reason`: optional reason for reversal rows
 - `created_at`, `updated_at`: UTC audit timestamps
 
 Constraints:
 
-- `amount > 0`
-- `transaction_type IN ('income', 'expense', 'correction')`
-- `wallet IN ('cash', 'bank')`
+- `amount_cents > 0`
+- `transaction_type IN ('income', 'expense')`
+- `length(currency) = 3`
+- reversal rows must link to an original transaction; non-reversal rows must not
 
 Indexes:
 
@@ -85,7 +95,8 @@ Payload:
 Behavior:
 
 - Uses authenticated `user_id`; request body cannot set `user_id`.
-- Stores one canonical `vault_transactions` row.
+- Converts `amount` from decimal euros to canonical `amount_cents`.
+- Stores one canonical `imperium_vault_transactions` row.
 - Appends `vault.transaction.created`.
 - Stores the idempotent response.
 - Same `Idempotency-Key` and same payload returns original response.
@@ -107,6 +118,9 @@ Response:
     "amount": "42.50",
     "currency": "EUR",
     "notes": "Optional",
+    "is_reversal": false,
+    "reversal_of_transaction_id": null,
+    "reversal_reason": null,
     "created_at": "2026-04-26T10:00:01Z",
     "event_id": "evt_...",
     "idempotency_key": "..."
@@ -133,7 +147,7 @@ Behavior:
 Rules:
 
 - `week_start` must be a Monday.
-- Summary is computed live from `vault_transactions`.
+- Summary is computed live from `imperium_vault_transactions`.
 - No materialized weekly table exists in V1.
 
 Response:
@@ -144,13 +158,15 @@ Response:
   "week_end": "2026-04-26",
   "income_total": "42.50",
   "expense_total": "12.00",
-  "correction_total": "0.00",
+  "reversal_total": "0.00",
+  "reversal_count": 0,
   "net_total": "30.50",
   "by_wallet": {
     "cash": {
       "income_total": "42.50",
       "expense_total": "12.00",
-      "correction_total": "0.00",
+      "reversal_total": "0.00",
+      "reversal_count": 0,
       "net_total": "30.50"
     }
   },
@@ -158,18 +174,24 @@ Response:
     "vtc": {
       "income_total": "42.50",
       "expense_total": "0.00",
-      "correction_total": "0.00",
+      "reversal_total": "0.00",
+      "reversal_count": 0,
       "net_total": "42.50"
     }
   }
 }
 ```
 
-V1 correction rule:
+V1 reversal rule:
 
-- `correction` uses a positive `amount`.
-- Weekly `net_total = income_total - expense_total + correction_total`.
-- If negative corrections are needed later, add a dedicated signed `amount_delta` migration instead of overloading this V1 column.
+- `correction` is not a canonical transaction type.
+- Corrections are represented by appending an opposite transaction with
+  `is_reversal = true`, `reversal_of_transaction_id`, and `reversal_reason`.
+- The original transaction is never updated or deleted.
+- Weekly `net_total = income_total - expense_total`.
+- Reversal rows are included in income/expense according to their opposite
+  transaction type and are also exposed separately through `reversal_total` and
+  `reversal_count`.
 
 ## Event
 
@@ -191,7 +213,8 @@ Privacy level:
 high
 ```
 
-Events are append-only. Transaction rows are canonical financial declarations.
+Events are append-only. Canonical transaction rows are financial declarations;
+reversals are separate linked declarations.
 
 ## Deployment Commands
 
