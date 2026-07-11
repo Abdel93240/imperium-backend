@@ -11,7 +11,8 @@ PAS re-développées ici. Les items nouveaux de ce digest sont numérotés `AD-x
 les questions continuent la numérotation à `Q14` (§7).
 
 Limites de vérification (identiques à l'audit toolbox, revérifiées ce jour) :
-1. Postgres de production INACCESSIBLE depuis Tower (VPS Hostinger hors tailnet visible ;
+1. Postgres de production INACCESSIBLE depuis Tower (VPS Hostinger non visible dans
+   l'environnement réseau observé ;
    le Postgres local 127.0.0.1:5432 refuse les credentials par défaut — `alembic current`
    impossible). Le « schéma réel » = les migrations `backend/alembic/versions/` 0001→0037.
    HYPOTHÈSE portée : toutes appliquées en prod (déploiement Alembic, doc 19).
@@ -72,14 +73,14 @@ RÉEL (constaté ce jour depuis Tower)
 │ (docker-compose.imperium.yml)│   │  Postgres local orchestrator_dev)   │
 │ INACCESSIBLE depuis Tower    │   │ GPU : AUCUN (phase 1, F10 §5-bis)   │
 └──────────────────────────────┘   └─────────────────────────────────────┘
-   ▲ HTTP (apps → API)                 tailnet visible : tower, iphone,
-┌─ TABLETTE Galaxy ────────────┐       tablette, thomson (pas le VPS)
+   ▲ HTTP (apps → API)                 réseau observé : postes clients visibles,
+┌─ TABLETTE ANDROID ───────────┐       VPS absent
 │ AUCUNE app déployée          │
 │ (vtc-companion introuvable,  │
 │  frontend-apps/imperium=README│
 └──────────────────────────────┘
 ```
-- Cible F10 : orchestrateur → Machine 1 chez le père (F10 §2), Tower sort de
+- Cible F10 : orchestrateur → machine externe dédiée (F10 §2), Tower sort de
   l'écosystème (F10 §3) — « réorganisation à venir (pas immédiate) », calendrier =
   point ouvert (F10 §7). Aujourd'hui Tower héberge de fait le build (orchestrateur +
   ce repo) : écart réel↔cible documenté, pas une incohérence.
@@ -297,10 +298,11 @@ NOUVELLES ou dont l'état a CHANGÉ depuis hier.
   porte de date de fin de compat. Aucune « compat 30 j » formelle trouvée dans les docs —
   le pattern « refonte faite, ancien jamais débranché » (audit_resync §dette) reste le
   risque. → Q15.
-- **AD-10 — TOOLBOX_CATALOG_DRAFT non promu, livrables non commités** (MINEUR, S).
+- **AD-10 — TOOLBOX_CATALOG_DRAFT non promu en doc canonique** (MINEUR, S).
   Les 5 livrables toolbox + la mise à jour de `gap_analysis_v1/00_INDEX.md` sont
-  UNTRACKED/modifiés dans le working tree (git status au 2026-07-11) — l'audit d'hier
-  n'est pas encore commité. Risque de perte + le doc 78 canonique attend Q13.
+  présents et trackés (`git status --short` propre, log `gap_analysis_v1/toolbox`).
+  Le risque de perte est levé ; reste l'arbitrage Q13 : promouvoir le catalogue en
+  doc 78 canonique ou le garder comme brouillon d'audit.
 
 ---
 
