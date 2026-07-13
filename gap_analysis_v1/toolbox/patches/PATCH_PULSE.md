@@ -10,6 +10,10 @@ Ajouter à la liste de lectures §0 : `TOOLBOX_CATALOG_DRAFT.md` (ou son success
 `TOOLBOX_FINDINGS.md`. Toute création de table/service passe d'abord par une vérification au
 catalogue (anti-doublon), consignée dans PULSE_MAPPING.md.
 
+## P-0bis. Activation R1 (doc 76)
+R1 : TOUT seed (signaux, sentinelle, procédures, coups, rouges) naît `active=false` ;
+l'activation est un UPDATE journalisé par vague (doc 76).
+
 ## P-1. Tables partagées créées PARTAGÉES d'emblée (confirme le pré-inventaire)
 - §3.9 : NE PAS créer `pulse_ai_transition` / `pulse_audit_samples`. Créer directement
   `ai_slot_transition` / `ai_audit_samples` (schéma spec WR §3.7, slots namespacés `pulse.*`)

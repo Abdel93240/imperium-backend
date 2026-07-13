@@ -51,6 +51,10 @@ comme alias, pas comme deuxième entrée.
 - §12 crons (`daily_scores_refresh` 06:30, `day_start`, `override_aggregation`,
   `gmaps_cache_gc`) → jobs `toolbox.runner`, pas de workflows n8n.
 
+## D-6bis. Activation CF-5 (doc 76)
+Ajouter le flag `daily_selection_enabled=False` : tant que OFF, `POST /api/daily/complete`
+conserve le comportement actuel (CF-5).
+
 ## D-7. Porte G5 (Pulse) via une vue contractuelle
 FINDINGS C-4 : G5 lit l'état red-flag Pulse à travers une vue dédiée (ex.
 `v_pulse_active_blocks` exposant {block_kind, min_physical_load}) créée par la passe Pulse —
