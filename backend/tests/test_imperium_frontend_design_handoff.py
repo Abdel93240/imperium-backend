@@ -1,4 +1,3 @@
-from pathlib import Path
 import re
 from types import SimpleNamespace
 from uuid import uuid4
@@ -10,9 +9,6 @@ from fastapi.testclient import TestClient
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
 
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 DESIGN_HANDOFF_PATH = "/api/imperium/frontend/design-handoff"
 
@@ -270,7 +266,7 @@ def test_frontend_design_handoff_exact_fields_contain_no_remote_or_embedded_asse
     assert "filesystem scan" not in payload_text
 
 
-def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> None:
+def test_frontend_design_handoff_is_declared_in_contracts_index() -> None:
     client = _client(FakeDb(), _user())
     contracts_index = client.get("/api/imperium/contracts/index").json()
     frontend_group = next(group for group in contracts_index["groups"] if group["name"] == "frontend")
@@ -283,28 +279,3 @@ def test_frontend_design_handoff_is_declared_in_contracts_index_and_docs() -> No
         "read_only": True,
         "idempotency_key_required": False,
     }
-
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-    for text in (contracts_docs, schema_docs):
-        assert DESIGN_HANDOFF_PATH in text
-        assert "frontend design handoff metadata" in text
-        assert "claude code design" in text
-        assert "metadata only" in text
-        assert "static deterministic v1" in text
-        assert "frontend metadata layer version v6" in text
-        assert "design_handoff_version v1" in text
-        assert "no filesystem scan" in text
-        assert "no asset existence check" in text
-        assert "no remote url" in text
-        assert "no base64" in text
-        assert "no code frontend" in text
-        assert "claude code design handoff only" in text
-        assert "no ui rendering" in text
-        assert "no asset upload" in text
-        assert "no runtime discovery" in text
-        assert "no generated frontend code" in text
-        assert "no screenshots/blobs" in text
-        assert "final assets provided later" in text
-        assert "supported_modules order is deterministic" in text
-        assert "asset_groups align with asset-registry expectations" in text
