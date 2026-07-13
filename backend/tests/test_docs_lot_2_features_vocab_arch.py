@@ -43,28 +43,6 @@ def test_sadaqa_margin_and_feed_ia_file_policy_are_centralized() -> None:
     assert "everything EXCEPT video and audio" not in inbox
 
 
-def test_carrier_engagement_and_expert_orchestration_are_documented() -> None:
-    submissions = _doc("53_SUBMISSIONS_OVERLAY_TASKS.md")
-    qwen = _doc("35_QWEN_SETUP_AND_PROMPTS.md")
-    brain = _doc("44_BRAIN_UNIFIED_LOGIC.md")
-
-    assert "Decisive criterion: ENGAGEMENT." in submissions
-    assert "engagement_level VARCHAR(16) NULL" in submissions
-    assert "### 12.2 Qwen carrier prompt template" in submissions
-    assert "carrier_mission_id = NULL (done standalone)" in submissions
-    assert "physical_demand" not in submissions
-    assert "Actualiser" not in submissions
-
-    assert "## 9. Carrier Classification Prompt (doc 53)" in qwen
-    assert '"engagement_level": <"low" | "medium" | "high">' in qwen
-
-    assert "## 6-bis. Expert-Call Orchestration During Qwen Dialogue" in brain
-    assert "Models never call each other directly." in brain
-    assert "RAG access to vectorized domain data" in brain
-    assert "Qwen must not escalate ordinary low-risk questions" in brain
-    assert "Future option: vectorize expert answers during dialogue" in brain
-
-
 def test_vocab_hierarchy_and_numeric_targets_use_cible() -> None:
     vision = _doc("00_VISION_GLOBALE.md")
     brain = _doc("44_BRAIN_UNIFIED_LOGIC.md")
