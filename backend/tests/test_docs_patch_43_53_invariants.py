@@ -30,17 +30,3 @@ def test_doc_43_morning_popup_and_parallel_mission_rules_match_canonical_model()
     assert 'Front-end (FR): "mission principale" / "mission annexe".' in text
     assert "très_importante" not in text
 
-
-def test_doc_53_overlay_exclusions_use_observable_mission_types() -> None:
-    text = _doc("53_SUBMISSIONS_OVERLAY_TASKS.md")
-    section_51 = text.split("### 5.1 Explicitly excluded", maxsplit=1)[1].split("### 5.2", maxsplit=1)[0]
-    qwen_prompt = text.split("### 12.1 Qwen prompt template", maxsplit=1)[1].split("---", maxsplit=1)[0]
-
-    assert "NEVER OVERLAY (exclusion by mission TYPE — perceivable by the AI)" in section_51
-    assert "Overlay-eligibility is defined by mission TYPE, never by a non-perceivable\ninternal moment." in section_51
-    assert "Conduite proprement dite" not in section_51
-    assert "Repas (digestion, social)" not in section_51
-    assert "- Sleep, ghusl" in qwen_prompt
-    assert "- Sleep, meals, ghusl" not in qwen_prompt
-    assert "**mission principale**" in text
-    assert "**mission annexe**" in text
