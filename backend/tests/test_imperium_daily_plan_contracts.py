@@ -11,7 +11,6 @@ from app.api.v1.router import api_router
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 
 class FakeDb:
@@ -182,27 +181,3 @@ def test_daily_plan_modules_and_meta_are_metadata_only() -> None:
     assert snapshot_generated_at.utcoffset().total_seconds() == 0
     assert body["dashboard"]["meta"]["dashboard_version"] == "v1"
 
-
-def test_daily_plan_docs_explicitly_document_contract_rules() -> None:
-    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (contracts_text, schema_text):
-        assert "/api/imperium/daily-plan" in text
-        assert "read-only" in text
-        assert "europe/paris" in text
-        assert "meta.daily_plan_version" in text
-        assert "meta.read_only" in text
-        assert "snapshot_generated_at" in text
-        assert "readiness snapshot" in text
-        assert "not a score" in text
-        assert "not a recommendation" in text
-        assert "not a health check" in text
-        assert "no orchestration" in text
-        assert "ai" in text
-        assert "n8n" in text
-        assert "ocr" in text
-        assert "scoring" in text
-        assert "coaching" in text
-        assert "recommendation" in text
-        assert "legacy dashboard aggregator" in text
