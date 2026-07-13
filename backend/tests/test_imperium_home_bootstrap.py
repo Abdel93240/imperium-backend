@@ -10,7 +10,6 @@ from app.api.v1.router import api_router
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 
 class FakeDb:
@@ -125,21 +124,3 @@ def test_home_bootstrap_read_only_no_db_write() -> None:
     assert db.flushed is False
     assert db.committed is False
 
-
-def test_home_bootstrap_docs_metadata_only_no_health_check_no_ai_n8n_no_cross_module_write() -> None:
-    docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (docs_text, schema_text):
-        assert "/api/imperium/home/bootstrap" in text
-        assert "metadata only" in text
-        assert "no business data" in text
-        assert "not a health check" in text
-        assert "status available" in text
-        assert "no ai" in text
-        assert "no n8n" in text
-        assert "no ocr" in text
-        assert "no scoring" in text
-        assert "no coaching" in text
-        assert "no recommendation" in text
-        assert "no cross-module write" in text

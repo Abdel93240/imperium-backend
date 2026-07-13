@@ -15,3 +15,4 @@ Suppressions de tests purement documentaires:
 - `test_imperium_daily_plan_contracts.py::test_daily_plan_docs_explicitly_document_contract_rules` supprime: verifiait uniquement des phrases de docs daily-plan, sans contrat de code supplementaire.
 - `test_docs_lot_2_features_vocab_arch.py::test_carrier_engagement_and_expert_orchestration_are_documented` supprime: verifiait uniquement la redaction de docs V3/Qwen/brain.
 - `test_docs_patch_43_53_invariants.py::test_doc_53_overlay_exclusions_use_observable_mission_types` supprime: verifiait uniquement des titres et phrases du doc 53.
+- `test_imperium_home_bootstrap.py::test_home_bootstrap_docs_metadata_only_no_health_check_no_ai_n8n_no_cross_module_write` supprime: verifiait uniquement des phrases de docs Home Bootstrap.
