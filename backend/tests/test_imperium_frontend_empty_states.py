@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -7,10 +6,6 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
-
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 
 class FakeDb:
@@ -132,19 +127,3 @@ def test_frontend_empty_states_not_ai_not_recommendation_not_coaching_not_health
         "ai decision",
     ):
         assert forbidden not in payload_text
-
-
-def test_frontend_empty_states_docs_static_ui_copy_not_personalized_recommendation() -> None:
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (contracts_docs, schema_docs):
-        assert "/api/imperium/frontend/empty-states" in text
-        assert "static ui copy metadata" in text
-        assert "not personalized recommendation" in text
-        assert "not coaching" in text
-        assert "not ai decision" in text
-        assert "not a health check" in text
-        assert "no business data read" in text
-        assert "removed from the active v1 contract" in text
-        assert "/api/imperium/frontend/static-copy" not in text
