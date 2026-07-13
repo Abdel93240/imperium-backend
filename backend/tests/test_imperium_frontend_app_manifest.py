@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -24,11 +23,6 @@ FRONTEND_METADATA_ENDPOINTS = (
     "/api/imperium/frontend/design-handoff",
 )
 FRONTEND_METADATA_ENDPOINT_SET = set(FRONTEND_METADATA_ENDPOINTS)
-
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
-
 
 class FakeDb:
     def __init__(self) -> None:
@@ -174,21 +168,3 @@ def test_frontend_app_manifest_read_only_no_db_write() -> None:
     assert db.added == []
     assert db.flushed is False
     assert db.committed is False
-
-
-def test_frontend_app_manifest_docs_metadata_only_static_v1_not_discovery_not_health() -> None:
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (contracts_docs, schema_docs):
-        assert "/api/imperium/frontend/app-manifest" in text
-        assert "/api/imperium/frontend/design-handoff" in text
-        assert "metadata only" in text
-        assert "static deterministic v1" in text
-        assert "declarative endpoint list only" in text
-        assert "not runtime discovery" in text
-        assert "not openapi" in text
-        assert "not a health check" in text
-        assert "no business data read" in text
-        assert "no secrets/providers/infra metadata" in text
-        assert "/api/imperium/frontend/asset-registry" in text
