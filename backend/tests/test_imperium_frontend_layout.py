@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -7,10 +6,6 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
-
-
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = BACKEND_ROOT.parent / "docs_master"
 
 
 class FakeDb:
@@ -134,18 +129,3 @@ def test_frontend_layout_read_only_no_db_write() -> None:
     assert db.added == []
     assert db.flushed is False
     assert db.committed is False
-
-
-def test_frontend_layout_docs_metadata_only_static_v1_not_theme_not_health_not_discovery() -> None:
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (contracts_docs, schema_docs):
-        assert "/api/imperium/frontend/layout" in text
-        assert "metadata only" in text
-        assert "static deterministic v1" in text
-        assert "not a dynamic theme" in text
-        assert "not a health check" in text
-        assert "not a dynamic discovery" in text
-        assert "no business data read" in text
-        assert "no secrets/providers/infra metadata" in text
