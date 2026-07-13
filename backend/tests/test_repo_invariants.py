@@ -118,6 +118,17 @@ def test_no_n8n_db_reference_in_backend_app_python() -> None:
     assert offenders == []
 
 
+def test_env_example_points_to_local_canonical_imperium_database() -> None:
+    env_example = (BACKEND_ROOT / ".env.example").read_text(encoding="utf-8")
+
+    assert "n8n-postgres" not in env_example
+    assert "personal_ai_os" not in env_example
+    assert (
+        "DATABASE_URL=postgresql+psycopg://imperium_user:"
+        "REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core"
+    ) in env_example
+
+
 def test_wr_mock_n8n_workflow_contract_is_safe_and_importable() -> None:
     workflow_path = REPO_ROOT / "ops" / "n8n" / "workflows" / "wr_interactive_start_mock.json"
     workflow_text = workflow_path.read_text(encoding="utf-8")

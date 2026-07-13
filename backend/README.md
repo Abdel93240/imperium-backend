@@ -37,6 +37,16 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+For Tower without Docker, `DATABASE_URL` must point to the local PostgreSQL
+cluster and the canonical Imperium database:
+
+```env
+DATABASE_URL=postgresql+psycopg://imperium_user:REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core
+```
+
+Do not use the Docker-only host `n8n-postgres` on Tower. Keep
+`imperium_restore_test` until `imperium_core` has been validated.
+
 Default local API:
 
 ```text
@@ -73,7 +83,7 @@ Create the one V1 user explicitly after `alembic upgrade head`:
 
 ```powershell
 cd backend
-$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_STRONG_PASSWORD@31.97.52.42:5432/imperium_core"
+$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core"
 python -m app.cli.create_user
 ```
 
@@ -95,7 +105,7 @@ python -m app.cli.create_user
 Fully non-interactive mode:
 
 ```powershell
-$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_STRONG_PASSWORD@31.97.52.42:5432/imperium_core"
+$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core"
 $env:IMPERIUM_BOOTSTRAP_EMAIL="you@example.com"
 $env:IMPERIUM_BOOTSTRAP_PASSWORD="REPLACE_WITH_PASSWORD"
 $env:IMPERIUM_BOOTSTRAP_MASTER_KEY="REPLACE_WITH_MASTER_KEY"
@@ -118,7 +128,7 @@ Use the admin reset CLI if the login password or master key must be rotated:
 
 ```powershell
 cd backend
-$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_STRONG_PASSWORD@31.97.52.42:5432/imperium_core"
+$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core"
 python -m app.cli.reset_credentials
 ```
 
@@ -133,7 +143,7 @@ Interactive mode prompts for:
 Fully non-interactive mode:
 
 ```powershell
-$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_STRONG_PASSWORD@31.97.52.42:5432/imperium_core"
+$env:DATABASE_URL="postgresql+psycopg://imperium_user:REPLACE_WITH_RUNTIME_PASSWORD@127.0.0.1:5432/imperium_core"
 $env:IMPERIUM_RESET_PASSWORD="REPLACE_WITH_NEW_PASSWORD"
 $env:IMPERIUM_RESET_MASTER_KEY="REPLACE_WITH_NEW_MASTER_KEY"
 $env:IMPERIUM_RESET_REVOKE_REFRESH_TOKENS="true"
