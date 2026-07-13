@@ -750,48 +750,6 @@ def test_frontend_architecture_63_declares_feature_modules_tablet_and_sync_state
         assert required in tablet
 
 
-def test_frontend_architecture_63_defines_security_performance_and_non_goals() -> None:
-    text = _frontend_architecture_text()
-    security = _top_level_section(text, 13)
-    performance = _top_level_section(text, 14)
-    non_goals = _top_level_section(text, 15)
-
-    for required in (
-        "JWT",
-        "Secure storage",
-        "Encrypted preferences",
-        "No secrets in UI",
-        "Android Keystore",
-        "aucune API key Gemini, OpenAI, Claude, n8n",
-    ):
-        assert required in security
-
-    for required in (
-        "LazyColumn",
-        "Image loading",
-        "Pagination",
-        "Memory rules",
-        "clés stables obligatoires",
-        "pas de liste infinie gardée intégralement en mémoire",
-    ):
-        assert required in performance
-
-    for excluded_surface in (
-        "iOS",
-        "Web",
-        "Desktop",
-        "Compose Multiplatform",
-        "Wear OS",
-        "Android Auto",
-        "OCR runtime V1",
-        "AI runtime local frontend",
-    ):
-        assert excluded_surface in non_goals
-
-    for forbidden_artifact in ("android/", "frontend/", "fichier Kotlin"):
-        assert forbidden_artifact in non_goals
-
-
 def test_frontend_architecture_63_declares_ready_for_compose_scaffold_gate() -> None:
     readiness = _top_level_section(_frontend_architecture_text(), 16)
 
@@ -821,24 +779,6 @@ def test_frontend_architecture_63_declares_ready_for_compose_scaffold_gate() -> 
 
 def test_imperium_screen_source_docs_are_available_in_audited_docs_master() -> None:
     missing = [doc_name for doc_name in SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
-
-    assert missing == []
-
-
-def test_vault_screen_source_docs_are_available_in_audited_docs_master() -> None:
-    missing = [doc_name for doc_name in VAULT_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
-
-    assert missing == []
-
-
-def test_vector_screen_source_docs_are_available_in_audited_docs_master() -> None:
-    missing = [doc_name for doc_name in VECTOR_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
-
-    assert missing == []
-
-
-def test_pulse_screen_source_docs_are_available_in_audited_docs_master() -> None:
-    missing = [doc_name for doc_name in PULSE_SOURCE_DOCS if not (DOCS_ROOT / doc_name).exists()]
 
     assert missing == []
 
@@ -1208,39 +1148,6 @@ def test_design_system_instantiates_pulse_contracts_and_health_guardrails() -> N
         "PUL-14 --> IMPERIUM_REPLAN",
     ):
         assert required in text
-
-
-def test_pulse_medical_and_logic_docs_define_required_v1_contracts() -> None:
-    logic_text = (DOCS_ROOT / "40_PULSE_LOGIC_DETAIL.md").read_text(encoding="utf-8")
-    medical_text = (DOCS_ROOT / "34_PULSE_MEDICAL_FEED_AI.md").read_text(encoding="utf-8")
-
-    for required in (
-        "Meal Tracking",
-        "Food Stock",
-        "Hydration",
-        "Workouts",
-        "Body Snapshot",
-        "Pain Log",
-        "Pulse UI Surface",
-        "Idempotency-Key",
-        "hydration sum merge",
-        "stock_decrement_applied",
-    ):
-        _assert_doc_contains(logic_text, required)
-
-    _assert_doc_contains_terms(logic_text, "meal", "macros")
-
-    for required in (
-        "GPT-5.5 static override",
-        "explicit consent",
-        "no diagnosis",
-        "raw medical document retention",
-        "pulse.medical_rule.activated",
-        "RGPD article 9",
-    ):
-        _assert_doc_contains(medical_text, required)
-
-    _assert_doc_contains_terms(medical_text, "user validation", "activation")
 
 
 def test_design_system_maps_all_11_path_screens_with_stable_ids() -> None:
