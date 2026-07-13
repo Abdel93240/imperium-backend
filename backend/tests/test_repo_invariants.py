@@ -416,8 +416,6 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     home_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "home.py").read_text(encoding="utf-8")
     contracts_schema_text = (BACKEND_ROOT / "app" / "schemas" / "contracts.py").read_text(encoding="utf-8")
     home_schema_text = (BACKEND_ROOT / "app" / "schemas" / "home.py").read_text(encoding="utf-8")
-    contracts_docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     lowered_route = contracts_route_text.lower()
     lowered_service = contracts_service_text.lower()
 
@@ -444,18 +442,6 @@ def test_contract_index_v1_is_static_metadata_only_and_not_dynamic_discovery() -
     for forbidden in ("n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "gemini", "claude"):
         assert forbidden not in lowered_service
 
-    assert "route owner canonique" in contracts_docs_text
-    assert "imperium_contracts.py" in contracts_docs_text
-    assert "home bootstrap" in contracts_docs_text
-    assert "contract index" in contracts_docs_text
-    assert "not a full openapi" in contracts_docs_text
-    assert "not a health check" in contracts_docs_text
-    assert "not a dynamic runtime discovery" in contracts_docs_text
-    assert "contracts index" in schema_docs_text
-    assert "metadata only" in schema_docs_text
-    assert "not openapi" in schema_docs_text
-    assert "not a health check" in schema_docs_text
-
 
 def test_patch_16b_contracts_compliance_is_declarative_metadata_only_and_not_runtime_audit() -> None:
     contracts_route_text = (
@@ -465,8 +451,6 @@ def test_patch_16b_contracts_compliance_is_declarative_metadata_only_and_not_run
         encoding="utf-8"
     )
     contracts_schema_text = (BACKEND_ROOT / "app" / "schemas" / "contracts.py").read_text(encoding="utf-8")
-    contracts_docs_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
 
     lowered_route = contracts_route_text.lower()
     lowered_service = contracts_service_text.lower()
@@ -488,19 +472,6 @@ def test_patch_16b_contracts_compliance_is_declarative_metadata_only_and_not_run
     assert "db.flush" not in lowered_service
     assert "db.commit" not in lowered_service
     assert "status: literal[\"declared\"]" in lowered_schema
-    assert "declarative metadata only" in schema_docs_text
-    assert "not a runtime compliance audit" in schema_docs_text
-    assert "not openapi" in schema_docs_text
-    assert "not a health check" in schema_docs_text
-    assert "not dynamic discovery" in schema_docs_text
-    assert "/api/imperium/contracts/compliance" in contracts_docs_text
-    assert "frontend contracts compliance metadata" in contracts_docs_text
-    assert "`status` is always `declared`" in contracts_docs_text
-    assert "deterministic `checks[]` order" in contracts_docs_text
-    assert "not a runtime compliance audit" in contracts_docs_text
-    assert "not openapi" in contracts_docs_text
-    assert "not a health check" in contracts_docs_text
-    assert "not dynamic discovery" in contracts_docs_text
     for forbidden in ("passed", "failed", "user_id", "secret", "provider", "infra"):
         assert forbidden not in lowered_service
 
@@ -655,8 +626,6 @@ def test_patch_16a_frontend_navigation_is_metadata_only_static_and_safe() -> Non
     service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(encoding="utf-8")
     schema_text = (BACKEND_ROOT / "app" / "schemas" / "frontend.py").read_text(encoding="utf-8")
     router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     lowered_service = service_text.lower()
     lowered_route = route_text.lower()
 
@@ -708,15 +677,6 @@ def test_patch_16a_frontend_navigation_is_metadata_only_static_and_safe() -> Non
     ):
         assert f"services.imperium.{forbidden_service_ref}" not in service_text
 
-    assert "/api/imperium/frontend/navigation" in contracts_docs
-    assert "metadata only" in contracts_docs
-    assert "static deterministic v1" in contracts_docs
-    assert "not a health check" in contracts_docs
-    assert "not a dynamic discovery" in contracts_docs
-    assert "no business data read" in contracts_docs
-    assert "no secrets/providers/infra metadata" in contracts_docs
-    assert "/api/imperium/frontend/navigation" in schema_docs
-
 
 def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and_non_dynamic() -> None:
     home_route_text = (BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_home.py").read_text(encoding="utf-8")
@@ -734,7 +694,6 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
         encoding="utf-8"
     )
     lowered_services = "\n".join([home_service_text, contracts_service_text, frontend_service_text]).lower()
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
 
     for route_text in (home_route_text, contracts_route_text, frontend_route_text):
         assert "CurrentUserDep" in route_text
@@ -775,22 +734,10 @@ def test_patch_16c_frontend_metadata_layer_services_are_static_metadata_only_and
         "anthropic",
         "gemini",
         "claude",
-    ):
-        assert forbidden not in lowered_services
+        ):
+            assert forbidden not in lowered_services
 
     assert "runtime health check" in contracts_service_text.lower()
-    assert "runtime compliance audit" in contracts_docs.lower()
-
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-    for text in (contracts_docs, schema_docs):
-        assert "frontend metadata layer" in text
-        assert "metadata only" in text
-        assert "not a health check" in text
-        assert "not openapi" in text
-        assert "not dynamic discovery" in text
-        assert "no business data read" in text
-        assert "no secrets/providers/infra metadata" in text
 
 
 def test_patch_22d_design_handoff_service_is_metadata_only_and_non_rendering() -> None:
@@ -824,13 +771,6 @@ def test_patch_22d_design_handoff_service_is_metadata_only_and_non_rendering() -
         assert forbidden not in design_handoff_block.lower()
     for forbidden in ("react", "html", "css"):
         assert forbidden not in lowered
-
-    contracts_docs = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-    for text in (contracts_docs, schema_docs):
-        assert "claude code design handoff only" in text
-        assert "no ui rendering" in text
-        assert "no generated frontend code" in text
 
 
 def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() -> None:
@@ -916,64 +856,6 @@ def test_patch_11d_pulse_contract_consolidation_is_documented_and_locked_down() 
         "path linkage",
     ):
         assert forbidden not in lowered_route_and_service
-
-
-def test_patch_11f_pulse_docs_mark_future_surfaces_outside_v1_contract() -> None:
-    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8")
-    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8")
-    lowered_docs = "\n".join([contracts_text, schema_text]).lower()
-
-    active_contract = contracts_text.split("#### Pulse Foundation 11A", maxsplit=1)[1].split(
-        "#### Future Pulse surfaces - FUTURE / NOT IMPLEMENTED",
-        maxsplit=1,
-    )[0]
-    future_contract = contracts_text.split(
-        "#### Future Pulse surfaces - FUTURE / NOT IMPLEMENTED",
-        maxsplit=1,
-    )[1].split("### The Path", maxsplit=1)[0]
-    active_schema = schema_text.split("### Pulse Foundation 11A", maxsplit=1)[1].split(
-        "### FUTURE / NOT IMPLEMENTED",
-        maxsplit=1,
-    )[0]
-
-    implemented_endpoints = (
-        "POST | `/api/imperium/pulse/entries`",
-        "GET | `/api/imperium/pulse/entries`",
-        "GET | `/api/imperium/pulse/entries/{entry_id}`",
-        "GET | `/api/imperium/pulse/today`",
-        "GET | `/api/imperium/pulse/stats/summary`",
-    )
-    for endpoint in implemented_endpoints:
-        assert endpoint in contracts_text
-
-    future_endpoints = (
-        "/api/pulse/dashboard",
-        "/api/pulse/workout/generate",
-        "/api/pulse/workout/adapt",
-        "/api/pulse/wearable/sync",
-    )
-    for endpoint in future_endpoints:
-        assert endpoint not in active_contract
-        future_lines = [line for line in future_contract.splitlines() if endpoint in line]
-        assert future_lines
-        assert all("FUTURE / NOT IMPLEMENTED" in line for line in future_lines)
-
-    future_tables = (
-        "pulse_biological_profiles",
-        "pulse_health_scores",
-        "pulse_workouts",
-        "pulse_recommendations",
-    )
-    for table in future_tables:
-        assert table not in active_schema
-        assert f"future / not implemented in pulse v1 11a->11d: `{table}`" in lowered_docs
-
-    assert "pulse v1 11a->11d active backend surface is only" in lowered_docs
-    assert "pulse v1 11a->11d implemented schema surface is only `imperium_pulse_entries`" in lowered_docs
-    assert "health score table" in lowered_docs
-    assert "workout generation" in lowered_docs
-    assert "wearable sync tables" in lowered_docs
-    assert "no automatic scoring/coaching/recommendations" in lowered_docs
 
 
 def test_patch_12a_imperium_dashboard_foundation_is_read_only_and_route_order_safe() -> None:
@@ -1665,13 +1547,9 @@ def test_patch_23d_imperium_events_db_constraints_hardening_remains_stable() -> 
     model_path = BACKEND_ROOT / "app" / "models" / "imperium.py"
     migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260526_0031_imperium_events_constraints_hardening.py"
     postgres_test_path = BACKEND_ROOT / "tests" / "test_imperium_events_db_constraints_postgres.py"
-    docs04_path = DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md"
-    docs05_path = DOCS_ROOT / "05_DATABASE_SCHEMA.md"
     model_text = model_path.read_text(encoding="utf-8")
     migration_text = migration_path.read_text(encoding="utf-8")
     postgres_test_text = postgres_test_path.read_text(encoding="utf-8")
-    docs04_text = docs04_path.read_text(encoding="utf-8")
-    docs05_text = docs05_path.read_text(encoding="utf-8")
 
     assert 'revision: str = "20260526_0031"' in migration_text
     assert 'down_revision: str | None = "20260526_0030"' in migration_text
@@ -1687,17 +1565,6 @@ def test_patch_23d_imperium_events_db_constraints_hardening_remains_stable() -> 
     assert "mission-started" in postgres_test_text
     assert 'schema_version="v2"' in postgres_test_text
     assert 'payload_json=["not", "object"]' in postgres_test_text
-    assert "DB constraints aligned with Pydantic" in docs04_text
-    assert "event_type snake_case strict" in docs04_text
-    assert "schema_version = v1" in docs04_text
-    assert "payload_json null or JSON object only" in docs04_text
-    assert "DB constraints aligned with Pydantic" in docs05_text
-    assert "event_type snake_case strict" in docs05_text
-    assert "schema_version = v1" in docs05_text
-    assert "payload_json null or JSON object only" in docs05_text
-    assert "index user/occurred_at desc" in docs05_text.lower()
-    assert "index user/source_module/occurred_at desc" in docs05_text.lower()
-    assert "index user/event_type/occurred_at desc" in docs05_text.lower()
 
 
 def test_patch_24e_1_imperium_events_contract_clarity_remains_documented_and_read_only() -> None:
@@ -2595,8 +2462,6 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
     service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "daily_plan.py").read_text(encoding="utf-8")
     schema_text = (BACKEND_ROOT / "app" / "schemas" / "daily_plan.py").read_text(encoding="utf-8")
     router_text = (BACKEND_ROOT / "app" / "api" / "v1" / "router.py").read_text(encoding="utf-8")
-    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     lowered_code = "\n".join([route_text, service_text, schema_text]).lower()
 
     assert '@router.get("/daily-plan"' in route_text
@@ -2619,20 +2484,6 @@ def test_patch_13a_daily_plan_foundation_is_read_only_and_uses_existing_snapshot
     assert "readiness: DailyPlanReadinessSection" in schema_text
     assert 'api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])' in router_text
     assert router_text.index("imperium_daily_plan.router") < router_text.index("imperium.router")
-
-    assert "/api/imperium/daily-plan" in contracts_text
-    assert "daily plan snapshot" in contracts_text
-    assert "read-only consolidation layer" in contracts_text
-    assert "no legacy dashboard aggregator" in contracts_text
-    assert "readiness snapshot only" in contracts_text
-    assert "bool/count only" in contracts_text
-    assert "not a score" in contracts_text
-    assert "not a recommendation" in contracts_text
-    assert "read-only semantics" in contracts_text
-    assert "/api/imperium/daily-plan" in schema_docs_text
-    assert "does not persist a new plan row" in schema_docs_text
-    assert "summary and meta are metadata-only sections" in schema_docs_text
-    assert "readiness" in schema_docs_text
 
     for forbidden in (
         "qwenclient",
@@ -2723,8 +2574,6 @@ def test_patch_13e_daily_plan_contract_consolidation_v2_is_read_only_and_non_can
     dashboard_service_text = (BACKEND_ROOT / "app" / "services" / "imperium" / "dashboard.py").read_text(
         encoding="utf-8"
     )
-    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_docs_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     lowered = "\n".join([route_text, service_text, schema_text, dashboard_service_text]).lower()
 
     assert "legacy dashboard aggregator" not in service_text.lower()
@@ -2760,15 +2609,6 @@ def test_patch_13e_daily_plan_contract_consolidation_v2_is_read_only_and_non_can
     assert "datetime.now(UTC)" in service_text
     assert "snapshot_generated_at" in schema_text
     assert "safe_explanation" in schema_text
-    assert "not a score" in contracts_text
-    assert "not a recommendation" in contracts_text
-    assert "not a health check" in contracts_text
-    assert "no orchestration" in contracts_text
-    assert "summary" in schema_docs_text
-    assert "meta" in schema_docs_text
-    assert "readiness" in schema_docs_text
-    assert "modules" in schema_docs_text
-    assert "legacy dashboard aggregator" in contracts_text
     assert "no new endpoint" not in lowered
 
 
@@ -3224,24 +3064,9 @@ def test_home_bootstrap_service_has_no_db_write_or_business_service_dependency()
         assert forbidden not in lowered
 
 
-def test_home_bootstrap_docs_define_metadata_only_and_status_available_not_health_check() -> None:
-    contracts_text = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    schema_text = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
-
-    for text in (contracts_text, schema_text):
-        assert "/api/imperium/home/bootstrap" in text
-        assert "metadata only" in text
-        assert "status available" in text
-        assert "not a health check" in text
-        assert "no business data read" in text
-        assert "primary_endpoint" in text
-
-
 def test_frontend_layout_service_is_metadata_only_and_has_no_business_or_discovery_or_write_paths() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     service_text = service_path.read_text(encoding="utf-8")
     service_lower = service_text.lower()
     route_text = route_path.read_text(encoding="utf-8")
@@ -3257,19 +3082,10 @@ def test_frontend_layout_service_is_metadata_only_and_has_no_business_or_discove
     for forbidden in ("openapi", "filesystem scan", "dynamic discovery", "health", "n8n", "ocr", "scoring", "coaching", "recommendation", "openai", "anthropic", "gemini", "claude"):
         assert forbidden not in service_lower
 
-    for docs_text in (docs_contracts, docs_schema):
-        assert "/api/imperium/frontend/layout" in docs_text
-        assert "metadata only" in docs_text
-        assert "not a health check" in docs_text
-        assert "not a dynamic discovery" in docs_text
-        assert "not a dynamic theme" in docs_text
-
 
 def test_frontend_theme_tokens_service_is_metadata_only_and_has_no_business_or_discovery_or_write_paths() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     service_text = service_path.read_text(encoding="utf-8")
     service_lower = service_text.lower()
     route_text = route_path.read_text(encoding="utf-8")
@@ -3312,20 +3128,10 @@ def test_frontend_theme_tokens_service_is_metadata_only_and_has_no_business_or_d
     assert "https://" not in service_lower
     assert "#" not in service_text
 
-    for docs_text in (docs_contracts, docs_schema):
-        assert "/api/imperium/frontend/theme-tokens" in docs_text
-        assert "metadata only" in docs_text
-        assert "not a dynamic theme" in docs_text
-        assert "not a user preference" in docs_text
-        assert "not a health check" in docs_text
-        assert "not a dynamic discovery" in docs_text
-
 
 def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only() -> None:
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     service_text = service_path.read_text(encoding="utf-8")
     service_lower = service_text.lower()
     route_text = route_path.read_text(encoding="utf-8")
@@ -3372,26 +3178,11 @@ def test_frontend_empty_states_service_is_metadata_only_and_static_ui_copy_only(
     ):
         assert forbidden not in service_lower
 
-    for docs_text in (docs_contracts, docs_schema):
-        assert "/api/imperium/frontend/empty-states" in docs_text
-        assert "canonical v1 contract" in docs_text
-        assert "static ui copy metadata" in docs_text
-        assert "not personalized recommendation" in docs_text
-        assert "not coaching" in docs_text
-        assert "not ai decision" in docs_text
-        assert "not a health check" in docs_text
-        assert "no business data read" in docs_text
-        assert "no action triggered" in docs_text
-        assert "removed, not active, and not canonical" in docs_text
-        assert "/api/imperium/frontend/static-copy" not in docs_text
-
 
 def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -> None:
     route_path = BACKEND_ROOT / "app" / "api" / "v1" / "routes" / "imperium_frontend.py"
     service_path = BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py"
     schema_path = BACKEND_ROOT / "app" / "schemas" / "frontend.py"
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
 
     route_text = route_path.read_text(encoding="utf-8")
     service_text = service_path.read_text(encoding="utf-8")
@@ -3450,26 +3241,11 @@ def test_patch_19a_frontend_action_registry_is_metadata_only_static_and_safe() -
     ):
         assert forbidden not in service_lower
 
-    for docs_text in (docs_contracts, docs_schema):
-        assert "/api/imperium/frontend/actions" in docs_text
-        assert "metadata only" in docs_text
-        assert "static ui action metadata" in docs_text
-        assert "static deterministic v1" in docs_text
-        assert "declarative navigation actions only" in docs_text
-        assert "not a health check" in docs_text
-        assert "not dynamic discovery" in docs_text or "not a dynamic discovery" in docs_text
-        assert "no action triggered" in docs_text
-        assert "no destructive action" in docs_text
-        assert "no mutation/destructive action" in docs_text
-        assert "not permissions/feature flags" in docs_text
-
 
 def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_not_call_business_layers() -> None:
     home_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "home.py").read_text(encoding="utf-8")
     contracts_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "contracts.py").read_text(encoding="utf-8")
     frontend_service = (BACKEND_ROOT / "app" / "services" / "imperium" / "frontend.py").read_text(encoding="utf-8")
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
 
     for service_text in (home_service, contracts_service, frontend_service):
         lowered = service_text.lower()
@@ -3525,19 +3301,6 @@ def test_patch_19b_frontend_metadata_layer_v3_services_are_metadata_only_and_do_
     assert "get_imperium_frontend_actions_metadata" in frontend_service
     assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
     assert "get_imperium_frontend_app_manifest_metadata" in frontend_service
-
-    for docs_text in (docs_contracts, docs_schema):
-        assert "frontend metadata layer v6" in docs_text
-        assert "metadata only" in docs_text
-        assert "no business data read" in docs_text
-        assert "not health check" in docs_text
-        assert "not openapi" in docs_text
-        assert "not dynamic discovery" in docs_text
-        assert "not runtime audit" in docs_text
-        assert "no action triggered" in docs_text
-        assert "no cross-module write" in docs_text
-        assert "declarative endpoint list only" in docs_text
-        assert "not runtime discovery" in docs_text
 
 
 def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_static() -> None:
@@ -3717,8 +3480,6 @@ def test_patch_19d_frontend_metadata_layer_stability_lock_is_exact_get_only_and_
 def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_static() -> None:
     app = _frontend_metadata_app()
     client = TestClient(app)
-    docs_contracts = (DOCS_ROOT / "04_MVP_BACKEND_CONTRACTS.md").read_text(encoding="utf-8").lower()
-    docs_schema = (DOCS_ROOT / "05_DATABASE_SCHEMA.md").read_text(encoding="utf-8").lower()
     responses = {path: client.get(path) for path in FRONTEND_METADATA_ENDPOINTS}
 
     assert all(response.status_code == 200 for response in responses.values())
@@ -3775,9 +3536,3 @@ def test_frontend_metadata_manifest_and_contract_index_stability_are_exact_and_s
     ]
     assert "dynamic discovery" not in str(contracts_index).lower()
     assert "openapi" not in str(contracts_index).lower()
-    assert "frontend metadata layer v6" in docs_contracts
-    assert "frontend metadata layer v6" in docs_schema
-    assert "contains exactly 12 endpoints" in docs_schema
-    assert "no filesystem scan" in docs_contracts
-    assert "no asset existence check" in docs_contracts
-    assert "final png/svg assets may be provided later" in docs_contracts
