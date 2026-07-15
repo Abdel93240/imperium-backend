@@ -850,7 +850,7 @@ class ImperiumMemoryCandidateDecision(UUIDPrimaryKeyMixin, Base):
             "source IN ('weekly_review')",
             name="imperium_memory_candidate_decisions_source_check",
         ),
-        Index("imperium_memory_candidate_decisions_user_created_idx", "user_id", "created_at"),
+        Index("imperium_memory_candidate_decisions_user_created_idx", "user_id", text("created_at DESC")),
         Index("imperium_memory_candidate_decisions_user_decision_idx", "user_id", "decision"),
         Index("imperium_memory_candidate_decisions_report_idx", "report_id"),
         Index("imperium_memory_candidate_decisions_session_idx", "session_id"),

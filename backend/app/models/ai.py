@@ -7,16 +7,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
-from sqlalchemy.types import UserDefinedType
 
+from app.db.postgres_types import Vector1024
 from app.db.base import Base, UUIDPrimaryKeyMixin
-
-
-class Vector1024(UserDefinedType):
-    cache_ok = True
-
-    def get_col_spec(self, **_kw) -> str:
-        return "vector(1024)"
 
 
 class AITask(UUIDPrimaryKeyMixin, Base):

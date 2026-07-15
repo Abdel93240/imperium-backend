@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.postgres_types import register_postgresql_vector_type
 from app.models import ai, auth, event, idempotency, imperium, vault  # noqa: F401
 
 config = context.config
@@ -14,6 +15,8 @@ if config.config_file_name is not None:
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.database_url)
+
+register_postgresql_vector_type()
 
 target_metadata = Base.metadata
 
