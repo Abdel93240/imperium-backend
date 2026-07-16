@@ -1,0 +1,44 @@
+# Serving d'embeddings Tower (P40) — qwen3-embedding:8b, Q8, llama.cpp server.
+# Exposé UNIQUEMENT sur l'IP Tailscale de Tower (aucun port public).
+# Smoke J+2 : ops/gpu/EMBEDDINGS_SMOKE_CHECKLIST.md — tant qu'elle n'est pas verte,
+# embeddings_enabled reste False (action utilisateur pour la lever, D5).
+#
+# Installation :
+#   sudo cp ops/systemd/imperium-embeddings.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now imperium-embeddings
+#
+# Choix llama.cpp plutôt que vLLM : Pascal (CC 6.1) n'est pas supporté par les
+# roues CUDA récentes de vLLM ; llama.cpp compile nativement pour sm_61 et son
+# serveur expose /embedding et /health. Changer de stack = éditer ce fichier.
+
+[Unit]
+Description=Imperium embeddings serving (qwen3-embedding:8b Q8 on P40, llama.cpp)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=abd
+Group=abd
+EnvironmentFile=-/etc/imperium/embeddings.env
+# /etc/imperium/embeddings.env doit définir :
+#   EMBEDDINGS_BIND_ADDR   = IP Tailscale de Tower (jamais 0.0.0.0)
+#   EMBEDDINGS_PORT        = 8090
+#   EMBEDDINGS_MODEL_GGUF  = /opt/models/qwen3-embedding-8b-q8_0.gguf
+#   LLAMA_SERVER_BIN       = /opt/llama.cpp/build/bin/llama-server
+ExecStartPre=/opt/imperium-backend/ops/gpu/embeddings_start_check.sh
+ExecStart=/bin/sh -c 'exec "$LLAMA_SERVER_BIN" \
+  --model "$EMBEDDINGS_MODEL_GGUF" \
+  --embedding \
+  --host "$EMBEDDINGS_BIND_ADDR" \
+  --port "$EMBEDDINGS_PORT" \
+  --ctx-size 8192 \
+  --batch-size 512 \
+  --n-gpu-layers 999'
+Restart=on-failure
+RestartSec=5
+# Le backend traite l'indisponibilité en skip loggé (GpuServiceUnreachable) :
+# un crash ici ne doit jamais casser un job.
+
+[Install]
+WantedBy=multi-user.target
