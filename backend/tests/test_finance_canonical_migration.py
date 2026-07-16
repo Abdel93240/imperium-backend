@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -102,6 +103,16 @@ def test_legacy_vault_transaction_routes_are_removed_from_api_router() -> None:
     assert ("/vault/pressure", ("GET",)) in routes
     assert ("/vault/upcoming-expenses", ("POST",)) in routes
     assert ("/vault/weekly-summaries", ("GET",)) in routes
+
+
+def test_legacy_vault_transaction_service_and_schemas_are_removed() -> None:
+    backend_root = Path(__file__).resolve().parents[1]
+    assert not (backend_root / "app" / "services" / "vault" / "transactions.py").exists()
+
+    schema_text = (backend_root / "app" / "schemas" / "vault.py").read_text(encoding="utf-8")
+    assert "CreateVaultTransactionRequest" not in schema_text
+    assert "VaultTransactionWriteResponse" not in schema_text
+    assert "VaultWeeklySummaryResponse" not in schema_text
 
 
 def test_dashboard_vault_week_uses_canonical_cents_and_exposes_reversals() -> None:
