@@ -1004,7 +1004,7 @@ Mapping écran Vault ↔ composants foundation ↔ assets ↔ états ↔ navigat
 | Sadaqa donation | PAT-03 reste l'écran unique de donation ; Vault reçoit ensuite une transaction personnelle confirmée. |
 | Wallet refresh / Upcoming | VAU-10 et VAU-11 sont routes dédiées, accessibles depuis VAU-12 et depuis les banners VAU-01. |
 | Transaction removal | transaction removal uses reversal : VAU-08 n'exécute pas de hard delete ; il appelle l'écriture inverse. |
-| Weekly profit | `vault.weekly_profit.computed` est surfacé par une banner/card VAU-01 et consommé par Path pour la cible sadaqa. |
+| Weekly profit | `finance.weekly_summary.created` est surfacé par une banner/card VAU-01 et consommé par Path via `weekly_finance_summaries` pour la cible sadaqa. |
 
 Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (`VAU-09`), Settings (`VAU-12`). Les autres écrans sont des overlays, routes dédiées ou deep links.
 
@@ -1017,7 +1017,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Widgets :** Pressure Gauge, wallet stack bar, week/month comparator, upcoming countdown rows.
 - **Assets :** Vault emblem 48dp, Material Symbols `payments`, `receipt_long`, `warning`, `account_balance`; no hero.
 - **Etats :** Loading=skeleton wallet/balance/pressure cards ; Empty=first run with wallet snapshot CTA and transaction CTA ; Error=summary/pressure fetch failure with retry ; Offline=cached values banner with timestamp ; Syncing=top sync line for pending transaction ; Synced=snackbar only after backend confirmation ; Conflict=server ledger conflict banner opens diff dialog.
-- **Backend deps :** `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly`, `TBD GET /api/vault/pressure/current`, event `vault.weekly_profit.computed`.
+- **Backend deps :** `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly`, `GET /api/vault/pressure`, event `finance.weekly_summary.created`.
 - **Navigation :** entry from app nav `/vault` ; exits to VAU-02, VAU-03, VAU-04, VAU-06, VAU-07, VAU-10, VAU-11, VAU-12.
 - **Tab S10 Ultra :** 3 columns: Sidebar 240dp, dashboard max 1280dp, right panel 320dp for upcoming + pressure details.
 

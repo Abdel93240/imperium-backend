@@ -101,12 +101,10 @@ Le domaine `finance` remplace les noms d'application de type `vault.*`.
 
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
 |---|---|---|---|---|
-| `finance.transaction.created` | Actuel : `vault.transaction.created`. Existe, à renommer. | `transaction_id` + champs de `CreateVaultTransactionRequest` : `occurred_at`, `local_date`, `timezone`, `transaction_type`, `wallet`, `category`, `label`, `amount`, `currency`, `notes`. | V1 | Domaine `vault` interdit en cible car c'est un nom d'app. Privacy actuelle : `high`. |
-| `finance.transaction.reversed` | Aucun event canonique observé aujourd'hui. À créer. | Non détaillé dans les sources. | V1 | Le ledger financier reste factuel. La décision financière ne vient pas de Vault seul. |
-
-La pression financière n'est pas un event. Elle reste une jauge visuelle
-informative. Le profit hebdomadaire n'est pas un event non plus ; les faits
-liés aux objectifs de profit vivent côté `planning`.
+| `finance.transaction.created` | Existe ; émis par le service canonique `/api/imperium/vault/transactions`. | `transaction_id`, `transaction_type`, `amount_cents`, `currency`, `wallet`, `occurred_at`, `local_date`, `timezone`, `category`, `source`, `external_ref`, `is_reversal`, `reversal_of_transaction_id`. | V1 | Domaine `finance` canonique. Privacy `high`. |
+| `finance.transaction.reversed` | Existe ; émis par le service canonique de reversal. | Payload transaction canonique + `original_transaction_id`, `reversal_reason`. | V1 | Le ledger financier reste factuel. La décision financière ne vient pas de Vault seul. |
+| `finance.pressure.updated` | Existe ; émis après écriture d'un snapshot déterministe. | `snapshot_id`, `score`, `label`. | V1 | Le score reste calculé/signal déterministe `vault.pressure`; l'event journalise qu'un nouveau snapshot existe. |
+| `finance.weekly_summary.created` | Existe ; émis par le job/calcul weekly profit. | `week_start`, `weekly_business_profit`. | V1 | The Path lit `weekly_finance_summaries` comme source de valeur ; l'event sert au réveil/chaînage. |
 
 ### WORSHIP — NON-RETENU (DV-11, 2026-07-15)
 
@@ -267,13 +265,15 @@ technique sain, append-only, mais hors catalogue `events`.
 
 ## Ce qui n'est pas un event
 
-La pression financière n'est pas un event. C'est un signal déterministe
-potentiellement trompeur, par exemple quand un prêt à un ami fausse le calcul.
-Elle doit rester visuelle et informative ; elle ne déclenche pas de replan
-automatique.
+La valeur de pression financière n'est pas inventée par un event : c'est un
+signal déterministe (`vault.pressure`) issu de `pressure_snapshots`. L'event
+`finance.pressure.updated` existe seulement pour journaliser la création d'un
+nouveau snapshot et réveiller les consommateurs autorisés ; il ne doit pas
+déclencher de replan automatique à lui seul.
 
-Le profit hebdomadaire n'est pas un event. C'est un agrégat calculé à la demande.
-Les faits notables autour du profit sont les objectifs fixés, atteints ou ratés :
+Le profit hebdomadaire reste un agrégat stocké dans `weekly_finance_summaries`.
+L'event `finance.weekly_summary.created` existe pour signaler qu'un résumé a été
+recalculé ; les faits d'objectif restent côté planning :
 `planning.profit_target.set`, `planning.profit_target.reached`,
 `planning.profit_target.missed`.
 

@@ -519,7 +519,7 @@ Event names:
   - pulse.workout.skipped      → log skip reason + replan if needed
   - pulse.medical_rule.activated → trigger replan to apply rule
   
-  - vault.weekly_profit.computed → financial context update
+  - finance.weekly_summary.created → financial context update
   - vault.pressure.spike        → trigger replan if critical
   
   - vector.session.started      → daily VTC tracking begins

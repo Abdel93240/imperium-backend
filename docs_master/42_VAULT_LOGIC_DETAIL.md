@@ -344,7 +344,7 @@ Triggered every Monday at 00:30 Europe/Paris (n8n temporal trigger):
   business_profit_N = business_income_N - business_expenses_N
 
 4. The backend writes weekly_finance_summaries when that table exists.
-5. The backend emits vault.weekly_profit.computed.
+5. The backend emits `finance.weekly_summary.created`.
 6. Path/Imperium can use the event to update the sadaqa target.
 
 n8n never writes directly to Postgres.
