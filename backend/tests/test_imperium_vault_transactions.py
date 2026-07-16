@@ -8,6 +8,7 @@ from sqlalchemy import CheckConstraint
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.routes import imperium_vault
+from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.vault import ImperiumVaultTransactionCreate
@@ -153,6 +154,12 @@ def test_post_creates_income_transaction() -> None:
     assert transaction.wallet == "cash"
     assert transaction.local_date.isoformat() == "2026-05-25"
     assert transaction.timezone == "UTC"
+    event = next(item for item in db.added if isinstance(item, Event))
+    assert event.event_type == "finance.transaction.created"
+    assert event.source_app == "vault"
+    assert event.privacy_level == "high"
+    assert event.payload["transaction_id"] == str(transaction.id)
+    assert event.payload["amount_cents"] == 123400
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
     assert db.committed is True
 

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus
+from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.vault import (
@@ -19,6 +19,7 @@ from app.schemas.vault import (
     ImperiumVaultTransactionReverseRequest,
     ImperiumVaultTransactionReverseResponse,
 )
+from app.services.events.emitter import build_event
 
 VAULT_TRANSACTIONS_SAFE_EXPLANATION = "Vault transactions for current user."
 
@@ -66,6 +67,18 @@ def create_vault_transaction(
     )
     db.add(transaction)
     db.flush()
+
+    db.add(
+        build_event(
+            db,
+            user_id=current_user.id,
+            event_type="finance.transaction.created",
+            payload=_transaction_event_payload(transaction),
+            idempotency_key=f"finance.transaction.created.{transaction.id}",
+            source_app=SourceApp.vault,
+            privacy_level=PrivacyLevel.high,
+        )
+    )
 
     response = ImperiumVaultTransactionRead.model_validate(transaction)
     db.add(
@@ -145,6 +158,22 @@ def reverse_vault_transaction(
     )
     db.add(reversal)
     db.flush()
+
+    db.add(
+        build_event(
+            db,
+            user_id=current_user.id,
+            event_type="finance.transaction.reversed",
+            payload={
+                **_transaction_event_payload(reversal),
+                "original_transaction_id": str(original.id),
+                "reversal_reason": payload.reason,
+            },
+            idempotency_key=f"finance.transaction.reversed.{reversal.id}",
+            source_app=SourceApp.vault,
+            privacy_level=PrivacyLevel.high,
+        )
+    )
 
     response = ImperiumVaultTransactionReverseResponse(
         transaction=ImperiumVaultTransactionRead.model_validate(reversal),
@@ -309,6 +338,28 @@ def _local_date_in_timezone(value: datetime, timezone_name: str) -> date:
         return value.astimezone(ZoneInfo(timezone_name)).date()
     except ZoneInfoNotFoundError:
         return value.astimezone(UTC).date()
+
+
+def _transaction_event_payload(transaction: ImperiumVaultTransaction) -> dict:
+    return {
+        "transaction_id": str(transaction.id),
+        "transaction_type": transaction.transaction_type,
+        "amount_cents": transaction.amount_cents,
+        "currency": transaction.currency,
+        "wallet": transaction.wallet,
+        "occurred_at": transaction.occurred_at.isoformat(),
+        "local_date": transaction.local_date.isoformat(),
+        "timezone": transaction.timezone,
+        "category": transaction.category,
+        "source": transaction.source,
+        "external_ref": transaction.external_ref,
+        "is_reversal": transaction.is_reversal,
+        "reversal_of_transaction_id": (
+            str(transaction.reversal_of_transaction_id)
+            if transaction.reversal_of_transaction_id is not None
+            else None
+        ),
+    }
 
 
 def _hash_request(action: str, payload: dict) -> str:

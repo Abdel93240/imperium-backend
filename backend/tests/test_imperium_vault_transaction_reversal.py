@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.routes import imperium_vault
+from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.vault import ImperiumVaultTransactionReverseRequest
@@ -151,6 +152,13 @@ def test_reverse_income_creates_expense_same_amount_and_currency() -> None:
     assert reversal.timezone == "UTC"
     assert reversal.reversal_of_transaction_id == original.id
     assert reversal.reversal_reason == "duplicate revenue"
+    event = next(item for item in db.added if isinstance(item, Event))
+    assert event.event_type == "finance.transaction.reversed"
+    assert event.source_app == "vault"
+    assert event.privacy_level == "high"
+    assert event.payload["transaction_id"] == str(reversal.id)
+    assert event.payload["original_transaction_id"] == str(original.id)
+    assert event.payload["reversal_reason"] == "duplicate revenue"
     assert body["transaction"]["transaction_type"] == "expense"
     assert body["transaction"]["is_reversal"] is True
     assert body["transaction"]["reversal_of_transaction_id"] == str(original.id)
