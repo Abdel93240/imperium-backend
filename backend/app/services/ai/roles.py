@@ -52,7 +52,7 @@ def resolve_model_id(role_code: str, db: Session | None = None) -> str:
 
             with SessionLocal() as session:
                 return resolve_role(session, role_code).model_id
-        except Exception:  # pragma: no cover - DB unavailable, fall back to seed mirror
+        except Exception:  # nosec B110 # pragma: no cover - DB unavailable, fall back to seed mirror
             pass
     fallback = _FALLBACK_MODEL_IDS.get(role_code)
     if fallback is None:

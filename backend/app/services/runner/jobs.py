@@ -7,7 +7,7 @@
 """
 
 import logging
-import subprocess
+import subprocess  # nosec B404 - only runs the fixed repo-owned backup script
 from pathlib import Path
 
 from sqlalchemy import func, select
@@ -57,7 +57,7 @@ def events_heartbeat(ctx: RunContext, window: Window) -> None:
 def backup_nightly(ctx: RunContext, window: Window) -> None:
     if not BACKUP_SCRIPT.exists():
         raise FileNotFoundError(f"Backup script missing: {BACKUP_SCRIPT}")
-    completed = subprocess.run(  # noqa: S603 - fixed repo-owned script path
+    completed = subprocess.run(  # noqa: S603 # nosec B603 - fixed repo-owned script path
         [str(BACKUP_SCRIPT)],
         capture_output=True,
         text=True,

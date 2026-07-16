@@ -27,6 +27,34 @@ logger = logging.getLogger(__name__)
 
 EXPECTED_DIMENSIONS = 1024
 
+# Full literal statements per mode — never assembled from fragments, so no
+# dynamic SQL construction exists in this module (Bandit B608).
+_SEARCH_MEMORIES_SQL = {
+    "current_truth": """
+        SELECT id AS memory_id, content, source_table, source_id, confidence,
+               privacy_level::text AS privacy_level,
+               (embedding <=> CAST(:query_vec AS vector)) AS distance,
+               (1 - (embedding <=> CAST(:query_vec AS vector)))
+                   * COALESCE(confidence, 1.0) AS final_score
+        FROM ai_memories
+        WHERE is_active = true
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY final_score DESC
+        LIMIT :k
+    """,
+    "historical": """
+        SELECT id AS memory_id, content, source_table, source_id, confidence,
+               privacy_level::text AS privacy_level,
+               (embedding <=> CAST(:query_vec AS vector)) AS distance,
+               (1 - (embedding <=> CAST(:query_vec AS vector))) AS final_score
+        FROM ai_memories
+        WHERE is_active = true
+          AND (expires_at IS NULL OR expires_at > now())
+        ORDER BY final_score DESC
+        LIMIT :k
+    """,
+}
+
 
 class GpuServiceUnreachable(RuntimeError):
     """The Tower GPU service is down/unreachable — callers skip, never fail."""
@@ -146,25 +174,8 @@ def search_memories(
         )
     if threshold is None:
         threshold = float(get_parameter(db, "toolbox.topk_threshold", default=0.35))
-    score_sql = (
-        "(1 - (embedding <=> CAST(:query_vec AS vector))) * COALESCE(confidence, 1.0)"
-        if mode == "current_truth"
-        else "(1 - (embedding <=> CAST(:query_vec AS vector)))"
-    )
     rows = db.execute(
-        text(
-            f"""
-            SELECT id AS memory_id, content, source_table, source_id, confidence,
-                   privacy_level::text AS privacy_level,
-                   (embedding <=> CAST(:query_vec AS vector)) AS distance,
-                   {score_sql} AS final_score
-            FROM ai_memories
-            WHERE is_active = true
-              AND (expires_at IS NULL OR expires_at > now())
-            ORDER BY final_score DESC
-            LIMIT :k
-            """
-        ),
+        text(_SEARCH_MEMORIES_SQL[mode]),
         {"query_vec": "[" + ",".join(str(component) for component in query_vec) + "]", "k": k},
     ).mappings().all()
     return [dict(row) for row in rows if float(row["final_score"]) > threshold]

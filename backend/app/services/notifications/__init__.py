@@ -31,7 +31,7 @@ SEVERITY_ORDER = {"info": 0, "normal": 1, "red": 2}
 
 # Env-ref keys the product bot config uses. The orchestrator bot's variables
 # (TELEGRAM_BOT_TOKEN & co) are FORBIDDEN here — enforced by tests.
-TELEGRAM_PROD_TOKEN_ENV = "IMPERIUM_TELEGRAM_PROD_BOT_TOKEN"
+TELEGRAM_PROD_TOKEN_ENV = "IMPERIUM_TELEGRAM_PROD_BOT_TOKEN"  # nosec B105 - env var NAME, not a secret
 TELEGRAM_PROD_CHAT_ENV = "IMPERIUM_TELEGRAM_PROD_CHAT_ID"
 FORBIDDEN_ORCHESTRATOR_ENV_KEYS = {"TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"}
 

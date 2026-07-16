@@ -183,7 +183,7 @@ def _cache_store(
     ttl_min = CACHE_TTL_MIN_DEFAULT
     try:
         ttl_min = int(get_parameter(db, "toolbox.travel_cache_ttl_min", default=ttl_min))
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 # nosec B110 - unreadable param falls back to default TTL
         pass
     existing = db.scalar(
         select(TravelCacheEntry).where(
