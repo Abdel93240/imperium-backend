@@ -19,6 +19,28 @@ from app.services.params import get_parameter
 MONEY = Decimal("0.01")
 ZERO = Decimal("0.00")
 LABELS = ("safe", "stable", "attention", "pressure", "critical")
+FUEL_CATEGORIES = {"fuel", "carburant", "diesel", "essence"}
+FIXED_WEEKLY_CHARGE_CATEGORIES = {"fixed_weekly_charges", "charges", "charge fixe", "charges fixes"}
+CONDITIONAL_REQUIRED_CATEGORIES = {
+    "family_exceptional_expense",
+    "school_payment_due",
+    "rent_proximity",
+    "leasing_payment_proximity",
+    "loyer",
+    "rent",
+    "leasing",
+    "school",
+    "ecole",
+    "école",
+}
+EXCEPTIONAL_REQUIRED_CATEGORIES = {
+    "exceptional_required_expenses",
+    "urgent_maintenance_cost",
+    "maintenance",
+    "entretien",
+    "reparation",
+    "réparation",
+}
 
 
 @dataclass(frozen=True)
@@ -143,10 +165,11 @@ def compute_pressure_from_db(
 def load_pressure_inputs(
     db: Session, *, current_user: User, today: date, now: datetime
 ) -> PressureInputs:
-    horizon_days = int(get_parameter(db, "vault.horizon_days", default=45))
     minimum_survival = Decimal(str(get_parameter(db, "vault.minimum_survival_threshold", default=150)))
     realistic_daily_capacity = _recent_daily_capacity(db, current_user=current_user, today=today)
     work_days = _remaining_work_days(today)
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
 
     transactions = list(
         db.scalars(
@@ -158,48 +181,66 @@ def load_pressure_inputs(
     )
     liquidity = ZERO
     current_week_income = ZERO
-    week_start = today - timedelta(days=today.weekday())
     for transaction in transactions:
         amount = Decimal(transaction.amount_cents) / Decimal("100")
         signed = amount if transaction.transaction_type == "income" else -amount
-        if transaction.wallet in {"cash", "bank"}:
+        if transaction.wallet in {"cash", "bank"} and transaction.occurred_at <= now:
             liquidity += signed
-        if transaction.transaction_type == "income" and transaction.local_date >= week_start:
+        if (
+            transaction.transaction_type == "income"
+            and week_start <= transaction.local_date <= today
+        ):
             current_week_income += amount
 
-    horizon_end = today + timedelta(days=horizon_days)
     active_expenses = list(
         db.scalars(
             select(UpcomingExpense).where(
                 UpcomingExpense.active.is_(True),
-                UpcomingExpense.due_date <= horizon_end,
+                UpcomingExpense.due_date <= week_end,
             )
         )
     )
+    fixed_weekly = ZERO
     overdue = ZERO
     upcoming = ZERO
+    fuel = ZERO
+    conditional = ZERO
+    exceptional = ZERO
     urgent = ZERO
     for expense in active_expenses:
         if not expense.mandatory:
             continue
+        if expense.due_date > week_end:
+            continue
         amount = _money(Decimal(expense.amount))
         if expense.due_date < today:
             overdue += amount
-        else:
-            upcoming += amount
+            continue
         if expense.due_date <= today + timedelta(days=3):
             urgent += amount
+
+        category = _normalize_category(expense.category)
+        if category in FUEL_CATEGORIES:
+            fuel += amount
+        elif category in EXCEPTIONAL_REQUIRED_CATEGORIES:
+            exceptional += amount
+        elif expense.recurrence in {"monthly", "quarterly", "yearly"} or category in CONDITIONAL_REQUIRED_CATEGORIES:
+            conditional += amount
+        elif expense.recurrence == "weekly" or category in FIXED_WEEKLY_CHARGE_CATEGORIES:
+            fixed_weekly += amount
+        else:
+            upcoming += amount
 
     return PressureInputs(
         current_week_income=_money(current_week_income),
         expected_week_income=_money(current_week_income),
-        fixed_weekly_charges=ZERO,
+        fixed_weekly_charges=_money(fixed_weekly),
         upcoming_required_expenses=_money(upcoming),
         overdue_expenses=_money(overdue),
         available_liquidity=_money(liquidity),
-        fuel_required_next_days=ZERO,
-        conditional_required_expenses=ZERO,
-        exceptional_required_expenses=ZERO,
+        fuel_required_next_days=_money(fuel),
+        conditional_required_expenses=_money(conditional),
+        exceptional_required_expenses=_money(exceptional),
         urgent_fixed_charges_due_within_3_days=_money(urgent),
         minimum_survival_threshold=_money(minimum_survival),
         number_of_remaining_work_days=work_days,
@@ -329,6 +370,12 @@ def _recent_daily_capacity(db: Session, *, current_user: User, today: date) -> D
         totals.setdefault(transaction.local_date, ZERO)
         totals[transaction.local_date] += Decimal(transaction.amount_cents) / Decimal("100")
     return _money(sum(totals.values(), ZERO) / Decimal(len(totals)))
+
+
+def _normalize_category(value: str | None) -> str:
+    if value is None:
+        return ""
+    return value.strip().lower()
 
 
 def _remaining_work_days(today: date) -> int:
