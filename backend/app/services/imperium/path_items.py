@@ -8,8 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
+from app.models.enums import IdempotencyStatus
 from app.models.event import Event
+from app.services.events.emitter import build_event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumPathItem
 from app.schemas.imperium import CreatePathItemRequest, PathItemResponse, PathItemWriteResponse
@@ -90,6 +91,7 @@ def create_path_item(
 
     event_id = f"evt_{uuid4().hex}"
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="path.item.created",
@@ -245,13 +247,25 @@ def _transition_path_item(
         item.cancelled_at = now
     db.flush()
 
+    creation_event = db.scalar(
+        select(Event)
+        .where(
+            Event.user_id == current_user.id,
+            Event.event_type == "path.item.created",
+            Event.payload["item_id"].astext == str(item_id),
+        )
+        .order_by(Event.occurred_at.desc())
+        .limit(1)
+    )
     event_id = f"evt_{uuid4().hex}"
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type=event_type,
         idempotency_key=idempotency_key,
         payload=payload,
+        causation_event=creation_event,
     )
     db.add(event)
     db.flush()
@@ -328,28 +342,27 @@ def _handle_existing_idempotency(
 
 
 def _build_event(
+    db: Session,
     *,
     current_user: User,
     event_id: str,
     event_type: str,
     idempotency_key: str,
     payload: dict,
+    causation_event: Event | None = None,
+    correlation_id: str | None = None,
 ) -> Event:
-    now = datetime.now(UTC)
-    return Event(
-        event_id=event_id,
-        event_type=event_type,
-        schema_version="1.0",
-        occurred_at=now,
-        received_at=now,
-        source_app=SourceApp.imperium,
-        device_id=None,
+    # E2 (passe 0): shared emitter — path.* stays canonical (DV-11), the item
+    # lifecycle inherits the dossier of path.item.created.
+    return build_event(
+        db,
         user_id=current_user.id,
-        idempotency_key=idempotency_key,
-        correlation_id=f"corr_{event_type.replace('.', '_')}_{uuid4().hex}",
-        causation_id=None,
-        privacy_level=PrivacyLevel.medium,
+        event_type=event_type,
         payload=payload,
+        idempotency_key=idempotency_key,
+        event_id=event_id,
+        causation_id=causation_event.event_id if causation_event is not None else None,
+        correlation_id=correlation_id,
     )
 
 

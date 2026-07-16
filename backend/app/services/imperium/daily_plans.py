@@ -8,16 +8,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
+from app.models.enums import IdempotencyStatus
 from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import (
     ImperiumDailyPlan,
     ImperiumDayReview,
     ImperiumMission,
-    ImperiumPathItem,
 )
 from app.schemas.imperium import CreateDailyPlanRequest, DailyPlanResponse, DailyPlanWriteResponse
+from app.services.events.emitter import build_event
+from app.services.path.canonical import path_today_view
 from app.services.imperium.decision_framework import get_canonical_priority_order
 
 PARIS_TIMEZONE = "Europe/Paris"
@@ -82,6 +83,7 @@ def create_daily_plan(
 
     event_id = f"evt_{uuid4().hex}"
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="day.plan.created",
@@ -208,6 +210,24 @@ def cancel_daily_plan(
     )
 
 
+def _find_plan_creation_event(
+    db: Session,
+    *,
+    current_user: User,
+    plan_id: UUID,
+) -> Event | None:
+    return db.scalar(
+        select(Event)
+        .where(
+            Event.user_id == current_user.id,
+            Event.event_type.in_(["planning.daily_plan.generated", "day.plan.created"]),
+            Event.payload["plan_id"].astext == str(plan_id),
+        )
+        .order_by(Event.occurred_at.desc())
+        .limit(1)
+    )
+
+
 def _transition_daily_plan(
     db: Session,
     *,
@@ -236,13 +256,16 @@ def _transition_daily_plan(
     plan.plan_status = new_status
     db.flush()
 
+    creation_event = _find_plan_creation_event(db, current_user=current_user, plan_id=plan_id)
     event_id = f"evt_{uuid4().hex}"
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type=event_type,
         idempotency_key=idempotency_key,
-        payload=payload,
+        payload={**payload, "trigger": status_text},
+        causation_event=creation_event,
     )
     db.add(event)
     db.flush()
@@ -274,20 +297,8 @@ def _collect_plan_sources(db: Session, *, current_user: User, local_date: date) 
             ImperiumMission.status == "active",
         )
     )
-    path_items = list(
-        db.scalars(
-            select(ImperiumPathItem)
-            .where(
-                ImperiumPathItem.user_id == current_user.id,
-                ImperiumPathItem.local_date == local_date,
-            )
-            .order_by(
-                ImperiumPathItem.sort_order.asc(),
-                ImperiumPathItem.planned_start.asc().nulls_last(),
-                ImperiumPathItem.created_at.asc(),
-            )
-        )
-    )
+    # C-1 / AD-2 (passe 0): canonical Path source = habits/check-ins.
+    path_items = path_today_view(db, current_user=current_user, local_date=local_date)
     priorities = get_canonical_priority_order(db, current_user=current_user)
     latest_day_review = db.scalar(
         select(ImperiumDayReview)
@@ -314,6 +325,7 @@ def _collect_plan_sources(db: Session, *, current_user: User, local_date: date) 
         plan_blocks.append(
             {
                 "block_type": "path_item",
+                "source": "canonical_habit",
                 "source_id": str(item.id),
                 "title": item.title,
                 "category": item.category,
@@ -399,28 +411,26 @@ def _handle_existing_idempotency(
 
 
 def _build_event(
+    db: Session,
     *,
     current_user: User,
     event_id: str,
     event_type: str,
     idempotency_key: str,
     payload: dict,
+    causation_event: Event | None = None,
+    correlation_id: str | None = None,
 ) -> Event:
-    now = datetime.now(UTC)
-    return Event(
-        event_id=event_id,
-        event_type=event_type,
-        schema_version="1.0",
-        occurred_at=now,
-        received_at=now,
-        source_app=SourceApp.imperium,
-        device_id=None,
+    # E2 (passe 0): shared emitter — canonical type, real depth, plan dossier.
+    return build_event(
+        db,
         user_id=current_user.id,
-        idempotency_key=idempotency_key,
-        correlation_id=f"corr_{event_type.replace('.', '_')}_{uuid4().hex}",
-        causation_id=None,
-        privacy_level=PrivacyLevel.medium,
+        event_type=event_type,
         payload=payload,
+        idempotency_key=idempotency_key,
+        event_id=event_id,
+        causation_id=causation_event.event_id if causation_event is not None else None,
+        correlation_id=correlation_id,
     )
 
 

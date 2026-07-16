@@ -1,14 +1,14 @@
 import hashlib
 import json
-from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
+from app.models.enums import IdempotencyStatus
 from app.models.event import Event
+from app.services.events.emitter import build_event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumPriorityRule
 from app.schemas.imperium import (
@@ -133,21 +133,14 @@ def _build_event(
     idempotency_key: str,
     payload: dict,
 ) -> Event:
-    now = datetime.now(UTC)
-    return Event(
-        event_id=event_id,
-        event_type="priority.rules.updated",
-        schema_version="1.0",
-        occurred_at=now,
-        received_at=now,
-        source_app=SourceApp.imperium,
-        device_id=None,
+    # E2 (passe 0): shared emitter (canonical: decision.priorities.updated, root).
+    return build_event(
+        None,
         user_id=current_user.id,
-        idempotency_key=idempotency_key,
-        correlation_id=f"corr_priority_rules_updated_{uuid4().hex}",
-        causation_id=None,
-        privacy_level=PrivacyLevel.medium,
+        event_type="priority.rules.updated",
         payload=payload,
+        idempotency_key=idempotency_key,
+        event_id=event_id,
     )
 
 

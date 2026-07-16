@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
+from app.models.enums import IdempotencyStatus
 from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
@@ -40,6 +40,7 @@ from app.schemas.imperium import (
     PromoteBacklogMissionResponse,
     StartMissionRequest,
 )
+from app.services.events.emitter import build_event
 from app.services.imperium.decision_framework import (
     SOURCE as DECISION_FRAMEWORK_SOURCE,
     build_mission_score_from_start_request,
@@ -137,6 +138,7 @@ def start_mission(
         **payload.model_dump(mode="json", exclude_none=True),
     }
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="mission.started",
@@ -211,6 +213,7 @@ def create_backlog_mission(
         **payload.model_dump(mode="json", exclude_none=True),
     }
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="mission.backlog.created",
@@ -413,12 +416,19 @@ def promote_backlog_mission(
         "mission_id": str(mission.id),
         "source": "backlog_promotion",
     }
+    backlog_event = (
+        db.get(Event, mission.created_by_event_id)
+        if mission.created_by_event_id is not None
+        else None
+    )
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="mission.started",
         idempotency_key=idempotency_key,
         payload=event_payload,
+        causation_event=backlog_event,
     )
     db.add(event)
     db.flush()
@@ -479,12 +489,19 @@ def complete_mission(
         "outcome": outcome,
         "reason": payload.reason,
     }
+    start_event = (
+        db.get(Event, mission.created_by_event_id)
+        if mission.created_by_event_id is not None
+        else None
+    )
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type=f"mission.{outcome}",
         idempotency_key=idempotency_key,
         payload={key: value for key, value in event_payload.items() if value is not None},
+        causation_event=start_event,
     )
     db.add(event)
     db.flush()
@@ -542,16 +559,24 @@ def fail_mission(
     event_id = f"evt_{uuid4().hex}"
     event_payload = {
         "mission_id": str(mission.id),
+        "reason": payload.failure_reason,
         "failure_reason": payload.failure_reason,
         "user_reported_signals": payload.user_reported_signals,
         "ai_usable_reason": payload.ai_usable_reason,
     }
+    start_event = (
+        db.get(Event, mission.created_by_event_id)
+        if mission.created_by_event_id is not None
+        else None
+    )
     event = _build_event(
+        db,
         current_user=current_user,
         event_id=event_id,
         event_type="mission.failed",
         idempotency_key=idempotency_key,
         payload={key: value for key, value in event_payload.items() if value is not None},
+        causation_event=start_event,
     )
     db.add(event)
     db.flush()
@@ -969,28 +994,27 @@ def _require_active_mission(mission: ImperiumMission | None) -> None:
 
 
 def _build_event(
+    db: Session,
     *,
     current_user: User,
     event_id: str,
     event_type: str,
     idempotency_key: str,
     payload: dict,
+    causation_event: Event | None = None,
+    correlation_id: str | None = None,
 ) -> Event:
-    now = datetime.now(UTC)
-    return Event(
-        event_id=event_id,
-        event_type=event_type,
-        schema_version="1.0",
-        occurred_at=now,
-        received_at=now,
-        source_app=SourceApp.imperium,
-        device_id=None,
+    # E2 (passe 0): shared emitter fills the envelope (canonical type, depth,
+    # correlation inherited from the declared cause / mission dossier).
+    return build_event(
+        db,
         user_id=current_user.id,
-        idempotency_key=idempotency_key,
-        correlation_id=f"corr_{event_type.replace('.', '_')}_{uuid4().hex}",
-        causation_id=None,
-        privacy_level=PrivacyLevel.medium,
+        event_type=event_type,
         payload=payload,
+        idempotency_key=idempotency_key,
+        event_id=event_id,
+        causation_id=causation_event.event_id if causation_event is not None else None,
+        correlation_id=correlation_id,
     )
 
 

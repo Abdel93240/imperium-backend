@@ -11,6 +11,7 @@ from app.models.enums import IdempotencyStatus
 from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.schemas.events import EventEnvelope, EventIngestResponse
+from app.services.events.nomenclature import canonical_event_type
 
 logger = logging.getLogger(__name__)
 
@@ -58,9 +59,28 @@ def ingest_event(
         response_status_code=201,
         response_body=response.model_dump(mode="json"),
     )
+    # E2 (passe 0): explicit (correlation_id, causation_id) are honored and the
+    # deterministic envelope is COMPLETED at ingestion — a declared cause fills
+    # depth (parent + 1) and inherits the parent's correlation (dossier).
+    correlation_id = envelope.correlation_id
+    causation_id = envelope.causation_id
+    depth = envelope.depth
+    if causation_id is not None:
+        parent = db.scalar(
+            select(Event).where(Event.user_id == current_user.id, Event.event_id == causation_id)
+        )
+        if parent is not None:
+            if depth is None:
+                depth = (parent.depth or 1) + 1
+            if not correlation_id:
+                correlation_id = parent.correlation_id
+    if depth is None:
+        depth = 1
+    if not correlation_id:
+        correlation_id = f"corr_{envelope.event_type.replace('.', '_')}_{envelope.event_id}"
     event = Event(
         event_id=envelope.event_id,
-        event_type=envelope.event_type,
+        event_type=canonical_event_type(envelope.event_type),
         schema_version=envelope.schema_version,
         occurred_at=envelope.occurred_at,
         received_at=envelope.received_at or datetime.now(UTC),
@@ -68,9 +88,9 @@ def ingest_event(
         device_id=envelope.device_id,
         user_id=current_user.id,
         idempotency_key=envelope.idempotency_key,
-        correlation_id=envelope.correlation_id,
-        causation_id=envelope.causation_id,
-        depth=envelope.depth,
+        correlation_id=correlation_id,
+        causation_id=causation_id,
+        depth=depth,
         privacy_level=envelope.privacy_level,
         payload=envelope.payload,
     )

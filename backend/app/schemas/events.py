@@ -16,7 +16,9 @@ class EventEnvelope(BaseModel):
     device_id: UUID | None = None
     user_id: UUID
     idempotency_key: str = Field(min_length=1)
-    correlation_id: str = Field(min_length=1)
+    # Optional since passe 0 (E2): omitted → inherited from the causation parent,
+    # or a fresh root correlation is assigned at ingestion.
+    correlation_id: str | None = Field(default=None, min_length=1)
     causation_id: str | None = None
     depth: int | None = Field(default=None, ge=1)
     privacy_level: PrivacyLevel

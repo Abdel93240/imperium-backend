@@ -1,14 +1,13 @@
 import hashlib
 import json
-from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
-from app.models.event import Event
+from app.models.enums import IdempotencyStatus
+from app.services.events.emitter import build_event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumDayReview
 from app.schemas.imperium import DayReviewResponse, FinishDayRequest, FinishDayResponse
@@ -80,20 +79,17 @@ def finish_day(
     db.flush()
 
     event_payload = payload.model_dump(mode="json", exclude_none=True)
-    event = Event(
-        event_id=event_id,
-        event_type="day.finished",
-        schema_version="1.0",
-        occurred_at=datetime.now(UTC),
-        received_at=datetime.now(UTC),
-        source_app=SourceApp.imperium,
-        device_id=None,
+    # E2 (passe 0): canonical planning.day.finished; the deterministic
+    # corr_day_finish_{review.id} dossier is kept (doc 77 cites it as the one
+    # non-random correlation of the legacy code).
+    event = build_event(
+        db,
         user_id=current_user.id,
-        idempotency_key=idempotency_key,
-        correlation_id=f"corr_day_finish_{review.id}",
-        causation_id=None,
-        privacy_level=PrivacyLevel.medium,
+        event_type="day.finished",
         payload=event_payload,
+        idempotency_key=idempotency_key,
+        event_id=event_id,
+        correlation_id=f"corr_day_finish_{review.id}",
     )
     db.add(event)
     db.flush()
