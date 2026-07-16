@@ -10,9 +10,10 @@ from app.models.imperium import (
     ImperiumDailyPlan,
     ImperiumDayReview,
     ImperiumMission,
-    ImperiumPathItem,
-    ImperiumPriorityRule,
 )
+from app.services.imperium.dashboard import CANONICAL_PRIORITY_LABELS
+from app.services.imperium.decision_framework import get_canonical_priority_order
+from app.services.path.canonical import path_week_stats
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import (
     WeeklyReportDailyPlans,
@@ -71,14 +72,9 @@ def get_weekly_report(
             .order_by(ImperiumMission.started_at.desc())
         )
     )
-    path_items = list(
-        db.scalars(
-            select(ImperiumPathItem).where(
-                ImperiumPathItem.user_id == current_user.id,
-                ImperiumPathItem.local_date >= week_start,
-                ImperiumPathItem.local_date < week_end_exclusive,
-            )
-        )
+    # C-1 (passe 0): canonical Path source = habits/check-ins.
+    path_stats = path_week_stats(
+        db, current_user=current_user, week_start=week_start, week_end_exclusive=week_end_exclusive
     )
     daily_plans = list(
         db.scalars(
@@ -98,19 +94,11 @@ def get_weekly_report(
             )
         )
     )
-    priorities = list(
-        db.scalars(
-            select(ImperiumPriorityRule)
-            .where(
-                ImperiumPriorityRule.user_id == current_user.id,
-                ImperiumPriorityRule.is_active.is_(True),
-            )
-            .order_by(ImperiumPriorityRule.rank_order.asc(), ImperiumPriorityRule.created_at.asc())
-        )
-    )
+    # C-1 (passe 0): canonical priorities = imperium_user_priorities.
+    priorities = get_canonical_priority_order(db, current_user=current_user)
 
     days = _build_days(day_reviews)
-    path = _build_path(path_items)
+    path = _build_path(path_stats)
     vault = _build_vault(transactions)
     signals = _build_signals(days=days, path=path, vault=vault, transaction_count=len(transactions))
 
@@ -125,10 +113,12 @@ def get_weekly_report(
         vault=vault,
         priorities=[
             WeeklyReportPriority(
-                rank_order=priority.rank_order,
-                priority_key=priority.priority_key,
-                label=priority.label,
-                importance_score=priority.importance_score,
+                rank_order=priority.position,
+                priority_key=priority.domain,
+                label=CANONICAL_PRIORITY_LABELS.get(
+                    priority.domain, priority.domain.replace("_", " ").title()
+                ),
+                importance_score=None,
             )
             for priority in priorities
         ],
@@ -174,17 +164,17 @@ def _build_missions(missions: list[ImperiumMission]) -> WeeklyReportMissions:
     )
 
 
-def _build_path(path_items: list[ImperiumPathItem]) -> WeeklyReportPath:
-    total = len(path_items)
-    completed = sum(1 for item in path_items if item.status == "completed")
+def _build_path(path_stats: dict[str, int]) -> WeeklyReportPath:
+    total = path_stats["total_items"]
+    completed = path_stats["completed"]
     completion_rate = None if total == 0 else _round2(Decimal(completed) / Decimal(total) * Decimal("100"))
     return WeeklyReportPath(
         total_items=total,
-        planned=sum(1 for item in path_items if item.status == "planned"),
-        in_progress=sum(1 for item in path_items if item.status == "in_progress"),
+        planned=path_stats["planned"],
+        in_progress=path_stats["in_progress"],
         completed=completed,
-        skipped=sum(1 for item in path_items if item.status == "skipped"),
-        cancelled=sum(1 for item in path_items if item.status == "cancelled"),
+        skipped=path_stats["skipped"],
+        cancelled=path_stats["cancelled"],
         completion_rate=completion_rate,
     )
 

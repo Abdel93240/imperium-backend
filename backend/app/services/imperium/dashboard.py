@@ -11,8 +11,12 @@ from app.models.imperium import (
     ImperiumDailyPlan,
     ImperiumDayReview,
     ImperiumMission,
-    ImperiumPathItem,
     ImperiumUserPriority,
+)
+from app.services.path.canonical import (
+    CanonicalPathToday,
+    path_today_view,
+    report_legacy_divergence,
 )
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import (
@@ -169,19 +173,11 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
             )
         )
     )
-    path_today = list(
-        db.scalars(
-            select(ImperiumPathItem)
-            .where(
-                ImperiumPathItem.user_id == current_user.id,
-                ImperiumPathItem.local_date == today,
-            )
-            .order_by(
-                ImperiumPathItem.sort_order.asc(),
-                ImperiumPathItem.planned_start.asc().nulls_last(),
-                ImperiumPathItem.created_at.asc(),
-            )
-        )
+    # C-1 (passe 0): canonical Path source = habits/check-ins. The legacy
+    # imperium_path_items table keeps its data but loses this reader.
+    path_today = path_today_view(db, current_user=current_user, local_date=today)
+    report_legacy_divergence(
+        db, current_user=current_user, local_date=today, canonical=path_today
     )
     daily_plan_today = db.scalar(
         select(ImperiumDailyPlan).where(
@@ -224,7 +220,7 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
     )
 
 
-def _path_counts(items: list[ImperiumPathItem]) -> dict[str, int]:
+def _path_counts(items: list[CanonicalPathToday]) -> dict[str, int]:
     counts = {
         "planned": 0,
         "in_progress": 0,
