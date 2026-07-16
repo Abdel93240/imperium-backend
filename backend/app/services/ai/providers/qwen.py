@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from app.core.config import Settings, get_settings
 from app.models.imperium import ImperiumWeeklyReviewSession
 from app.schemas.ai import QwenRoutingDecision, QwenScoreBreakdown, QwenWeeklySummary
+from app.services.ai.roles import LOCAL_EXECUTOR_ROLE, resolve_model_id
 
 
 class QwenProviderError(RuntimeError):
@@ -26,10 +27,18 @@ class QwenClient:
     ) -> None:
         self.settings = settings or get_settings()
         self._http_post = http_post or self._post_json
+        self._model_id: str | None = None
+
+    @property
+    def model_id(self) -> str:
+        # Resolved through the local_executor role (ai_role_models), never hard-coded.
+        if self._model_id is None:
+            self._model_id = resolve_model_id(LOCAL_EXECUTOR_ROLE)
+        return self._model_id
 
     def build_prompt(self, *, task_type: str, input_payload: dict, mode: str) -> str:
         return (
-            "You are Qwen 2.5 7B Instruct inside Imperium. "
+            "You are the local executor model inside Imperium. "
             "Return strict JSON only. Do not create canonical actions. "
             f"mode={mode}; task_type={task_type}; "
             f"input_payload={json.dumps(input_payload, sort_keys=True, default=str)}"
@@ -109,7 +118,7 @@ class QwenClient:
             response = self._http_post(
                 url,
                 {
-                    "model": self.settings.qwen_model,
+                    "model": self.model_id,
                     "prompt": prompt,
                     "stream": False,
                     "format": "json",
@@ -162,7 +171,7 @@ class QwenClient:
             + breakdown.data_sensitivity * 3
             + breakdown.cost_justification * 2
         )
-        recommended_model = "qwen2.5:7b-instruct" if score < 60 else "strong_model_required_by_policy"
+        recommended_model = self.model_id if score < 60 else "strong_model_required_by_policy"
         return QwenRoutingDecision(
             task_type=task_type,
             difficulty_score=score,
