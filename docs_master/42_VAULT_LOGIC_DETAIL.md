@@ -194,7 +194,7 @@ User taps "Scanner ticket"
      - category suggested by the local model
   → user reviews + validates
   → on validation: 
-     - INSERT INTO vault_transactions
+     - INSERT INTO imperium_vault_transactions
      - if food items: also INSERT INTO food_stock_items (Pulse)
 ```
 
@@ -323,31 +323,34 @@ User adds these manually. V2 may auto-detect from email parsing.
 ## 11. Weekly Profit Computation
 
 ```text
-Triggered every Monday at 00:30 Europe/Paris (n8n temporal trigger):
+Triggered by backend runner job `vault.weekly_profit` every Monday at 00:30 UTC
+(cron `30 0 * * 1`):
 
-1. n8n calls the dedicated backend endpoint or workflow trigger.
-2. The backend reads vault_transactions for week N.
-3. The backend computes:
+1. The runner invokes `app.services.vault.weekly:weekly_profit_job`.
+2. The backend reads `imperium_vault_transactions` for the closed Monday-Sunday
+   week, scoped by `user_id` and `currency = "EUR"`.
+3. The backend classifies business vs personal rows through `vault.category_map`
+   and computes:
 
-  business_income_N = SUM(vault_transactions WHERE
-    book = 'business' AND
-    type = 'income' AND
-    date IN week_N
+  business_income_N = SUM(imperium_vault_transactions WHERE
+    category maps to business_income AND
+    transaction_type = "income" AND
+    local_date IN closed week_N
   )
 
-  business_expenses_N = SUM(vault_transactions WHERE
-    book = 'business' AND
-    type = 'expense' AND
-    date IN week_N
+  business_expenses_N = SUM(imperium_vault_transactions WHERE
+    category maps to business_expenses AND
+    transaction_type = "expense" AND
+    local_date IN closed week_N
   )
 
   business_profit_N = business_income_N - business_expenses_N
 
-4. The backend writes weekly_finance_summaries when that table exists.
+4. The backend upserts `weekly_finance_summaries`.
 5. The backend emits `finance.weekly_summary.created`.
 6. Path/Imperium can use the event to update the sadaqa target.
 
-n8n never writes directly to Postgres.
+n8n never writes directly to Postgres; Phase E uses the backend runner for this path.
 ```
 
 ---
