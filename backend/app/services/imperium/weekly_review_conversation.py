@@ -68,13 +68,8 @@ from app.schemas.weekly_review import (
 )
 from app.schemas.ai import AIResultCallback
 from app.services.ai.memories import WR_MEMORY_COMMIT_DISABLED_REASON
+from app.services.ai.roles import LOCAL_EXECUTOR_ROLE, resolve_model_id
 from app.services.ai.tasks import receive_ai_result
-from app.services.integrations.n8n_client import (
-    N8NConfigurationError,
-    N8NRequestError,
-    n8n_is_configured,
-    trigger_n8n_webhook,
-)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -231,13 +226,7 @@ def launch_weekly_review_session(
     )
     db.commit()
     if created_ai_task is not None:
-        settings = get_settings()
-        _trigger_weekly_review_n8n_if_enabled(
-            db,
-            ai_task=created_ai_task,
-            path=settings.wr_n8n_qwen_dry_run_webhook_path,
-            idempotency_key_prefix="wr_n8n_trigger",
-        )
+        _run_wr_bridge_if_enabled(db, ai_task=created_ai_task, bridge="interactive_start")
     return response, False
 
 
@@ -283,35 +272,35 @@ def prepare_weekly_review_answers_integrate_payload(
     }
 
 
-def _trigger_weekly_review_n8n_if_enabled(
+def _run_wr_bridge_if_enabled(
     db: Session,
     *,
     ai_task: AITask,
-    path: str,
-    idempotency_key_prefix: str,
+    bridge: str,
 ) -> None:
+    """Ported n8n bridge (passe 0): direct in-process call, same payloads.
+
+    Gated by wr_bridge_enabled the way the n8n trigger was gated by n8n_dry_run:
+    OFF keeps today's queued-task behavior, ON completes the flow inline.
+    """
     settings = get_settings()
-    if settings.n8n_dry_run:
+    if not settings.wr_bridge_enabled:
         return
-    if not n8n_is_configured(settings):
-        ai_task.error_code = "n8n_not_configured"
-        ai_task.error_message = "N8N_BASE_URL and N8N_WEBHOOK_SECRET are required for outbound n8n trigger."
-        db.commit()
-        return
+    from app.services.imperium import wr_bridge as wr_bridge_module
+
+    runner = (
+        wr_bridge_module.run_wr_interactive_start
+        if bridge == "interactive_start"
+        else wr_bridge_module.run_wr_answers_integrate
+    )
     try:
-        trigger_n8n_webhook(
-            path=path,
-            payload=ai_task.prepared_payload or {},
-            idempotency_key=f"{idempotency_key_prefix}_{ai_task.id}",
-            settings=settings,
-            dry_run=False,
-        )
-    except N8NConfigurationError as exc:
-        ai_task.error_code = "n8n_not_configured"
+        runner(db, ai_task=ai_task)
+    except wr_bridge_module.WRBridgePayloadError as exc:
+        ai_task.error_code = "wr_bridge_payload_invalid"
         ai_task.error_message = str(exc)
         db.commit()
-    except N8NRequestError as exc:
-        ai_task.error_code = "n8n_trigger_failed"
+    except Exception as exc:  # noqa: BLE001 - bridge failure must not lose the launch
+        ai_task.error_code = "wr_bridge_failed"
         ai_task.error_message = str(exc)
         db.commit()
 
@@ -367,13 +356,7 @@ def add_user_message(
     )
     db.commit()
     if created_ai_task is not None:
-        settings = get_settings()
-        _trigger_weekly_review_n8n_if_enabled(
-            db,
-            ai_task=created_ai_task,
-            path=settings.wr_n8n_answers_integrate_webhook_path,
-            idempotency_key_prefix="wr_n8n_answers_integrate",
-        )
+        _run_wr_bridge_if_enabled(db, ai_task=created_ai_task, bridge="answers_integrate")
     return response, False
 
 
@@ -2102,7 +2085,7 @@ def _create_chat_final_draft_ai_result(
         source_module="imperium",
         input_payload=input_payload,
         prepared_payload=input_payload,
-        model_hint="qwen2.5:7b-instruct",
+        model_hint=resolve_model_id(LOCAL_EXECUTOR_ROLE, db=db),
         privacy_level="medium",
         completed_at=datetime.now(UTC),
     )
@@ -2119,7 +2102,7 @@ def _create_chat_final_draft_ai_result(
             "source": "qwen_dry_run_chat_confirm_no_more_input",
             "dry_run": True,
         },
-        model_used="qwen2.5:7b-instruct",
+        model_used=resolve_model_id(LOCAL_EXECUTOR_ROLE, db=db),
         provider="qwen-dry-run",
     )
     db.add(ai_result)

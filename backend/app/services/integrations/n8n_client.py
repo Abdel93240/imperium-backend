@@ -1,3 +1,12 @@
+"""DEPRECATED (passe 0 socle toolbox, 2026-07-15).
+
+n8n is out of the production path: the WR bridges are direct backend calls
+(app/services/imperium/wr_bridge.py) and the single execution mechanism is
+toolbox.runner. This client has NO remaining caller (enforced by test). It is
+kept only until the VPS n8n container export is confirmed and the container is
+cut (user action, out of pass), then this module and the N8N_* settings go away.
+"""
+
 import hmac
 import json
 from dataclasses import dataclass
@@ -8,6 +17,16 @@ from urllib.error import URLError
 from urllib.parse import urljoin, urlparse
 
 from app.core.config import Settings, get_settings
+
+import warnings
+
+warnings.warn(
+    "app.services.integrations.n8n_client is deprecated: n8n is out of the "
+    "production path (socle toolbox, 2026-07-15). Use the runner and "
+    "app/services/imperium/wr_bridge.py instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 @dataclass(frozen=True)
