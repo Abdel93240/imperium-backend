@@ -746,6 +746,208 @@ Lesson:
 - gross income does not equal financial safety
 - pressure must use real available liquidity and required obligations
 
+## Golden Test Examples - Proposed Validation Set
+
+Status: proposed for human validation before implementation. These five cases
+are intended to become the exact golden fixtures for the deterministic Vault
+pressure tests. Monetary outputs are expressed in EUR and rounded to two decimal
+places after applying the formulas above.
+
+### Golden A - safe
+
+Inputs:
+
+```text
+current_week_income = 650
+expected_week_income = 800
+fixed_weekly_charges = 300
+upcoming_required_expenses = 100
+overdue_expenses = 0
+available_liquidity = 700
+fuel_required_next_days = 60
+conditional_required_expenses = 0
+exceptional_required_expenses = 0
+urgent_fixed_charges_due_within_3_days = 0
+minimum_survival_threshold = 150
+number_of_remaining_work_days = 3
+realistic_daily_capacity = 220
+```
+
+Expected:
+
+```text
+required_money_this_week = 460
+remaining_required_money = 0
+remaining_realistic_earning_capacity = 660
+base_pressure_ratio = 0
+base_score = 0
+overdue_modifier = 0
+low_cash_modifier = 0
+urgent_fixed_charge_modifier = 0
+exceptional_modifier = 0
+final_score = 0
+label = safe
+daily_minimum_target = 0.00
+daily_comfortable_target = 0.00
+daily_optimal_target = 0.00
+```
+
+### Golden B - stable
+
+Inputs:
+
+```text
+current_week_income = 450
+expected_week_income = 800
+fixed_weekly_charges = 300
+upcoming_required_expenses = 150
+overdue_expenses = 0
+available_liquidity = 352
+fuel_required_next_days = 100
+conditional_required_expenses = 0
+exceptional_required_expenses = 0
+urgent_fixed_charges_due_within_3_days = 0
+minimum_survival_threshold = 150
+number_of_remaining_work_days = 3
+realistic_daily_capacity = 220
+```
+
+Expected:
+
+```text
+required_money_this_week = 550
+remaining_required_money = 198
+remaining_realistic_earning_capacity = 660
+base_pressure_ratio = 0.30
+base_score = 30
+overdue_modifier = 0
+low_cash_modifier = 0
+urgent_fixed_charge_modifier = 0
+exceptional_modifier = 0
+final_score = 30
+label = stable
+daily_minimum_target = 66.00
+daily_comfortable_target = 89.10
+daily_optimal_target = 115.50
+```
+
+### Golden C - attention
+
+Inputs:
+
+```text
+current_week_income = 500
+expected_week_income = 850
+fixed_weekly_charges = 300
+upcoming_required_expenses = 230
+overdue_expenses = 0
+available_liquidity = 300
+fuel_required_next_days = 100
+conditional_required_expenses = 0
+exceptional_required_expenses = 0
+urgent_fixed_charges_due_within_3_days = 0
+minimum_survival_threshold = 150
+number_of_remaining_work_days = 3
+realistic_daily_capacity = 200
+```
+
+Expected:
+
+```text
+required_money_this_week = 630
+remaining_required_money = 330
+remaining_realistic_earning_capacity = 600
+base_pressure_ratio = 0.55
+base_score = 55
+overdue_modifier = 0
+low_cash_modifier = 0
+urgent_fixed_charge_modifier = 0
+exceptional_modifier = 0
+final_score = 55
+label = attention
+daily_minimum_target = 110.00
+daily_comfortable_target = 148.50
+daily_optimal_target = 192.50
+```
+
+### Golden D - pressure
+
+Inputs:
+
+```text
+current_week_income = 420
+expected_week_income = 760
+fixed_weekly_charges = 300
+upcoming_required_expenses = 160
+overdue_expenses = 50
+available_liquidity = 200
+fuel_required_next_days = 80
+conditional_required_expenses = 0
+exceptional_required_expenses = 0
+urgent_fixed_charges_due_within_3_days = 0
+minimum_survival_threshold = 150
+number_of_remaining_work_days = 3
+realistic_daily_capacity = 200
+```
+
+Expected:
+
+```text
+required_money_this_week = 590
+remaining_required_money = 390
+remaining_realistic_earning_capacity = 600
+base_pressure_ratio = 0.65
+base_score = 65
+overdue_modifier = 10
+low_cash_modifier = 0
+urgent_fixed_charge_modifier = 0
+exceptional_modifier = 0
+final_score = 75
+label = pressure
+daily_minimum_target = 130.00
+daily_comfortable_target = 175.50
+daily_optimal_target = 227.50
+```
+
+### Golden E - critical
+
+Inputs:
+
+```text
+current_week_income = 300
+expected_week_income = 720
+fixed_weekly_charges = 200
+upcoming_required_expenses = 110
+overdue_expenses = 0
+available_liquidity = 100
+fuel_required_next_days = 50
+conditional_required_expenses = 100
+exceptional_required_expenses = 100
+urgent_fixed_charges_due_within_3_days = 150
+minimum_survival_threshold = 150
+number_of_remaining_work_days = 3
+realistic_daily_capacity = 200
+```
+
+Expected:
+
+```text
+required_money_this_week = 460
+remaining_required_money = 360
+remaining_realistic_earning_capacity = 600
+base_pressure_ratio = 0.60
+base_score = 60
+overdue_modifier = 0
+low_cash_modifier = 10
+urgent_fixed_charge_modifier = 10
+exceptional_modifier = 5
+final_score = 85
+label = critical
+daily_minimum_target = 120.00
+daily_comfortable_target = 162.00
+daily_optimal_target = 210.00
+```
+
 ## Open Decisions
 
 TODO:
