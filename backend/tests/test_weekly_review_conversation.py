@@ -5120,6 +5120,7 @@ def test_internal_mock_ai_summary_hmac_without_plaintext_secret(monkeypatch) -> 
             webhook_timestamp_tolerance_seconds=60,
         ),
     )
+    monkeypatch.setattr(internal, "get_settings", lambda: SimpleNamespace(environment="test"))
 
     app = FastAPI()
     app.include_router(internal.router, prefix="/internal")
