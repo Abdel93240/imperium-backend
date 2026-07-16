@@ -18,13 +18,21 @@ def engine():
 def test_pressure_snapshots_are_append_only(engine) -> None:
     snapshot_id = uuid4()
     with engine.begin() as conn:
+        user_id = uuid4()
+        conn.execute(
+            text(
+                "INSERT INTO users (id, email, single_user_mode, created_at, updated_at) "
+                "VALUES (:id, :email, FALSE, now(), now())"
+            ),
+            {"id": str(user_id), "email": f"vault-phase-e-{user_id}@example.test"},
+        )
         conn.execute(
             text(
                 "INSERT INTO pressure_snapshots "
-                "(id, computed_at, score, label, factors, daily_targets, inputs_snapshot) "
-                "VALUES (:id, now(), 30, 'stable', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)"
+                "(id, user_id, computed_at, score, label, factors, daily_targets, inputs_snapshot) "
+                "VALUES (:id, :user_id, now(), 30, 'stable', '{}'::jsonb, '{}'::jsonb, '{}'::jsonb)"
             ),
-            {"id": snapshot_id},
+            {"id": snapshot_id, "user_id": str(user_id)},
         )
 
     with engine.begin() as conn, pytest.raises(Exception, match="append-only"):
