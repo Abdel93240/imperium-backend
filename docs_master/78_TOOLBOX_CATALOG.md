@@ -8,14 +8,14 @@ revient à ce catalogue ; le catalogue ai_task est **absorbé** (T7, TOOLBOX_FIN
 `ai_slot_transition` EST le registre des slots — tout slot doit y avoir une ligne,
 les specs le font déjà via leurs seeds. Pas de document séparé.
 
-> **ÉTAT DES STATUTS** : les fiches photographient le système au 2026-07-10. La
-> passe 0 (socle toolbox, mergée depuis) a livré ÉTEINT : runner (F1-14),
-> notifications (F1-11), params (F1-12/F2-10), signaux — tables (F2-13), tables
-> d'audit IA (F2-09), client embeddings (F1-07, serving différé GPU), travel v0 +
-> geo/H3 (F1-01/F1-23), prayer minimal (F1-16), enveloppe events E2 + NOTIFY
-> (F1-10), config rôle→modèle `ai_role_models` (F2-17), lecteurs legacy migrés
-> (C-1, F2-08). La LIMITE 1 est caduque (base rapatriée sur Tower). État
-> d'activation : doc 76 ; détail d'exécution : `SOCLE_MAPPING.md` (racine repo).
+> **ÉTAT DES STATUTS** : fiches réconciliées le 2026-07-16 avec la passe 0 (socle
+> toolbox, livrée ÉTEINTE sur cette branche — le merge reste un acte utilisateur) :
+> runner (F1-14), notifications (F1-11), params (F1-12/F2-10), signaux — tables
+> (F2-13), tables d'audit IA (F2-09), client embeddings (F1-07, serving différé
+> GPU), travel v0 + geo/H3 (F1-01/F1-23), prayer minimal (F1-16), enveloppe events
+> E2 + NOTIFY (F1-10), config rôle→modèle `ai_role_models` (F2-17), lecteurs
+> legacy migrés (C-1, F2-08). La LIMITE 1 est caduque (base rapatriée sur Tower).
+> État d'activation : doc 76 ; détail d'exécution : `SOCLE_MAPPING.md` (racine repo).
 
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
@@ -25,11 +25,12 @@ n8n sur disque (`ops/n8n/workflows/`).
 
 ## RÉPONSE CHIFFRÉE
 
-**Le système compte 55 outils : 25 en F1 (dont 5 codés, 15 spécifiés, 4 manquants, 1 dupliqué franc),
-17 en F2 (dont 8 codées, 7 spécifiées, 2 manquantes), 13 en F3 (dont 1 servi en production, 12
-spécifiés non déployés), plus 10 dormants** (candidats mono-consommateur, règle du second
-consommateur : ATTEND). Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25,
-F2-01…F2-17, F3-01…F3-13, D-01…D-10).
+**Le système compte 55 outils : 25 en F1 (dont 12 codés — 7 livrés éteints par la passe 0 —,
+12 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 12 codées,
+3 spécifiées, 2 manquantes), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
+plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
+Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
+D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 
 ## LIMITES DE L'AUDIT (à lire avant les fiches)
 
@@ -56,37 +57,37 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 
 # FAMILLE F1 — LIBRAIRIES / SERVICES DE CODE
 
-### F1-01 `toolbox.travel` — estimation de trajet ⚠ LE doublon franc
+### F1-01 `toolbox.travel` — estimation de trajet (ex-doublon franc, tranché DBL-1)
 - description : durée/coût de déplacement A→B (temps réel + attendu par créneau).
 - famille : F1
-- vit_aujourd_hui : **MANQUANT** (greps `haversine|h3|google.?maps|travel_time|distance_km|osrm|valhalla|graphhopper` = zéro résultat dans `backend/app/`). Spécifié DEUX fois :
+- vit_aujourd_hui : **CODÉ v0 (passe 0, éteint)** — `backend/app/services/travel/` (`estimate.py` : interface unique `estimate()`, signature gravée, plancher ×1,3 dans l'interface ; `geo.py` : utilitaires H3) + table `travel_cache` (migration 0038 : clé h3 origine/dest + tranche horaire, TTL 2 h). Historique — était spécifié DEUX fois :
   - spec Daily Orchestrator §5 (porte G4 + « Trajet ») : Google Maps API × `P:gmaps_multiplier` plancher dur 1,3, cache (origine arrondie, destination arrondie, tranche horaire) TTL 2h, fallback `distance_km / 25 km/h × 1,3` ;
   - spec VTC Vector §3.5 (estimateur local embarqué : matrice H3 cellule×heure×type-de-jour × multiplicateurs live, ≤50 ms hors-ligne) + §4.2 (fantôme Google/TomTom asynchrone côté Tower, recyclé en multiplicateurs §4.1).
-- consommateurs_actuels : aucun (rien de codé).
+- consommateurs_actuels : aucun (service livré éteint, flags OFF).
 - consommateurs_prevus_par_specs : Daily (G4 temps, §7 départage moindre trajet), Vector (scoreur §3.6, « Où je vais » §3.10, matrice §3.5, fantôme §4.2).
 - consommateurs_probables_non_documentés :
   - **The Path** — doc 41 §7-bis : sélection dynamique de mosquée « position dans la continuité de la journée » (scan geo + trajets) ; doc 41 §10.2 : replan ghusl « nearest registered ghusl address ». → QUESTION UTILISATEUR Q2 (fournisseur geo pour données religieuses very_high).
   - Vector HUD doc 55 §9.5/9.6 (overlay mosquées, raccourcis avec gain de temps estimé) — V6+, futur.
   - Doc 52 §9 génération du plan quotidien (enchaînement de missions avec lieux).
-- doublons : les deux specs ci-dessus. Différences : Daily = service Tower, temps réel large, appel API cloud accepté, précision « verdict de planification » ; Vector = embarqué tablette, zéro réseau, <50 ms, précision « verdict binaire à seuil ». Ce sont deux PROFILS du même outil, pas deux outils : la matrice H3 calibrée par la Tower (Vector §3.5) et le fantôme Google (§4.2) peuvent servir le G4 de Daily (qui n'a pas la contrainte 900 ms) via une interface unique côté Tower ; la tablette embarque un miroir.
+- doublons : les deux specs ci-dessus. Différences : Daily = service Tower, temps réel large, appel API cloud accepté, précision « verdict de planification » ; Vector = embarqué tablette, zéro réseau, <50 ms, précision « verdict binaire à seuil ». Ce sont deux PROFILS du même outil, pas deux outils : la matrice H3 calibrée par la Tower (Vector §3.5) et le fantôme Google (§4.2) peuvent servir le G4 de Daily (qui n'a pas la contrainte 900 ms) via une interface unique côté Tower ; la tablette embarque un miroir. **Tranché (DBL-1) : l'interface unique est livrée au socle** ; les passes Daily/Vector renforcent le moteur sans changer la signature.
 - seconde_regle_consommateur : PASSE (Daily + Vector spécifiés ; Path probable).
-- statut : **dupliqué** (spécifié 2×, non codé).
+- statut : **existe_codé** (v0 éteint ; profils Daily/Vector à brancher par leurs passes).
 
 ### F1-02 `toolbox.signals` — moteur de signaux génériques
 - description : définitions versionnées + valeurs horodatées + baselines glissantes (médiane 28j ± MAD) + bandes green/yellow/orange/red + drapeaux + staleness.
 - famille : F1 (avec F2-13 pour les tables)
-- vit_aujourd_hui : spécifié non codé — spec Pulse §3.1 (`pulse_signal_definitions`/`pulse_signal_values`/`v_pulse_board_current`, 32 signaux seedés §4) ; spec WR §4 W4 : « réutiliser le mécanisme `pulse_signal_definitions` si présent, sinon table équivalente `wr_signal_definitions` » — doublon latent explicite. Dictionnaire historique : doc 01.
-- consommateurs_actuels : aucun.
+- vit_aujourd_hui : tables partagées CODÉES (passe 0) — `signal_definitions`/`signal_values` (migration 0038 : colonne `domain` en tête, `active=false` par défaut, code unique). Le MOTEUR (calcul baselines/bandes/staleness) et les seeds des 32 signaux Pulse restent à livrer par la passe Pulse. Historique : la spec Pulse §3.1 nommait `pulse_signal_definitions`/`pulse_signal_values`/`v_pulse_board_current` ; la spec WR §4 W4 prévoyait un fallback `wr_signal_definitions` — doublon latent ÉTEINT par la table partagée. Dictionnaire historique : doc 01.
+- consommateurs_actuels : aucun (tables vides, moteur non codé).
 - consommateurs_prevus_par_specs : Pulse (board, sentinelle, interprète), WR (W4 anomalies ecosystem, variance inexpliquée → digest), Vector (§4.8 dérive « au-delà de sa bande » → docket), Daily (indirect : signaux Pulse via porte G5).
 - consommateurs_probables_non_documentés : Vault — la pression financière est « une jauge visuelle » (doc 77 « Ce qui n'est pas un event ») : c'est exactement un signal à bandes ; The Path — score quotidien §13 et assiduité (bandes) → QUESTION Q11.
-- doublons : `pulse_signal_definitions` vs `wr_signal_definitions` (fallback WR) — à tuer par ordre d'exécution + patch (voir PATCH_WR).
+- doublons : TRANCHÉ au socle — table PARTAGÉE `signal_definitions` (0038) ; ni `pulse_signal_definitions` ni `wr_signal_definitions` ne doivent être créées (les fiches d'activation Pulse ciblent `signal_definitions` avec `domain='pulse'`).
 - seconde_regle_consommateur : PASSE (Pulse + WR + Vector).
-- statut : spécifié.
+- statut : spécifié (tables codées au socle ; moteur = passe Pulse).
 
 ### F1-03 `toolbox.llm` — client LLM local contraint + wrapper de tiers
 - description : appel Qwen local temp 0, sortie contrainte GBNF/guided decoding par JSON Schema, retry-avec-erreur, fallback déterministe, dry-run loggé (`real_ai_enabled=False`), tiers `local_default|cloud_forced|routed`.
 - famille : F1
-- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; MAIS modèle en dur `qwen2.5:7b-instruct` (`app/core/config.py:51`, 7B écarté définitivement par PHASE_0 D6), pas de GBNF, pas de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8.
+- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; l'ancien modèle 7B en dur (écarté définitivement par PHASE_0 D6) a été purgé au socle (DV-6) : le modèle se résout via le rôle `local_executor` d'`ai_role_models` (seed `qwen3-32b`). Toujours pas de GBNF ni de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8.
 - consommateurs_actuels : WR conversation (dry-run, `weekly_review_conversation.py`), smoke endpoint.
 - consommateurs_prevus_par_specs : tous les slots LLM des specs Pulse (interpreter, p1..p10), WR (wr.probe_gen, wr.pair_verdict, wr.identity…), Daily (daily.disruption_classify, daily.conflict_arbitrate). Vector : AUCUN (zéro LLM, gravé spec §0).
 - consommateurs_probables_non_documentés : chatbot doc 72, conseils quotidiens doc 43 §12.3.
@@ -129,12 +130,12 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 ### F1-07 `toolbox.embeddings` — service d'embedding + recherche top-K
 - description : embed(texts)→vector(1024) local (privacy-first), wrapper provider (doc 38 §11), recherche sémantique top-K avec deux modes (current_truth = cos×confidence ; historical = cos seul), seuil 0.35.
 - famille : F1 (modèle F3-02 ; table F2-02)
-- vit_aujourd_hui : schéma PRÊT, service ABSENT — migration `20260705_0032` (vector(1024) + HNSW cosine) ; `app/services/ai/memories.py:29` : « Canonical writes wait for the embedding service » ; `embeddings_enabled=False`. Aucun module `embedding.py` codé.
-- consommateurs_actuels : aucun (writes WR bloqués, D5).
+- vit_aujourd_hui : client CODÉ (passe 0) — `app/services/ai/embedding.py` (embed batché, top-K deux modes current_truth/historical, `GpuServiceUnreachable` = skip loggé jamais un échec de job) sur le schéma `20260705_0032` (vector(1024) + HNSW cosine). Serving GPU DIFFÉRÉ : unités systemd `ops/systemd/`, smoke J+2 `ops/gpu/EMBEDDINGS_SMOKE_CHECKLIST.md` ; `embeddings_enabled=False` (activation = acte utilisateur après smoke vert).
+- consommateurs_actuels : aucun (writes WR bloqués, D5, en attente du serving).
 - consommateurs_prevus_par_specs : WR (canal vectoriel classique + sondes §5.2, identity top-K §6.2, forage P1), Pulse (corpus sheets embedding §3.4 — ⚠ spec dit `vector(4096)`, canon = 1024, voir FINDINGS DV-2), chatbot pass 2 (doc 72 §6.1).
 - consommateurs_probables_non_documentés : Knowledge Inbox (doc 70 §12), doc 52 §8.2 CATEGORY 6.
 - seconde_regle_consommateur : PASSE.
-- statut : spécifié (schéma codé, service manquant → FINDINGS trou T4).
+- statut : existe_codé (client ; serving GPU différé — trou T4 refermé côté code).
 
 ### F1-08 `toolbox.memory` — API mémoire (ai_memories)
 - description : écriture validée d'éléments d'apprentissage, supersession, expiry, contraintes de canonicité (1024 dims, privacy_level obligatoire).
@@ -157,47 +158,48 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 ### F1-10 `toolbox.events` — émetteur d'events E2
 - description : émission dans le journal canonique `events` avec enveloppe complète + chaînage correlation_id/causation_id/depth.
 - famille : F1 (table F2-01)
-- vit_aujourd_hui : CODÉ PARTIEL — `app/services/events/ingestion.py` + `app/models/event.py` (depth ajouté migration 0036, CHECK ≥1) ; 19 event_types émis par 8 services (audit du 2026-07-02). MAIS le chaînage réel n'est pas rempli : correlation_id aléatoire, causation_id vide (même audit) ; renommage dotted génériques (doc 77 « À faire côté code ») pas fait.
+- vit_aujourd_hui : CODÉ PARTIEL — `app/services/events/ingestion.py` + `app/models/event.py` (depth ajouté migration 0036, CHECK ≥1) ; 19 event_types émis par 8 services (audit du 2026-07-02) ; trigger `pg_notify('events_new', …)` ajouté au socle (0038, consommé par le runner F1-14) ; renommages dotted génériques doc 77 APPLIQUÉS au socle (`app/services/events/nomenclature.py`, compat lecture 30 j — `path.*` inchangé, DV-11). MAIS le chaînage réel n'est pas rempli : correlation_id aléatoire, causation_id vide (même audit).
 - consommateurs_actuels : émetteurs = missions, daily plans, day finish, path items, priorities, calendar, vault legacy. **Consommateurs = AUCUN** (journal write-only, constat structurant de l'audit events).
 - consommateurs_prevus_par_specs : les 4 specs émettent (Pulse §12, WR §11, Daily §11, Vector §7) ET consomment (usine WR s'abonne à la fin de session ; W2 lit les events notables ; Daily réagit à mission.completed).
 - seconde_regle_consommateur : PASSE.
-- statut : existe_codé (enveloppe) / spécifié (chaînage V1 temps réel + consumers).
+- statut : existe_codé (enveloppe + NOTIFY + nomenclature) / spécifié (chaînage V1 temps réel + consumers).
 
-### F1-11 `toolbox.notifications` — notifications utilisateur ⚠ LE trou confirmé
+### F1-11 `toolbox.notifications` — notifications utilisateur (ex-trou T1, refermé)
 - description : canal de notification produit (rouge docket, red flags santé, préemption, sollicitations capture surge, rappels Path).
 - famille : F1
-- vit_aujourd_hui : **MANQUANT** — `backend/app/services/notifications/__init__.py` = 1 ligne : « Notifications service skeleton. Business logic intentionally not implemented yet. » Aucune spec ne le définit.
-- consommateurs_actuels : aucun.
+- vit_aujourd_hui : **CODÉ (passe 0, éteint)** — `app/services/notifications/` : tables `notifications`/`notification_channels` (0038), canal Telegram produit `telegram_prod` (Q3 arbitrée — distinct du bot de dev de l'orchestrateur), routage red→tous les canaux / normal+info→canal primaire, dedup 24 h, livraison externe en dry-run tant que `notifications_enabled=False`.
+- consommateurs_actuels : aucun (service livré éteint).
 - consommateurs_prevus_par_specs : Pulse (red flag ack §11, fallback_move « appliqué automatiquement avec notification » §8, P5 file vision) ; WR (« item rouge → notification en semaine » §7 ; seed §13.7 : « canaux de notification existants réutilisés (identifier) » — ils N'EXISTENT PAS) ; Daily (préemption §9 « notification immédiate + proposition ») ; Vector (§3.9 « la Tower détecte une cause candidate → notification », §4.8 dérive).
 - consommateurs_probables_non_documentés : Path (path.reminder.requested doc 41 §5 ; bannières de préparation jeûne §8), Vault (alertes upcoming expenses doc 42 §10).
-- doublons : l'orchestrateur (`/opt/orchestrator/telegram_bot.py`) possède un canal Telegram — mais c'est l'outillage de DEV, pas le produit. Ne pas confondre.
+- doublons : l'orchestrateur (`/opt/orchestrator/telegram_bot.py`) possède un canal Telegram — mais c'est l'outillage de DEV, pas le produit. Ne pas confondre (le canal produit `telegram_prod` utilise un bot distinct).
 - seconde_regle_consommateur : PASSE (4 specs + 2 apps).
-- statut : **manquant** (trou T1 des FINDINGS ; à spécifier avant les passes).
+- statut : **existe_codé** (éteint ; trou T1 des FINDINGS refermé au socle).
 
 ### F1-12 `toolbox.params` — store de paramètres versionnés append-only
 - description : paramètres à versions (jamais d'UPDATE de valeur, superseded_by, origin, rationale, date+raison), vue « current », cache invalidé sur nouvelle version.
 - famille : F1 (table F2-10)
-- vit_aujourd_hui : spécifié non codé — spec Pulse §3.4 (`pulse_parameters`) ; spec WR §13.2 (« table de paramètres versionnés existante ou équivalente ») ; spec Daily §4 (« jeu de paramètres versionnés `df.*` (table de paramètres partagée des specs précédentes) ») ; spec Vector §8 (« défauts à valider, versionnés »).
+- vit_aujourd_hui : **CODÉ (passe 0)** — table PARTAGÉE `parameters` + vue `v_parameters_current` (0038, pattern append-only spec Pulse §3.4 verbatim), lecture via `app/services/params/` (`get_parameter`). Historique specs : Pulse §3.4 (`pulse_parameters`) ; WR §13.2 (« table de paramètres versionnés existante ou équivalente ») ; Daily §4 (« jeu de paramètres versionnés `df.*` ») ; Vector §8 (« défauts à valider, versionnés »).
+- consommateurs_actuels : embeddings top-K (`toolbox.topk_threshold`), prayer (`path.reference_mosque_id`).
 - consommateurs_prevus_par_specs : les 4 (P:*, df.*, chain_*, belief_*, docket_*, h3_res, thresholds…).
-- doublons : latent — Pulse crée `pulse_parameters` (préfixe domaine), les trois autres attendent une table PARTAGÉE. À trancher AVANT la passe Pulse (patch).
+- doublons : TRANCHÉ au socle — table partagée créée ; `pulse_parameters` ne doit PAS être créée par la passe Pulse.
 - seconde_regle_consommateur : PASSE.
-- statut : spécifié (dupliqué latent).
+- statut : existe_codé.
 
 ### F1-13 `toolbox.audit_loop` — audit décroissant des slots IA
 - description : contre-lecture cloud échantillonnée des sorties locales, agreement par slot, décroissance = décision utilisateur, dataset LoRA depuis désaccords + refus expliqués.
 - famille : F1 (tables F2-09)
-- vit_aujourd_hui : spécifié non codé — spec Pulse §3.9 (`pulse_ai_transition`/`pulse_audit_samples`) ; spec WR §3.7 GÉNÉRALISE en `ai_slot_transition`/`ai_audit_samples` + `v_ai_training_pairs` (avec migration des lignes Pulse si déjà créées) ; spec Daily (2 slots seedés) ; spec Vector §4.7 (même principe appliqué au capteur OCR) ; racine conceptuelle : CONCEPTION_chainage_V2 Étape 4.
-- doublons : latent pulse_* vs partagé — la spec WR prévoit la danse de migration ; le pré-inventaire recommande de créer PARTAGÉ dès Pulse (confirmé par cet audit, voir PATCH_PULSE/PATCH_WR).
+- vit_aujourd_hui : tables partagées CODÉES (passe 0) — `ai_slot_transition`/`ai_audit_samples` + vue `v_ai_training_pairs` (0038, schéma spec WR §3.7 verbatim, vides). La BOUCLE (échantillonnage cloud, agreement par slot, décroissance) reste à coder par les passes. Historique : spec Pulse §3.9 nommait `pulse_ai_transition`/`pulse_audit_samples` ; spec WR §3.7 généralisait ; spec Daily (2 slots seedés) ; spec Vector §4.7 (même principe appliqué au capteur OCR) ; racine conceptuelle : CONCEPTION_chainage_V2 Étape 4.
+- doublons : TRANCHÉ au socle — créées PARTAGÉES d'emblée (R1 appliquée) ; pas de tables `pulse_*`, pas de danse de migration WR.
 - seconde_regle_consommateur : PASSE (4 specs).
-- statut : spécifié (dupliqué latent).
+- statut : spécifié (tables codées au socle ; boucle = passes).
 
-### F1-14 `toolbox.runner` — runner de jobs backend (successeur de n8n)
+### F1-14 `toolbox.runner` — runner de jobs backend (successeur de n8n ; ex-trou T2, refermé)
 - description : APScheduler + LISTEN/NOTIFY + advisory locks ; crons, abonnements events, verrous, un SEUL mécanisme pour toutes les passes.
 - famille : F1
-- vit_aujourd_hui : **MANQUANT** — décision prise (contexte fourni par l'utilisateur : sortir n8n du chemin de production) ; aucune spec. Chaque spec dit « workflows n8n ou crons backend, au choix de l'exécuteur, mais UN seul mécanisme » (Pulse §7, WR §12, Daily §12).
+- vit_aujourd_hui : **CODÉ (passe 0, éteint)** — `app/services/runner/` (`engine.py`, `scheduler.py`, `jobs.py`) : APScheduler + LISTEN/NOTIFY (canal `events_new`) + advisory locks ; tables `job_definitions`/`job_runs`/`job_cursors` (0038) ; jobs seedés `enabled=false` (0039) ; skip global si `runner_enabled=False`. n8n est SORTI du chemin de production : exports portés en fonctions backend, `n8n_client.py` déprécié, `N8N_*` deprecated dans config (SOCLE_MAPPING §4). Chaque spec disait « workflows n8n ou crons backend, au choix de l'exécuteur, mais UN seul mécanisme » (Pulse §7, WR §12, Daily §12) : le mécanisme unique est ce runner.
 - consommateurs_prevus_par_specs : ~25 jobs — Pulse (features_daily 06:45, sentinel am/pm, pre_session, runners, weekly, monthly, scientific_review, audit_weekly, metrics_rollup) ; WR (factory_on_session_end, fallback 23:30, exposure_daily, review_due_weekly, digest_on_open, audit_weekly, metrics, monthly_regen) ; Daily (scores_refresh 06:30, day_start, override_aggregation, gmaps_cache_gc) ; Vector (builders 5 min/60 min/hebdo/nocturne, entraînement, fantôme).
 - seconde_regle_consommateur : PASSE.
-- statut : **manquant** (trou T2 ; à spécifier avant les passes — voir EXECUTION_ORDER_PROPOSAL).
+- statut : **existe_codé** (éteint ; trou T2 refermé au socle — les ~25 jobs des passes s'y branchent en seeds `enabled=false`).
 
 ### F1-15 `toolbox.gbm` — harnais d'entraînement GBM + registre de modèles
 - description : entraînement nocturne CatBoost, verrou de backtest 14 j (jamais déployer un candidat inférieur), export ONNX + hash, registre `vtc_model_versions` (multi-`model_kind`), rollback une commande, poids d'exploration.
@@ -211,12 +213,12 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 ### F1-16 `toolbox.prayer` — moteur religieux temporel (prières, Hijri, Qibla)
 - description : temps de prière (MAWAQIT prioritaire + cache 30 j + fallback moteur type Adhan MuslimWorldLeague/Maliki), calendrier Hijri lunaire (observation + confirmation manuelle + duplicate-date V3), Qibla. Catégorie « déterministe qui doit être EXACT » (gap_analysis_v1/00_INDEX).
 - famille : F1
-- vit_aujourd_hui : MANQUANT (grep `prayer|salat|mawaqit|qibla|hijri` = zéro dans `backend/app/`). Spécifié : doc 41 §6, §14, Patch 41-A (14-V3) ; tables doc 41 §20 (`path_calculated_prayer_times`, `path_registered_mosques`, `path_mawaqit_cache`) non codées.
-- consommateurs_actuels : aucun.
+- vit_aujourd_hui : minimal CODÉ (passe 0, éteint) — `app/services/path/prayer.py` : MAWAQIT prioritaire + cache 30 j + fallback lib adhan (calcul local) ; tables doc 41 §20 créées (0038 : `path_registered_mosques`, `path_mawaqit_cache`, `path_calculated_prayer_times`) ; mosquée de référence via paramètre `path.reference_mosque_id` ; contrat `prayer_windows(date)` pour la porte G4 (Q6 arbitrée : prières = engagements fixes). Hijri/duplicate-date (Patch 41-A, 14-V3) et Qibla restent à livrer (doc 41 §6, §14).
+- consommateurs_actuels : aucun (service livré éteint).
 - consommateurs_prevus_par_specs : aucune des 4 specs (angle mort confirmé).
 - consommateurs_probables_non_documentés (sourcés docs) : The Path (affichage PAT-01/02) ; **Imperium planning** (awareness zones de prière créées PAR le daily planning, doc 41 §7-bis → le futur Daily Orchestrator devrait traiter les prières comme engagements, cf. QUESTION Q6) ; **Vector HUD** doc 55 §9.5 (overlay mosquées, couleur = urgence prochaine prière) ; Pulse (fenêtres suhoor/iftar lues via l'état de jeûne Path, doc 40 §15.2/41 §8) ; doc 52 §8.2 CATEGORY 8 (« Daily prayers » en engagements récurrents).
 - seconde_regle_consommateur : PASSE (Path + planning + HUD).
-- statut : spécifié (non couvert par les 4 passes → FINDINGS).
+- statut : existe_codé (minimal éteint ; Hijri V3 et Qibla à venir — hors des 4 passes, voir FINDINGS).
 
 ### F1-17 `toolbox.pressure` — moteur de pression financière
 - description : score déterministe 0-100 + label + facteurs explicables + objectifs journaliers min/comfortable/optimal (formule doc 11 complète).
@@ -275,9 +277,9 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 ### F1-23 `toolbox.geo` — utilitaires géo/H3
 - description : indexation H3 (résolution paramétrée), corridors de cellules, cellule tenue ≥10 min, distances ; support de travel/zones/mosquées.
 - famille : F1
-- vit_aujourd_hui : MANQUANT (aucun code H3). Spécifié implicitement par la spec Vector (§3.5 corridors, §4.5 cellules tenues, h3_res=8) ; besoins Path doc 41 §7-bis (scan geo).
+- vit_aujourd_hui : v0 CODÉ (passe 0) — `app/services/travel/geo.py` (lib `h3==4.5.0` : indexation, distances), ancré dans `toolbox.travel` (propriétaire tranché). Corridors de cellules et « cellule tenue ≥10 min » restent à livrer par la passe Vector (§3.5, §4.5, h3_res=8) ; besoins Path doc 41 §7-bis (scan geo).
 - seconde_regle_consommateur : PASSE (travel + zones + Path probable).
-- statut : spécifié (implicite, pas de propriétaire → à ancrer dans toolbox.travel ou séparé).
+- statut : existe_codé (v0, ancré dans travel ; extensions Vector à venir).
 
 ### F1-24 `toolbox.scoring_mission` — service de scoring déterministe /100 (doc 52)
 - description : critères A-E, coefficients ×10/8/5/4 depuis `imperium_user_priorities`, breakdown `explanation`, bucket public.
@@ -336,18 +338,18 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 - statut : existe_codé.
 
 ### F2-08 ledger finance canonique `imperium_vault_transactions`
-- vit : migrations 0024/0025/0026 + **0033 (guards append-only)** + **0037 (wallet)**. PHASE_0 TRI 1 : canonique (cible `finance_transactions`) ; `vault_transactions` déprécié mais ENCORE LU par `dashboard.py` et `weekly_report.py` (risque chiffres incohérents, audit_resync).
-- consommateurs : Vault ; prévus : Path (base sadaqa), WR W1 (rollups finance), pression (F1-17).
-- statut : existe_codé (lecteurs legacy à migrer).
+- vit : migrations 0024/0025/0026 + **0033 (guards append-only)** + **0037 (wallet)**. PHASE_0 TRI 1 : canonique (cible `finance_transactions`) ; lecteurs finance MIGRÉS (C-1 couvert — `dashboard.py` et `weekly_report.py` lisent la table canonique, vérifié passe 0).
+- consommateurs : Vault, dashboard, weekly report ; prévus : Path (base sadaqa), WR W1 (rollups finance), pression (F1-17).
+- statut : existe_codé.
 
 ### F2-09 `ai_slot_transition` + `ai_audit_samples` + vue `v_ai_training_pairs`
-- vit : spécifiées (spec WR §3.7, généralisation du pattern Pulse §3.9). MANQUANTES en code.
+- vit : CRÉÉES au socle (0038, schéma spec WR §3.7 verbatim, généralisation du pattern Pulse §3.9). Vides — chaque passe y seede ses slots.
 - consommateurs prévus : Pulse (tous slots), WR (10 slots §10), Daily (2 slots), Vector (audit OCR §4.7, même esprit).
-- statut : spécifié — À CRÉER PARTAGÉES D'EMBLÉE (recommandation R1, FINDINGS).
+- statut : existe_codé (vides ; R1 appliquée — partagées d'emblée).
 
 ### F2-10 store de paramètres versionnés partagé
-- vit : spécifié 4× (cf. F1-12). MANQUANT.
-- statut : spécifié (dupliqué latent) — à créer PARTAGÉ dès la première passe (R2).
+- vit : CRÉÉ au socle (0038) — table `parameters` + vue `v_parameters_current` (cf. F1-12).
+- statut : existe_codé (R2 appliquée — partagé d'emblée, doublon latent éteint).
 
 ### F2-11 `wr_docket_items` — le docket
 - vit : spécifiée (spec WR §3.1). MANQUANTE.
@@ -359,9 +361,9 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 - consommateurs prévus : WR (deltas hebdo, régénérations), Daily (G1 périmètre « plan courant », §0.5), le 32B terrain (« le lit ENTIER »).
 - statut : spécifié.
 
-### F2-13 définitions de signaux partagées (`*_signal_definitions`/`*_signal_values`)
-- vit : spécifiées (cf. F1-02). MANQUANTES. Doublon latent pulse_ vs wr_.
-- statut : spécifié (dupliqué latent) — R2.
+### F2-13 définitions de signaux partagées (`signal_definitions`/`signal_values`)
+- vit : CRÉÉES au socle (0038) — tables partagées avec colonne `domain` (cf. F1-02) ; seeds des signaux = chaque passe (32 signaux Pulse par la passe Pulse).
+- statut : existe_codé (doublon latent pulse_/wr_ éteint — R2 appliquée).
 
 ### F2-14 `ai_call_logs` + `ai_model_pricing` — observabilité IA
 - vit : spécifiées (doc 43 §17, section « critique »). MANQUANTES en code. ⚠ seed pricing périmé (qwen-2.5-7b, claude-opus-4.7, haiku — doc 43 §17.2) vs doc 30 canonique.
@@ -379,9 +381,10 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 - statut : manquant (divergence docs↔code DV-3 ; QUESTION Q9).
 
 ### F2-17 config role→model éditable (doc 73 PART B)
-- vit : spécifiée (doc 73 : store identifier-not-call, provider+model+effort par rôle, catalogue rafraîchissable, hybride OpenRouter/direct selon sensibilité). MANQUANTE.
-- consommateurs prévus : toolbox.router, toolbox.llm, tous les appels cloud ; alias de rôles D6 (PHASE_0).
-- statut : spécifié.
+- vit : CRÉÉE au socle — table `ai_role_models` (0038, identifier-not-call) + seed doc 30 §3 (0039 : `local_executor` → `qwen3-32b`, Fable 5 restauré au rôle `sustained_long_context` — §7.8 mis à jour).
+- consommateurs actuels : `toolbox.llm` (résolution du modèle local via `resolve_role`, DV-6).
+- consommateurs prévus : toolbox.router, tous les appels cloud ; alias de rôles D6 (PHASE_0).
+- statut : existe_codé.
 
 ---
 
@@ -389,8 +392,8 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 
 | # | modèle | rôle | vit aujourd'hui | consommateurs (source) | statut |
 |---|---|---|---|---|---|
-| F3-01 | Qwen3-32B (V100, Q5) | routeur/scoreur/exécuteur/conducteur local | NON DÉPLOYÉ (GPU phase 2 à venir, F10 §5-bis) ; le code référence encore `qwen2.5:7b-instruct` (config.py:51 + 5 autres endroits, audit_resync) | doc 30 §3.3 ; tous slots local_default des 4 specs ; chatbot 72 ; dialogue 30 §6 | spécifié |
-| F3-02 | qwen3-embedding:8b (P40, Q8→FP16) | embeddings 1024 | NON DÉPLOYÉ (`embeddings_enabled=False`) | doc 38 §5/§11, F10 §5-ter ; mémoire, chaînage WR, corpus Pulse | spécifié |
+| F3-01 | Qwen3-32B (V100, Q5) | routeur/scoreur/exécuteur/conducteur local | NON DÉPLOYÉ (GPU phase 2 à venir, F10 §5-bis) ; le code résout le modèle via le rôle `local_executor` d'`ai_role_models` (seed `qwen3-32b`) — plus aucune référence au 7B legacy (DV-6 soldé au socle) | doc 30 §3.3 ; tous slots local_default des 4 specs ; chatbot 72 ; dialogue 30 §6 | spécifié |
+| F3-02 | qwen3-embedding:8b (P40, Q8→FP16) | embeddings 1024 | NON DÉPLOYÉ (`embeddings_enabled=False`) ; client backend livré au socle (F1-07), unités systemd + smoke J+2 prêts | doc 38 §5/§11, F10 §5-ter ; mémoire, chaînage WR, corpus Pulse | spécifié |
 | F3-03 | Reranker Qwen3-4B (P40) | rerank candidats causaux | NON DÉPLOYÉ — brique V2 UNIQUEMENT (CONCEPTION_chainage : inutile tant que le juge est frontier) ; spec WR 5.2 : « si présent, sinon score composite » | WR W2 | spécifié (V2) |
 | F3-04 | OCR VLM système (PaddleOCR-VL-1.6 ou GLM-OCR, P40) | OCR documents/médical/PDF | NON DÉPLOYÉ (F10 §5-quater propriétaire) | Vault reçus (42 §6.3), Pulse médical (34), Inbox (70) | spécifié |
 | F3-05 | PP-OCRv4 (OCR Bolt dédié) | lecture écran offre (fallback de l'accessibilité Android) | NON DÉPLOYÉ (F10 §5-quater) ; la spec Vector §3.3 met ML Kit ON-DEVICE en primaire + P40 en contre-lecture §4.7 | Vector | spécifié |
@@ -399,7 +402,7 @@ F2-01…F2-17, F3-01…F3-13, D-01…D-10).
 | F3-08 | CatBoost acceptation (ONNX embarqué) | €/h cycle complet → verdict halo | NON ENTRAÎNÉ (spec Vector §3.6/§4.4 ; docs 57/58 ; doc 30 §2.2/§7.7) | Vector tablette | spécifié |
 | F3-09 | CatBoost zones ×2 (zone_eph + zone_wait, même dataset) | temps mort/attente + « Où je vais » | NON ENTRAÎNÉ (spec Vector §4.5 — « un seul modèle de zones, deux consommateurs ») | scoreur embarqué + repositionnement | spécifié |
 | F3-10 | Prédicteur cause→surge (GBM) | surge attendu +15/+30 min | NON ENTRAÎNÉ (spec Vector §4.6) | feature CatBoost, modèle de zones, notifications capture | spécifié |
-| F3-11 | Rôles cloud : Sonnet 4.6 / Opus 4.8 / Fable 5 / GPT-5.5 (santé, finance, web ×3 rôles) | tiers cloud doc 30 §3 | CONFIGURÉS EN DOC uniquement ; aucun appel branché ; statut Fable §7.8 périmé (suspendu 17/06 ; revenu 01/07 — CONCLUSIONS_test_papier demande la mise à jour) | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
+| F3-11 | Rôles cloud : Sonnet 4.6 / Opus 4.8 / Fable 5 / GPT-5.5 (santé, finance, web ×3 rôles) | tiers cloud doc 30 §3 | CONFIGURÉS dans `ai_role_models` (seed 0039, identifier-not-call) ; aucun appel branché ; Fable 5 restauré au seed (§7.8 mis à jour au socle, demande CONCLUSIONS_test_papier soldée) | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
 | F3-12 | Qwen 3B classifier (Ollama, machine orchestrateur) | classification messages du bot de build | **SERVI ET CODÉ** (`/opt/orchestrator/llm_classifier.py`) — seul modèle local effectivement en service dans l'écosystème | orchestrateur (système) | existe_codé |
 | F3-13 | Futurs LoRA (32B juge chaînage ; 70B plan_delta/plan_regen) | trajectoires de sortie du cloud | FUTURS (doc 74 ; CONCEPTION_chainage V2/V3 ; spec WR §10 « trajectoire ») ; datasets = v_ai_training_pairs + Phase 4 | WR, Daily | spécifié (futur) |
 
@@ -480,6 +483,10 @@ Colonne « Système » = usine WR, orchestrateur de build, routage, runner.
   (TOOLBOX_FINDINGS + SOCLE_MAPPING §3), doublons/divergences tranchés (DBL-1 →
   interface unique `toolbox.travel` ; DV-6, DV-11 appliqués), emplacement acté (Q13 :
   numéro 78 à ce catalogue, `78_AI_TASK_CATALOG_V1` absorbé via T7).
+- 2026-07-16 : réconciliation post-livraison (contre-audit socle, finding 1) — fiches
+  F1-01/02/03/07/10/11/12/13/14/16/23, F2-08/09/10/13/17, F3-01/02/11 mises à jour avec
+  l'état réellement livré par la passe 0 ; chiffres de la RÉPONSE CHIFFRÉE recalculés ;
+  références au modèle 7B legacy purgées (DV-6, finding 2).
 - Maintenance : ce document est VIVANT — chaque passe qui code, étend ou active un
   outil met à jour la fiche concernée (statut + consommateurs). L'état d'activation
   reste au doc 76 (jamais ici).
