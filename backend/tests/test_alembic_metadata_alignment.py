@@ -48,6 +48,7 @@ def test_vault_phase_e_tables_are_declared_for_alembic_metadata() -> None:
         "detail",
     } <= weekly_columns
     assert [column.name for column in WeeklyFinanceSummary.__table__.primary_key.columns] == ["user_id", "week_start"]
+    assert WeeklyFinanceSummary.__table__.primary_key.name == "pk_weekly_finance_summaries"
 
     pressure_columns = set(PressureSnapshot.__table__.columns.keys())
     assert "user_id" in pressure_columns

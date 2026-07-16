@@ -20,6 +20,8 @@ down_revision: str | None = "20260716_0040"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+WEEKLY_FINANCE_SUMMARIES_PK = "pk_weekly_finance_summaries"
+
 
 def upgrade() -> None:
     op.add_column("upcoming_expenses", sa.Column("user_id", UUID(as_uuid=True), nullable=True))
@@ -47,8 +49,8 @@ def upgrade() -> None:
     )
     op.create_foreign_key("pressure_snapshots_user_id_fkey", "pressure_snapshots", "users", ["user_id"], ["id"])
 
-    op.drop_constraint("weekly_finance_summaries_pkey", "weekly_finance_summaries", type_="primary")
-    op.create_primary_key("weekly_finance_summaries_pkey", "weekly_finance_summaries", ["user_id", "week_start"])
+    op.drop_constraint(WEEKLY_FINANCE_SUMMARIES_PK, "weekly_finance_summaries", type_="primary")
+    op.create_primary_key(WEEKLY_FINANCE_SUMMARIES_PK, "weekly_finance_summaries", ["user_id", "week_start"])
     op.create_index(
         "upcoming_expenses_user_active_due_idx",
         "upcoming_expenses",
@@ -64,8 +66,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("pressure_snapshots_user_computed_at_idx", table_name="pressure_snapshots")
     op.drop_index("upcoming_expenses_user_active_due_idx", table_name="upcoming_expenses")
-    op.drop_constraint("weekly_finance_summaries_pkey", "weekly_finance_summaries", type_="primary")
-    op.create_primary_key("weekly_finance_summaries_pkey", "weekly_finance_summaries", ["week_start"])
+    op.drop_constraint(WEEKLY_FINANCE_SUMMARIES_PK, "weekly_finance_summaries", type_="primary")
+    op.create_primary_key(WEEKLY_FINANCE_SUMMARIES_PK, "weekly_finance_summaries", ["week_start"])
     op.drop_constraint("pressure_snapshots_user_id_fkey", "pressure_snapshots", type_="foreignkey")
     op.drop_constraint("weekly_finance_summaries_user_id_fkey", "weekly_finance_summaries", type_="foreignkey")
     op.drop_constraint("upcoming_expenses_user_id_fkey", "upcoming_expenses", type_="foreignkey")

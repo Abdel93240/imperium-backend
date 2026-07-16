@@ -2331,6 +2331,17 @@ def test_patch_9k_alembic_head_includes_vault_local_date_timezone_migration() ->
     assert "op.create_index(" in migration_text
 
 
+def test_vault_phase_e_user_scope_migration_uses_canonical_weekly_summary_pk_name() -> None:
+    migration_path = BACKEND_ROOT / "alembic" / "versions" / "20260716_0041_vault_phase_e_user_scope.py"
+    migration_text = migration_path.read_text(encoding="utf-8")
+    base_text = (BACKEND_ROOT / "app" / "db" / "base.py").read_text(encoding="utf-8")
+
+    assert "\"pk\": \"pk_%(table_name)s\"" in base_text
+    assert "WEEKLY_FINANCE_SUMMARIES_PK = \"pk_weekly_finance_summaries\"" in migration_text
+    assert "weekly_finance_summaries_pkey" not in migration_text
+    assert migration_text.count("WEEKLY_FINANCE_SUMMARIES_PK") == 5
+
+
 def test_patch_12g_path_today_has_single_canonical_route() -> None:
     from fastapi import FastAPI
     from fastapi.routing import APIRoute
