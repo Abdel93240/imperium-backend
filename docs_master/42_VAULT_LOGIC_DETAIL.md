@@ -263,9 +263,9 @@ Defined fully in `11_FINANCIAL_PRESSURE_FORMULA.md`.
 Brief summary:
 
 ```text
-pressure_score (0-10):
+pressure_score (0-100):   [PATCH 2026-07-15, Q4 : échelle doc 11 canonique]
   0 = comfortable, no urgency
-  10 = critical, every euro counts
+  100 = critical, every euro counts
 
 Inputs:
   - wallet_total
@@ -275,7 +275,7 @@ Inputs:
   - days_until_next_major_outflow
 
 Output:
-  - pressure_score: 0-10
+  - pressure_score: 0-100 (5 labels, doc 11)
   - pressure_explanation: short text
   - critical_signals: list (e.g. "rent due in 3 days")
 ```
@@ -383,7 +383,7 @@ LEVEL 1 — Always visible
   Daily Vault dashboard shows:
     - week balance: +X €
     - month balance: +Y €
-    - pressure score: N/10
+    - pressure score: N/100 (0-100, doc 11)
     - upcoming alerts
   Computed deterministically, no AI.
 
@@ -460,8 +460,10 @@ Imperium uses these for:
 ## 16. Database Tables
 
 Existing (per doc 05):
-- `vault_transactions` ✅
-- `weekly_finance_summaries` ✅
+- `vault_transactions` ✅ (legacy — ledger canonique = `imperium_vault_transactions`)
+- `weekly_finance_summaries` — **CORRIGÉ 2026-07-15 (DV-3/Q9)** : cette table
+  N'EXISTE PAS en code (aucune migration). **À créer, mini-passe Vault
+  déterministe** (elle alimente la sadaqa Path §16.2 et les rollups W1).
 
 To add:
 
@@ -506,7 +508,7 @@ CREATE TABLE vault_pressure_snapshots (
   id              UUID PK,
   user_id         UUID FK,
   computed_at     TIMESTAMPTZ,
-  pressure_score  NUMERIC(3,1),
+  pressure_score  NUMERIC(5,1),  -- 0-100 (Q4: échelle doc 11 partout)
   inputs_json     JSONB,
   explanation     TEXT
 );
