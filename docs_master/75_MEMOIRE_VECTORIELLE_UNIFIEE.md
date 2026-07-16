@@ -4,7 +4,9 @@
 > Issu d'une session de conception complète. Tranche définitivement la question
 > « `ai_memories` vs `pgvector_memory` » (doublon relevé par l'audit du 18/06).
 > Les patches sur les docs 09, 38, 05, 16, 31, 47 (et autres) DÉCOULENT de ce doc.
-> Décisions prises ici : ne plus y revenir.
+> Version amendée du 2026-07-15 (passe 0, Q5 tranchée) : la décroissance par
+> exposition non confirmée est NORMATIVE (§0.3/§4 amendés, renvoi spec WR §6.3).
+> Cette version amendée datée fait foi.
 
 ---
 
@@ -17,10 +19,16 @@
    données structurées, pas la data brute. Le log WR complet reste en texte
    (étage 1), pointé par les éléments d'apprentissage.
 3. **Pas de decay temporel.** Le poids-qui-décroît-avec-l'âge de doc 38 est
-   SUPPRIMÉ. Un élément d'apprentissage ne vieillit pas ; il se renforce
-   (confidence) ou se fait corriger (supersession).
-4. **`confidence` = solidité par preuve accumulée.** Monte à chaque ré-observation,
-   ne descend jamais toute seule.
+   SUPPRIMÉ. Un élément d'apprentissage ne vieillit pas avec le TEMPS ; il se
+   renforce (confidence) ou se fait corriger (supersession).
+4. **`confidence` = solidité par preuve accumulée.** Monte à chaque ré-observation.
+   AMENDEMENT (2026-07-15, Q5) : elle ne descend jamais avec le simple passage du
+   temps, mais elle PEUT descendre sur **exposition non confirmée** (spec WR §6.3 :
+   le prédicat de contexte était rempli, le pattern ne s'est PAS manifesté).
+   Une exposition non confirmée est une OBSERVATION négative, pas du temps qui
+   passe — le principe « la preuve fait bouger la confiance » est conservé dans
+   les deux sens. Le mécanisme (β×confidence, status_multiplier) appartient à la
+   spec WR §6.3 ; ce doc grave seulement sa légitimité doctrinale.
 5. **Deux patterns contradictoires coexistent** ; le plus prouvé domine ;
    l'ancien survit en trace faible, **jamais supprimé** (valeur historique).
 6. **`privacy_level` sur CHAQUE ligne, sans exception.** Garde-fou médical/religieux.
@@ -135,9 +143,14 @@ Index recommandés : index de similarité vectorielle (HNSW, cosine) sur `embedd
 - Un pattern naît avec une confidence initiale (preuve de départ).
 - **Chaque ré-observation fait monter la confidence.** Un pattern re-confirmé
   semaine après semaine devient très solide.
-- **Un pattern plus jamais observé garde sa confidence figée.** Il ne descend PAS
+- **Un pattern jamais ré-exposé garde sa confidence figée.** Il ne descend PAS
   tout seul avec le temps. (Il ne devient minoritaire que *relativement* à un
   pattern concurrent qui, lui, accumule des preuves — voir §5.)
+- **AMENDEMENT (2026-07-15, Q5) — exposition non confirmée.** Quand le contexte
+  du pattern se présente (exposition) et que le pattern ne se manifeste PAS,
+  cette non-confirmation est une preuve négative : la confidence descend selon
+  la spec WR §6.3. Distinct du decay temporel (toujours interdit) : sans
+  exposition, rien ne bouge.
 - **Il n'existe AUCUN mécanisme de décroissance temporelle (decay).** C'était la
   logique `weight` de l'ex-doc 38 ; elle est supprimée. Elle résolvait
   l'accumulation des WR — problème dissous puisqu'on ne vectorise plus les WR.
@@ -299,6 +312,7 @@ le trou de l'ex-`pgvector_memory` (pas de `privacy_level`) — définitivement b
   doc 38 (qui garde ce rôle).
 - **La cascade d'agrégation temporelle des signaux** → doc 09 (PATCH 08 déjà déployé) ;
   distincte de la présente table de patterns.
-- **La vitesse de décroissance / calibration** → SANS OBJET désormais (decay supprimé).
-  Aucun paramètre de demi-vie à régler.
+- **La vitesse de décroissance / calibration** → le decay TEMPOREL reste sans
+  objet (aucune demi-vie). La calibration de la décroissance PAR EXPOSITION
+  (β, status_multiplier) appartient à la spec WR §6.3 et à ses paramètres.
 ```
