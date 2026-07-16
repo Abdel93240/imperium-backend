@@ -10,9 +10,16 @@ Core principle:
 
 Default rule:
 
-> Keep raw media by default when it is CONTENT (documents, content audio, images with intrinsic value). Deletion is an explicit user decision with a mandatory reason. EXCEPTION: raw audio used only as INPUT (voice command/chatbot dictation) is deleted after successful transcription — it is transport, not content.
+> **PATCH 2026-07-15 (passe 0, doctrine actée — chantier ecosystem 3 absorbé) :
+> TOUT CONSERVER.** Le brut n'est JAMAIS jeté par défaut, quel que soit son
+> rôle (contenu OU transport). « Jeter le brut après extraction » est retiré
+> de la politique. La suppression reste possible mais est TOUJOURS une
+> décision utilisateur explicite avec raison obligatoire. Le stockage vit sur
+> le NAS (pointeur abstrait doc 70) ; le coût du brut est assumé — la vérité
+> re-vérifiable prime.
 
-Summaries and structured records are preferred over raw storage.
+Summaries and structured records are preferred as the WORKING view; the raw
+stays underneath as the source of truth.
 
 ## Global Rules
 
@@ -108,7 +115,9 @@ Indexes:
 
 Rules:
 - `expires_at` is required unless `retention_reason` is `user_archive`, `proof_required`, or `reference_document`.
-- If `delete_after_extraction = true`, cleanup should delete raw media after successful extraction.
+- `delete_after_extraction` : DÉPRÉCIÉ (doctrine « tout conserver », 2026-07-15).
+  La valeur par défaut est `false` partout ; un `true` n'est posé que par une
+  décision utilisateur explicite (avec raison), jamais par un flux automatique.
 - `deleted_at` means raw media is deleted or inaccessible from normal storage.
 
 ### `media_extractions`
@@ -160,29 +169,25 @@ Examples:
 - reminders
 - quick spoken expense declarations
 
-Policy:
-- INPUT audio (voice command, chatbot dictation, quick spoken declaration): transport,
-  not content. Delete raw audio after successful transcription. No user question.
-- CONTENT audio (recorded lesson, voice note with intrinsic value): kept by default
-  (raw = source of truth), via the normal upload flow (doc 70) with the "keep raw?"
-  question defaulting to KEEP.
-- Failed transcription (either role) may keep temporary audio for retry/debug with expiration.
+Policy (PATCHÉE 2026-07-15 — tout conserver) :
+- INPUT audio (voice command, chatbot dictation, quick spoken declaration):
+  conservé aussi (le brut reste re-vérifiable). Plus de suppression
+  automatique post-transcription.
+- CONTENT audio (recorded lesson, voice note with intrinsic value): kept by
+  default (raw = source of truth), via the normal upload flow (doc 70).
+- Failed transcription: raw kept (retry/debug possible sans limite arbitraire).
 
 Default:
-- `delete_after_extraction = true`
-- `retention_reason = temporary_processing`
-- `expires_at` required
+- `delete_after_extraction = false`
+- `retention_reason = keep_all_doctrine`
+- `expires_at` non requis (suppression = décision utilisateur)
 
-Store after successful transcription:
+Store after successful transcription (en PLUS du brut) :
 - transcript if useful and allowed
 - structured event/action result
 - confidence
 - language if detected
 - created transaction/mission/replanning event if applicable
-
-Do not store by default:
-- raw audio forever
-- private raw voice note if a summary is enough
 
 ## Bolt Screenshot Policy
 
@@ -192,10 +197,11 @@ Examples:
 - zone analysis
 - session review
 
-Policy:
+Policy (PATCHÉE 2026-07-15 — tout conserver) :
 - keep OCR extraction and structured VTC event
-- raw screenshot should be deleted after successful extraction unless flagged for audit
-- never keep unnecessary screenshot history forever
+- le screenshot brut est CONSERVÉ (NAS) — il sert la contre-lecture nocturne
+  (spec Vector §4.7) et reste la preuve re-vérifiable
+- la suppression d'un historique de screenshots = décision utilisateur explicite
 
 Default:
 - `delete_after_extraction = true`
