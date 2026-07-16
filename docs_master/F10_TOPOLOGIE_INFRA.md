@@ -142,9 +142,12 @@ une ligne à modifier ici, aucun autre doc cassé.
 - Service OCR = modèle VLM local précis (PaddleOCR-VL-1.6 ou GLM-OCR), sur la P40.
   Pour tout l'OCR du système (documents, médical, PDF).
 - OCR Bolt (cas particulier, modèle DÉDIÉ distinct du service OCR système) :
-  l'assistant d'acceptation de course lit D'ABORD le texte affiché via l'accessibilité
-  Android (lecture seule, jamais d'action — voir règle Bolt). Si échec/blocage → OCR
-  de capture avec PP-OCRv4 (léger, rapide), dédié à cet assistant.
+  **PATCH 2026-07-15 (passe 0, décision utilisateur)** — le chemin PRIMAIRE de
+  l'assistant d'acceptation de course est la **capture + OCR embarqué**
+  (ML Kit on-device, spec Vector §3.3). L'accessibilité Android n'est
+  **JAMAIS** utilisée (ni lecture ni action). PP-OCRv4 (P40) sert de
+  **contre-lecture uniquement** (audit nocturne, spec Vector §4.7), jamais de
+  chemin temps réel.
 - Service de transcription = faster-whisper large-v3 (français ET arabe), sur la
   P40. (large-v3 requis pour l'arabe.) Vigilance : arabe dialectal moins fiable.
 - Garde-fou langue = fastText lid.176.ftz (CPU, ~1 Mo, hors-ligne, aucun impact
