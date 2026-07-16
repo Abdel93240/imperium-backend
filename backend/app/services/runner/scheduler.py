@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.event import Event
 from app.models.toolbox import JobDefinition
-from app.services.events.nomenclature import expand_for_read
+from app.services.events.nomenclature import canonical_event_type, expand_for_read
 from app.services.runner.engine import execute_job
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def _run_job_once(job_code: str, trigger: str, trigger_ref: UUID | None = None) 
 def register_cron_jobs(scheduler: BackgroundScheduler, db: Session) -> list[str]:
     """Register every cron job_definition (enabled or not — dry-run logs skips)."""
     registered: list[str] = []
-    jobs = db.scalars(select(JobDefinition).where(JobDefinition.kind == "cron")).all()
+    jobs = db.scalars(select(JobDefinition).where(JobDefinition.schedule.is_not(None))).all()
     for job in jobs:
         try:
             trigger = CronTrigger.from_crontab(job.schedule, timezone="UTC")
@@ -76,11 +76,25 @@ def dispatch_event(db: Session, event_id: str) -> list[str]:
     ).all()
     launched: list[str] = []
     for job in jobs:
-        if job.event_types and event.event_type not in expand_for_read(list(job.event_types)):
+        if job.event_types and not _event_type_matches(
+            event.event_type, expand_for_read(list(job.event_types))
+        ):
             continue
         execute_job(db, job_code=job.code, trigger="event", trigger_ref=event.id)
         launched.append(job.code)
     return launched
+
+
+def _event_type_matches(event_type: str, filters: list[str]) -> bool:
+    event_candidates = {event_type, canonical_event_type(event_type)}
+    for pattern in filters:
+        if pattern.endswith(".*"):
+            prefix = pattern.removesuffix("*")
+            if any(candidate.startswith(prefix) for candidate in event_candidates):
+                return True
+        elif pattern in event_candidates:
+            return True
+    return False
 
 
 def _listen_loop() -> None:

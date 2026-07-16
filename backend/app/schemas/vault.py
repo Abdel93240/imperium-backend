@@ -185,3 +185,107 @@ class ImperiumVaultTransactionReversalSummary(BaseModel):
 class ImperiumVaultTransactionReverseResponse(BaseModel):
     transaction: ImperiumVaultTransactionRead
     reversal_summary: ImperiumVaultTransactionReversalSummary
+
+
+class VaultDailyTargets(BaseModel):
+    minimum: Decimal
+    comfortable: Decimal
+    optimal: Decimal
+
+
+class VaultPressureResponse(BaseModel):
+    score: int = Field(ge=0, le=100)
+    label: Literal["safe", "stable", "attention", "pressure", "critical"]
+    daily_targets: VaultDailyTargets
+    computed_at: datetime
+
+
+class VaultPressureExplainResponse(BaseModel):
+    score: int = Field(ge=0, le=100)
+    label: Literal["safe", "stable", "attention", "pressure", "critical"]
+    factors: dict
+    daily_targets: dict
+    inputs_snapshot: dict
+    computed_at: datetime
+
+
+class VaultPressureHistoryItem(BaseModel):
+    id: UUID
+    computed_at: datetime
+    score: int
+    label: str
+    daily_targets: dict
+
+
+class UpcomingExpenseCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label_fr: str = Field(min_length=1, max_length=200)
+    amount: Decimal = Field(gt=Decimal("0"), max_digits=12, decimal_places=2)
+    due_date: date
+    recurrence: Literal["monthly", "quarterly", "yearly"] | None = None
+    category: str = Field(min_length=1, max_length=120)
+    wallet: str | None = Field(default=None, max_length=80)
+    mandatory: bool = True
+    active: bool = True
+
+    @field_validator("label_fr", "category", "wallet")
+    @classmethod
+    def strip_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return stripped
+
+
+class UpcomingExpenseUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label_fr: str | None = Field(default=None, min_length=1, max_length=200)
+    amount: Decimal | None = Field(default=None, gt=Decimal("0"), max_digits=12, decimal_places=2)
+    due_date: date | None = None
+    recurrence: Literal["monthly", "quarterly", "yearly"] | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=120)
+    wallet: str | None = Field(default=None, max_length=80)
+    mandatory: bool | None = None
+    active: bool | None = None
+
+    @field_validator("label_fr", "category", "wallet")
+    @classmethod
+    def strip_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return stripped
+
+
+class UpcomingExpenseRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    label_fr: str
+    amount: Decimal
+    due_date: date
+    recurrence: str | None
+    category: str
+    wallet: str | None
+    mandatory: bool
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class WeeklyFinanceSummaryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    week_start: date
+    business_revenue: Decimal
+    business_expenses: Decimal
+    weekly_business_profit: Decimal
+    personal_expenses: Decimal
+    computed_at: datetime
+    detail: dict
