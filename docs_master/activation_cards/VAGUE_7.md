@@ -20,12 +20,12 @@ observations: pulse_device_samples HORS whitelist prompts (testé §16.4) — in
 ```
 id: ACT-PLS-02    nom_fr: Signaux device — famille sleep (×3) + cardio (×4)
 domaine: pulse    classe: det_lecture   echelon_audace: 1   statut: NOT_CODED
-bascule_exacte: UPDATE pulse_signal_definitions SET active=true WHERE code IN
+bascule_exacte: UPDATE signal_definitions SET active=true WHERE domain='pulse' AND code IN
   ('sleep_duration_last','sleep_debt_7d','sleep_regularity_7d','resting_hr_delta',
-  'hrv_delta_pct','steps_ratio_day','recovery_score');
+  'hrv_delta_pct','steps_ratio_day','recovery_score');  -- table PARTAGÉE (socle 0038)
 prerequis_activation: [ACT-PLS-01]
-protocole_terrain: pulse_signal_values calculées à chaque refresh ; bandes vs ressenti ;
-  2-3 j
+protocole_terrain: signal_values (table partagée) calculées à chaque refresh ; bandes vs
+  ressenti ; 2-3 j
 critere_succes: valeurs exactes (recalcul manuel sur 1 jour), staleness correcte
 rollback: UPDATE ... SET active=false (valeurs écrites conservées)
 source: spec Pulse §4 (dictionnaire des 32 signaux)

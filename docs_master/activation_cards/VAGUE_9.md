@@ -7,8 +7,8 @@ doivent monter la garde d'abord). Durée : 7 j (notifiant).
 ```
 id: ACT-PLS-06    nom_fr: Signaux médicaux (×3 : labs, monitoring dû, tendance poids)
 domaine: pulse    classe: det_lecture   echelon_audace: 1   statut: NOT_CODED
-bascule_exacte: UPDATE pulse_signal_definitions SET active=true WHERE code IN
-  ('labs_out_of_range_active','medical_monitoring_due','weight_trend_28d');
+bascule_exacte: UPDATE signal_definitions SET active=true WHERE domain='pulse' AND code IN
+  ('labs_out_of_range_active','medical_monitoring_due','weight_trend_28d');  -- table PARTAGÉE
 prerequis_activation: [ACT-PLS-08]
 protocole_terrain: signaux visibles au board ; orange/red routés vers red_flag_rules
   (actives en même vague) ; 2-3 j

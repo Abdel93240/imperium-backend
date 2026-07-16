@@ -6,9 +6,9 @@ famille vit dans son domaine de board (colonnes distinctes). Durée : 2-3 j.
 ```
 id: ACT-PLS-03    nom_fr: Signaux intake — hydration (×2) + nutrition (×5)
 domaine: pulse    classe: det_lecture   echelon_audace: 1   statut: NOT_CODED
-bascule_exacte: UPDATE pulse_signal_definitions SET active=true WHERE code IN
+bascule_exacte: UPDATE signal_definitions SET active=true WHERE domain='pulse' AND code IN
   ('hydration_ratio_now','hydration_day_total','protein_ratio_day','kcal_ratio_day',
-  'eating_window_state','last_meal_hours','mealplan_adherence_7d');
+  'eating_window_state','last_meal_hours','mealplan_adherence_7d');  -- table PARTAGÉE
 prerequis_activation: [ACT-PLS-08]
 protocole_terrain: saisies eau/repas réelles → ratios au prorata de l'heure ; 2-3 j
 critere_succes: ratios exacts vs saisies ; courbe horaire P:hydration_curve respectée
@@ -21,7 +21,7 @@ observations: mealplan_adherence_7d reste neutre tant que P6/solveur inactifs (p
 ```
 id: ACT-PLS-04    nom_fr: Signaux training (×7)
 domaine: pulse    classe: det_lecture   echelon_audace: 1   statut: NOT_CODED
-bascule_exacte: UPDATE pulse_signal_definitions SET active=true WHERE code IN
+bascule_exacte: UPDATE signal_definitions SET active=true WHERE domain='pulse' AND code IN
   ('session_planned_today','hours_to_session','volume_debt_total','training_adherence_7d',
   'last_high_load_hours','muscle_recovery_gate','adaptation_freq_by_slot','rpe_trend_7d');
 prerequis_activation: [ACT-PLS-08]
