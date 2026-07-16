@@ -91,6 +91,8 @@ Le rapport recommande 3 catalogues centraux à créer :
 - `76_INFRA_MEMORY_AI_EVENTS_CONTRACT` : contrat socle unique.
 - `77_EVENT_TYPE_CATALOG_V1` : vocabulaire d'events stable -> résout les 2 stores.
 - `78_AI_TASK_CATALOG_V1` : vocabulaire `task_type` -> évite que chaque workflow invente.
+  *(Arbitré 2026-07-16, Q13/T7 : absorbé — `ai_slot_transition` est le registre des slots ;
+  le numéro 78 est pris par `docs_master/78_TOOLBOX_CATALOG.md`, le catalogue toolbox.)*
 
 Raison : règles éparpillées sur docs 06/09/30/31/38/45/75 + code déjà divergé. Un catalogue unique évite de recoder un socle incohérent.
 

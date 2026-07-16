@@ -2,7 +2,7 @@
 
 Créé : 2026-07-11 (Claude Code / Fable 5, Tower). Statut : **canonique pour l'activation** —
 premier document lu par tout audit futur (R8). Mis à jour à chaque merge de passe puis à
-chaque bascule. Numéro 76 = prochain libre (78 reste réservé au catalogue toolbox, Q13/Q22).
+chaque bascule. Numéro 76 = prochain libre (78 = catalogue toolbox, promu 2026-07-16, Q13/Q22).
 
 Doctrine (gravée par l'utilisateur, résumé) : R1 coder ≠ brancher (les passes livrent
 ÉTEINT, l'activation est un acte séparé, journalisé, réversible) ; R2 l'unité = la feature

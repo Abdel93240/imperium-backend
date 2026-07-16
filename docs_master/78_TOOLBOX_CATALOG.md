@@ -1,8 +1,22 @@
-# TOOLBOX_CATALOG_DRAFT — Inventaire des outils du système et de leurs consommateurs
+# 78_TOOLBOX_CATALOG — Inventaire des outils du système et de leurs consommateurs
 
-Date : 2026-07-10. Audit lecture seule (Claude Code / Fable 5, Tower).
-Statut : **PROMU → `docs_master/78_TOOLBOX_CATALOG.md` (2026-07-16, Q13).** Fichier
-figé comme archive de l'audit — ne plus éditer, toute mise à jour va au doc 78.
+Audit source : 2026-07-10, lecture seule (Claude Code / Fable 5, Tower) —
+`gap_analysis_v1/toolbox/TOOLBOX_CATALOG_DRAFT.md`.
+Statut : **CANONIQUE** — promu le 2026-07-16 (passe 0 socle toolbox, décision Q13).
+Le numéro 78, réservé à `78_AI_TASK_CATALOG_V1` (gap_analysis_v1/00_INDEX ligne 93),
+revient à ce catalogue ; le catalogue ai_task est **absorbé** (T7, TOOLBOX_FINDINGS) :
+`ai_slot_transition` EST le registre des slots — tout slot doit y avoir une ligne,
+les specs le font déjà via leurs seeds. Pas de document séparé.
+
+> **ÉTAT DES STATUTS** : les fiches photographient le système au 2026-07-10. La
+> passe 0 (socle toolbox, mergée depuis) a livré ÉTEINT : runner (F1-14),
+> notifications (F1-11), params (F1-12/F2-10), signaux — tables (F2-13), tables
+> d'audit IA (F2-09), client embeddings (F1-07, serving différé GPU), travel v0 +
+> geo/H3 (F1-01/F1-23), prayer minimal (F1-16), enveloppe events E2 + NOTIFY
+> (F1-10), config rôle→modèle `ai_role_models` (F2-17), lecteurs legacy migrés
+> (C-1, F2-08). La LIMITE 1 est caduque (base rapatriée sur Tower). État
+> d'activation : doc 76 ; détail d'exécution : `SOCLE_MAPPING.md` (racine repo).
+
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
 INVENTAIRE_tables, GAP_*), audit_resync/, les 4 specs one-pass (`/tmp/incoming_docs/`), le code réel
@@ -459,10 +473,13 @@ Colonne « Système » = usine WR, orchestrateur de build, routage, runner.
 
 ---
 
-# NOTES DE PROMOTION
+# PROMOTION (journal)
 
-Ce brouillon devient `TOOLBOX_CATALOG.md` canonique après : (1) réponses aux QUESTIONS
-UTILISATEUR (TOOLBOX_FINDINGS.md, en tête) ; (2) arbitrage des doublons/divergences ;
-(3) décision sur l'emplacement canonique (suggestion : `docs_master/78_TOOLBOX_CATALOG.md` —
-le numéro 78 était déjà pressenti pour un catalogue transverse, cf. gap_analysis_v1/00_INDEX
-ligne 93 qui réservait 78 au catalogue ai_task ; à arbitrer).
+- 2026-07-16 : promu canonique depuis `gap_analysis_v1/toolbox/TOOLBOX_CATALOG_DRAFT.md`
+  (passe 0 socle toolbox). Conditions remplies : questions Q1-Q13 arbitrées
+  (TOOLBOX_FINDINGS + SOCLE_MAPPING §3), doublons/divergences tranchés (DBL-1 →
+  interface unique `toolbox.travel` ; DV-6, DV-11 appliqués), emplacement acté (Q13 :
+  numéro 78 à ce catalogue, `78_AI_TASK_CATALOG_V1` absorbé via T7).
+- Maintenance : ce document est VIVANT — chaque passe qui code, étend ou active un
+  outil met à jour la fiche concernée (statut + consommateurs). L'état d'activation
+  reste au doc 76 (jamais ici).
