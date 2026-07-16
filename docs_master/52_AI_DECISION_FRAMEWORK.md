@@ -495,21 +495,31 @@ This keeps compute lightweight and predictable.
 
 ## 8. The Rolling 4-Week Plan
 
+> **PATCH 2026-07-15 (passe 0, Q8 tranchée) — RENVOI.** La génération et la
+> régénération du plan 4 semaines sont définies par la spec WR (Continuous
+> Engine) : le plan vit dans `plan_versions` (+ `v_plan_current`), avec
+> `origin=monthly_regen|shock_regen`. Le présent §8 reste la référence du
+> CONTENU (inputs §8.2, prompt §8.3-sketch, structure de sortie) mais son
+> mécanisme d'exécution (cron lundi 05:00) est REMPLACÉ : la cadence devient
+> la révision mensuelle de la spec WR §8.3, exécutée par le runner
+> (`toolbox.runner`), jamais par un workflow n8n.
+
 The high reasoning model-generated monthly plan is the **spinal cord** of the operational brain.
 
 ### 8.1 When it runs
 
 ```text
-Every Monday at 05:00 Europe/Paris.
+[PATCHÉ 2026-07-15 — voir renvoi en tête de §8]
+Cadence canonique : révision MENSUELLE (spec WR §8.3, plan_versions
+origin=monthly_regen) + régénération sur CHOC (origin=shock_regen).
+L'ancien cron hebdomadaire « Every Monday at 05:00 Europe/Paris » n'est
+PLUS le mécanisme : les deltas hebdomadaires vivent dans la spec WR
+(plan_deltas), le plan complet n'est régénéré que mensuellement ou sur choc.
 
-Why Monday early:
-- The user's Monday morning popup happens around 06:00-09:00
-- The monthly plan must be ready before
-- 05:00 leaves a comfortable buffer
-- Sundays are part of the previous week (per ISO weeks)
-
-If the cron fails: retry at 05:30, 06:00, 06:30.
-If still failing: alert user, fall back to previous plan.
+Robustesse (inchangée dans l'esprit) :
+Si la génération échoue : retries espacés par le runner.
+Si l'échec persiste : notification utilisateur, le plan précédent reste
+actif (v_plan_current ne bouge pas).
 ```
 
 ### 8.2 Inputs to the high reasoning model (10 categories)
