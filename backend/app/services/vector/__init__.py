@@ -6,3 +6,10 @@ from app.services.vector.scoring import (
     VectorRideSample,
     aggregate_hourly_rate_estimate,
 )
+
+__all__ = [
+    "VECTOR_ABSTENTION_MESSAGE",
+    "VectorHourlyRateAggregationResult",
+    "VectorRideSample",
+    "aggregate_hourly_rate_estimate",
+]
