@@ -27,6 +27,7 @@ from app.services.events.nomenclature import (  # noqa: E402
     expand_for_read,
 )
 from app.services.runner.engine import execute_job  # noqa: E402
+from app.services.runner.scheduler import _event_type_matches  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -91,6 +92,12 @@ def test_declared_replan_flow_fills_causation_correlation_and_depth(engine, user
         db.commit()
         assert replanned.depth == 3
         assert replanned.correlation_id == root.correlation_id
+
+
+def test_event_subscription_wildcards_match_canonical_and_legacy_finance_events() -> None:
+    assert _event_type_matches("finance.transaction.created", ["finance.transaction.*"])
+    assert _event_type_matches("vault.transaction.created", ["finance.transaction.*"])
+    assert not _event_type_matches("planning.day.finished", ["finance.transaction.*"])
 
 
 def test_pg_notify_events_new_is_delivered_on_insert(engine, user_id) -> None:

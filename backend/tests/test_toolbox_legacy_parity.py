@@ -159,7 +159,7 @@ def test_real_divergence_produces_one_normal_notification(engine, user) -> None:
         db.rollback()
 
 
-def test_legacy_tables_are_not_dropped(engine) -> None:
+def test_non_vault_legacy_tables_remain_but_vault_transactions_is_dropped(engine) -> None:
     from sqlalchemy import text
 
     with engine.connect() as conn:
@@ -172,7 +172,7 @@ def test_legacy_tables_are_not_dropped(engine) -> None:
                 )
             )
         }
-        assert names == {"imperium_path_items", "imperium_priority_rules", "vault_transactions"}
+        assert names == {"imperium_path_items", "imperium_priority_rules"}
 
 
 def test_no_reader_left_on_legacy_models() -> None:

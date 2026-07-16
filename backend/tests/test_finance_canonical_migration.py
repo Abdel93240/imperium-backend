@@ -3,13 +3,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from fastapi.routing import APIRoute
 
-from app.api.deps import get_current_user, get_db
-from app.api.v1.routes import vault
+from app.api.v1 import router as api_router_module
 from app.models.event import Event
-from app.models.idempotency import IdempotencyKey
 from app.models.vault import ImperiumVaultTransaction
 from app.services.imperium.dashboard import get_dashboard_snapshot
 from app.services.imperium.weekly_report import get_weekly_report
@@ -68,14 +65,6 @@ def _user(user_id=None) -> SimpleNamespace:
     return SimpleNamespace(id=user_id or uuid4(), timezone="UTC")
 
 
-def _legacy_vault_client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
-    app = FastAPI()
-    app.include_router(vault.router, prefix="/vault")
-    app.dependency_overrides[get_current_user] = lambda: current_user
-    app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app)
-
-
 def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     occurred_at = overrides.pop("occurred_at", datetime(2026, 7, 6, 10, 0, tzinfo=UTC))
     return ImperiumVaultTransaction(
@@ -100,44 +89,19 @@ def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
     )
 
 
-def test_legacy_vault_create_writes_canonical_transaction_in_cents_and_keeps_event() -> None:
-    current_user = _user()
-    db = FakeDb()
+def test_legacy_vault_transaction_routes_are_removed_from_api_router() -> None:
+    routes = {
+        (route.path, tuple(sorted(route.methods)))
+        for route in api_router_module.api_router.routes
+        if isinstance(route, APIRoute)
+    }
 
-    response = _legacy_vault_client(db, current_user).post(
-        "/vault/transactions",
-        headers={"Idempotency-Key": "legacy-vault-income-1"},
-        json={
-            "occurred_at": "2026-07-06T10:00:00Z",
-            "local_date": "2026-07-06",
-            "timezone": "UTC",
-            "transaction_type": "income",
-            "wallet": "revolut_business",
-            "category": "vtc",
-            "label": "Bolt morning",
-            "amount": "123.45",
-            "currency": "eur",
-            "notes": "gross revenue",
-        },
-    )
-
-    assert response.status_code == 201
-    body = response.json()
-    transaction = next(item for item in db.added if isinstance(item, ImperiumVaultTransaction))
-    event = next(item for item in db.added if isinstance(item, Event))
-    assert transaction.amount_cents == 12345
-    assert transaction.wallet == "revolut_business"
-    assert transaction.transaction_type == "income"
-    assert transaction.source == "vault"
-    assert transaction.note == "gross revenue"
-    assert transaction.is_reversal is False
-    assert body["transaction"]["amount"] == "123.45"
-    assert body["transaction"]["wallet"] == "revolut_business"
-    assert body["transaction"]["is_reversal"] is False
-    assert event.event_type == "finance.transaction.created"
-    assert event.payload["transaction_id"] == str(transaction.id)
-    assert any(isinstance(item, IdempotencyKey) for item in db.added)
-    assert db.committed is True
+    assert ("/vault/transactions", ("POST",)) not in routes
+    assert ("/vault/transactions/recent", ("GET",)) not in routes
+    assert ("/vault/summary/week", ("GET",)) not in routes
+    assert ("/vault/pressure", ("GET",)) in routes
+    assert ("/vault/upcoming-expenses", ("POST",)) in routes
+    assert ("/vault/weekly-summaries", ("GET",)) in routes
 
 
 def test_dashboard_vault_week_uses_canonical_cents_and_exposes_reversals() -> None:
@@ -170,49 +134,6 @@ def test_dashboard_vault_week_uses_canonical_cents_and_exposes_reversals() -> No
     assert snapshot.vault_week.reversal_total == Decimal("200.00")
     assert snapshot.vault_week.reversal_count == 1
     assert snapshot.vault_week.transaction_count == 3
-    assert "imperium_vault_transactions.user_id" in "\n".join(str(query) for query in db.queries)
-
-
-def test_legacy_vault_weekly_summary_uses_canonical_cents_wallets_and_reversals() -> None:
-    current_user = _user()
-    original_income = _transaction(
-        current_user.id,
-        transaction_type="income",
-        amount_cents=15000,
-        wallet="cash",
-        category="vtc",
-    )
-    fuel_expense = _transaction(
-        current_user.id,
-        transaction_type="expense",
-        amount_cents=2500,
-        wallet="bank",
-        category="fuel",
-    )
-    reversal = _transaction(
-        current_user.id,
-        transaction_type="expense",
-        amount_cents=15000,
-        wallet="cash",
-        category="vtc",
-        is_reversal=True,
-        reversal_of_transaction_id=original_income.id,
-        reversal_reason="duplicate",
-    )
-    db = FakeDb(scalars_results=[[original_income, fuel_expense, reversal]])
-
-    response = _legacy_vault_client(db, current_user).get("/vault/summary/week?week_start=2026-07-06")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["income_total"] == "150.00"
-    assert body["expense_total"] == "175.00"
-    assert body["net_total"] == "-25.00"
-    assert body["reversal_total"] == "150.00"
-    assert body["reversal_count"] == 1
-    assert body["by_wallet"]["cash"]["reversal_total"] == "150.00"
-    assert body["by_wallet"]["cash"]["reversal_count"] == 1
-    assert body["by_category"]["vtc"]["reversal_total"] == "150.00"
     assert "imperium_vault_transactions.user_id" in "\n".join(str(query) for query in db.queries)
 
 

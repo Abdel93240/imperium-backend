@@ -6,7 +6,7 @@ from app.db.postgres_types import Vector1024, register_postgresql_vector_type
 from app.models.ai import AIMemory
 from app.models.auth import Device, RefreshToken, User
 from app.models.imperium import ImperiumMemoryCandidateDecision
-from app.models.vault import LegacyVaultTransaction
+from app.models.vault import PressureSnapshot, UpcomingExpense, WeeklyFinanceSummary
 
 
 def _index_expressions(model, index_name: str) -> list[str]:
@@ -14,48 +14,45 @@ def _index_expressions(model, index_name: str) -> list[str]:
     return [str(expression) for expression in index.expressions]
 
 
-def test_legacy_vault_transactions_stays_declared_for_alembic_metadata() -> None:
-    assert LegacyVaultTransaction.__tablename__ == "vault_transactions"
-    assert Base.metadata.tables["vault_transactions"] is LegacyVaultTransaction.__table__
+def test_vault_phase_e_tables_are_declared_for_alembic_metadata() -> None:
+    assert "vault_transactions" not in Base.metadata.tables
+    assert Base.metadata.tables["upcoming_expenses"] is UpcomingExpense.__table__
+    assert Base.metadata.tables["weekly_finance_summaries"] is WeeklyFinanceSummary.__table__
+    assert Base.metadata.tables["pressure_snapshots"] is PressureSnapshot.__table__
 
-    columns = set(LegacyVaultTransaction.__table__.columns.keys())
+    upcoming_columns = set(UpcomingExpense.__table__.columns.keys())
     assert {
         "id",
-        "user_id",
-        "event_id",
-        "occurred_at",
-        "local_date",
-        "timezone",
-        "transaction_type",
-        "wallet",
-        "category",
-        "label",
+        "label_fr",
         "amount",
-        "currency",
-        "notes",
-        "source_app",
+        "due_date",
+        "recurrence",
+        "category",
+        "wallet",
+        "mandatory",
+        "active",
         "created_at",
         "updated_at",
-    } <= columns
+    } <= upcoming_columns
+
+    weekly_columns = set(WeeklyFinanceSummary.__table__.columns.keys())
+    assert {
+        "week_start",
+        "business_revenue",
+        "business_expenses",
+        "weekly_business_profit",
+        "personal_expenses",
+        "computed_at",
+        "detail",
+    } <= weekly_columns
 
     constraint_names = {
         constraint.name
-        for constraint in LegacyVaultTransaction.__table__.constraints
+        for constraint in PressureSnapshot.__table__.constraints
         if isinstance(constraint, CheckConstraint)
     }
-    for expected_name in {
-        "vault_transactions_transaction_type_check",
-        "vault_transactions_wallet_check",
-        "vault_transactions_amount_positive",
-    }:
-        assert any(name.endswith(expected_name) for name in constraint_names)
-
-    index_names = {index.name for index in LegacyVaultTransaction.__table__.indexes}
-    assert {
-        "vault_transactions_user_local_date_idx",
-        "vault_transactions_user_occurred_at_idx",
-        "vault_transactions_user_transaction_type_idx",
-    } <= index_names
+    assert any(name.endswith("pressure_snapshots_score_range") for name in constraint_names)
+    assert any(name.endswith("pressure_snapshots_label_check") for name in constraint_names)
 
 
 def test_auth_metadata_uses_existing_constraint_and_index_names() -> None:
@@ -81,15 +78,14 @@ def test_desc_indexes_match_existing_migrations() -> None:
         ImperiumMemoryCandidateDecision,
         "imperium_memory_candidate_decisions_user_created_idx",
     )
-    legacy_vault_expressions = _index_expressions(
-        LegacyVaultTransaction,
-        "vault_transactions_user_occurred_at_idx",
+    pressure_expressions = _index_expressions(
+        PressureSnapshot,
+        "pressure_snapshots_computed_at_idx",
     )
 
     assert memory_candidate_expressions[0].endswith("user_id")
     assert memory_candidate_expressions[1] == "created_at DESC"
-    assert legacy_vault_expressions[0].endswith("user_id")
-    assert legacy_vault_expressions[1] == "occurred_at DESC"
+    assert pressure_expressions[0] == "computed_at DESC"
 
 
 def test_pgvector_type_is_registered_for_alembic_reflection() -> None:
