@@ -14,8 +14,25 @@ Rappels structurants :
 - D3 : le format cible des `event_type` est dotted,
   `domaine.sujet.action`.
 - Le premier segment est un domaine générique, jamais un nom d'application :
-  `finance`, `worship`, `planning`, `health`, `decision`, `calendar`,
-  `rides`, `vehicle`.
+  `finance`, `planning`, `health`, `decision`, `calendar`, `rides`,
+  `vehicle` — **et `path` (DV-11, gravée 2026-07-15) : exception assumée,
+  voir section WORSHIP.**
+- **PATCH 2026-07-15 (passe 0) — renommages APPLIQUÉS côté code** avec compat
+  en lecture 30 jours (jusqu'au 2026-08-14, module
+  `app/services/events/nomenclature.py`). Table de correspondance :
+
+| ancien (historique) | nouveau (canonique, émis) |
+|---|---|
+| `vault.transaction.created` | `finance.transaction.created` |
+| `mission.backlog.created` | `planning.mission.created` |
+| `mission.started` | `planning.mission.started` |
+| `mission.completed` | `planning.mission.completed` |
+| `mission.failed`, `mission.abandoned` (E1) | `planning.mission.aborted` (+ `reason`) |
+| `day.plan.created` | `planning.daily_plan.generated` |
+| `day.plan.activated/completed/cancelled` | `planning.daily_plan.replanned` (+ `trigger`) |
+| `day.finished` | `planning.day.finished` |
+| `priority.rules.updated` | `decision.priorities.updated` |
+| `path.item.*` | **INCHANGÉ** (DV-11 : le code fait foi) |
 - Les applications restent des interfaces. Elles affichent, collectent,
   déclenchent et montrent des recommandations ; elles ne deviennent pas le
   cerveau stratégique.
@@ -91,10 +108,17 @@ La pression financière n'est pas un event. Elle reste une jauge visuelle
 informative. Le profit hebdomadaire n'est pas un event non plus ; les faits
 liés aux objectifs de profit vivent côté `planning`.
 
-### WORSHIP
+### WORSHIP — NON-RETENU (DV-11, 2026-07-15)
 
-Le domaine `worship` remplace les noms d'application de type `path.*`. Les
-pratiques religieuses ont des events dédiés quand elles ont une valeur
+> **DÉCISION DV-11 (gravée, passe 0) : le canonique est ce que le code émet.**
+> Le domaine `worship.*` proposé par ce catalogue N'EST PAS RETENU : les
+> events religieux restent sous **`path.*`** (`path.item.*` émis aujourd'hui,
+> `path.ghusl.*` reste le nom cible du mode ghusl, `path.prayer.*`,
+> `path.fasting.*`, etc. pour les futurs). Le tableau ci-dessous est conservé
+> comme inventaire SÉMANTIQUE (quels faits méritent un event, quels payloads)
+> — lire chaque `worship.X.Y` comme `path.X.Y`.
+
+Les pratiques religieuses ont des events dédiés quand elles ont une valeur
 opérationnelle ou analytique.
 
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
@@ -257,24 +281,29 @@ Le score de mission n'est pas un event. C'est un attribut ou calcul permanent
 qui varie avec l'urgence et le contexte. Une mission rescored n'est donc pas un
 fait journalisé ; seules les décisions explicites liées à cette mission le sont.
 
-## À faire côté code
+## À faire côté code — ÉTAT AU 2026-07-15 (passe 0)
 
-Ces points sont un récapitulatif documentaire. Ils ne sont pas implémentés par
-ce fichier.
+1. ✅ FAIT (partiel par décision) : `vault.*`→`finance.*`, `mission.*`/`day.*`
+   →`planning.*`, `priority.*`→`decision.*` appliqués (compat lecture 30 j).
+   `path.*`→`worship.*` NON APPLIQUÉ : DV-11 grave `path.*` comme canonique.
+2. ✅ FAIT : `events.depth` rempli à l'émission (émetteur partagé
+   `app/services/events/emitter.py` — cause déclarée → depth parent+1).
+3. ✅ FAIT pour les types émis par le backend (dotted génériques).
+4. ✅ FAIT : E1 résolu — `mission.failed`/`mission.abandoned` →
+   `planning.mission.aborted` (+ raison). `planning.mission.ai_disagreement`
+   reste V2 (à créer à la passe Daily/WR).
+5. Débrancher `imperium_events` selon E3 option B : EN COURS (routes
+   dépréciées, doc 04 patché ; coupure des lecteurs orphelins à suivre).
+6. ✅ FAIT (migration 0035) : soft delete calendrier + `calendar.event.deleted`
+   émis (lié à la création par causation, passe 0).
+7. ✅ FAIT : `correlation_id`/`causation_id` remplis par la passe déterministe
+   des liens déclarés (même action, conséquence directe) ; le chaînage profond
+   reste WR Phase 3.
 
-1. Renommer les domaines d'event_type pour supprimer les noms d'app :
-   `vault.*` vers `finance.*`, `path.*` vers `worship.*`,
-   `mission.*` et `day.*` vers `planning.*`,
-   `priority.*` vers `decision.*`.
-2. Calculer et remplir `events.depth` dans le chaînage réel des événements.
-3. Normaliser les formats dotted en `domaine.sujet.action`, avec domaines
-   génériques.
-4. Résoudre `mission.failed` selon E1 : remplacer le double émetteur par
-   `planning.mission.aborted`, garder `planning.mission.completed` pour la
-   réussite, et créer `planning.mission.ai_disagreement` comme event séparé V2.
-5. Débrancher `imperium_events` selon E3 option B : désactiver proprement les
-   lecteurs orphelins sans repointer précipitamment vers `events`.
-6. Passer calendar de hard delete à soft delete et émettre
-   `calendar.event.deleted`.
-7. Remplir `correlation_id` et `causation_id` avec un vrai chaînage. Aujourd'hui,
-   `correlation_id` est presque toujours aléatoire et `causation_id` est vide.
+## Types des passes à venir
+
+Chaque passe ajoute ses types à CE catalogue au moment de son patch docs de
+fin de passe, sous domaines génériques : Pulse → `health.*` ; WR → `planning.*`
+(revue/plan) ; Daily → `planning.*` ; Vector → `rides.*`/`vehicle.*` (jamais
+`vtc.*`, nom d'app interdit par D3). Le runner (passe 0) consomme ces types
+via `job_definitions.event_types` + `job_cursors`.
