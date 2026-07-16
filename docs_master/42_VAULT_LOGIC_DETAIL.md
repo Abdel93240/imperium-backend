@@ -152,7 +152,7 @@ User taps "+ Gain" in Vault
      - source: cash | bank | crypto (which wallet receives)
   
   → User taps "Ajouter"
-  → POST /api/vault/transactions
+  → POST /api/imperium/vault/transactions
      headers: Idempotency-Key
   → backend validates + stores
   → wallet balance updated
@@ -459,15 +459,18 @@ Imperium uses these for:
 
 ## 16. Database Tables
 
-Existing (per doc 05):
-- `vault_transactions` ✅ (legacy — ledger canonique = `imperium_vault_transactions`)
-- `weekly_finance_summaries` — **CORRIGÉ 2026-07-15 (DV-3/Q9)** : cette table
-  N'EXISTE PAS en code (aucune migration). **À créer, mini-passe Vault
-  déterministe** (elle alimente la sadaqa Path §16.2 et les rollups W1).
+Existing after Phase E (per doc 05):
+- `imperium_vault_transactions` — ledger canonique append-only.
+- `upcoming_expenses` — dépenses à venir / récurrentes saisies par l'utilisateur.
+- `weekly_finance_summaries` — résumé hebdomadaire déterministe ;
+  `weekly_business_profit` alimente la sadaqa Path §16.2.
+- `pressure_snapshots` — historique append-only du score 0-100.
+- `vault_transactions` — legacy archivé puis droppé par la migration Phase E.
 
-To add:
+Reference schemas:
 
 ```sql
+-- Future / outside Phase E.
 CREATE TABLE vault_wallet_snapshots (
   id              UUID PK,
   user_id         UUID FK,
@@ -479,48 +482,44 @@ CREATE TABLE vault_wallet_snapshots (
   source          VARCHAR(32) -- manual | sync (V2)
 );
 
+-- Phase E.
 CREATE TABLE upcoming_expenses (
-  id                    UUID PK,
-  user_id               UUID FK,
-  title                 VARCHAR(200),
-  amount_eur            NUMERIC(12,2),
-  due_date              DATE,
-  book                  VARCHAR(16) CHECK (book IN ('business','personal')),
-  status                VARCHAR(16) CHECK (status IN ('pending','paid','overdue')),
-  recurrence            VARCHAR(16) CHECK (recurrence IN ('none','monthly','yearly')),
-  reminder_days_before  INTEGER,
-  created_at            TIMESTAMPTZ,
-  paid_at               TIMESTAMPTZ NULL
+  id          UUID PK,
+  label_fr    TEXT NOT NULL,
+  amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  due_date    DATE NOT NULL,
+  recurrence  TEXT NULL CHECK (recurrence IS NULL OR recurrence IN ('monthly','quarterly','yearly')),
+  category    TEXT NOT NULL,
+  wallet      TEXT NULL,
+  mandatory   BOOLEAN NOT NULL DEFAULT true,
+  active      BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE user_category_memory (
-  id              UUID PK,
-  user_id         UUID FK,
-  description_normalized VARCHAR(255),
-  category        VARCHAR(64),
-  book            VARCHAR(16),
-  occurrences     INTEGER,
-  last_used_at    TIMESTAMPTZ,
-  UNIQUE (user_id, description_normalized, book)
+CREATE TABLE weekly_finance_summaries (
+  week_start              DATE PK,
+  business_revenue        NUMERIC(12,2) NOT NULL,
+  business_expenses       NUMERIC(12,2) NOT NULL,
+  weekly_business_profit  NUMERIC(12,2) NOT NULL,
+  personal_expenses       NUMERIC(12,2) NOT NULL,
+  computed_at             TIMESTAMPTZ NOT NULL,
+  detail                  JSONB NOT NULL
 );
 
-CREATE TABLE vault_pressure_snapshots (
-  id              UUID PK,
-  user_id         UUID FK,
-  computed_at     TIMESTAMPTZ,
-  pressure_score  NUMERIC(5,1),  -- 0-100 (Q4: échelle doc 11 partout)
-  inputs_json     JSONB,
-  explanation     TEXT
+CREATE TABLE pressure_snapshots (
+  id               UUID PK,
+  computed_at      TIMESTAMPTZ NOT NULL,
+  score            INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
+  label            TEXT NOT NULL,
+  factors          JSONB NOT NULL,
+  daily_targets    JSONB NOT NULL,
+  inputs_snapshot  JSONB NOT NULL
 );
 ```
 
-The existing `vault_transactions` table needs the `book` column added if not present:
-
-```sql
-ALTER TABLE vault_transactions
-ADD COLUMN IF NOT EXISTS book VARCHAR(16) NOT NULL DEFAULT 'business'
-CHECK (book IN ('business','personal'));
-```
+Phase E drops the orphaned `vault_transactions` table after archiving
+`backend/db_archives/20260716_vault_transactions_pre_drop.pg_dump.sql`.
 
 ---
 
@@ -534,7 +533,7 @@ Vault Dashboard:
      └─ Crypto: __ €
   ├─ Week balance: business +A €  / personal +B €
   ├─ Month balance: business +C € / personal +D €
-  ├─ Pressure score: N/10
+  ├─ Pressure score: N/100
   │   └─ [Voir pourquoi ?] (the local model)
   ├─ Upcoming alerts (next 7 days)
   └─ Quick actions: + Gain | + Dépense | Scan ticket

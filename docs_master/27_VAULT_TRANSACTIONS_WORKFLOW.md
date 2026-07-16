@@ -1,299 +1,69 @@
 # 27 - Vault Transactions Workflow
 
-## Scope
+## Status After Vault Phase E
 
-Vault V1 supports manual financial transaction capture and a live weekly summary.
+This document now records the active transaction boundary after the Phase E
+mini-pass.
 
-Not implemented in this workflow:
+`vault_transactions` was the old Vault ledger. It is archived and dropped by
+migration `20260716_0040_vault_deterministic_phase_e.py` after the dump:
 
-- AI analysis
-- n8n workflows
-- bank sync
-- notifications
-- UI
-- materialized weekly summaries
-- wallet balance tables
+```text
+backend/db_archives/20260716_vault_transactions_pre_drop.pg_dump.sql
+```
 
-The backend remains source of truth. The Vault stores declared financial reality; it must not invent money or treat future income as confirmed.
+The legacy `/api/vault/transactions`, `/api/vault/transactions/recent`, and
+`/api/vault/summary/week` routes are removed. `/api/vault` is now reserved for
+Phase E deterministic Vault surfaces: pressure, pressure explain/history,
+upcoming expenses, and weekly summaries.
 
-## Database Table
+## Active Ledger
 
 Canonical table: `imperium_vault_transactions`.
 
-Deprecated legacy table: `vault_transactions`.
-
-The legacy table remains in the database for historical compatibility, but the
-active ORM model has been removed and no new application write should target it.
-The compatibility endpoint `/api/vault/transactions` now writes into the
-canonical ledger.
-
-Columns:
-
-- `id`: UUID primary key
-- `user_id`: canonical user FK
-- `transaction_type`: `income` or `expense`
-- `amount_cents`: integer amount in cents, positive
-- `currency`: defaults to `EUR`
-- `wallet`: open wallet label, defaults to `cash`
-- `occurred_at`: transaction timestamp
-- `local_date`: user-local date
-- `timezone`: user timezone
-- `category`: optional category
-- `source`: optional source label
-- `note`: optional note
-- `external_ref`: optional external reference
-- `is_reversal`: boolean, defaults to `false`
-- `reversal_of_transaction_id`: nullable FK to `imperium_vault_transactions.id`
-- `reversal_reason`: optional reason for reversal rows
-- `created_at`, `updated_at`: UTC audit timestamps
-
-Constraints:
-
-- `amount_cents > 0`
-- `transaction_type IN ('income', 'expense')`
-- `length(currency) = 3`
-- reversal rows must link to an original transaction; non-reversal rows must not
-
-Indexes:
-
-- `(user_id, local_date)`
-- `(user_id, occurred_at DESC)`
-- `(user_id, transaction_type)`
-
-## Endpoints
-
-All endpoints require JWT authentication.
-
-### Create Transaction
-
-`POST /api/vault/transactions`
-
-Headers:
+Active transaction routes live under `/api/imperium/vault`:
 
 ```text
-Authorization: Bearer <access_token>
-Idempotency-Key: <unique_key>
+GET  /api/imperium/vault/transactions
+GET  /api/imperium/vault/transactions/{transaction_id}
+POST /api/imperium/vault/transactions
+POST /api/imperium/vault/transactions/{transaction_id}/reverse
 ```
-
-Payload:
-
-```json
-{
-  "occurred_at": "2026-04-26T12:00:00+02:00",
-  "local_date": "2026-04-26",
-  "timezone": "Europe/Paris",
-  "transaction_type": "income",
-  "wallet": "cash",
-  "category": "vtc",
-  "label": "Course Bolt",
-  "amount": "42.50",
-  "currency": "EUR",
-  "notes": "Optional"
-}
-```
-
-Behavior:
-
-- Uses authenticated `user_id`; request body cannot set `user_id`.
-- Converts `amount` from decimal euros to canonical `amount_cents`.
-- Stores one canonical `imperium_vault_transactions` row.
-- Appends `vault.transaction.created`.
-- Stores the idempotent response.
-- Same `Idempotency-Key` and same payload returns original response.
-- Same `Idempotency-Key` and different payload returns `409`.
-
-Response:
-
-```json
-{
-  "transaction": {
-    "id": "f1ec4b45-f639-40da-a02f-f40232ce26d8",
-    "occurred_at": "2026-04-26T12:00:00+02:00",
-    "local_date": "2026-04-26",
-    "timezone": "Europe/Paris",
-    "transaction_type": "income",
-    "wallet": "cash",
-    "category": "vtc",
-    "label": "Course Bolt",
-    "amount": "42.50",
-    "currency": "EUR",
-    "notes": "Optional",
-    "is_reversal": false,
-    "reversal_of_transaction_id": null,
-    "reversal_reason": null,
-    "created_at": "2026-04-26T10:00:01Z",
-    "event_id": "evt_...",
-    "idempotency_key": "..."
-  },
-  "event_id": "evt_...",
-  "idempotency_key": "...",
-  "status": "created"
-}
-```
-
-### Recent Transactions
-
-`GET /api/vault/transactions/recent?limit=20`
-
-Behavior:
-
-- Returns recent transactions ordered by `occurred_at` descending.
-- `limit` range: `1` to `100`.
-
-### Weekly Summary
-
-`GET /api/vault/summary/week?week_start=YYYY-MM-DD`
 
 Rules:
 
-- `week_start` must be a Monday.
-- Summary is computed live from `imperium_vault_transactions`.
-- No materialized weekly table exists in V1.
+- Amounts are stored as positive cents in `amount_cents`.
+- `transaction_type` is `income` or `expense` only.
+- Corrections are append-only reversal rows; no UPDATE/DELETE correction path.
+- `POST` and reversal require `Idempotency-Key`.
+- Reads and writes are scoped to the authenticated user.
+- Events use the current finance namespace; legacy `vault.transaction.created`
+  is read-compatible through the event nomenclature layer during the compatibility
+  window.
 
-Response:
+## Phase E Additions
 
-```json
-{
-  "week_start": "2026-04-20",
-  "week_end": "2026-04-26",
-  "income_total": "42.50",
-  "expense_total": "12.00",
-  "reversal_total": "0.00",
-  "reversal_count": 0,
-  "net_total": "30.50",
-  "by_wallet": {
-    "cash": {
-      "income_total": "42.50",
-      "expense_total": "12.00",
-      "reversal_total": "0.00",
-      "reversal_count": 0,
-      "net_total": "30.50"
-    }
-  },
-  "by_category": {
-    "vtc": {
-      "income_total": "42.50",
-      "expense_total": "0.00",
-      "reversal_total": "0.00",
-      "reversal_count": 0,
-      "net_total": "42.50"
-    }
-  }
-}
-```
-
-V1 reversal rule:
-
-- `correction` is not a canonical transaction type.
-- Corrections are represented by appending an opposite transaction with
-  `is_reversal = true`, `reversal_of_transaction_id`, and `reversal_reason`.
-- The original transaction is never updated or deleted.
-- Weekly `net_total = income_total - expense_total`.
-- Reversal rows are included in income/expense according to their opposite
-  transaction type and are also exposed separately through `reversal_total` and
-  `reversal_count`.
-
-## Event
-
-Canonical event type:
+Phase E adds deterministic Vault reporting around the canonical ledger:
 
 ```text
-vault.transaction.created
+GET    /api/vault/pressure
+GET    /api/vault/pressure/explain
+GET    /api/vault/pressure/history
+GET    /api/vault/upcoming-expenses
+POST   /api/vault/upcoming-expenses
+PATCH  /api/vault/upcoming-expenses/{expense_id}
+DELETE /api/vault/upcoming-expenses/{expense_id}
+GET    /api/vault/weekly-summaries?from=YYYY-MM-DD
 ```
 
-Source app:
+Tables:
 
-```text
-vault
-```
+- `upcoming_expenses`
+- `weekly_finance_summaries`
+- `pressure_snapshots`
 
-Privacy level:
+Jobs, all seeded disabled:
 
-```text
-high
-```
-
-Events are append-only. Canonical transaction rows are financial declarations;
-reversals are separate linked declarations.
-
-## Deployment Commands
-
-Run migrations against `imperium_core`, never `n8n_db`.
-
-```bash
-cd /root/imperium
-
-set -a
-. /etc/imperium/imperium-api.env
-set +a
-
-docker compose -f docker-compose.imperium.yml run --rm \
-  -e DATABASE_URL='postgresql+psycopg://imperium_admin:ADMIN_PASSWORD@31.97.52.42:5432/imperium_core' \
-  imperium-api alembic upgrade head
-
-docker compose -f docker-compose.imperium.yml up -d --build imperium-api
-
-curl -sS http://127.0.0.1:8000/api/health
-curl -sS http://127.0.0.1:8000/api/health/db
-```
-
-## Live Test Commands
-
-Login first and store the masked token locally in shell variables. Do not print secrets in logs.
-
-```bash
-API_BASE='http://127.0.0.1:8000/api'
-TOKEN='<ACCESS_TOKEN>'
-IDEM_KEY="vault_txn_$(date -u +%Y%m%dT%H%M%SZ)"
-
-curl -i -X POST "$API_BASE/vault/transactions" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Idempotency-Key: $IDEM_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "occurred_at": "2026-04-26T12:00:00+02:00",
-    "local_date": "2026-04-26",
-    "timezone": "Europe/Paris",
-    "transaction_type": "income",
-    "wallet": "cash",
-    "category": "vtc",
-    "label": "Course Bolt",
-    "amount": "42.50",
-    "currency": "EUR",
-    "notes": "Manual V1 test"
-  }'
-
-curl -i -X POST "$API_BASE/vault/transactions" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Idempotency-Key: $IDEM_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "occurred_at": "2026-04-26T12:00:00+02:00",
-    "local_date": "2026-04-26",
-    "timezone": "Europe/Paris",
-    "transaction_type": "income",
-    "wallet": "cash",
-    "category": "vtc",
-    "label": "Course Bolt",
-    "amount": "42.50",
-    "currency": "EUR",
-    "notes": "Manual V1 test"
-  }'
-
-curl -i "$API_BASE/vault/transactions/recent?limit=20" \
-  -H "Authorization: Bearer $TOKEN"
-
-curl -i "$API_BASE/vault/summary/week?week_start=2026-04-20" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-Expected verification:
-
-- Unauthenticated `POST /api/vault/transactions` returns `401`.
-- Valid transaction returns `201`.
-- Duplicate idempotency retry returns same response and does not create a second event or transaction.
-- Recent endpoint returns transactions ordered by newest first.
-- Weekly summary rejects non-Monday `week_start`.
-- Weekly summary totals match live transactions.
-- `events` contains `vault.transaction.created`.
-- `n8n_db` is not touched.
+- `vault.weekly_profit`
+- `vault.pressure_refresh`
+- `vault.expenses_horizon`

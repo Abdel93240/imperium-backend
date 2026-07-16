@@ -1,19 +1,13 @@
 # VAULT_MAPPING.md
 
-## Phase E Status
+## Phase E Source
 
-Source spec read from `/tmp/incoming_docs/VAULT_DETERMINISTIC_SPEC_V1.md`.
+Specification used as the single implementation source:
+`/tmp/incoming_docs/VAULT_DETERMINISTIC_SPEC_V1.md`.
 
-Phase E is stopped at the golden-fixture validation gate required by spec
-section 7.1 and by the user instruction:
-
-- `docs_master/11_FINANCIAL_PRESSURE_FORMULA.md` had four narrative example
-  cases, not five golden examples.
-- The existing examples did not define exact daily target expectations for test
-  fixtures.
-- Five proposed golden examples have been added to doc 11 and require human
-  validation before any implementation, migration, seed, route, job, or table
-  drop.
+The five golden pressure examples A-E in
+`docs_master/11_FINANCIAL_PRESSURE_FORMULA.md` were human-validated on
+2026-07-16 and are now normative fixtures.
 
 ## Documents Read
 
@@ -23,50 +17,96 @@ section 7.1 and by the user instruction:
 - `gap_analysis_v1/GAP_vault.md`
 - `docs_master/78_TOOLBOX_CATALOG.md`
 - `docs_master/05_DATABASE_SCHEMA.md` finance section
-- `/tmp/incoming_docs/TOOLBOX_SOCLE_SPEC_V1.md` for inherited runner, signals,
-  notifications, and events constraints referenced by the Vault spec
+- `/tmp/incoming_docs/TOOLBOX_SOCLE_SPEC_V1.md`
 
 ## Scope Boundary
 
-No Phase E technical implementation has been started.
+Implemented only Vault Phase E:
 
-Unchanged in this stop-point commit:
+- deterministic pressure 0-100
+- upcoming expenses
+- weekly finance summaries
+- runner job definitions seeded disabled
+- shared signal/event publication
+- legacy `/api/vault` transaction routes removed
+- legacy `vault_transactions` archived then dropped by migration
 
-- Alembic migrations
-- SQL tables
-- API routes
-- Vault services
-- runner job definitions
-- seed data
-- legacy `/api/vault` route
-- legacy `vault_transactions` physical table
+Explicitly not implemented: OCR receipts, LLM categorization, forecasts,
+fuel smart tracking, UI, WR/Plan consumption of pressure, and Phase F.
 
-## Prerequisite Check From Repository State
+## Schema Mapping
 
-The toolbox socle appears present in code:
+| Spec item | Implementation |
+|---|---|
+| `upcoming_expenses` | `backend/app/models/vault.py::UpcomingExpense`, migration `20260716_0040` |
+| `weekly_finance_summaries` | `backend/app/models/vault.py::WeeklyFinanceSummary`, migration `20260716_0040` |
+| `pressure_snapshots` | `backend/app/models/vault.py::PressureSnapshot`, append-only trigger in migration `20260716_0040` |
+| canonical ledger | existing `imperium_vault_transactions`, append-only guards left intact |
+| legacy ledger | `vault_transactions` dump archive then `op.drop_table("vault_transactions")` |
 
-- `job_definitions`, `job_runs`, `job_cursors`
-- `parameters` and `v_parameters_current`
-- `signal_definitions`, `signal_values`
-- `notifications`, `notification_channels`
-- events `NOTIFY` trigger on channel `events_new`
+Dump archive path:
+`backend/db_archives/20260716_vault_transactions_pre_drop.pg_dump.sql`.
 
-Relevant migrations:
+## Service Mapping
 
-- `backend/alembic/versions/20260715_0038_toolbox_socle_foundations.py`
-- `backend/alembic/versions/20260715_0039_toolbox_socle_seeds.py`
-- `backend/alembic/versions/20260706_0033_imperium_vault_append_only_guards.py`
-- `backend/alembic/versions/20260710_0037_imperium_vault_wallet.py`
+| Spec item | Implementation |
+|---|---|
+| pressure formula | `backend/app/services/vault/pressure.py::compute_pressure` |
+| explain breakdown | `backend/app/services/vault/pressure.py::explain` and API explain route |
+| pressure publication | snapshot insert + `signal_values` + `finance.pressure.updated` E2 event |
+| upcoming CRUD/recurrence | `backend/app/services/vault/upcoming.py` |
+| weekly profit/backfill | `backend/app/services/vault/weekly.py` |
+| wildcard event wake-up | `backend/app/services/runner/scheduler.py::_event_type_matches` |
 
-## Human Validation Needed
+## API Mapping
 
-Validate or correct the five proposed golden examples in doc 11:
+`backend/app/api/v1/routes/vault.py` now exposes:
 
-- Golden A: safe
-- Golden B: stable
-- Golden C: attention
-- Golden D: pressure
-- Golden E: critical
+- `GET /api/vault/pressure`
+- `GET /api/vault/pressure/explain`
+- `GET /api/vault/pressure/history`
+- `GET /api/vault/upcoming-expenses`
+- `POST /api/vault/upcoming-expenses`
+- `PATCH /api/vault/upcoming-expenses/{expense_id}`
+- `DELETE /api/vault/upcoming-expenses/{expense_id}`
+- `GET /api/vault/weekly-summaries?from=YYYY-MM-DD`
 
-Once validated, Phase E can continue with tests-first implementation against
-those fixtures.
+Removed legacy routes:
+
+- `POST /api/vault/transactions`
+- `GET /api/vault/transactions/recent`
+- `GET /api/vault/summary/week`
+
+Canonical transaction routes remain under `/api/imperium/vault`.
+
+## Seeds
+
+Migration `20260716_0040_vault_deterministic_phase_e.py` seeds:
+
+- parameters: `vault.pressure_thresholds`, `vault.category_map`, `vault.horizon_days`
+- signal definition: `vault.pressure`
+- disabled jobs: `vault.weekly_profit`, `vault.pressure_refresh`, `vault.expenses_horizon`
+
+`vault.pressure_refresh` is seeded as `event_subscription` with schedule
+`0 6 * * *` and event filter `finance.transaction.*`; scheduler registration
+uses any job with a non-null cron schedule, so the hybrid trigger is registered
+while still disabled by default.
+
+## Tests
+
+- Golden pressure fixtures A-E exact.
+- Pressure monotonicity.
+- Weekly profit aggregation, empty week, idempotent upsert/event.
+- Upcoming recurrence and no duplicate generation.
+- Pressure snapshot/signal/E2 event publication.
+- J-7/J-1 upcoming notifications with dedup-compatible refs.
+- Append-only pressure snapshots and legacy table drop checks for migrated
+  PostgreSQL environments.
+- Negative Q7 grep: Daily modules do not import `vault.pressure`.
+
+## Execution Note
+
+The code and migration are ready, but applying `20260716_0040` to the real DB
+requires the migration/admin role. In this session only the runtime
+`DATABASE_URL` is available; it cannot create tables in `public`. No local
+`/etc/imperium/imperium-db-admin.pass` or admin URL is present.

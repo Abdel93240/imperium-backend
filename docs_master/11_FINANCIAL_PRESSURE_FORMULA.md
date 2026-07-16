@@ -746,12 +746,12 @@ Lesson:
 - gross income does not equal financial safety
 - pressure must use real available liquidity and required obligations
 
-## Golden Test Examples - Proposed Validation Set
+## Golden Test Examples - Normative Validation Set
 
-Status: proposed for human validation before implementation. These five cases
-are intended to become the exact golden fixtures for the deterministic Vault
-pressure tests. Monetary outputs are expressed in EUR and rounded to two decimal
-places after applying the formulas above.
+Status: human-validated on 2026-07-16. These five cases are the exact golden
+fixtures for the deterministic Vault pressure tests. Monetary outputs are
+expressed in EUR and rounded to two decimal places after applying the formulas
+above.
 
 ### Golden A - safe
 

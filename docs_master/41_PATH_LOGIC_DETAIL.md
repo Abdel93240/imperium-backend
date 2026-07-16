@@ -890,8 +890,9 @@ The backend emits append-only events; Imperium READS them:
 ### 16.2 With Vault
 
 ```text
-Path READS weekly_business_profit from common memory (read-only) to compute
-the sadaqa target.
+Path READS `weekly_business_profit` from `weekly_finance_summaries`
+(read-only) to compute the sadaqa target. The row is produced by the Vault
+Phase E deterministic weekly-profit job.
 
 When the user confirms a sadaqa donation, the BACKEND records the action on the
 Path side (owner of sadaqa state) AND the Vault service writes the matching

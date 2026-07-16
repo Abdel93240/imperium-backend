@@ -487,7 +487,9 @@ Notes cible :
 
 Tables finance :
 `imperium_vault_transactions` (canonique actuel, nom cible
-`finance_transactions`) et `vault_transactions` (legacy deprecie).
+`finance_transactions`), `upcoming_expenses`, `weekly_finance_summaries` et
+`pressure_snapshots`. `vault_transactions` est un legacy archivé puis droppé par
+la migration Phase E `20260716_0040`; il ne doit plus être lu ni écrit.
 
 Regle de lecture pour cette section :
 - Le ledger canonique fonctionnel est `imperium_vault_transactions`.
@@ -629,72 +631,86 @@ Lecteurs et contrats actifs :
   `backend/app/services/imperium/vault.py`
 - Les anciens lecteurs directs `backend/app/services/imperium/dashboard.py` et
   `backend/app/services/imperium/weekly_report.py` lisent aussi le canonique.
-- L'ancien endpoint `backend/app/api/v1/routes/vault.py` ecrit desormais dans le
-  canonique via `backend/app/services/vault/transactions.py`.
+- `backend/app/api/v1/routes/vault.py` ne porte plus les transactions legacy ;
+  il expose uniquement les surfaces Phase E : pression, dépenses à venir et
+  résumés hebdomadaires.
+
+### upcoming_expenses
+
+Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+`backend/app/models/vault.py::UpcomingExpense`.
+
+Role : source de vérité utilisateur pour les dépenses à venir et récurrentes
+utilisées par la pression financière et les notifications J-7/J-1.
+
+```text
+id          UUID PRIMARY KEY
+label_fr    TEXT NOT NULL
+amount      NUMERIC(12,2) NOT NULL CHECK amount > 0
+due_date    DATE NOT NULL
+recurrence  TEXT NULL CHECK null|monthly|quarterly|yearly
+category    TEXT NOT NULL
+wallet      TEXT NULL
+mandatory   BOOLEAN NOT NULL DEFAULT true
+active      BOOLEAN NOT NULL DEFAULT true
+created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Index : `upcoming_expenses_due_active_idx`, `upcoming_expenses_category_idx`.
+
+### weekly_finance_summaries
+
+Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+`backend/app/models/vault.py::WeeklyFinanceSummary`.
+
+Role : résumé hebdomadaire déterministe Vault. `weekly_business_profit` est le
+champ lu par The Path pour la cible sadaqa.
+
+```text
+week_start              DATE PRIMARY KEY
+business_revenue        NUMERIC(12,2) NOT NULL
+business_expenses       NUMERIC(12,2) NOT NULL
+weekly_business_profit  NUMERIC(12,2) NOT NULL
+personal_expenses       NUMERIC(12,2) NOT NULL
+computed_at             TIMESTAMPTZ NOT NULL
+detail                  JSONB NOT NULL
+```
+
+### pressure_snapshots
+
+Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+`backend/app/models/vault.py::PressureSnapshot`.
+
+Role : historique append-only de la pression financière 0-100. Chaque calcul
+publie aussi le signal partagé `vault.pressure` et l'événement
+`finance.pressure.updated`.
+
+```text
+id               UUID PRIMARY KEY
+computed_at      TIMESTAMPTZ NOT NULL
+score            INTEGER NOT NULL CHECK score BETWEEN 0 AND 100
+label            TEXT NOT NULL CHECK safe|stable|attention|pressure|critical
+factors          JSONB NOT NULL
+daily_targets    JSONB NOT NULL
+inputs_snapshot  JSONB NOT NULL
+```
+
+Guards : `pressure_snapshots_append_only_guard` interdit UPDATE/DELETE et
+`pressure_snapshots_append_only_truncate_guard` interdit TRUNCATE.
 
 ### vault_transactions
 
-Nom actuel : `vault_transactions`
-Nom cible : aucun. Table DEPRECIEE, legacy, a supprimer apres migration des
-lecteurs restants.
-Source code : migration `20260426_0007_vault_transactions.py`, modele
-ORM actif retire. La classe `VaultTransaction` n'existe plus dans
-`backend/app/models/vault.py`.
+Statut Phase E : table legacy archivée puis supprimée.
 
-Role legacy : ancien ledger Vault, remplace par le ledger canonique ci-dessus.
-Ne pas creer de nouveau developpement dessus. La table reste en base pour
-historique/deprecation mais ne doit plus recevoir d'ecriture applicative.
-
-Schema reel bref :
-
-```text
-id                UUID PRIMARY KEY
-user_id           UUID NOT NULL FK users.id
-event_id          UUID NULL FK events.id
-occurred_at       TIMESTAMPTZ NOT NULL
-local_date        DATE NOT NULL
-timezone          TEXT NOT NULL
-transaction_type  TEXT NOT NULL
-wallet            TEXT NOT NULL
-category          TEXT NOT NULL
-label             TEXT NULL
-amount            NUMERIC(12, 2) NOT NULL
-currency          TEXT NOT NULL DEFAULT 'EUR'
-notes             TEXT NULL
-source_app        TEXT NOT NULL DEFAULT 'vault'
-created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
-updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
-```
-
-Contraintes et index :
-- PK : `vault_transactions.id`
-- FK : `vault_transactions.user_id -> users.id`
-- FK : `vault_transactions.event_id -> events.id`
-- Check `vault_transactions_transaction_type_check` :
-  `transaction_type IN ('income', 'expense', 'correction')`
-- Check `vault_transactions_wallet_check` :
-  `wallet IN ('cash', 'bank')`
-- Check `vault_transactions_amount_positive` : `amount > 0`
-- Index : `vault_transactions_user_local_date_idx` sur `(user_id, local_date)`
-- Index : `vault_transactions_user_occurred_at_idx` sur
-  `(user_id, occurred_at DESC)`
-- Index : `vault_transactions_user_transaction_type_idx` sur
-  `(user_id, transaction_type)`
-
-Notes legacy :
-- Cette table utilise `NUMERIC(12, 2)` au lieu de `amount_cents`.
-- Elle porte `label`, `notes`, `source_app` et `event_id`, absents du ledger
-  canonique actuel. `wallet` a ete reintegre au canonique sous forme de texte
-  ouvert.
-- Elle autorise `transaction_type = 'correction'`, alors que le canonique
-  represente les corrections par reversal append-only.
-- Lecteurs migrés vers le canonique :
-  `backend/app/services/imperium/dashboard.py`,
-  `backend/app/services/imperium/weekly_report.py`,
-  `backend/app/services/vault/transactions.py`.
-- Ancien chemin API encore present pour compatibilite :
-  `backend/app/api/v1/routes/vault.py`; il convertit les montants euros en
-  centimes et ecrit dans `imperium_vault_transactions`.
+- Archive préalable :
+  `backend/db_archives/20260716_vault_transactions_pre_drop.pg_dump.sql`.
+- Drop : migration `20260716_0040_vault_deterministic_phase_e.py`.
+- Modèle ORM actif : aucun.
+- Routes legacy `/api/vault/transactions`, `/api/vault/transactions/recent` et
+  `/api/vault/summary/week` : supprimées.
+- Ledger actif inchangé : `imperium_vault_transactions` via
+  `/api/imperium/vault/transactions` et reversals append-only.
 
 ## HEALTH
 
