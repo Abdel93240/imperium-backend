@@ -3,6 +3,9 @@
 ## Phase E Source
 
 Specification used as the single implementation source:
+`specs/VAULT_DETERMINISTIC_SPEC_V1.md`.
+
+This versioned file is an exact copy of the source originally supplied at
 `/tmp/incoming_docs/VAULT_DETERMINISTIC_SPEC_V1.md`.
 
 The five golden pressure examples A-E in
@@ -106,7 +109,10 @@ while still disabled by default.
 
 ## Execution Note
 
-The code and migration are ready, but applying `20260716_0040` to the real DB
-requires the migration/admin role. In this session only the runtime
-`DATABASE_URL` is available; it cannot create tables in `public`. No local
-`/etc/imperium/imperium-db-admin.pass` or admin URL is present.
+Final Phase E database state verified on 2026-07-16:
+
+- `alembic current` = `20260716_0041 (head)`
+- `alembic check` = `No new upgrade operations detected`
+
+Migration `20260716_0041` adds authenticated `user_id` scoping to the Phase E
+runtime tables created by `20260716_0040`.
