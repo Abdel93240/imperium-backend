@@ -39,6 +39,7 @@ from app.schemas.weekly_review import (
 )
 from app.schemas.ai import AIResultCallback
 from app.services.imperium import weekly_review_conversation as wr
+from app.services.imperium import wr_bridge as wr_bridge_module
 from app.services.integrations import n8n_client
 
 
@@ -251,7 +252,9 @@ def test_launch_creates_session_ai_task_and_replays_idempotently(monkeypatch) ->
     }
 
 
-def test_launch_dry_run_does_not_call_n8n(monkeypatch) -> None:
+def test_launch_bridge_disabled_does_not_run_bridge(monkeypatch) -> None:
+    # Passe 0: the n8n webhook became the in-process wr_bridge, gated by
+    # wr_bridge_enabled (default False keeps the queued-task behavior).
     db = FakeDb()
     current_user = _user()
     monkeypatch.setattr(wr, "_get_session_by_week", lambda *args, **kwargs: None)
@@ -262,14 +265,13 @@ def test_launch_dry_run_does_not_call_n8n(monkeypatch) -> None:
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_dry_run=True,
+            wr_bridge_enabled=False,
         ),
     )
     monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda *args, **kwargs: pytest.fail("dry-run launch must not call n8n"),
+        wr_bridge_module,
+        "run_wr_interactive_start",
+        lambda *args, **kwargs: pytest.fail("disabled bridge must not run"),
     )
 
     result, duplicate = wr.launch_weekly_review_session(
@@ -285,7 +287,7 @@ def test_launch_dry_run_does_not_call_n8n(monkeypatch) -> None:
     assert result.status == "preparing_initial_summary"
 
 
-def test_launch_enabled_mode_triggers_n8n_once_with_prepared_payload(monkeypatch) -> None:
+def test_launch_bridge_enabled_runs_bridge_once_with_prepared_payload(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     calls = []
@@ -301,18 +303,14 @@ def test_launch_enabled_mode_triggers_n8n_once_with_prepared_payload(monkeypatch
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
-            wr_n8n_qwen_dry_run_webhook_path="imperium/wr/interactive-start-qwen-dry-run",
+            wr_bridge_enabled=True,
         ),
     )
-
-    def fake_trigger(**kwargs):
-        calls.append(kwargs)
-        return None
-
-    monkeypatch.setattr(wr, "trigger_n8n_webhook", fake_trigger)
+    monkeypatch.setattr(
+        wr_bridge_module,
+        "run_wr_interactive_start",
+        lambda _db, *, ai_task: calls.append(ai_task),
+    )
 
     first, duplicate = wr.launch_weekly_review_session(
         db,
@@ -335,15 +333,16 @@ def test_launch_enabled_mode_triggers_n8n_once_with_prepared_payload(monkeypatch
     assert replay_duplicate is True
     assert replay.id == first.id
     assert len(calls) == 1
-    call = calls[0]
     ai_task = next(item for item in db.added if isinstance(item, AITask))
-    assert call["path"] == "imperium/wr/interactive-start-qwen-dry-run"
-    assert call["payload"] == ai_task.prepared_payload
-    assert call["idempotency_key"] == f"wr_n8n_trigger_{ai_task.id}"
-    assert call["dry_run"] is False
+    assert calls[0] is ai_task
+    # Same payload shape the n8n export validated (equivalence, fixtures).
+    payload = ai_task.prepared_payload
+    assert payload["task_type"] == "weekly_report.interactive.start"
+    assert payload["callback_url"] == f"/api/internal/ai/tasks/{ai_task.id}/result"
+    assert payload["wr_attach_url"].endswith("/attach-ai-result")
 
 
-def test_launch_missing_n8n_base_url_does_not_break(monkeypatch) -> None:
+def test_launch_bridge_invalid_payload_records_error_without_breaking(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     monkeypatch.setattr(wr, "_get_session_by_week", lambda *args, **kwargs: None)
@@ -354,15 +353,14 @@ def test_launch_missing_n8n_base_url_does_not_break(monkeypatch) -> None:
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url=None,
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
-    monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda *args, **kwargs: pytest.fail("missing N8N_BASE_URL must not call n8n"),
-    )
+
+    def invalid_payload(_db, *, ai_task):
+        raise wr_bridge_module.WRBridgePayloadError("Missing required WR payload field: task_id")
+
+    monkeypatch.setattr(wr_bridge_module, "run_wr_interactive_start", invalid_payload)
 
     result, duplicate = wr.launch_weekly_review_session(
         db,
@@ -373,11 +371,14 @@ def test_launch_missing_n8n_base_url_does_not_break(monkeypatch) -> None:
         request_path="/api/imperium/weekly-review/launch",
     )
 
+    ai_task = next(item for item in db.added if isinstance(item, AITask))
     assert duplicate is False
     assert result.status == "preparing_initial_summary"
+    assert ai_task.error_code == "wr_bridge_payload_invalid"
+    assert "task_id" in ai_task.error_message
 
 
-def test_launch_n8n_failure_keeps_session_and_task_without_duplicates(monkeypatch) -> None:
+def test_launch_bridge_failure_keeps_session_and_task_without_duplicates(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     monkeypatch.setattr(wr, "_get_session_by_week", lambda *args, **kwargs: None)
@@ -388,16 +389,14 @@ def test_launch_n8n_failure_keeps_session_and_task_without_duplicates(monkeypatc
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
-    monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda *args, **kwargs: (_ for _ in ()).throw(n8n_client.N8NRequestError("n8n webhook request failed.")),
-    )
+
+    def failing_bridge(_db, *, ai_task):
+        raise RuntimeError("bridge exploded")
+
+    monkeypatch.setattr(wr_bridge_module, "run_wr_interactive_start", failing_bridge)
 
     result, duplicate = wr.launch_weekly_review_session(
         db,
@@ -414,11 +413,14 @@ def test_launch_n8n_failure_keeps_session_and_task_without_duplicates(monkeypatc
     assert result.status == "preparing_initial_summary"
     assert len(tasks) == 1
     assert len(sessions) == 1
-    assert tasks[0].error_code == "n8n_trigger_failed"
-    assert tasks[0].error_message == "n8n webhook request failed."
+    assert tasks[0].error_code == "wr_bridge_failed"
+    assert tasks[0].error_message == "bridge exploded"
 
 
-def test_launch_with_n8n_enabled_but_missing_webhook_secret_does_not_send_unsigned_request(monkeypatch) -> None:
+def test_launch_bridge_is_in_process_and_never_touches_network(monkeypatch) -> None:
+    # The ported bridge is a direct call chain: no webhook, no HMAC, no socket.
+    import urllib.request
+
     db = FakeDb()
     current_user = _user()
     monkeypatch.setattr(wr, "_get_session_by_week", lambda *args, **kwargs: None)
@@ -429,15 +431,17 @@ def test_launch_with_n8n_enabled_but_missing_webhook_secret_does_not_send_unsign
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret=None,
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
     monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda *args, **kwargs: pytest.fail("missing N8N_WEBHOOK_SECRET must not send an unsigned n8n request"),
+        urllib.request,
+        "urlopen",
+        lambda *args, **kwargs: pytest.fail("the WR bridge must never open a socket"),
+    )
+    seen = []
+    monkeypatch.setattr(
+        wr_bridge_module, "run_wr_interactive_start", lambda _db, *, ai_task: seen.append(ai_task)
     )
 
     result, duplicate = wr.launch_weekly_review_session(
@@ -449,11 +453,9 @@ def test_launch_with_n8n_enabled_but_missing_webhook_secret_does_not_send_unsign
         request_path="/api/imperium/weekly-review/launch",
     )
 
-    ai_task = next(item for item in db.added if isinstance(item, AITask))
     assert duplicate is False
     assert result.status == "preparing_initial_summary"
-    assert ai_task.error_code == "n8n_not_configured"
-    assert ai_task.error_message == "N8N_BASE_URL and N8N_WEBHOOK_SECRET are required for outbound n8n trigger."
+    assert len(seen) == 1
 
 
 def test_launch_with_different_key_for_existing_week_returns_existing(monkeypatch) -> None:
@@ -872,7 +874,7 @@ def test_answer_flow_idempotency_replay_does_not_duplicate_message_or_task(monke
     assert len([item for item in db.added if isinstance(item, AITask)]) == 1
 
 
-def test_answer_integration_n8n_dry_run_does_not_call_n8n(monkeypatch) -> None:
+def test_answer_integration_bridge_disabled_does_not_run_bridge(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="waiting_for_user_answer")
@@ -885,12 +887,12 @@ def test_answer_integration_n8n_dry_run_does_not_call_n8n(monkeypatch) -> None:
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=True,
+            wr_bridge_enabled=False,
         ),
     )
-    monkeypatch.setattr(wr, "trigger_n8n_webhook", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        wr_bridge_module, "run_wr_answers_integrate", lambda _db, *, ai_task: calls.append(ai_task)
+    )
 
     wr.add_user_message(
         db,
@@ -909,7 +911,7 @@ def test_answer_integration_n8n_dry_run_does_not_call_n8n(monkeypatch) -> None:
     assert calls == []
 
 
-def test_answer_integration_n8n_enabled_triggers_once_with_signed_payload(monkeypatch) -> None:
+def test_answer_integration_bridge_enabled_runs_once_with_export_payload_shape(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="waiting_for_user_answer")
@@ -922,18 +924,12 @@ def test_answer_integration_n8n_enabled_triggers_once_with_signed_payload(monkey
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
-            wr_n8n_answers_integrate_webhook_path="imperium/wr/answers-integrate-qwen-dry-run",
+            wr_bridge_enabled=True,
         ),
     )
-
-    def fake_trigger(**kwargs):
-        calls.append(kwargs)
-        return SimpleNamespace(dry_run=False, configured=True, status_code=200)
-
-    monkeypatch.setattr(wr, "trigger_n8n_webhook", fake_trigger)
+    monkeypatch.setattr(
+        wr_bridge_module, "run_wr_answers_integrate", lambda _db, *, ai_task: calls.append(ai_task)
+    )
 
     result, duplicate = wr.add_user_message(
         db,
@@ -950,21 +946,20 @@ def test_answer_integration_n8n_enabled_triggers_once_with_signed_payload(monkey
     ai_task = next(item for item in db.added if isinstance(item, AITask))
     assert duplicate is False
     assert len(calls) == 1
-    call = calls[0]
-    assert call["path"] == "imperium/wr/answers-integrate-qwen-dry-run"
-    assert call["idempotency_key"] == f"wr_n8n_answers_integrate_{ai_task.id}"
-    assert call["dry_run"] is False
-    assert call["payload"]["task_id"] == str(ai_task.id)
-    assert call["payload"]["session_id"] == str(session.id)
-    assert call["payload"]["task_type"] == "weekly_report.answers.integrate"
-    assert call["payload"]["callback_url"] == f"/api/internal/ai/tasks/{ai_task.id}/result"
-    assert call["payload"]["wr_attach_url"] == f"/api/internal/weekly-review/{session.id}/attach-ai-result"
-    assert call["payload"]["user_message_id"] == str(result.id)
-    assert call["payload"]["user_answer"] == "My answer"
-    assert "raw_payload" not in call["payload"]
+    assert calls[0] is ai_task
+    # Field-for-field the shape the n8n export validated (equivalence lock).
+    payload = ai_task.prepared_payload
+    assert payload["task_id"] == str(ai_task.id)
+    assert payload["session_id"] == str(session.id)
+    assert payload["task_type"] == "weekly_report.answers.integrate"
+    assert payload["callback_url"] == f"/api/internal/ai/tasks/{ai_task.id}/result"
+    assert payload["wr_attach_url"] == f"/api/internal/weekly-review/{session.id}/attach-ai-result"
+    assert payload["user_message_id"] == str(result.id)
+    assert payload["user_answer"] == "My answer"
+    assert "raw_payload" not in payload
 
 
-def test_answer_integration_replay_does_not_retrigger_n8n(monkeypatch) -> None:
+def test_answer_integration_replay_does_not_rerun_bridge(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="waiting_for_user_answer")
@@ -981,12 +976,12 @@ def test_answer_integration_replay_does_not_retrigger_n8n(monkeypatch) -> None:
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
-    monkeypatch.setattr(wr, "trigger_n8n_webhook", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        wr_bridge_module, "run_wr_answers_integrate", lambda _db, *, ai_task: calls.append(ai_task)
+    )
 
     first, duplicate = wr.add_user_message(
         db,
@@ -1019,7 +1014,7 @@ def test_answer_integration_replay_does_not_retrigger_n8n(monkeypatch) -> None:
     assert len(calls) == 1
 
 
-def test_answer_integration_n8n_failure_records_error_without_failing_answer(monkeypatch) -> None:
+def test_answer_integration_bridge_failure_records_error_without_failing_answer(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="waiting_for_user_answer")
@@ -1031,16 +1026,14 @@ def test_answer_integration_n8n_failure_records_error_without_failing_answer(mon
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
-    monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda **kwargs: (_ for _ in ()).throw(n8n_client.N8NRequestError("n8n unavailable")),
-    )
+
+    def failing_bridge(_db, *, ai_task):
+        raise RuntimeError("bridge unavailable")
+
+    monkeypatch.setattr(wr_bridge_module, "run_wr_answers_integrate", failing_bridge)
 
     result, duplicate = wr.add_user_message(
         db,
@@ -1057,12 +1050,12 @@ def test_answer_integration_n8n_failure_records_error_without_failing_answer(mon
     ai_task = next(item for item in db.added if isinstance(item, AITask))
     assert duplicate is False
     assert result.content == "My answer"
-    assert ai_task.error_code == "n8n_trigger_failed"
-    assert ai_task.error_message == "n8n unavailable"
+    assert ai_task.error_code == "wr_bridge_failed"
+    assert ai_task.error_message == "bridge unavailable"
     assert len([item for item in db.added if isinstance(item, ImperiumWeeklyReviewMessage)]) == 1
 
 
-def test_answer_integration_missing_n8n_config_records_error_without_failing_answer(monkeypatch) -> None:
+def test_answer_integration_invalid_payload_records_error_without_failing_answer(monkeypatch) -> None:
     db = FakeDb()
     current_user = _user()
     session = _session(current_user.id, status="waiting_for_user_answer")
@@ -1074,16 +1067,14 @@ def test_answer_integration_missing_n8n_config_records_error_without_failing_ans
         lambda: Settings(
             jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
             internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret=None,
-            n8n_dry_run=False,
+            wr_bridge_enabled=True,
         ),
     )
-    monkeypatch.setattr(
-        wr,
-        "trigger_n8n_webhook",
-        lambda *args, **kwargs: pytest.fail("missing N8N_WEBHOOK_SECRET must not send an outbound n8n request"),
-    )
+
+    def invalid_payload(_db, *, ai_task):
+        raise wr_bridge_module.WRBridgePayloadError("Unsupported task_type for WR bridge: nope")
+
+    monkeypatch.setattr(wr_bridge_module, "run_wr_answers_integrate", invalid_payload)
 
     result, duplicate = wr.add_user_message(
         db,
@@ -1100,8 +1091,8 @@ def test_answer_integration_missing_n8n_config_records_error_without_failing_ans
     ai_task = next(item for item in db.added if isinstance(item, AITask))
     assert duplicate is False
     assert result.content == "My answer"
-    assert ai_task.error_code == "n8n_not_configured"
-    assert ai_task.error_message == "N8N_BASE_URL and N8N_WEBHOOK_SECRET are required for outbound n8n trigger."
+    assert ai_task.error_code == "wr_bridge_payload_invalid"
+    assert "Unsupported task_type" in ai_task.error_message
     assert len([item for item in db.added if isinstance(item, ImperiumWeeklyReviewMessage)]) == 1
 
 
@@ -4803,75 +4794,78 @@ def test_n8n_client_rejects_non_http_base_url() -> None:
         )
 
 
-def test_launch_with_n8n_enabled_and_secret_sends_signed_headers(monkeypatch) -> None:
-    db = FakeDb()
-    current_user = _user()
-    captured = []
-    monkeypatch.setattr(wr, "_get_session_by_week", lambda *args, **kwargs: None)
-    monkeypatch.setattr(wr, "_get_existing_idempotency", lambda *args, **kwargs: None)
+def test_wr_bridge_callback_matches_n8n_export_contract(monkeypatch) -> None:
+    # Equivalence lock: the ported bridge produces the exact callback the n8n
+    # export produced (fixtures from ops/n8n/workflows JSON), except model_used
+    # which is resolved via the local_executor role (DV-6).
+    from fixtures.n8n_wr_payloads import (
+        EXPECTED_START_CALLBACK_PROVIDER,
+        EXPECTED_START_CALLBACK_RESULT_TYPE,
+        EXPECTED_START_CALLBACK_SOURCE,
+        EXPECTED_START_IDEMPOTENCY_TEMPLATE,
+        EXPECTED_START_RAW_WORKFLOW,
+        interactive_start_payload,
+    )
+
+    task_id = uuid4()
+    session_id = uuid4()
+    ai_task = AITask(
+        id=task_id,
+        user_id=uuid4(),
+        task_type="weekly_report.interactive.start",
+        status="queued",
+        source_module="imperium",
+        input_payload={},
+        prepared_payload=interactive_start_payload(task_id=str(task_id), session_id=str(session_id)),
+    )
+
+    captured = {}
+
+    def fake_receive(db, *, task_id, payload, idempotency_key):
+        captured["callback"] = payload
+        captured["idempotency_key"] = idempotency_key
+        return SimpleNamespace(id=uuid4()), False
+
+    def fake_attach(db, *, session_id, payload, idempotency_key, request_method, request_path):
+        captured["attach_idempotency_key"] = idempotency_key
+        captured["attach_payload"] = payload
+        return SimpleNamespace(), False
+
+    monkeypatch.setattr(wr_bridge_module, "receive_ai_result", fake_receive)
+    monkeypatch.setattr(wr_bridge_module, "attach_ai_result_to_session", fake_attach)
     monkeypatch.setattr(
-        wr,
-        "get_settings",
-        lambda: Settings(
-            jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
-            internal_webhook_secret="strong-internal-secret-for-tests-long",
-            n8n_base_url="https://n8n.example/webhook/",
-            n8n_webhook_secret="n8n-webhook-secret-for-tests",
-            n8n_dry_run=False,
-            wr_n8n_qwen_dry_run_webhook_path="imperium/wr/interactive-start-qwen-dry-run",
-        ),
+        wr_bridge_module, "resolve_model_id", lambda role, db=None: "qwen3-32b"
     )
 
-    def fake_trigger(**kwargs):
-        signed = n8n_client.build_signed_n8n_request(
-            path=kwargs["path"],
-            payload=kwargs["payload"],
-            idempotency_key=kwargs["idempotency_key"],
-            settings=kwargs["settings"],
-            timestamp=123,
-        )
-        captured.append(signed)
-        return None
+    wr_bridge_module.run_wr_interactive_start(FakeDb(), ai_task=ai_task)
 
-    monkeypatch.setattr(wr, "trigger_n8n_webhook", fake_trigger)
+    callback = captured["callback"]
+    assert callback.result_type == EXPECTED_START_CALLBACK_RESULT_TYPE
+    assert callback.result_payload["source"] == EXPECTED_START_CALLBACK_SOURCE
+    assert callback.provider == EXPECTED_START_CALLBACK_PROVIDER
+    assert callback.raw_payload["workflow"] == EXPECTED_START_RAW_WORKFLOW
+    assert callback.model_used == "qwen3-32b"
+    assert captured["idempotency_key"] == EXPECTED_START_IDEMPOTENCY_TEMPLATE.format(task_id=task_id)
 
-    result, duplicate = wr.launch_weekly_review_session(
-        db,
-        current_user=current_user,
-        week_start=date(2026, 4, 27),
-        idempotency_key="wr-launch-n8n-signed",
-        request_method="POST",
-        request_path="/api/imperium/weekly-review/launch",
+
+def test_n8n_client_is_deprecated_and_has_no_caller() -> None:
+    # Passe 0: n8n is out of the production path. The client module stays only
+    # until the VPS export is confirmed, warns on import, and nothing calls it.
+    import subprocess
+
+    result = subprocess.run(
+        ["grep", "-rn", "n8n_client", "app/"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-
-    assert duplicate is False
-    assert result.status == "preparing_initial_summary"
-    assert len(captured) == 1
-    signed = captured[0]
-    assert signed.url == "https://n8n.example/webhook/imperium/wr/interactive-start-qwen-dry-run"
-    assert signed.headers["X-Timestamp"] == "123"
-    assert "X-Signature" in signed.headers
-    assert signed.headers["Idempotency-Key"].startswith("wr_n8n_trigger_")
-
-
-def test_missing_n8n_config_does_not_break_dry_run() -> None:
-    settings = Settings(
-        jwt_secret_key="strong-jwt-secret-for-tests-that-is-long",
-        internal_webhook_secret="strong-internal-secret-for-tests-long",
-    )
-
-    result = n8n_client.trigger_n8n_webhook(
-        path="/wr/start",
-        payload={"task_id": "mock"},
-        idempotency_key="n8n-trigger-dry-run",
-        settings=settings,
-        dry_run=True,
-    )
-
-    assert n8n_client.n8n_is_configured(settings) is False
-    assert result.dry_run is True
-    assert result.configured is False
-    assert result.request.headers["Idempotency-Key"] == "n8n-trigger-dry-run"
+    callers = [
+        line
+        for line in result.stdout.splitlines()
+        if "app/services/integrations/n8n_client.py" not in line.split(":")[0]
+    ]
+    assert callers == []
+    assert "deprecated" in (n8n_client.__doc__ or "").lower()
 
 
 def test_mock_ai_summary_attachment_is_proposal_only(monkeypatch) -> None:

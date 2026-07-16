@@ -55,7 +55,13 @@ def test_dry_run_classify_task_returns_valid_routing_decision_without_network() 
 
     assert decision.task_type == "imperium.daily_plan_assist"
     assert 0 <= decision.difficulty_score <= 200
-    assert decision.recommended_model in {"qwen2.5:7b-instruct", "strong_model_required_by_policy"}
+    # DV-6: the local model id is resolved via the local_executor role
+    # (ai_role_models), never hard-coded.
+    from app.services.ai.roles import LOCAL_EXECUTOR_ROLE, resolve_model_id
+
+    local_model = resolve_model_id(LOCAL_EXECUTOR_ROLE)
+    assert "qwen2.5" not in local_model  # DV-6: 7B written off (PHASE_0 D6)
+    assert decision.recommended_model in {local_model, "strong_model_required_by_policy"}
     assert "dry_run" in decision.risk_flags
 
 

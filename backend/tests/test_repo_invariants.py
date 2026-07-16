@@ -129,22 +129,18 @@ def test_env_example_points_to_local_canonical_imperium_database() -> None:
     ) in env_example
 
 
-def test_wr_mock_n8n_workflow_contract_is_safe_and_importable() -> None:
+def test_wr_mock_n8n_workflow_removed_and_replaced_by_fixture() -> None:
+    # Passe 0 (N8N_INVENTORY §A #3): the mock workflow was killed; its value
+    # (contract testing) lives on as a pytest fixture of the ported flow.
     workflow_path = REPO_ROOT / "ops" / "n8n" / "workflows" / "wr_interactive_start_mock.json"
-    workflow_text = workflow_path.read_text(encoding="utf-8")
-    workflow = json.loads(workflow_text)
+    assert not workflow_path.exists()
 
-    assert workflow["name"] == "IMPERIUM_WR_INTERACTIVE_START_MOCK"
-    assert INTERNAL_SECRET_HEADER not in workflow_text
-    assert N8N_DB_NAME not in workflow_text
-    assert "createHmac" in workflow_text
-    assert "INTERNAL_WEBHOOK_SECRET" in workflow_text
-    assert "Idempotency-Key" in workflow_text
-    assert "weekly_report.summary" in workflow_text
-    assert "mock-n8n" in workflow_text
-    assert "openai" not in workflow_text.lower()
-    assert "anthropic" not in workflow_text.lower()
-    assert "gemini" not in workflow_text.lower()
+    from fixtures.n8n_wr_payloads import mock_workflow_callback_body
+
+    body = mock_workflow_callback_body(week_start="2026-04-27", week_end="2026-05-03")
+    assert body["result_type"] == "weekly_report.summary"
+    assert body["model_used"] == "mock-n8n"
+    assert body["raw_payload"]["workflow"] == "IMPERIUM_WR_INTERACTIVE_START_MOCK"
 
 
 def test_wr_qwen_dry_run_n8n_workflow_contract_is_safe_and_importable() -> None:

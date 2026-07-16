@@ -163,7 +163,7 @@ def test_complete_active_mission_with_completed_outcome_sets_safe_summary() -> N
     assert mission.status == "completed"
     assert mission.started_at == started_at
     assert mission.ended_at is not None
-    assert any(isinstance(item, Event) and item.event_type == "mission.completed" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.completed" for item in db.added)
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
 
 
@@ -396,7 +396,7 @@ def test_complete_different_idempotency_key_after_completion_returns_409() -> No
     assert first_response.status_code == 200
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "Mission is not active."
-    assert sum(isinstance(item, Event) and item.event_type == "mission.completed" for item in db.added) == 1
+    assert sum(isinstance(item, Event) and item.event_type == "planning.mission.completed" for item in db.added) == 1
 
 
 def test_complete_response_does_not_expose_coefficients_or_weighted_scores() -> None:
@@ -479,7 +479,7 @@ def test_fail_active_mission_stores_reason_signals_and_event() -> None:
     assert mission.failure_reason == "fatigue was too high"
     assert mission.user_reported_signals == {"fatigue_level": 9}
     assert mission.ai_usable_reason is False
-    assert any(isinstance(item, Event) and item.event_type == "mission.failed" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.aborted" for item in db.added)
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
     assert db.committed is True
 

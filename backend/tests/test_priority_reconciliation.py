@@ -166,7 +166,7 @@ def test_daily_plan_uses_decision_framework_priorities() -> None:
     priorities = _canonical_priorities(current_user.id)
     db = QueueFakeDb(
         scalar_results=[None, None, None],
-        scalars_results=[[], priorities],
+        scalars_results=[[], [], priorities],
     )
 
     response, duplicate = create_daily_plan(
@@ -247,7 +247,7 @@ def test_priority_order_consistent_across_dashboard_and_daily_plan() -> None:
     )
     plan_db = QueueFakeDb(
         scalar_results=[None, None],
-        scalars_results=[[], priorities],
+        scalars_results=[[], [], priorities],
     )
 
     dashboard_snapshot = get_dashboard_snapshot(dashboard_db, current_user=current_user)

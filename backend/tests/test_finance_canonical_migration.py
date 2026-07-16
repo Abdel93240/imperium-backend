@@ -134,7 +134,7 @@ def test_legacy_vault_create_writes_canonical_transaction_in_cents_and_keeps_eve
     assert body["transaction"]["amount"] == "123.45"
     assert body["transaction"]["wallet"] == "revolut_business"
     assert body["transaction"]["is_reversal"] is False
-    assert event.event_type == "vault.transaction.created"
+    assert event.event_type == "finance.transaction.created"
     assert event.payload["transaction_id"] == str(transaction.id)
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
     assert db.committed is True
@@ -159,7 +159,7 @@ def test_dashboard_vault_week_uses_canonical_cents_and_exposes_reversals() -> No
     )
     db = FakeDb(
         scalar_results=[None, None, None, None],
-        scalars_results=[[], [], [original_income, fuel_expense, reversal], []],
+        scalars_results=[[], [], [original_income, fuel_expense, reversal], [], [], []],
     )
 
     snapshot = get_dashboard_snapshot(db, current_user=current_user)
@@ -244,7 +244,7 @@ def test_weekly_report_finance_uses_canonical_wallets_and_exposes_reversals() ->
         reversal_reason="duplicate",
     )
     db = FakeDb(
-        scalars_results=[[], [], [], [], [original_income, fuel_expense, reversal], []],
+        scalars_results=[[], [], [], [], [], [original_income, fuel_expense, reversal], []],
     )
 
     report = get_weekly_report(db, current_user=current_user, week_start=week_start)

@@ -149,7 +149,7 @@ def test_create_backlog_mission() -> None:
     assert body["mission"]["priority_level"] == 4
     assert body["status"] == "created"
     assert any(isinstance(item, ImperiumMission) for item in db.added)
-    assert any(isinstance(item, Event) and item.event_type == "mission.backlog.created" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.created" for item in db.added)
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
 
 
@@ -492,7 +492,7 @@ def test_promote_backlog_mission_to_active() -> None:
         "NO_ACTIVE_MISSION_FOUND",
         "IDEMPOTENCY_KEY_ACCEPTED",
     ]
-    assert any(isinstance(item, Event) and item.event_type == "mission.started" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.started" for item in db.added)
 
 
 def test_promote_backlog_route_returns_safe_public_summary() -> None:
@@ -649,7 +649,7 @@ def test_backlog_promote_different_idempotency_key_after_promotion_returns_409()
     assert second_response.status_code == 409
     assert second_response.json()["detail"] == "Mission is not in backlog."
     assert mission.status == "active"
-    assert sum(isinstance(item, Event) and item.event_type == "mission.started" for item in db.added) == 1
+    assert sum(isinstance(item, Event) and item.event_type == "planning.mission.started" for item in db.added) == 1
 
 
 def test_backlog_public_response_does_not_expose_coefficient_or_weighted_score() -> None:

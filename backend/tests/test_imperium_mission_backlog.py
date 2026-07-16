@@ -186,7 +186,7 @@ def test_create_backlog_mission_persists_backlog_status_and_score_when_signals_e
     assert response.score_created is True
     assert response.mission.decision_score is not None
     assert any(isinstance(item, ImperiumMissionScore) for item in db.added)
-    assert any(isinstance(item, Event) and item.event_type == "mission.backlog.created" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.created" for item in db.added)
     assert any(isinstance(item, IdempotencyKey) for item in db.added)
     assert db.committed is True
 
@@ -266,7 +266,7 @@ def test_promote_backlog_mission_sets_active_and_started_event() -> None:
     assert response.mission.status == "active"
     assert response.status == "promoted"
     assert response.decision_score is not None
-    assert any(isinstance(item, Event) and item.event_type == "mission.started" for item in db.added)
+    assert any(isinstance(item, Event) and item.event_type == "planning.mission.started" for item in db.added)
     assert db.committed is True
 
 
