@@ -81,9 +81,12 @@ def test_expenses_horizon_notifications_j7_and_j1_red_are_emitted(monkeypatch) -
         return object()
 
     monkeypatch.setattr(upcoming_service, "notify", fake_notify)
+    user = SimpleNamespace(id=uuid4())
+    monkeypatch.setattr(upcoming_service, "_job_user", lambda _db: user)
     today = date(2026, 7, 16)
     j7 = UpcomingExpense(
         id=uuid4(),
+        user_id=user.id,
         label_fr="Assurance",
         amount=Decimal("120.00"),
         due_date=today + timedelta(days=7),
@@ -95,6 +98,7 @@ def test_expenses_horizon_notifications_j7_and_j1_red_are_emitted(monkeypatch) -
     )
     j1 = UpcomingExpense(
         id=uuid4(),
+        user_id=user.id,
         label_fr="Loyer",
         amount=Decimal("900.00"),
         due_date=today + timedelta(days=1),

@@ -637,7 +637,8 @@ Lecteurs et contrats actifs :
 
 ### upcoming_expenses
 
-Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+Source code : migrations `20260716_0040_vault_deterministic_phase_e.py`,
+`20260716_0041_vault_phase_e_user_scope.py`, modèle
 `backend/app/models/vault.py::UpcomingExpense`.
 
 Role : source de vérité utilisateur pour les dépenses à venir et récurrentes
@@ -645,6 +646,7 @@ utilisées par la pression financière et les notifications J-7/J-1.
 
 ```text
 id          UUID PRIMARY KEY
+user_id     UUID NOT NULL FK users.id
 label_fr    TEXT NOT NULL
 amount      NUMERIC(12,2) NOT NULL CHECK amount > 0
 due_date    DATE NOT NULL
@@ -657,18 +659,21 @@ created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
-Index : `upcoming_expenses_due_active_idx`, `upcoming_expenses_category_idx`.
+Index : `upcoming_expenses_due_active_idx`,
+`upcoming_expenses_user_active_due_idx`, `upcoming_expenses_category_idx`.
 
 ### weekly_finance_summaries
 
-Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+Source code : migrations `20260716_0040_vault_deterministic_phase_e.py`,
+`20260716_0041_vault_phase_e_user_scope.py`, modèle
 `backend/app/models/vault.py::WeeklyFinanceSummary`.
 
 Role : résumé hebdomadaire déterministe Vault. `weekly_business_profit` est le
 champ lu par The Path pour la cible sadaqa.
 
 ```text
-week_start              DATE PRIMARY KEY
+user_id                 UUID NOT NULL FK users.id
+week_start              DATE NOT NULL
 business_revenue        NUMERIC(12,2) NOT NULL
 business_expenses       NUMERIC(12,2) NOT NULL
 weekly_business_profit  NUMERIC(12,2) NOT NULL
@@ -677,9 +682,12 @@ computed_at             TIMESTAMPTZ NOT NULL
 detail                  JSONB NOT NULL
 ```
 
+Primary key : `(user_id, week_start)`.
+
 ### pressure_snapshots
 
-Source code : migration `20260716_0040_vault_deterministic_phase_e.py`, modèle
+Source code : migrations `20260716_0040_vault_deterministic_phase_e.py`,
+`20260716_0041_vault_phase_e_user_scope.py`, modèle
 `backend/app/models/vault.py::PressureSnapshot`.
 
 Role : historique append-only de la pression financière 0-100. Chaque calcul
@@ -688,6 +696,7 @@ publie aussi le signal partagé `vault.pressure` et l'événement
 
 ```text
 id               UUID PRIMARY KEY
+user_id          UUID NOT NULL FK users.id
 computed_at      TIMESTAMPTZ NOT NULL
 score            INTEGER NOT NULL CHECK score BETWEEN 0 AND 100
 label            TEXT NOT NULL CHECK safe|stable|attention|pressure|critical

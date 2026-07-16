@@ -23,6 +23,7 @@ def test_vault_phase_e_tables_are_declared_for_alembic_metadata() -> None:
     upcoming_columns = set(UpcomingExpense.__table__.columns.keys())
     assert {
         "id",
+        "user_id",
         "label_fr",
         "amount",
         "due_date",
@@ -37,6 +38,7 @@ def test_vault_phase_e_tables_are_declared_for_alembic_metadata() -> None:
 
     weekly_columns = set(WeeklyFinanceSummary.__table__.columns.keys())
     assert {
+        "user_id",
         "week_start",
         "business_revenue",
         "business_expenses",
@@ -45,6 +47,10 @@ def test_vault_phase_e_tables_are_declared_for_alembic_metadata() -> None:
         "computed_at",
         "detail",
     } <= weekly_columns
+    assert [column.name for column in WeeklyFinanceSummary.__table__.primary_key.columns] == ["user_id", "week_start"]
+
+    pressure_columns = set(PressureSnapshot.__table__.columns.keys())
+    assert "user_id" in pressure_columns
 
     constraint_names = {
         constraint.name
@@ -82,10 +88,16 @@ def test_desc_indexes_match_existing_migrations() -> None:
         PressureSnapshot,
         "pressure_snapshots_computed_at_idx",
     )
+    pressure_user_expressions = _index_expressions(
+        PressureSnapshot,
+        "pressure_snapshots_user_computed_at_idx",
+    )
 
     assert memory_candidate_expressions[0].endswith("user_id")
     assert memory_candidate_expressions[1] == "created_at DESC"
     assert pressure_expressions[0] == "computed_at DESC"
+    assert pressure_user_expressions[0].endswith("user_id")
+    assert pressure_user_expressions[1] == "computed_at DESC"
 
 
 def test_pgvector_type_is_registered_for_alembic_reflection() -> None:

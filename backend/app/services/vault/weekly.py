@@ -50,7 +50,7 @@ def compute_weekly_finance_summary(
     db: Session,
     *,
     week_start: date,
-    current_user: User | None = None,
+    current_user: User,
     computed_at: datetime | None = None,
     emit_event: bool = True,
 ) -> WeeklyFinanceSummary:
@@ -59,18 +59,17 @@ def compute_weekly_finance_summary(
     computed_at = computed_at or datetime.now(UTC)
     week_end = week_start + timedelta(days=6)
     query = select(ImperiumVaultTransaction).where(
+        ImperiumVaultTransaction.user_id == current_user.id,
         ImperiumVaultTransaction.local_date >= week_start,
         ImperiumVaultTransaction.local_date <= week_end,
         ImperiumVaultTransaction.currency == "EUR",
     )
-    if current_user is not None:
-        query = query.where(ImperiumVaultTransaction.user_id == current_user.id)
     transactions = list(db.scalars(query))
     data = build_weekly_summary_detail(transactions, category_map=_category_map(db))
 
-    summary = db.get(WeeklyFinanceSummary, week_start)
+    summary = db.get(WeeklyFinanceSummary, (current_user.id, week_start))
     if summary is None:
-        summary = WeeklyFinanceSummary(week_start=week_start, **data, computed_at=computed_at)
+        summary = WeeklyFinanceSummary(user_id=current_user.id, week_start=week_start, **data, computed_at=computed_at)
         db.add(summary)
     else:
         summary.business_revenue = data["business_revenue"]
@@ -81,7 +80,7 @@ def compute_weekly_finance_summary(
         summary.computed_at = computed_at
     db.flush()
 
-    if emit_event and current_user is not None:
+    if emit_event:
         db.add(
             build_event(
                 db,
@@ -146,10 +145,10 @@ def build_weekly_summary_detail(
     }
 
 
-def backfill_weekly_finance_summaries(db: Session, *, current_user: User | None = None) -> list[WeeklyFinanceSummary]:
-    query = select(func.min(ImperiumVaultTransaction.local_date), func.max(ImperiumVaultTransaction.local_date))
-    if current_user is not None:
-        query = query.where(ImperiumVaultTransaction.user_id == current_user.id)
+def backfill_weekly_finance_summaries(db: Session, *, current_user: User) -> list[WeeklyFinanceSummary]:
+    query = select(func.min(ImperiumVaultTransaction.local_date), func.max(ImperiumVaultTransaction.local_date)).where(
+        ImperiumVaultTransaction.user_id == current_user.id
+    )
     start, end = db.execute(query).one()
     if start is None or end is None:
         return []
@@ -166,8 +165,12 @@ def backfill_weekly_finance_summaries(db: Session, *, current_user: User | None 
     return summaries
 
 
-def list_weekly_summaries(db: Session, *, from_date: date | None = None) -> list[WeeklyFinanceSummary]:
-    query = select(WeeklyFinanceSummary).order_by(WeeklyFinanceSummary.week_start.desc())
+def list_weekly_summaries(db: Session, *, current_user: User, from_date: date | None = None) -> list[WeeklyFinanceSummary]:
+    query = (
+        select(WeeklyFinanceSummary)
+        .where(WeeklyFinanceSummary.user_id == current_user.id)
+        .order_by(WeeklyFinanceSummary.week_start.desc())
+    )
     if from_date is not None:
         query = query.where(WeeklyFinanceSummary.week_start >= from_date)
     return list(db.scalars(query))

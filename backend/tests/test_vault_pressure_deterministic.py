@@ -243,6 +243,7 @@ def _transaction(user_id, **overrides) -> ImperiumVaultTransaction:
 def _expense(**overrides) -> UpcomingExpense:
     return UpcomingExpense(
         id=overrides.pop("id", uuid4()),
+        user_id=overrides.pop("user_id", uuid4()),
         label_fr=overrides.pop("label_fr", "Expense"),
         amount=overrides.pop("amount", Decimal("10.00")),
         due_date=overrides.pop("due_date", date(2026, 7, 16)),

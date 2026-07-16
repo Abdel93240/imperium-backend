@@ -8,27 +8,37 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.models.auth import User
 from app.models.vault import ImperiumVaultTransaction, UpcomingExpense
 from app.services.notifications import notify
 
 
-def list_upcoming_expenses(db: Session, *, active: bool | None = True) -> list[UpcomingExpense]:
-    query = select(UpcomingExpense).order_by(UpcomingExpense.due_date, UpcomingExpense.label_fr)
+def list_upcoming_expenses(db: Session, *, current_user: User, active: bool | None = True) -> list[UpcomingExpense]:
+    query = (
+        select(UpcomingExpense)
+        .where(UpcomingExpense.user_id == current_user.id)
+        .order_by(UpcomingExpense.due_date, UpcomingExpense.label_fr)
+    )
     if active is not None:
         query = query.where(UpcomingExpense.active.is_(active))
     return list(db.scalars(query))
 
 
-def create_upcoming_expense(db: Session, *, payload) -> UpcomingExpense:
-    expense = UpcomingExpense(**payload.model_dump(exclude_unset=True))
+def create_upcoming_expense(db: Session, *, current_user: User, payload) -> UpcomingExpense:
+    expense = UpcomingExpense(user_id=current_user.id, **payload.model_dump(exclude_unset=True))
     db.add(expense)
     db.commit()
     db.refresh(expense)
     return expense
 
 
-def update_upcoming_expense(db: Session, *, expense_id: UUID, payload) -> UpcomingExpense | None:
-    expense = db.get(UpcomingExpense, expense_id)
+def update_upcoming_expense(db: Session, *, current_user: User, expense_id: UUID, payload) -> UpcomingExpense | None:
+    expense = db.scalar(
+        select(UpcomingExpense).where(
+            UpcomingExpense.id == expense_id,
+            UpcomingExpense.user_id == current_user.id,
+        )
+    )
     if expense is None:
         return None
     for key, value in payload.model_dump(exclude_unset=True).items():
@@ -38,8 +48,13 @@ def update_upcoming_expense(db: Session, *, expense_id: UUID, payload) -> Upcomi
     return expense
 
 
-def deactivate_upcoming_expense(db: Session, *, expense_id: UUID) -> UpcomingExpense | None:
-    expense = db.get(UpcomingExpense, expense_id)
+def deactivate_upcoming_expense(db: Session, *, current_user: User, expense_id: UUID) -> UpcomingExpense | None:
+    expense = db.scalar(
+        select(UpcomingExpense).where(
+            UpcomingExpense.id == expense_id,
+            UpcomingExpense.user_id == current_user.id,
+        )
+    )
     if expense is None:
         return None
     expense.active = False
@@ -67,6 +82,7 @@ def ensure_next_occurrence(db: Session, *, expense: UpcomingExpense) -> Upcoming
     existing = db.scalar(
         select(UpcomingExpense).where(
             UpcomingExpense.label_fr == expense.label_fr,
+            UpcomingExpense.user_id == expense.user_id,
             UpcomingExpense.amount == expense.amount,
             UpcomingExpense.category == expense.category,
             UpcomingExpense.wallet == expense.wallet,
@@ -76,6 +92,7 @@ def ensure_next_occurrence(db: Session, *, expense: UpcomingExpense) -> Upcoming
     if existing is not None:
         return existing
     generated = UpcomingExpense(
+        user_id=expense.user_id,
         label_fr=expense.label_fr,
         amount=expense.amount,
         due_date=next_date,
@@ -91,10 +108,19 @@ def ensure_next_occurrence(db: Session, *, expense: UpcomingExpense) -> Upcoming
 
 
 def expenses_horizon_job(ctx, window) -> None:
+    user = _job_user(ctx.db)
+    if user is None:
+        ctx.items_in = 0
+        ctx.items_out = 0
+        ctx.detail = {"skip": "no_user"}
+        if window.to_ts is not None:
+            ctx.cursor_ts = window.to_ts
+        return
     today = (window.to_ts.date() if window.to_ts is not None else date.today())
     expenses = list(
         ctx.db.scalars(
             select(UpcomingExpense).where(
+                UpcomingExpense.user_id == user.id,
                 UpcomingExpense.active.is_(True),
                 or_(
                     UpcomingExpense.due_date.in_(
@@ -105,7 +131,7 @@ def expenses_horizon_job(ctx, window) -> None:
             )
         )
     )
-    balances = _wallet_balances(ctx.db)
+    balances = _wallet_balances(ctx.db, current_user=user)
     sent = 0
     generated = 0
     for expense in expenses:
@@ -140,9 +166,11 @@ def expenses_horizon_job(ctx, window) -> None:
         ctx.cursor_ts = window.to_ts
 
 
-def _wallet_balances(db: Session) -> dict[str, Decimal]:
+def _wallet_balances(db: Session, *, current_user: User) -> dict[str, Decimal]:
     balances: dict[str, Decimal] = {}
-    transactions = list(db.scalars(select(ImperiumVaultTransaction)))
+    transactions = list(
+        db.scalars(select(ImperiumVaultTransaction).where(ImperiumVaultTransaction.user_id == current_user.id))
+    )
     for transaction in transactions:
         amount = Decimal(transaction.amount_cents) / Decimal("100")
         if transaction.transaction_type == "expense":
@@ -150,6 +178,17 @@ def _wallet_balances(db: Session) -> dict[str, Decimal]:
         balances.setdefault(transaction.wallet, Decimal("0.00"))
         balances[transaction.wallet] += amount
     return balances
+
+
+def _job_user(db: Session) -> User | None:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    if settings.imperium_canonical_user_id is not None:
+        user = db.get(User, settings.imperium_canonical_user_id)
+        if user is not None:
+            return user
+    return db.scalar(select(User).order_by(User.created_at).limit(1))
 
 
 def _add_months(value: date, months: int) -> date:

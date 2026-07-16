@@ -485,6 +485,7 @@ CREATE TABLE vault_wallet_snapshots (
 -- Phase E.
 CREATE TABLE upcoming_expenses (
   id          UUID PK,
+  user_id     UUID FK,
   label_fr    TEXT NOT NULL,
   amount      NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   due_date    DATE NOT NULL,
@@ -498,17 +499,20 @@ CREATE TABLE upcoming_expenses (
 );
 
 CREATE TABLE weekly_finance_summaries (
-  week_start              DATE PK,
+  user_id                 UUID FK,
+  week_start              DATE NOT NULL,
   business_revenue        NUMERIC(12,2) NOT NULL,
   business_expenses       NUMERIC(12,2) NOT NULL,
   weekly_business_profit  NUMERIC(12,2) NOT NULL,
   personal_expenses       NUMERIC(12,2) NOT NULL,
   computed_at             TIMESTAMPTZ NOT NULL,
-  detail                  JSONB NOT NULL
+  detail                  JSONB NOT NULL,
+  PRIMARY KEY (user_id, week_start)
 );
 
 CREATE TABLE pressure_snapshots (
   id               UUID PK,
+  user_id          UUID FK,
   computed_at      TIMESTAMPTZ NOT NULL,
   score            INTEGER NOT NULL CHECK (score BETWEEN 0 AND 100),
   label            TEXT NOT NULL,

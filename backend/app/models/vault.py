@@ -110,9 +110,11 @@ class UpcomingExpense(UUIDPrimaryKeyMixin, Base):
             name="upcoming_expenses_recurrence_check",
         ),
         Index("upcoming_expenses_due_active_idx", "active", "due_date"),
+        Index("upcoming_expenses_user_active_due_idx", "user_id", "active", "due_date"),
         Index("upcoming_expenses_category_idx", "category"),
     )
 
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     label_fr: Mapped[str] = mapped_column(Text, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     due_date: Mapped[date] = mapped_column(Date(), nullable=False)
@@ -132,6 +134,7 @@ class UpcomingExpense(UUIDPrimaryKeyMixin, Base):
 class WeeklyFinanceSummary(Base):
     __tablename__ = "weekly_finance_summaries"
 
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     week_start: Mapped[date] = mapped_column(Date(), primary_key=True)
     business_revenue: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     business_expenses: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
@@ -150,8 +153,10 @@ class PressureSnapshot(UUIDPrimaryKeyMixin, Base):
             name="pressure_snapshots_label_check",
         ),
         Index("pressure_snapshots_computed_at_idx", desc("computed_at")),
+        Index("pressure_snapshots_user_computed_at_idx", "user_id", desc("computed_at")),
     )
 
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     label: Mapped[str] = mapped_column(Text, nullable=False)

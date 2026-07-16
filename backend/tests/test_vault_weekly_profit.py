@@ -12,9 +12,11 @@ class FakeDb:
         self.transactions = transactions
         self.summaries = {}
         self.added = []
+        self.queries = []
         self.commits = 0
 
     def scalars(self, query):
+        self.queries.append(query)
         return list(self.transactions)
 
     def execute(self, query, params=None):
@@ -37,7 +39,7 @@ class FakeDb:
             obj.id = uuid4()
         self.added.append(obj)
         if isinstance(obj, WeeklyFinanceSummary):
-            self.summaries[obj.week_start] = obj
+            self.summaries[(obj.user_id, obj.week_start)] = obj
 
     def flush(self):
         pass
@@ -96,7 +98,9 @@ def test_weekly_summary_upsert_is_idempotent_and_emits_event() -> None:
 
     assert first is second
     assert len(db.summaries) == 1
+    assert second.user_id == user.id
     assert str(second.weekly_business_profit) == "100.00"
+    assert "imperium_vault_transactions.user_id" in str(db.queries[0])
     events = [item for item in db.added if isinstance(item, Event)]
     assert events
     assert all(event.event_type == "finance.weekly_summary.created" for event in events)

@@ -195,6 +195,7 @@ def load_pressure_inputs(
     active_expenses = list(
         db.scalars(
             select(UpcomingExpense).where(
+                UpcomingExpense.user_id == current_user.id,
                 UpcomingExpense.active.is_(True),
                 UpcomingExpense.due_date <= week_end,
             )
@@ -259,6 +260,7 @@ def publish_pressure_result(
     computed_at = computed_at or datetime.now(UTC)
     snapshot = PressureSnapshot(
         id=uuid4(),
+        user_id=current_user.id,
         computed_at=computed_at,
         score=result.score,
         label=result.label,
@@ -300,14 +302,22 @@ def publish_pressure_result(
     return snapshot
 
 
-def latest_pressure_snapshot(db: Session) -> PressureSnapshot | None:
-    return db.scalar(select(PressureSnapshot).order_by(PressureSnapshot.computed_at.desc()).limit(1))
+def latest_pressure_snapshot(db: Session, *, current_user: User) -> PressureSnapshot | None:
+    return db.scalar(
+        select(PressureSnapshot)
+        .where(PressureSnapshot.user_id == current_user.id)
+        .order_by(PressureSnapshot.computed_at.desc())
+        .limit(1)
+    )
 
 
-def pressure_history(db: Session, *, limit: int = 30) -> list[PressureSnapshot]:
+def pressure_history(db: Session, *, current_user: User, limit: int = 30) -> list[PressureSnapshot]:
     return list(
         db.scalars(
-            select(PressureSnapshot).order_by(PressureSnapshot.computed_at.desc()).limit(limit)
+            select(PressureSnapshot)
+            .where(PressureSnapshot.user_id == current_user.id)
+            .order_by(PressureSnapshot.computed_at.desc())
+            .limit(limit)
         )
     )
 
