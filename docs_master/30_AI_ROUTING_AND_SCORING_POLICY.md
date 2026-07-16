@@ -145,6 +145,16 @@ This has **nothing to do** with model routing. It does not call the cloud. It is
 
 This section is the single owner of the role → concrete model → version mapping. Other docs name the ROLE; the concrete model and version live here only (and feed the code's API calls).
 
+> **Note (passe 0, 2026-07-15) : incarnation code = table `ai_role_models`**
+> (migration 20260715_0039, doc 73 PART B "identifier-not-call"). Le code
+> résout un rôle (`local_executor`, `first_cloud_tier`, `high_reasoning`,
+> `sustained_long_context`, `health_specialist`, `finance_specialist`,
+> `web_fresh_data`, `embedding_service`, `ocr_service`,
+> `transcription_service`) via cette table ; ce doc reste le propriétaire de
+> la LISTE des rôles et de leurs critères. Changer un modèle = nouvelle
+> version de ligne, jamais un edit de code (DV-6 : plus aucune référence
+> concrète en dur).
+
 ### 3.1 Imperium Backend
 
 - Current model: backend service
@@ -211,13 +221,13 @@ Opus must never be called by reflex.
 - Selection criteria: endurance on long tasks.
 - Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence.
 
-#### Current availability status (temporary)
+#### Availability status
 
-Fable 5 is currently UNAVAILABLE — blocked by a US government regulatory decision on national-security grounds; Anthropic is in discussion with the authorities. While it is unavailable, this role's work is handled by the high reasoning model (§3.6). This is acceptable for now because early-ecosystem contexts are still short (few prior weeks, few examples, light vector history), so the sustained-long-context advantage does not yet materialize: on short contexts, the high reasoning model and Fable perform comparably, and Fable's edge is endurance over long contexts, not raw intelligence.
-
-Planned switch-back: as data accumulates and contexts grow long, if Fable 5 is still unavailable and the high reasoning model starts to struggle on length, evaluate an endurance-capable substitute (Fable 5 returning, or Gemini Pro 3.1 - chosen for long-context endurance, not for being more intelligent than the high reasoning model). Until that point, the Opus-based cascade stands.
-
-Consequently, the monthly-plan generation cascade (§8.5) is currently high-reasoning-model-based for this reason, not by oversight.
+**RESOLVED (2026-07-01, doc patched 2026-07-15).** Fable 5 was suspended by a US
+export-control directive on 2026-06-17 and access was restored on 2026-07-01
+(CONCLUSIONS_test_papier, PHASE_0 note). The role is served by Fable 5 again;
+Gemini Pro 3.1 stays the availability fallback and Opus 4.8 the
+content-safeguard fallback. The plan-generation cascade is Fable-5-based again.
 
 Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable blocks and falls back to Opus 4.8 on its own. This means the "sensitivity" routing criterion is partially handled model-side for Fable.
 
@@ -531,7 +541,9 @@ The one recurring task meeting long + complex + high-stakes/durable. Fable's own
 
 Unavailability fallback: if Fable 5 is unreachable (e.g. regulatory/export directive, provider outage), this step falls back to Opus 4.8. This is distinct from the §3.7 content safeguard (which only redirects high-risk topics) - it covers the model being absent from the routing layer entirely.
 
-Status as of 2026-06-17: Fable 5 suspended by US export-control directive (indefinite) -> Opus 4.8 fallback ACTIVE for this step. Re-evaluate and revert to Fable 5 if access is restored.
+Status as of 2026-06-17: Fable 5 suspended by US export-control directive (indefinite) -> Opus 4.8 fallback ACTIVE for this step.
+
+**Status update 2026-07-01 (applied 2026-07-15, passe 0): Fable 5 access RESTORED.** The forced rule is active again: WR Phase 3 → Fable 5. The Opus 4.8 fallback returns to being the unavailability fallback only. The §3 hierarchy below is realigned accordingly.
 
 ### 7.9 Deterministic backend decision
 ```text
