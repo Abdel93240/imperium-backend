@@ -21,7 +21,7 @@ services:
       IMPERIUM_CANONICAL_USER_ID: ${IMPERIUM_CANONICAL_USER_ID:?IMPERIUM_CANONICAL_USER_ID must be provided}
       QWEN_ENABLED: ${QWEN_ENABLED:-false}
       QWEN_BASE_URL: ${QWEN_BASE_URL:-}
-      QWEN_MODEL: ${QWEN_MODEL:-qwen2.5:7b-instruct}
+      # QWEN_MODEL removed: the model id resolves via ai_role_models (local_executor), DV-6.
       QWEN_REQUEST_TIMEOUT_SECONDS: ${QWEN_REQUEST_TIMEOUT_SECONDS:-60}
       QWEN_DRY_RUN: ${QWEN_DRY_RUN:-true}
       N8N_DRY_RUN: ${N8N_DRY_RUN:-true}

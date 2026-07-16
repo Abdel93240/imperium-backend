@@ -11,25 +11,47 @@ from sqlalchemy import create_engine
 from _postgres import require_test_database_url
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = BACKEND_ROOT.parent
 LEGACY_7B = "qwen2.5" + ":7b"  # assembled so this test file never matches itself
 
+# The ONLY places allowed to keep the legacy id: changelogs and frozen audit
+# archives that photograph a past state. Everything else in the repo (code,
+# docs_master, ops exports, compose files…) must be clean.
+_AUTHORIZED_ARCHIVE_DIRS = [
+    "docs_master_old",  # archived doc corpus
+    "audits",  # audit snapshots (photographs of past states)
+    "audit_resync",  # resync audit snapshots
+    "gap_analysis_v1",  # audit deliverables (catalog draft, findings, inventories)
+    "_patches_to_apply",  # old→new correspondence tables quote the legacy id
+]
+_AUTHORIZED_ARCHIVE_FILES = [
+    "ARCHITECTURE_DIGEST_2.md",  # audit snapshot kept at repo root
+    "SOCLE_MAPPING.md",  # passe 0 changelog (documents the DV-6 replacement itself)
+]
 
-def test_grep_legacy_7b_model_is_zero_outside_changelog() -> None:
+
+def test_grep_legacy_7b_model_is_zero_outside_authorized_archives() -> None:
+    excludes = [
+        "--exclude-dir=.git",
+        "--exclude-dir=__pycache__",
+        "--exclude-dir=.venv",
+        "--exclude-dir=node_modules",
+        # Machine-local runtime files, gitignored — the test must stay hermetic
+        # to this machine's environment (same rule as the HMAC mock-summary test).
+        "--exclude=.env",
+        "--exclude=.env.*",
+    ]
+    excludes += [f"--exclude-dir={name}" for name in _AUTHORIZED_ARCHIVE_DIRS]
+    excludes += [f"--exclude={name}" for name in _AUTHORIZED_ARCHIVE_FILES]
     result = subprocess.run(
-        [
-            "grep",
-            "-rln",
-            "--include=*.py",
-            LEGACY_7B,
-            str(BACKEND_ROOT / "app"),
-            str(BACKEND_ROOT / "tests"),
-            str(BACKEND_ROOT / "alembic"),
-        ],
+        ["grep", "-rlI", *excludes, LEGACY_7B, str(REPO_ROOT)],
         capture_output=True,
         text=True,
         check=False,
     )
-    assert result.stdout.strip() == ""
+    assert result.stdout.strip() == "", (
+        "Legacy 7B model id found outside authorized archives:\n" + result.stdout
+    )
 
 
 def test_local_executor_role_is_seeded_with_qwen3_32b() -> None:
