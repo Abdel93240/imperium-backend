@@ -642,8 +642,17 @@ no secrets/providers/infra metadata
 
 ## Event Foundation 23A
 
+> **PATCH 2026-07-15 (passe 0, D2 appliqué au doc).** Le journal métier
+> CANONIQUE est la table **`events`** (enveloppe complète, dotted types,
+> depth — migrations 0001/0011/0036, trigger NOTIFY `events_new` 0038).
+> `imperium_events` est DÉPRÉCIÉE : ses routes sont marquées deprecated
+> (imperium.py:1275), aucun nouveau consommateur ne doit s'y brancher.
+> La section 23A ci-dessous décrit le contrat HISTORIQUE de ce chemin
+> déprécié ; « route owner canonique » ne vaut plus que pour la surface
+> HTTP legacy, pas pour le journal.
+
 `/api/imperium/events`
-route owner canonique
+route owner du chemin legacy (déprécié D2)
 `app/api/v1/routes/imperium_events.py`
 Event Foundation 23A / 23B / 23C
 append-only
@@ -758,7 +767,10 @@ The returned page contains at most `limit` items.
 `next_offset` is null when the page is final.
 `count` in the public route is only the returned page size.
 It is not a total_count.
-Future internal consumers should read imperium_events through `app/services/imperium/event_readers.py`.
+Future internal consumers must read the canonical `events` journal (runner
+event subscriptions + job_cursors, passe 0) — NOT imperium_events (deprecated
+D2). The legacy reader `app/services/imperium/event_readers.py` exists only
+for the deprecated surface.
 
 Runtime constraints:
 read-only
