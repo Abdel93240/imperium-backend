@@ -150,7 +150,7 @@ def compute_pressure_from_db(
     now: datetime | None = None,
     causation_event_id: str | None = None,
 ) -> PressureSnapshot:
-    now = now or datetime.now(UTC)
+    now = now or _utcnow()
     today = today or now.date()
     inputs = load_pressure_inputs(db, current_user=current_user, today=today, now=now)
     return publish_pressure_result(
@@ -257,7 +257,7 @@ def publish_pressure_result(
     computed_at: datetime | None = None,
     causation_event_id: str | None = None,
 ) -> PressureSnapshot:
-    computed_at = computed_at or datetime.now(UTC)
+    computed_at = computed_at or _utcnow()
     snapshot = PressureSnapshot(
         id=uuid4(),
         user_id=current_user.id,
@@ -338,7 +338,7 @@ def pressure_refresh_job(ctx, window) -> None:
         if event is not None:
             causation_event_id = event.event_id
     compute_pressure_from_db(
-        ctx.db, current_user=user, now=window.to_ts or datetime.now(UTC), causation_event_id=causation_event_id
+        ctx.db, current_user=user, now=window.to_ts or _utcnow(), causation_event_id=causation_event_id
     )
     ctx.items_in = 1
     ctx.items_out = 1
@@ -358,6 +358,11 @@ def _job_user(db: Session) -> User | None:
         if user is not None:
             return user
     return db.scalar(select(User).order_by(User.created_at).limit(1))
+
+
+def _utcnow() -> datetime:
+    """Return the pressure clock, isolated so runtime paths can be tested deterministically."""
+    return datetime.now(UTC)
 
 
 def _recent_daily_capacity(db: Session, *, current_user: User, today: date) -> Decimal:

@@ -80,6 +80,7 @@ def test_pressure_api_loads_db_inputs_and_publishes_snapshot_signal_event(monkey
         )
     ]
     db = FakeDb(scalars_results=[transactions, expenses])
+    monkeypatch.setattr(pressure_service, "_utcnow", lambda: now)
     monkeypatch.setattr(pressure_service, "get_parameter", lambda *_args, default=None: default)
     monkeypatch.setattr(pressure_service, "_recent_daily_capacity", lambda *_args, **_kwargs: Decimal("220.00"))
 
