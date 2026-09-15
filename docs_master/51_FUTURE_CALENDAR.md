@@ -586,9 +586,9 @@ The cron at 06:00 each morning:
 ## 12. AI Task Types
 
 ```text
-calendar.event.evaluate_impact   - Sonnet/Opus, when adding 
+calendar.event.evaluate_impact   - first_cloud_tier/high_reasoning, when adding
                                     an event ≤7 days away
-calendar.event.deadline_plan     - Sonnet, propose best time
+calendar.event.deadline_plan     - first_cloud_tier, propose best time
                                     slot for a deadline
 calendar.event.recurrence_check  - daily, ensure recurrences
                                     in 7-day window are active
@@ -608,9 +608,9 @@ Most calendar work is DETERMINISTIC:
   - Cost: 0€
 
 AI calls only happen on 7-day threshold crossings:
-  - calendar.event.evaluate_impact: Sonnet 4.6
+  - calendar.event.evaluate_impact: first_cloud_tier
     (~0.02€ per event added in window)
-  - calendar.event.deadline_plan: Sonnet 4.6
+  - calendar.event.deadline_plan: first_cloud_tier
     (~0.02€ per deadline added in window)
 
 Estimated annual cost: 1-3€ depending on usage.

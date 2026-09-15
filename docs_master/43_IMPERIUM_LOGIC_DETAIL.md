@@ -747,7 +747,7 @@ REPLAN BEHAVIOR:
   - debounce_minutes (default: 5)
 
 CHATBOT:
-  - default_routing (qwen → ... → opus chain visible in advanced)
+  - default_routing (local_executor → ... → high_reasoning chain visible in advanced; doc 30 §3)
   - chat history retention (default: 90 days)
 
 FEED IA / NOURRIR L'IA:
@@ -807,6 +807,11 @@ SYSTEM HEALTH (V3, doc 54):
 > **Critical section.** This is the foundation for all future decisions about model quality, cost control, and architecture evolution. Every AI call in the ecosystem is logged here. Without this data, debugging and optimization are impossible after real usage.
 
 ### 17.1 The central AI call log table
+
+> Historical SQL examples in §17 preserve old concrete model identifiers for log
+> and pricing traceability. They are not the current routing mapping or a migration
+> to execute. Normative selection resolves generic roles through doc 30 §3; logs
+> retain the actual model identifier used at the time of the call.
 
 ```sql
 CREATE TABLE ai_call_logs (
@@ -912,6 +917,9 @@ WHERE related_entity_id IS NOT NULL;
 ```
 
 ### 17.2 Pricing configuration table
+
+> The seed below is a historical May 2026 pricing example. Its slugs and amounts
+> are preserved, not current pricing or prescribed model assignments.
 
 ```sql
 -- Allows updating pricing without code changes
@@ -1209,6 +1217,9 @@ ORDER BY 1 DESC;
 
 ### 17.5 Helper queries for manual review
 
+> Historical queries: the literal model filter deliberately targets old log rows.
+> Do not rename that identifier when the current local_executor model changes.
+
 ```sql
 -- Last 50 errors with context
 SELECT
@@ -1337,6 +1348,11 @@ APRÈS 6 MOIS:
 ---
 
 ## 18. How to Log in Code
+
+> Historical SDK/logging example, preserved for traceability. The concrete names
+> illustrate the model actually called and logged in that example, not a current
+> routing rule. Current calls resolve first_cloud_tier through doc 30 §3 and log
+> the returned concrete ID; historical log IDs must not be relabeled.
 
 Every AI call in the codebase should follow this pattern:
 

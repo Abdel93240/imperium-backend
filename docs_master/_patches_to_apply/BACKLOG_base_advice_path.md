@@ -1,5 +1,7 @@
 ## Backlog Entry — Path `base_advice` (pre-written religious advice)
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Context: the morning "AI advice" card for The Path must NOT let the AI generate
 or freely select religious content. Decision (doc 30, §7.6): Qwen 32B picks one
 entry at random from a dedicated, closed list of pre-written, validated advice

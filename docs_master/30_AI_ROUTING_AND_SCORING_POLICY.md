@@ -18,29 +18,23 @@ This version is a **full rewrite** (June 2026). It supersedes all previous versi
 - Opus 4.7 was the premium tier
 - Haiku 4.5 was a routing tier
 
-**V1 model decisions (canonical):**
-- **Qwen 32B** is the official local routing/scoring/execution model (GPU-served on the V100). It replaces the former Qwen 2.5 7B.
-- **Sonnet 4.6** is the first cloud tier.
-- **Opus 4.8** is the default heavy cloud model.
-- **Fable 5** is the top tier, reserved for tasks that are simultaneously long, complex, and high-stakes.
-- **GPT-5.5** is the domain specialist for health (Pulse) and fresh/web data (Vector).
-- **The OCR service handles vision/OCR. The transcription service** handles audio.
-- **CatBoost** is a dedicated metric ML model for Vector ride scoring — not an LLM.
-- **Haiku is removed** from the routing hierarchy (the local Qwen 32B covers the low band; Sonnet bounds the top of it — no room left for a paid light tier).
-- **Gemma** remains a future challenger only, not deployed by default.
-
-**Candidates to evaluate later (not adopted yet):** MiniMax M3 and Qwen3.7 Max as potential challengers to Sonnet 4.6 on the mid cloud tier. To be tested on real Imperium tasks (reasoning, advice, French), not adopted on the basis of coding benchmarks.
+**Document ownership (canonical):**
+- §3 alone owns the logical ROLE → concrete model/version mapping, including fallback assignments and candidates.
+- `F10_TOPOLOGIE_INFRA.md` owns physical/technical local deployment only: hardware, GGUF, quantization, hashes, runtime, endpoints, systemd and H3 measurements.
+- All other sections and specs reference generic roles and resolve concrete assignments through §3.
+- `local_executor` supplies local routing/scoring/execution and dialogue conduction; cloud tiers and specialists are selected under the rules below.
+- CatBoost remains the dedicated business ML model for Vector ride scoring, outside LLM routing.
 
 Patch 2E implementation note (preserved):
 - backend adapter: `app/services/ai/providers/qwen.py`;
 - default mode: dry-run, no network call;
 - smoke endpoint: `POST /api/ai/qwen/smoke`;
 - output: structured JSON contracts only;
-- canonical writes: forbidden from Qwen output without backend/user validation.
+- canonical writes: forbidden from local router-scorer output without backend/user validation.
 
 Patch 2F implementation note (preserved):
 - n8n dry-run workflow file: `ops/n8n/workflows/wr_interactive_start_qwen_dry_run.json`;
-- n8n calls the backend internal Qwen dry-run bridge, not the local model endpoint directly;
+- n8n calls the backend internal local router-scorer dry-run bridge, not the local model endpoint directly;
 - bridge endpoint: `POST /api/internal/ai/qwen/smoke`;
 - allowed bridge contract for now: `weekly_report.summary` + `weekly_summary`;
 - result storage still goes through `POST /api/internal/ai/tasks/{task_id}/result`.
@@ -103,10 +97,10 @@ The scoring system exists to avoid calling a powerful (expensive) model when the
 Priority order for execution:
 
 1. No AI if the backend can answer alone
-2. Qwen 32B local if the task is within its reach
-3. Sonnet 4.6 if the task exceeds the local model
-4. Opus 4.8 if deep analysis / strategy is required
-5. Fable 5 only if the task is long AND complex AND high-stakes
+2. local_executor if the task is within its reach
+3. first_cloud_tier if the task exceeds the local model
+4. high_reasoning if deep analysis / strategy is required
+5. sustained_long_context only if the task is long AND complex AND high-stakes
 
 ### 1.6 User-triggered AI calls
 
@@ -119,7 +113,7 @@ Suggest → Inform → User decides → Execute
 ```
 
 Exceptions allowed without user action:
-- Local Qwen 32B calls (free, fast, no impact)
+- local_executor calls (free, fast, no impact)
 - Vision OCR inside a flow the user explicitly initiated
 - Pure deterministic backend calculations (no AI)
 
@@ -131,7 +125,7 @@ A recurring source of confusion. Imperium has **two unrelated scoring systems**.
 
 ### 2.1 Task-difficulty scoring (`/200`)
 
-A routing score that decides **which model** handles a task. Computed by the local Qwen 32B. Detailed in §5. This is the "scoring" referenced everywhere else in this document unless stated otherwise.
+A routing score that decides **which model** handles a task. Computed by the local router-scorer (`local_executor`). Detailed in §5. This is the "scoring" referenced everywhere else in this document unless stated otherwise.
 
 ### 2.2 Vector ride scoring (CatBoost)
 
@@ -143,7 +137,7 @@ This has **nothing to do** with model routing. It does not call the cloud. It is
 
 ## 3. Component Roles
 
-This section is the single owner of the role → concrete model → version mapping. Other docs name the ROLE; the concrete model and version live here only (and feed the code's API calls).
+This section is the single owner of the logical role → concrete model → version mapping. Other docs name the ROLE. F10 documents physical/technical local deployment and may name deployed or candidate artifacts, without owning the logical mapping. This documentation update does not modify `ai_role_models` or activate any product call; `qwen_enabled=False` and `real_ai_enabled=False` remain unchanged.
 
 > **Note (passe 0, 2026-07-15) : incarnation code = table `ai_role_models`**
 > (migration 20260715_0039, doc 73 PART B "identifier-not-call"). Le code
@@ -178,25 +172,25 @@ Simple CRUD, simple read, simple deterministic compute → backend
 Multi-step, temporal, AI, external, email, file, audio, image → n8n
 ```
 
-### 3.3 Fast local model
+### 3.3 Fast local model — `local_executor`
 
-- Current model: Qwen 32B
-- Role: local router / scorer / executor / dialogue conductor.
+- Current model: `Qwen3.6-27B-Q6_K`
+- Role: `local_executor` — local router / scorer / executor / dialogue conductor.
 - Selection criteria: local, nothing leaves the machine.
 - Use for: classify incoming tasks; compute the dynamic difficulty score `/200`; pick the recommended model; detect ambiguities; decide whether to escalate; emit strict JSON routing output; conduct dialogue sessions (Weekly Review, Imperium chatbot) as the default speaker, escalating per §6.
-- Deployment: GPU-served locally (V100). The serving stack (Ollama or vLLM, to be finalized for a 32B on the V100) must be reachable by the backend through internal networking only. No public model port is exposed.
+- Deployment: see [F10 §5-ter](F10_TOPOLOGIE_INFRA.md#5-ter-local-executor--phase-h) for the active local runtime, hardware and technical validation. Backend access is internal only; no public model port is exposed.
 
-Qwen 32B also executes local tasks directly: light reformulation, classification, short summary, categorization, simple extraction, non-critical micro-decisions, and the routine turns of a dialogue.
+The local executor also executes local tasks directly: light reformulation, classification, short summary, categorization, simple extraction, non-critical micro-decisions, and the routine turns of a dialogue.
 
-Qwen 32B is the router, not the sovereign. It must not be treated as absolute truth; canonical writes always pass through backend/user validation.
+The local router-scorer is the router, not the sovereign. It must not be treated as absolute truth; canonical writes always pass through backend/user validation.
 
-**Working hypothesis (assumed, validated empirically):** the 32B is capable of routing and conducting dialogue reliably. If real-world use shows it is not, that is an ecosystem-wide problem (not a Weekly-Review-specific one), and the answer is a hardware decision (e.g. a 70B model + an additional GPU), not a local patch.
+**Working hypothesis (assumed, validated empirically):** the local model is capable of routing and conducting dialogue reliably. If real-world use shows it is not, that is an ecosystem-wide problem (not a Weekly-Review-specific one), and the answer is a hardware decision (see F10 for hardware evolution), not a local patch.
 
 ### 3.4 Gemma
 
 Optional, not deployed by default. Future possible uses: A/B challenger to Qwen on a sample of decisions, local fallback when Qwen is unavailable, specialized micro-model if benchmarks prove it useful. Do not run Qwen + Gemma in parallel by default in V1.
 
-### 3.5 First cloud tier
+### 3.5 First cloud tier — `first_cloud_tier`
 
 - Current model: Sonnet 4.6
 - Role: balanced cloud model, the first step above the local model.
@@ -205,7 +199,7 @@ Optional, not deployed by default. Future possible uses: A/B challenger to Qwen 
 
 Note: candidates MiniMax M3 / Qwen3.7 Max may later challenge this tier on cost/quality — to be tested on real tasks before any swap.
 
-### 3.6 High reasoning model
+### 3.6 High reasoning model — `high_reasoning`
 
 - Current model: Opus 4.8
 - Role: premium strategic model, the default when real depth is required.
@@ -214,7 +208,7 @@ Note: candidates MiniMax M3 / Qwen3.7 Max may later challenge this tier on cost/
 
 Opus must never be called by reflex.
 
-### 3.7 Sustained long-context model
+### 3.7 Sustained long-context model — `sustained_long_context`
 
 - Current model: Fable 5 (availability fallback: Gemini Pro 3.1; content-safeguard fallback: Opus 4.8)
 - Role: the most capable long-context model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably, so paying for Fable is only justified when task length and complexity let its endurance advantage materialize.
@@ -239,14 +233,14 @@ Two distinct fallbacks must not be conflated:
 
 Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the one recurring task that reliably meets the three conditions. Everything else escalates to Opus or below.
 
-### 3.8 Health specialist
+### 3.8 Health specialist — `health_specialist`
 
 - Current model: GPT-5.5
 - Role: specialist for health/Pulse.
 - Selection criteria: GDPR/EU guarantees for health data.
 - Use for: health/ Pulse (weight/nutrition/recovery calculations and medical-feed analysis). GPT-5.5 is the de facto "owner" of Pulse reasoning.
 
-### 3.8bis Finance specialist
+### 3.8bis Finance specialist — `finance_specialist`
 
 - Current model: GPT-5.5
 - Role: specialist for financial reasoning over Vault data, fresh data / web research, verification, and complex multimodal analysis.
@@ -255,32 +249,43 @@ Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the
 
 This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.
 
-### 3.8ter Web / fresh-data specialist
+### 3.8ter Web / fresh-data specialist — `web_fresh_data`
 
 - Current model: GPT-5.5
 - Role: real-time / fresh information specialist.
 - Selection criteria: must have web access / real-time retrieval.
 - Use for: fresh data (recent events around Paris for Vector — concerts, salons, sports), web retrieval, market/price comparison, regulatory research, real-time verification.
 
+Additional existing uses of the GPT-5.5 assignment: independent critical re-scoring (§5.6) and generic last-resort plan generation (doc 52 §8.5). These are referenced as the independent verification/fallback model in the specs; they do not introduce a new role or change the existing routing rules.
+
 Note: the three specialist roles (health 3.8, finance 3.8bis, web/fresh-data 3.8ter) are all served by the same concrete model today (GPT-5.5), but they remain distinct roles, each with its own selection criterion and may be served by a different model in the future.
 
-### 3.9 OCR service — vision / OCR
+### 3.9 OCR service — vision / OCR — `ocr_service`
 
-- Current model: see F10 (owner of concrete local model names)
-- Role: vision / OCR.
-- Selection criteria: delegated to the infra owner for concrete local model names.
+- Current model: not yet adopted; local candidates are PaddleOCR-VL-1.6 or GLM-OCR (not active).
+- Existing cloud fallback assignment from doc 37: Gemini with structured output (2.5+); no exact version is adopted here. It is only eligible when the local engine is unavailable and the privacy gate permits it. A Flash variant was a future candidate, not an adopted real-time path.
+- Role: `ocr_service` — vision / OCR.
+- Selection criteria: reliable structured visual extraction; physical feasibility and deployment are documented in F10.
 - Use for: receipts, screenshots, scanned documents, images, structured visual extraction.
 
-### 3.10 Transcription service — audio
+### 3.10 Transcription service — audio — `transcription_service`
 
-- Current model: see F10 (owner of concrete local model names)
-- Role: audio transcription.
-- Selection criteria: delegated to the infra owner for concrete local model names.
+- Current model: faster-whisper large-v3, planned and not active.
+- Role: `transcription_service` — audio transcription.
+- Selection criteria: French/Arabic transcription quality, including dialectal Arabic; physical deployment is documented in F10.
 - Use for: voice notes, long dictation, audio uploaded to Imperium, text preparation before AI routing. For short driving commands (<10s), Android Speech API is preferred to save resources.
 
 ### 3.11 CatBoost — Vector ride scoring
 
 See §2.2. Dedicated business ML model, not part of routing.
+
+### 3.12 Embedding service — `embedding_service`
+
+- Current model: qwen3-embedding:8b, planned local V1 default; not active.
+- Role: semantic embeddings, with the 1024-dimensional contract defined in doc 38.
+- Selection criteria: privacy-first local processing and consistent embeddings across a corpus.
+- Cloud fallback candidates already documented in doc 38: text-embedding-3-small (OpenAI) or voyage-3-lite, only if local hosting is impossible and the privacy gate permits it.
+- Physical deployment and readiness belong to F10; a mapping is not an activation.
 
 ---
 
@@ -289,7 +294,7 @@ See §2.2. Dedicated business ML model, not part of routing.
 n8n responds to six trigger families.
 
 ### 4.1 Time trigger
-Examples: every Monday prepare the week; Tuesday 20:00 backend-only WR availability flag; every morning events around Paris (Vector); weekly events research (GPT-5.5 + web); nightly maintenance/backup/cleanup. Cron → backend snapshot/signal → often no AI yet → status flagged in DB → user banner on next refresh.
+Examples: every Monday prepare the week; Tuesday 20:00 backend-only WR availability flag; every morning events around Paris (Vector); weekly events research (web_fresh_data); nightly maintenance/backup/cleanup. Cron → backend snapshot/signal → often no AI yet → status flagged in DB → user banner on next refresh.
 
 ### 4.2 Database update trigger
 Examples: weekly report validated, day.finished created, new Vault transaction, mission completed, daily plan validated. The DB does not call n8n directly in V1; the backend POSTs to signed, idempotent n8n internal webhooks when needed.
@@ -364,38 +369,38 @@ The cost criterion does not mean "more expensive = more difficult." It means: do
 
 Dynamic routing applies only if no static rule (§7) already forces a model. Haiku has been removed; the local model now covers the former light-cloud band.
 
-| Score `/200` | Recommended model | Role |
+| Score `/200` | Recommended role | Function |
 |---:|---|---|
-| 0–99 | Qwen 32B local | Execute locally |
-| 100–139 | Sonnet 4.6 | Balanced reasoning |
-| 140–179 | Opus 4.8 | Deep analysis |
+| 0–99 | local_executor | Execute locally |
+| 100–139 | first_cloud_tier | Balanced reasoning |
+| 140–179 | high_reasoning | Deep analysis |
 | 180–200 | **Critical mechanic (see below)** | Critical analysis |
 
 #### Critical tier (180–200) — two-step mechanic
 
-A score ≥180/200 is extremely rare (it requires a task that is simultaneously very complex, long, ambiguous, high-consequence and sensitive). When it happens, the gravity of the decision justifies the cost — we do not pinch pennies on Anthropic credits at this level. But a high score from Qwen may itself be a hallucination, so it must be independently verified before the heavy machinery runs.
+A score ≥180/200 is extremely rare (it requires a task that is simultaneously very complex, long, ambiguous, high-consequence and sensitive). When it happens, the gravity of the decision justifies the cost — we do not pinch pennies on Anthropic credits at this level. But a high score from the local router-scorer may itself be a hallucination, so it must be independently verified before the heavy machinery runs.
 
 **Step 1 — Independent re-scoring (anti-hallucination).**
-The 180+ score was produced by Qwen (local scorer), which can hallucinate an inflated score. Before engaging the heavy machinery, **GPT-5.5** (a different provider, hallucination-resistant, and with no stake in the execution) receives the situation + the scoring table (§5.2/5.3) and **re-evaluates the score**.
-- If GPT-5.5 lowers it below 180 → re-route to the band actually warranted (140–179 Opus 4.8, etc.). No heavy orchestration.
-- If GPT-5.5 confirms ≥180 → Step 2.
+The 180+ score was produced by the local router-scorer, which can hallucinate an inflated score. Before engaging the heavy machinery, **the independent verification model (§3.8ter)** (a different provider, hallucination-resistant, and with no stake in the execution) receives the situation + the scoring table (§5.2/5.3) and **re-evaluates the score**.
+- If the independent verification model (§3.8ter) lowers it below 180 → re-route to the band actually warranted (140–179 high_reasoning, etc.). No heavy orchestration.
+- If the independent verification model (§3.8ter) confirms ≥180 → Step 2.
 
-**Step 2 — Free orchestration by Opus (gravity confirmed).**
-Opus 4.8 is given the capability profiles of Fable 5 and GPT-5.5 and is left to **direct freely**: handle it itself, delegate, or combine. No cap on each model's depth of reasoning. At this gravity, cost is not a constraint.
+**Step 2 — Free orchestration by high_reasoning (gravity confirmed).**
+high_reasoning is given the capability profiles of sustained_long_context and the independent verification model (§3.8ter) and is left to **direct freely**: handle it itself, delegate, or combine. No cap on each model's depth of reasoning. At this gravity, cost is not a constraint.
 
 **Anti-loop breaker (circuit breaker).**
 The real failure mode at this tier is not a single weak model — it is models relaying to each other indefinitely (hollow back-and-forth, everyone "thinking" without converging). To prevent it without throttling intelligence:
 - A counter bounds the number of **hand-offs between models** (≈3–4 relays max for one critical task).
 - Each model may reason as deeply as it wants on its own turn (depth NOT capped).
-- If the relay cap is reached without resolution → **Opus must produce the final answer itself, with no further delegation.** The breaker cuts the hollow loop; it does not limit thinking depth.
+- If the relay cap is reached without resolution → **high_reasoning must produce the final answer itself, with no further delegation.** The breaker cuts the hollow loop; it does not limit thinking depth.
 
 (The hand-off counter is a design rule; its backend implementation is tracked in the backlog.)
 
-**Fable 5 is not reached by raw score alone.** It is engaged only when the three-fold condition (long AND complex AND high-stakes/durable) is met — in practice through a static rule (§7), e.g. the Weekly Review re-planning step. A high score routes to Opus 4.8; Fable is a deliberate, rule-driven choice, never a reflex of the score.
+**sustained_long_context is not reached by raw score alone.** It is engaged only when the three-fold condition (long AND complex AND high-stakes/durable) is met — in practice through a static rule (§7), e.g. the Weekly Review re-planning step. A high score routes to high_reasoning; sustained_long_context is a deliberate, rule-driven choice, never a reflex of the score.
 
 ### 5.7 Emergency Mode (user-triggered)
 
-Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model. Urgency and difficulty are different dimensions: an emergency can be simple-but-urgent (needs a FAST answer — local/Sonnet) or complex-and-grave (warrants Opus, or the §5.6 critical mechanic with Fable). Forcing the heaviest model on every emergency would be counter-productive: Opus/Fable reason deeply and are slower, while urgency often needs speed. The §5.2 "speed tolerance (inverted)" criterion already pushes urgent tasks toward the fast tier. So Emergency Mode raises priority and lifts the cost barrier, but lets normal scoring still pick the RIGHT model by the task's real nature.
+Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model. Urgency and difficulty are different dimensions: an emergency can be simple-but-urgent (needs a FAST answer — local/first_cloud_tier) or complex-and-grave (warrants high_reasoning, or the §5.6 critical mechanic with sustained_long_context). Forcing the heaviest model on every emergency would be counter-productive: high_reasoning/sustained_long_context reason deeply and are slower, while urgency often needs speed. The §5.2 "speed tolerance (inverted)" criterion already pushes urgent tasks toward the fast tier. So Emergency Mode raises priority and lifts the cost barrier, but lets normal scoring still pick the RIGHT model by the task's real nature.
 
 **Trigger**
 - The user signals an emergency through the chatbot (e.g. "I have an emergency").
@@ -409,8 +414,8 @@ Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model.
 
 **What the mode does NOT change (model choice stays nature-driven)**
 - Normal §5 scoring still decides the model by the task's real nature:
-  - simple + urgent → fast answer (Qwen 32B / Sonnet 4.6); no time wasted;
-  - complex + grave → escalate (Opus 4.8, or the §5.6 critical mechanic with Fable 5 if the re-scored gravity reaches ≥180).
+  - simple + urgent → fast answer (local_executor / first_cloud_tier); no time wasted;
+  - complex + grave → escalate (high_reasoning, or the §5.6 critical mechanic with sustained_long_context if the re-scored gravity reaches ≥180).
 - Emergency Mode **never forces** the heaviest model. It lifts the cost barrier and sets priority; speed stays king when the task is simple. This is consistent with the inverted speed-tolerance criterion (§5.2): urgency biases toward fast execution, not toward maximal depth.
 
 **Exit**
@@ -418,23 +423,23 @@ Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model.
 
 **Cross-references**
 - §5.2 — speed tolerance (inverted): urgency biases toward fast tiers; Emergency Mode honors this rather than overriding it.
-- §5.6 — if the emergency is genuinely critical (re-scored ≥180), the critical mechanic (GPT-5.5 re-score → Opus orchestration → anti-loop breaker) applies as usual; Emergency Mode simply guarantees priority and no cost retention.
+- §5.6 — if the emergency is genuinely critical (re-scored ≥180), the critical mechanic (independent verification model (§3.8ter) re-score → high_reasoning orchestration → anti-loop breaker) applies as usual; Emergency Mode simply guarantees priority and no cost retention.
 - §1.6 — Emergency Mode is an explicit, user-confirmed action, so it satisfies the "no expensive cloud call without explicit user action" rule by design.
 
 ### 5.8 Automatic escalation
 
 Even with a low score, escalate if:
-- Qwen confidence is low
+- local router-scorer confidence is low
 - the request is very ambiguous
 - consequences are high
 - the output will become a durable rule
 - the task touches money, health, law, critical administrative, or security
-- Qwen detects missing essential context
+- the local router-scorer detects missing essential context
 
 ```text
 If confidence < 0.65                     → escalate one tier
-If consequences ≥ 8 and ambiguity ≥ 7    → minimum Sonnet 4.6
-If consequences ≥ 9 and sensitivity ≥ 8  → Opus 4.8 or GPT-5.5 (depending on specialty)
+If consequences ≥ 8 and ambiguity ≥ 7    → minimum first_cloud_tier
+If consequences ≥ 9 and sensitivity ≥ 8  → high_reasoning or the domain specialist (health_specialist / finance_specialist / web_fresh_data, depending on specialty)
 ```
 
 ### 5.9 Automatic downgrade
@@ -449,10 +454,10 @@ Imperium has two conversational contexts that share **one dialogue engine**: a s
 
 ### 6.1 Shared dialogue engine
 
-- **Conductor = Qwen 32B (default).** It speaks to the user, keeps tone and continuity, and handles routine turns locally (acknowledgements, simple follow-up questions).
+- **Conductor = local_executor (default).** It speaks to the user, keeps tone and continuity, and handles routine turns locally (acknowledgements, simple follow-up questions).
 - **Shared context held by the backend.** Each model call receives the full relevant session dossier (summary, dialogue, data); each response is appended back. Switching models mid-dialogue does not break the thread, because the thread lives in the backend, not in any model's memory.
-- **Specialists consulted behind the scenes.** When a turn touches a domain (health → GPT-5.5, etc.), the conductor consults the specialist and **restitutes the answer itself**, so the user always talks to a single interlocutor. This is the "family doctor + specialists" pattern, not a "committee".
-- **Per-turn escalation.** Each turn is scored: a simple turn stays on Qwen 32B; a demanding turn escalates to Opus 4.8 (or Fable 5 only under the §7 rule). Escalation is mixed: hard rules at key moments, dynamic scoring for the rest.
+- **Specialists consulted behind the scenes.** When a turn touches a domain (health → health_specialist, etc.), the conductor consults the specialist and **restitutes the answer itself**, so the user always talks to a single interlocutor. This is the "family doctor + specialists" pattern, not a "committee".
+- **Per-turn escalation.** Each turn is scored: a simple turn stays on local_executor; a demanding turn escalates to high_reasoning (or sustained_long_context only under the §7 rule). Escalation is mixed: hard rules at key moments, dynamic scoring for the rest.
 
 ### 6.2 Domain routing vs dialogue
 
@@ -465,11 +470,11 @@ The WR is the "fuel in the AI's tank": a weekly **decision review**, not a chatb
 
 Trigger: Tuesday 20:00 banner → user clicks → session starts.
 
-**Phase 1 — Summary by exception.** A model reviews the week focusing on **changes/deviations**, not a full recital. Stable areas are skimmed ("religion: regular, nothing to flag"). Changes are reported with **precise figures** ("food budget +5%, minor" vs "+13%, worth attention"), crossing domains ("you skipped your mission 3 days for fatigue, yet your health constants were good — why?"). The backend pre-computes the figures, so this phase reasons over prepared data → Opus 4.8 if it escalates; lighter if data is well prepared.
+**Phase 1 — Summary by exception.** A model reviews the week focusing on **changes/deviations**, not a full recital. Stable areas are skimmed ("religion: regular, nothing to flag"). Changes are reported with **precise figures** ("food budget +5%, minor" vs "+13%, worth attention"), crossing domains ("you skipped your mission 3 days for fatigue, yet your health constants were good — why?"). The backend pre-computes the figures, so this phase reasons over prepared data → high_reasoning if it escalates; lighter if data is well prepared.
 
-**Phase 2 — Relevant questions + conversation.** The hard part: detecting the real issues, asking pertinent (non-generic) questions, sustaining a dialogue where the user can push back ("why did you insist on the prefecture when I had three months and the garage was more urgent?"). Conductor = Qwen 32B by default; demanding turns escalate to Opus 4.8. Domain turns consult specialists (health → GPT-5.5) in the background.
+**Phase 2 — Relevant questions + conversation.** The hard part: detecting the real issues, asking pertinent (non-generic) questions, sustaining a dialogue where the user can push back ("why did you insist on the prefecture when I had three months and the garage was more urgent?"). Conductor = local_executor (local conductor) by default; demanding turns escalate to high_reasoning. Domain turns consult specialists (health → health_specialist) in the background.
 
-**Phase 3 — Rolling 4-week re-planning.** All of the above is summarized, vectorized, and integrated with prior plans, vectorized history, and the **calendar**, to refine the next 4 weeks. The WR is a rolling window: 4 weeks behind, 4 weeks ahead. If a prior plan still holds, it is left unchanged; otherwise the AI re-plans, and may adjust every week ahead of it. **This step is forced to Fable 5 by a hard rule** (§7.8): it is long, complex, and high-stakes/durable — the one recurring task meeting all three conditions. It "lays the rails" the Qwen 32B then follows day to day, so the heavy model is not called by reflex during the week.
+**Phase 3 — Rolling 4-week re-planning.** All of the above is summarized, vectorized, and integrated with prior plans, vectorized history, and the **calendar**, to refine the next 4 weeks. The WR is a rolling window: 4 weeks behind, 4 weeks ahead. If a prior plan still holds, it is left unchanged; otherwise the AI re-plans, and may adjust every week ahead of it. **This step is forced to sustained_long_context by a hard rule** (§7.8): it is long, complex, and high-stakes/durable — the one recurring task meeting all three conditions. It "lays the rails" the local executor then follows day to day, so the heavy model is not called by reflex during the week.
 
 **Projects in the WR.** Projects are seen **only as decisions to evaluate** — e.g. the timing of activating a project versus the user's state ("you activated this heavy, slow-return project in a week you were exhausted; wouldn't a higher-energy month suit it better?"). The WR does not manage, plan, or break down projects. That belongs to the project module (§8).
 
@@ -477,7 +482,7 @@ Trigger: Tuesday 20:00 banner → user clicks → session starts.
 
 ### 6.4 Imperium chatbot
 
-Same engine as the WR, different framing: **open, on-demand dialogue** with no imposed phases. The user drives the topic (often project advice). Escalation is purely score-driven per turn (no forced re-planning step). Conductor = Qwen 32B, specialists in the background, context held by the backend.
+Same engine as the WR, different framing: **open, on-demand dialogue** with no imposed phases. The user drives the topic (often project advice). Escalation is purely score-driven per turn (no forced re-planning step). Conductor = local_executor, specialists in the background, context held by the backend.
 
 ---
 
@@ -491,42 +496,42 @@ Note — Emergency Mode (§5.7) is NOT a static rule: it raises priority and lif
 ```text
 Image, receipt, screenshot, scanned document → OCR service
 ```
-After OCR service extraction, Qwen may score the next step.
+After OCR service extraction, the local router-scorer may score the next step.
 
 ### 7.2 Audio
 ```text
 Raw audio → transcription service
 ```
-After transcription, Qwen scores the follow-up.
+After transcription, the local router-scorer scores the follow-up.
 
 ### 7.3 Fresh data / web
 ```text
-Need for current information → GPT-5.5 + web search
+Need for current information → web_fresh_data + web search
 ```
 Examples: events within 30 km of Paris, recent regulation, current prices, news, public disruptions not already in a connected API.
 
 ### 7.4 Health / Pulse
 ```text
-Health calculation or medical analysis → GPT-5.5
+Health calculation or medical analysis → health_specialist
 ```
-GPT-5.5 owns Pulse reasoning (weight/nutrition/recovery, medical-feed). Qwen must not produce a critical health analysis alone.
+health_specialist owns Pulse reasoning (weight/nutrition/recovery, medical-feed). The local model must not produce a critical health analysis alone.
 
 ### 7.5 Finance / Vault reasoning
 ```text
-Financial analysis or advice (not mere display) → GPT-5.5
+Financial analysis or advice (not mere display) → finance_specialist
 ```
-Triggered when the brain reasons over financial data — typically inside the Imperium chatbot or the Weekly Review (budget/cash-flow analysis, financial pressure, project cost evaluation). NOT triggered by Vault simply displaying a balance or by deterministic backend computation (those stay app/backend). The distinction is **display vs reasoning**: showing a number is not analysing it. Qwen must not produce a critical financial analysis alone. GPT-5.5 must surface its reasoning and signal uncertainty rather than fabricate values.
+Triggered when the brain reasons over financial data — typically inside the Imperium chatbot or the Weekly Review (budget/cash-flow analysis, financial pressure, project cost evaluation). NOT triggered by Vault simply displaying a balance or by deterministic backend computation (those stay app/backend). The distinction is **display vs reasoning**: showing a number is not analysing it. The local model must not produce a critical financial analysis alone. finance_specialist must surface its reasoning and signal uncertainty rather than fabricate values.
 
 ### 7.6 Morning "AI advice" cards
 The advice module present on each app dashboard is routed by app, by required depth — not as a special case but via normal domain routing:
 ```text
-Imperium → fine advice  → brain (Opus 4.8 / scoring by depth)
-Pulse    → fine advice  → GPT-5.5 (health, §7.4)
-Vault    → fine advice  → GPT-5.5 (finance, §7.5)
-Vector   → plain advice → Qwen 32B local (no finesse needed)
-Path     → reformulation only → Qwen 32B local
+Imperium → fine advice  → brain (high_reasoning / scoring by depth)
+Pulse    → fine advice  → health_specialist (health, §7.4)
+Vault    → fine advice  → finance_specialist (finance, §7.5)
+Vector   → plain advice → local_executor (no finesse needed)
+Path     → reformulation only → local_executor
 ```
-**Path religious advice — hard rule.** For the religious advice, the AI does NOT generate and does NOT freely select content. Qwen 32B picks one entry at random from a DEDICATED, closed list of pre-written, validated advice (`base_advice`, to be created in the Path docs) and only reformulates/presents it. This base is DISTINCT from the Dars knowledge base (doc 50): the AI must never extract or interpret religious content from the Dars (or any broad corpus) at will. On religion, the AI presents pre-validated content; it never invents or cherry-picks. (`base_advice` does not exist yet — see backlog.)
+**Path religious advice — hard rule.** For the religious advice, the AI does NOT generate and does NOT freely select content. local_executor picks one entry at random from a DEDICATED, closed list of pre-written, validated advice (`base_advice`, to be created in the Path docs) and only reformulates/presents it. This base is DISTINCT from the Dars knowledge base (doc 50): the AI must never extract or interpret religious content from the Dars (or any broad corpus) at will. On religion, the AI presents pre-validated content; it never invents or cherry-picks. (`base_advice` does not exist yet — see backlog.)
 
 ### 7.7 Vector ride scoring
 ```text
@@ -535,15 +540,11 @@ Ride opportunity scoring → CatBoost (business ML, not an LLM, not the cloud)
 
 ### 7.8 Weekly Review re-planning
 ```text
-WR Phase 3 (rolling 4-week re-planning) → Fable 5 (forced)
+WR Phase 3 (rolling 4-week re-planning) → sustained_long_context (forced)
 ```
-The one recurring task meeting long + complex + high-stakes/durable. Fable's own safeguard reroutes high-risk topics to Opus 4.8.
+The one recurring task meeting long + complex + high-stakes/durable. sustained_long_context's own safeguard reroutes high-risk topics to high_reasoning.
 
-Unavailability fallback: if Fable 5 is unreachable (e.g. regulatory/export directive, provider outage), this step falls back to Opus 4.8. This is distinct from the §3.7 content safeguard (which only redirects high-risk topics) - it covers the model being absent from the routing layer entirely.
-
-Status as of 2026-06-17: Fable 5 suspended by US export-control directive (indefinite) -> Opus 4.8 fallback ACTIVE for this step.
-
-**Status update 2026-07-01 (applied 2026-07-15, passe 0): Fable 5 access RESTORED.** The forced rule is active again: WR Phase 3 → Fable 5. The Opus 4.8 fallback returns to being the unavailability fallback only. The §3 hierarchy below is realigned accordingly.
+Unavailability fallback: use the availability fallback assigned in §3.7 when the sustained_long_context model is unreachable. This is distinct from its content safeguard, which redirects high-risk topics to high_reasoning. Current availability and the dated suspension/restoration history are owned solely by §3.7.
 
 ### 7.9 Deterministic backend decision
 ```text
@@ -557,8 +558,8 @@ CRUD, DB read, health check, dashboard snapshot, deterministic summary → Backe
 Distinct from temporal planning (the daily/weekly/monthly cadence the WR handles). A project is an objective with steps, dependencies, and progress, on its own timeline.
 
 Two AI facets, both routed by the general scoring (no dedicated expert model):
-- **Structure** (break into steps, track dependencies/progress, adjust the project plan) → Qwen 32B or Sonnet 4.6 by complexity.
-- **Reflect** (advise on strategy, arbitrate decisions) → Opus 4.8, and Fable 5 only if a given project decision is long + complex + high-stakes/durable.
+- **Structure** (break into steps, track dependencies/progress, adjust the project plan) → local_executor or first_cloud_tier by complexity.
+- **Reflect** (advise on strategy, arbitrate decisions) → high_reasoning, and sustained_long_context only if a given project decision is long + complex + high-stakes/durable.
 
 Link to the WR is limited to §6.3: the WR evaluates the **timing** of project activation as one of the week's decisions. No mechanical step→mission automation in V1 (that is a V2 candidate). The project module also surfaces in the Imperium chatbot for open advice.
 
@@ -567,16 +568,19 @@ Link to the WR is limited to §6.3: the WR evaluates the **timing** of project a
 ## 9. Summary Hierarchy
 
 ```text
-Qwen 32B local   → router/scorer + local execution + dialogue conductor (~60% of tasks)
-Sonnet 4.6       → first cloud tier (balanced reasoning)
-Opus 4.8         → default heavy model (deep analysis, strategy)
-Fable 5          → top tier, reserved (long + complex + high-stakes/durable; WR re-planning)
-GPT-5.5          → specialist: health/Pulse + fresh data/web (Vector)
-OCR service      → vision / OCR
-Transcription service → audio
-CatBoost         → Vector ride scoring (business ML, not routing)
+local_executor         → local router/scorer, executor and dialogue conductor (~60% of tasks)
+first_cloud_tier       → balanced reasoning
+high_reasoning         → deep analysis and strategy
+sustained_long_context → long + complex + high-stakes/durable; WR re-planning
+health_specialist      → health/Pulse reasoning
+finance_specialist     → financial reasoning over Vault data
+web_fresh_data         → fresh information and web research
+embedding_service     → semantic embeddings
+ocr_service           → vision / OCR
+transcription_service → audio
+CatBoost               → Vector ride scoring (business ML, outside LLM routing)
 ```
 
-Removed: Haiku (no remaining territory). Future challengers: Gemma (local), MiniMax M3 / Qwen3.7 Max (mid cloud tier, to be tested).
+Assignments, fallback models and future candidates are owned solely by §3.
 
-Guiding principle throughout: deterministic on the critical path, dynamic for the rest; local by default; expensive cloud only when value justifies it; the 32B-capability hypothesis is assumed and validated empirically, with hardware (not patches) as the answer if it fails.
+Guiding principle throughout: deterministic on the critical path, dynamic for the rest; local by default; expensive cloud only when value justifies it. Local routing and dialogue capability are validated empirically, with hardware (see F10) as the answer if that hypothesis fails.

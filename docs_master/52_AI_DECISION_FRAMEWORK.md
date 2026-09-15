@@ -680,7 +680,7 @@ If issues found: feedback loop (Section 8.5).
 
 ### 8.5 The fallback loop
 
-> Note: this cascade is high-reasoning-model-based (not sustained-long-context-based) because the sustained long-context model is currently unavailable and early contexts are still short — see doc 30 §3.7 for the status and the planned switch-back. The GPT-5.5 third attempt is a generic last-resort generator (no dedicated role).
+> Historical cascade rationale: this section was written during the sustained_long_context unavailability period, with short initial contexts. Current availability and WR re-planning assignments are owned by doc 30 §3.7/§7.8. The third attempt uses the independent fallback model defined in doc 30 §3.8ter (generic last-resort generation, no additional role). The historical loop below is not an override of that canonical WR routing.
 
 ```text
 ATTEMPT 1 — the high reasoning model generates plan.
@@ -693,7 +693,7 @@ ATTEMPT 2 — the high reasoning model regenerates with the feedback.
   If OK: SAVED.
   If KO: escalate.
 
-ATTEMPT 3 — GPT-5.5 takes over.
+ATTEMPT 3 — independent fallback model (doc 30 §3.8ter) takes over.
   Same prompt + the fallback context.
   Same local model validation.
   If OK: SAVED (logged as "fallback used").
@@ -708,7 +708,7 @@ ABORT — Last resort.
 
 This caps the cost at approximately:
 - 2 × the high reasoning model calls (~0.40€)
-- 1 × GPT-5.5 call (~0.10€)
+- 1 × independent fallback model (doc 30 §3.8ter) call (~0.10€)
 - Worst case total: ~0.50€ per monthly generation
 - Annual: ~26€ if always worst case (highly unlikely)
 - Realistic annual: ~10€
@@ -723,7 +723,7 @@ CREATE TABLE imperium_monthly_plans (
   plan_period_start        DATE,
   plan_period_end          DATE,
   generation_attempt       INTEGER, -- 1, 2, or 3 (fallback)
-  generation_model         VARCHAR(32), -- 'opus-4.8' or 'gpt-5.5'
+  generation_model         VARCHAR(32), -- historical example IDs: 'opus-4.8' or 'gpt-5.5'
   plan_json                JSONB,
   warnings                 TEXT[],
   key_objectives_progress  JSONB,
@@ -1069,7 +1069,7 @@ CREATE TABLE imperium_daily_plans (
   status              VARCHAR(32), -- 'draft' | 'active' | 'completed'
   plan_json           JSONB,
   generated_at        TIMESTAMPTZ,
-  generated_model     VARCHAR(32), -- 'qwen-local' typically; 'sonnet-4.6' fallback
+  generated_model     VARCHAR(32), -- historical example IDs: 'qwen-local'; 'sonnet-4.6' fallback
   is_adapted          BOOLEAN,     -- TRUE if differs from monthly
   adaptation_reason   TEXT NULL,
   cost_eur            NUMERIC(6,4)
@@ -1110,7 +1110,7 @@ CREATE TABLE mission_type_learned_durations (
 ├──────────────────────────────────────────────────────┤
 │ Monthly plan (the high reasoning model) │ 52 × /year │ ~10€    │
 │ Plan validation (the local model)       │ 52 × /year │ 0€      │
-│ Fallback GPT-5.5 (rare)       │ ~5 × /year │ ~0.50€  │
+│ Fallback independent fallback model (doc 30 §3.8ter) (rare)       │ ~5 × /year │ ~0.50€  │
 │ Daily plan (the local model)       │ 365 × /year│ 0€      │
 │ Daily first cloud tier fallback         │ if needed  │ ~18€    │
 │ Mission scoring (the local model)        │ on trigger │ 0€      │
@@ -1195,7 +1195,7 @@ Phase 3 — Monthly plan generation
   ├─ high reasoning model prompt template
   ├─ Input assembly service (10 categories)
   ├─ local model validation logic
-  ├─ Fallback chain (the high reasoning model → the high reasoning model → GPT-5.5)
+  ├─ Fallback chain (the high reasoning model → the high reasoning model → independent fallback model (doc 30 §3.8ter))
   └─ Storage of plan history
 
 Phase 4 — Daily plan instantiation

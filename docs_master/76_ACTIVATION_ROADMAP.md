@@ -27,7 +27,7 @@ boucle vitale.
 - Conséquence : la majorité des statuts = NOT_CODED ; leur `bascule_exacte` est la bascule
   CIBLE prévue par la spec, exécutable après le merge de la passe correspondante. Ce
   journal est exécutable dès maintenant (R statuts) et vivra avec les merges.
-- Compte : **117 features** — 8 ON (existant en service, vague V0), 3 OFF (codées,
+- Compte historique du relevé du 2026-07-11 : **117 features** — 8 ON (existant en service, vague V0), 3 OFF (codées,
   éteintes), 106 NOT_CODED. Par domaine : system 18, events 4, vault 10, path 3,
   pulse 28, wr 24, daily 14, vector 16.
 
@@ -36,6 +36,11 @@ boucle vitale.
 Colonnes : classe (dL=det_lecture, dE=det_ecriture, No=notifiant, Pr=proposant,
 iaD/iaS/iaA=ia_dryrun/shadow/advisory, Ap=apprenant), éch(elon R6), statut, vague,
 dates (activé le / rollback le), obs. Fiches complètes : `activation_cards/VAGUE_<n>.md`.
+
+Mise à jour Phase H : `INFRA_VALIDEE_PRODUIT_OFF` décrit une validation technique
+du service, pas une activation produit ni la clôture de validation humaine.
+`qwen_enabled=False` et `real_ai_enabled=False` restent inchangés. Les autres
+comptes/statuts du relevé initial ne sont pas réaudités par cette passe documentaire.
 
 | id | nom | classe | éch | statut | vague | dates | obs |
 |---|---|---|---|---|---|---|---|
@@ -64,8 +69,8 @@ dates (activé le / rollback le), obs. Fiches complètes : `activation_cards/VAG
 | ACT-VLT-10 | Base sadaqa exposée à Path | dL | 1 | NOT_CODED | V4 | — | — |
 | ACT-VLT-08 | Alertes échéances (7 j / overdue) | No | 3 | NOT_CODED | V4 | — | — |
 | ACT-PTH-03 | Rappels Path (path.reminder) | No | 3 | NOT_CODED | V5 | — | Q3 |
-| ACT-SYS-11 | LLM local réel (qwen_enabled, dry_run=false) | dE | 2 | OFF | V6 | — | DV-6 : 7B→32B avant |
-| ACT-SYS-12 | Modèle 32B servi (V100, phase 2) | dL | 1 | NOT_CODED | V6 | — | RÉSOLUE Q16 : les passes avancent ; seule la chaîne mémoire attend le smoke P40 |
+| ACT-SYS-11 | LLM local réel (qwen_enabled, dry_run=false) | dE | 2 | OFF | V6 | — | mapping doc 30 §3.3 ; activation distincte |
+| ACT-SYS-12 | local_executor servi (F10 §5-ter) | dL | 1 | INFRA_VALIDEE_PRODUIT_OFF | V6 | — | Produit OFF ; validation humaine Phase H non clôturée ; H3.7 NON TESTÉ ; Q16 historique |
 | ACT-SYS-13 | Serving embeddings 1024 (P40) | dL | 1 | NOT_CODED | V6 | — | T4 |
 | ACT-SYS-14 | embeddings_enabled=true (recherche vect.) | dL | 1 | OFF | V6 | — | — |
 | ACT-PLS-01 | Pipeline montre (features 06:45) | dE | 2 | NOT_CODED | V7 | — | — |
@@ -110,9 +115,9 @@ dates (activé le / rollback le), obs. Fiches complètes : `activation_cards/VAG
 | ACT-WR-23 | Audit hebdo agreement + métriques WR | dE | 2 | NOT_CODED | V19 | — | — |
 | ACT-WR-10 | Chaîne WR dry-run bout en bout | iaD | 2 | NOT_CODED | V20 | — | — |
 | ACT-WR-18 | Plan initial + v_plan_current | dE | 2 | NOT_CODED | V20 | — | RÉSOLUE Q8 : plan_versions |
-| ACT-WR-11 | W2 découverte causale réelle (32B) | Pr | 4 | NOT_CODED | V21 | — | rien n'entre en E2 avant P4/P5 |
+| ACT-WR-11 | W2 découverte causale réelle (local_executor) | Pr | 4 | NOT_CODED | V21 | — | rien n'entre en E2 avant P4/P5 |
 | ACT-WR-12 | P1 passe d'hypothèses (cloud) | Pr | 4 | NOT_CODED | V22 | — | — |
-| ACT-WR-15 | P5 écriture + exit_audit (Opus, gravé) | Pr | 4 | NOT_CODED | V22 | — | — |
+| ACT-WR-15 | P5 écriture + exit_audit (high_reasoning, gravé) | Pr | 4 | NOT_CODED | V22 | — | — |
 | ACT-WR-13 | P3 enquêtes dirigées (cloud) | Pr | 4 | NOT_CODED | V23 | — | — |
 | ACT-WR-14 | P3 synthèse conjonctive (cloud) | Pr | 4 | NOT_CODED | V23 | — | — |
 | ACT-WR-19 | Deltas de plan hebdo wr.plan_delta | Pr | 4 | NOT_CODED | V23 | — | — |
@@ -173,7 +178,7 @@ indiqué entre crochets.
 | V3 | Vault écritures : livres, wallet, corrections | [mini-passe Vault] V1 | 3-7 j |
 | V4 | Vault boucle : objectifs, profit hebdo, sadaqa→Path, alertes | V3, RÉSOLUE Q9 : mini-passe Vault | 7 j |
 | V5 | Path notifiant : rappels | V1 (canal) | 3-7 j |
-| V6 | infra IA : 32B servi, serving embeddings, flags embeddings+qwen réels | GPU phase 2 (Q16) ; DV-6 corrigé ; [wrapper GBNF passe Pulse] | 2-3 j smoke |
+| V6 | infra IA : local_executor déjà déployé (F10) ; embedding_service futur ; flags produit OFF | État Phase H et H3.7 : F10 ; intégration wrapper restante ; Q16 historique | 2-3 j smoke |
 | V7 | Pulse socle 1 : montre, signaux device, board | [passe Pulse] | 2-3 j |
 | V8 | Pulse socle 2 : intake, training, subjectifs, contexte/méta | V7 | 2-3 j |
 | V9 | Pulse médical : signaux médicaux + règles rouges | V7 ; canal notif (V1) | 7 j |
@@ -188,7 +193,7 @@ indiqué entre crochets.
 | V18 | usine WR : déclencheur+curseurs, W1, W4, W5, walker | [passe WR] ; V2 (noms) ; AD-2 fini | 3-7 j |
 | V19 | WR filets : rouge, review_due, digest, audit hebdo | V18 ; canal (V1) | 3-7 j |
 | V20 | WR dry-run bout en bout + plan initial/v_plan_current | V18 ; RÉSOLUE Q8 : plan_versions | 3-7 j |
-| V21 | W2 réel (sondes+verdicts 32B) — seul, gros échelon | V13 (32B éprouvé), V20 | 7-14 j |
+| V21 | W2 réel (sondes+verdicts local_executor) — seul, gros échelon | V13 (local_executor éprouvé), V20 | 7-14 j |
 | V22 | WR rituel cloud : hypothesis_pass + exit_audit | V12, V21 | 2 WR |
 | V23 | WR résiduel : investigation, conjunctive, plan_delta | V22 | 2 WR |
 | V24 | plan régénérations : choc + mensuelle | V20 | 1 mois |

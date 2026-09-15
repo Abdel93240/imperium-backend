@@ -23,7 +23,7 @@ observations: trajectoire de sortie : 70B local sur digest (jamais sur brut) —
 ```
 
 ```
-id: ACT-WR-15    nom_fr: P5 écriture + audit de sortie (wr.exit_audit, Opus — gravé)
+id: ACT-WR-15    nom_fr: P5 écriture + audit de sortie (wr.exit_audit, high_reasoning — gravé)
 domaine: wr       classe: proposant   echelon_audace: 4   statut: NOT_CODED
 bascule_exacte: UPDATE ai_slot_transition SET tier='cloud_forced' WHERE
   slot_code='wr.exit_audit';  + flag wr_phase5_write_enabled=true
@@ -35,7 +35,7 @@ protocole_terrain: 2 WR : validations appliquées par le CODE (chain_assemblies 
 critere_succes: SEUL ce chemin écrit le graphe causal découvert ; rapport en
   review_final_reports ; event review.completed ferme la session
 rollback: flag=false (les validations restent en attente d'application — rejouables)
-source: spec WR §9 P5, §10 (Opus gravé par décision utilisateur)
+source: spec WR §9 P5, §10 (high_reasoning gravé par décision utilisateur)
 prompt_codex: « Basculer exit_audit + activer l'écriture Phase 5 ; smoke chaîne validée
   fixture → E2 ; consigner. »
 observations: c'est la PREMIÈRE écriture du chaînage découvert dans le journal — la date

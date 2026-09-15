@@ -82,11 +82,11 @@ version mapping; this panel makes it **editable** without touching code.
 ### B.1 The principle: store the identifier, not the call
 
 A model call is two separate things: (1) HOW you call (the request recipe: URL, format,
-auth) and (2) WHO you call (the model identifier, e.g. `opus-4.8`). For models of the
+auth) and (2) WHO you call (the model identifier, resolved for `high_reasoning` via doc 30 §3). For models of the
 same provider, the "how" does not change — only the "who" does.
 
 ```text
-The code does NOT hard-code "opus-4.8". It holds a variable, e.g. high_reasoning_model,
+The code does NOT hard-code a concrete model/version. It holds a variable, e.g. high_reasoning_model,
 which reads its value from this panel's config.
   - Change a VERSION (same provider): change one string here → next call uses it.
   - Change a PROVIDER: change the provider menu → the code switches to that provider's

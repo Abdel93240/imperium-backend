@@ -44,11 +44,11 @@ Read this before implementing any AI-related backend code.
 │  - workflows    │                │ + pgvector         │
 └─────┬───────────┘                └────────────────────┘
       │
-      ├─ the local model (local, GPU-served on V100 / qwen3:32b)
+      ├─ local_executor (mapping: doc 30 §3.3; physical deployment: F10)
       ├─ the transcription service (local)
       ├─ the first cloud tier / the high reasoning model (cloud API)
-      ├─ GPT-5.5 (cloud API)
-      └─ Gemini (cloud API)
+      ├─ health_specialist / finance_specialist / web_fresh_data
+      └─ ocr_service
 ```
 
 ---
@@ -233,16 +233,10 @@ trigger → fetch context (backend API)
 
 ### 5.3 Local model runtime
 
-```text
-Ollama/the local model in Docker on the VPS:
-└─ Model: qwen3:32b (Q4_K_M, ~20-24 GB VRAM on V100)
-   Endpoint: internal Docker network only, for example http://ollama:11434/api/generate
-   Network: same internal Docker network as n8n, and reachable by backend through internal networking
-   Public exposure: forbidden
-   Used primarily by: n8n (orchestrated workflows)
-   Used directly by backend: only for documented latency-critical exceptions
-                             (see Section 5.4)
-```
+`local_executor` is defined in doc 30 §3.3. The active deployment and internal
+endpoint are owned by F10 §5-ter. The service is infrastructure-ready; product AI
+remains disabled (`qwen_enabled=False`, `real_ai_enabled=False`). No public model
+port is exposed. n8n orchestrates workflows; backend validation governs results.
 
 ### 5.4 Direct Backend → local model exception (latency-critical)
 
@@ -371,7 +365,7 @@ These domain-specific endpoints are wrappers that create the correct `ai_task` a
 
 ## 9. Local Model Routing Inputs
 
-When n8n calls the local model for routing, it provides:
+When n8n calls the local model for routing, it provides the following illustrative payload. Model fields hold resolved concrete IDs at runtime; placeholders below are not literal API values:
 
 ```json
 {
@@ -387,11 +381,11 @@ When n8n calls the local model for routing, it provides:
     "force_model": null
   },
   "available_models": [
-    "qwen-local",
-    "sonnet-4.6",
-    "opus-4.8",
-    "gpt-5.5",
-    "gemini"
+    "<resolved local_executor model ID>",
+    "<resolved first_cloud_tier model ID>",
+    "<resolved high_reasoning model ID>",
+    "<resolved domain specialist model ID>",
+    "<resolved ocr_service model ID>"
   ]
 }
 ```
@@ -410,11 +404,11 @@ The local model returns:
     "sensitivity": 5,
     "cost_justification": 7
   },
-  "selected_model": "opus-4.8",
+  "selected_model": "<resolved high_reasoning model ID>",
   "reason": "Multi-domain weekly synthesis, deep reasoning needed",
   "confidence": 0.82,
   "needs_clarification": false,
-  "fallback_model": "sonnet-4.6"
+  "fallback_model": "<resolved first_cloud_tier model ID>"
 }
 ```
 
@@ -429,7 +423,7 @@ Vision (image present)         → the OCR service
 Audio                          → the transcription service
 Web fresh data                 → the web specialist
 Medical reports                → the health specialist
-WR re-planning                 → Fable 5
+WR re-planning                 → sustained_long_context
 Backend deterministic          → no AI
 ```
 
@@ -558,8 +552,8 @@ Every AI call must produce:
 
 ```text
 ai_task.created_at
-ai_task.routing_model        (qwen-local)
-ai_task.selected_model       (opus-4.8)
+ai_task.routing_model        (concrete ID resolved for local_executor)
+ai_task.selected_model       (concrete ID resolved for high_reasoning)
 ai_result.input_tokens
 ai_result.output_tokens
 ai_result.estimated_cost_eur
@@ -587,7 +581,7 @@ daily_failed_tasks
 Bank account numbers, card numbers
 Government IDs
 Detailed medical history (only summaries sent to the health specialist)
-Personal voice recordings (Whisper local only)
+Personal voice recordings (local transcription_service only)
 Religious private practice details
 ```
 
@@ -631,7 +625,7 @@ Step 4 — Internal callbacks
   └─ /api/internal/ai/tasks/{id}/result
 
 Step 5 — Mock n8n workflow
-  └─ generic_ai_task_router with fake Qwen + fake model
+  └─ generic_ai_task_router with fake local_executor + fake model
 
 Step 6 — Real local model via Ollama
   └─ Replace mock in n8n

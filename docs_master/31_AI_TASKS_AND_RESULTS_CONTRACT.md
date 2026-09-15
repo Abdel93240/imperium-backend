@@ -275,7 +275,9 @@ The local model must not:
 
 ### Backend config
 
-Optional settings:
+**Historical Patch 2E configuration example:** model tag and legacy adapter settings
+are preserved for traceability, not prescribed for the active deployment. Current
+logical mapping: doc 30 §3; physical deployment: F10 §5-ter.
 
 ```text
 QWEN_ENABLED=false
@@ -319,7 +321,7 @@ This endpoint performs no database write. It is only a local adapter contract sm
 
 ### Real-call behavior
 
-When `QWEN_ENABLED=true` and `QWEN_DRY_RUN=false`, the adapter can call an Ollama-compatible local endpoint:
+Historical Patch 2E adapter behavior (not the active infrastructure recipe): when `QWEN_ENABLED=true` and `QWEN_DRY_RUN=false`, the adapter can call an Ollama-compatible local endpoint:
 
 ```http
 POST {QWEN_BASE_URL}/api/generate
@@ -1173,8 +1175,8 @@ trigger_type              VARCHAR(32) (button|schedule|db_event|external|email|m
 status                    VARCHAR(32) (see statuses below)
 difficulty_score          INTEGER NULL  (computed by the local model, 0..200)
 score_breakdown           JSONB NULL    (per-criterion scores)
-routing_model             VARCHAR(64)   (e.g. qwen3:32b)
-selected_model            VARCHAR(64)   (e.g. opus-4.8)
+routing_model             VARCHAR(64)   (resolved concrete ID for local_executor)
+selected_model            VARCHAR(64)   (resolved concrete ID for high_reasoning)
 fallback_model            VARCHAR(64) NULL
 requires_user_validation  BOOLEAN NOT NULL DEFAULT FALSE
 idempotency_key           VARCHAR(128) NOT NULL
@@ -1889,7 +1891,7 @@ Why this one first:
 
 ### Step 4 — Wire local model
 
-Install the local model via Ollama on the VPS (KVM 4: 16 GB RAM, suitable for Q5_K_M).
+Use `local_executor` (logical mapping: doc 30 §3.3); physical deployment and technical readiness are owned by F10 §5-ter. Product activation is a separate step and is not performed by this documentation.
 
 Replace mock local-model calls in workflows with real local calls.
 

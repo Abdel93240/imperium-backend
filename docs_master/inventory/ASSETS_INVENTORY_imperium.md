@@ -1423,7 +1423,7 @@ l'asset. À étoffer avant génération.
    `confidence` sur `AIRecommendationCard` mais pas le mapping Material
    Symbols pour high/medium/low. À figer.
 
-9. **Chatbot — provider chip pictogram** (Sonnet / Opus / Web / Qwen).
+9. **Chatbot — provider chip pictogram** (first_cloud_tier / high_reasoning / web_fresh_data / local_executor).
    Doc 59 §12.9 mentionne « read-only provider chip » sans figer
    d'iconographie. Probable mapping Material Symbols ou texte seul ; à
    trancher (le principe "ne générer que si valeur" pointe vers texte seul).

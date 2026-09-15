@@ -10,11 +10,11 @@ The official model strategy is now defined in:
 Key model decisions for V1:
 
 ```text
-🟢 Qwen 32B (local)            — primary router/scorer
-🟠 Claude Sonnet 4.6           — balanced reasoning
-🟣 Claude Opus 4.8             — premium strategic
-⭐ Claude Fable 5              — top tier, WR re-planning / long+complex+durable
-🟢 GPT-5.5                     — web research + medical
+🟢 local_executor             — local router/scorer/executor/conductor; mapping in doc 30 §3.3, deployment in F10
+🟠 first_cloud_tier           — balanced reasoning
+🟣 high_reasoning             — premium strategic
+⭐ sustained_long_context              — top tier, WR re-planning / long+complex+durable
+🟢 web_fresh_data / health_specialist                     — web research + medical
 🔵 OCR service                  — vision/OCR
 🎤 Transcription service       — transcription
 ```

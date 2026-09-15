@@ -1,5 +1,7 @@
 # Review Findings - docs_master
 
+> **Historical audit / audit historique.** Findings and concrete model names below describe the state examined at the time, including superseded recommendations. They do not define current routing. Current logical mapping: doc 30 §3; physical/technical local deployment: F10.
+
 ## Historical Review Status
 
 This file is a historical strict review snapshot.

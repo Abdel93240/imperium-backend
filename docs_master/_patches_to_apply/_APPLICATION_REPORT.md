@@ -1,5 +1,7 @@
 # Rapport d'application des patches de relecture doc
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Date : 2026-06-12. Appliqué par Fable Code dans l'ordre prescrit (1→9).
 Aucun fichier hors `docs_master/` modifié. Aucun code/test/migration touché
 (consigne explicite du prompt : doc Markdown uniquement). Le dossier

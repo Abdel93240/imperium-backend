@@ -36,7 +36,7 @@ source: specs Pulse §13 / WR §10 / Daily §8 (« routed ≈ cloud_forced en at
   F3-11, doc 30 §3
 prompt_codex: « Activer cloud_tiers ; smoke 1 appel tracé ; consigner. »
 observations: publier vers un cloud = irréversible par nature — c'est la bascule la plus
-  surveillée du socle ; statut Fable/pricing doc 30 §7.8 à rafraîchir avant (DV-7/DV-8)
+  surveillée du socle ; statut sustained_long_context (doc 30 §3.7) / pricing à rafraîchir avant (DV-7/DV-8)
 ```
 
 ```

@@ -1,5 +1,7 @@
 # Patch 30-C — Emergency Mode
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Patch 30-C adds a user-triggered Emergency Mode to the routing policy. It is a
 **behavior modifier**, not a shortcut to the heaviest model. Insert as a new
 sub-section in §5 (e.g. §5.7) or as a static-rule note in §7; cross-reference

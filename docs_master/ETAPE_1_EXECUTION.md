@@ -97,9 +97,9 @@ Interdits : tout fichier hors ces trois. DoD : diff lisible, un commit.
 
 **GO Phase C : doc 76 reflète les décisions ; plus aucun « BLOQUANT » fantôme.**
 
-## PHASE D — Passe SOCLE (Fable, la grosse dépense justifiée)
+## PHASE D — Passe SOCLE (sustained_long_context, tâche longue et complexe)
 
-- Coller `specs/TOOLBOX_SOCLE_SPEC_V1.md` à Claude Code (Fable 5) sur Tower.
+- Coller `specs/TOOLBOX_SOCLE_SPEC_V1.md` à Claude Code (rôle sustained_long_context, mapping doc 30 §3) sur Tower.
 - Rappels : étape 0 = STOP si base non rapatriée (Phase 0) ; DoD = tests §13 verts +
   runner en dry-run + ponts n8n portés + unités systemd embeddings livrées (smoke différé
   J+2) + patches docs + catalogue promu doc 78 + SOCLE_MAPPING.md.
@@ -171,13 +171,15 @@ de l'étape 1.
 
 ## PHASE H — Parallèle matériel (J+2, hors chemin critique)
 
-Ventilateurs → V100 + P40 → checklist smoke embeddings du socle (dims 1024, latence,
-paires témoins) → `embeddings_enabled=True` → D5 levé. Puis serving 32B + smoke GBNF.
-Rien dans V1 n'attend ça ; tout V6+ en dépend.
+État actualisé : le local_executor est déployé et validé en infrastructure ; les
+mesures H3 et la validation restante H3.7 sont en F10 §5-ter. Les services
+complémentaires restent futurs (F10 §5-quater). La carte VAGUE_6 distingue ces
+états de l’activation produit : `qwen_enabled=False`, `real_ai_enabled=False`,
+aucune bascule ni levée automatique de D5 ici. Mapping logique : doc 30 §3.
 
 ## SORTIE DE L'ÉTAPE 1 → ÉTAPE 2
 
 Livrables vivants : boucle vitale ON (6 features), journal doc 76 avec ses premières
 lignes de bascule, chrono de validation initialisé, suite de tests = signal fiable.
 L'étape 2 est déjà écrite : V2 (hygiène du journal d'events — déjà codée au socle §6, il
-ne reste que les bascules) en chevauchement avec le lancement de la passe Pulse (Fable).
+ne reste que les bascules) en chevauchement avec le lancement de la passe Pulse (sustained_long_context).

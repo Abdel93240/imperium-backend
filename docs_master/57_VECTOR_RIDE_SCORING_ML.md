@@ -648,7 +648,7 @@ class BoltImportProcessor:
     def __init__(self, db, gemini_api_key):
         self.db = db
         genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')  # historical SDK example, not current ocr_service mapping (doc 30 §3.9)
     
     async def process_zip(self, zip_path: Path) -> dict:
         batch_id = uuid4()
@@ -1361,7 +1361,7 @@ WR RULE REVISION (weekly high reasoning model):
 
 EXPLANATIONS (on-demand):
 ├─ the local model: 0€
-└─ Sonnet deep analysis: ~1€/month
+└─ first_cloud_tier deep analysis: ~1€/month
 
 TOTAL ONGOING: < 2€/month
 TOTAL BOOTSTRAP: < 2€ one-time

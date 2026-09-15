@@ -19,7 +19,7 @@ The system must be faithful to the user's vision, not generic best practices.
 ```text
 Backend (FastAPI + PostgreSQL) = canonical truth
 n8n                            = orchestration only
-Qwen 2.5 7B local              = router/scorer
+local_executor              = router/scorer
 Cloud models                   = specialists, called only when justified
 pgvector                       = semantic memory, never canonical truth
 Apps (Android, V2)             = display + collect, never decide
@@ -42,26 +42,26 @@ Apps (Android, V2)             = display + collect, never decide
 ## AI Model Strategy
 
 ```text
-~90% calls → Qwen local (free)
+~90% calls → local_executor (free)
 ~5%        → the local model
-~3%        → Sonnet 4.6 (balanced)
-~1.5%      → Opus 4.7 (deep, WR)
-~0.5%      → GPT-5.5 (web + medical)
+~3%        → first_cloud_tier (balanced)
+~1.5%      → high_reasoning (deep, WR)
+~0.5%      → web_fresh_data / health_specialist
 ~0.3%      → the OCR service (vision)
 the transcription service for audio
 ```
 
-**Routing rule:** Qwen scores tasks `/200`. Static overrides for vision/audio/web/medical/WR.
+**Routing rule:** local_executor scores tasks `/200`. Static overrides for vision/audio/web/medical/WR.
 
-**See:** `30_AI_ROUTING_AND_SCORING_POLICY.md` for full rules.
+**See:** `30_AI_ROUTING_AND_SCORING_POLICY.md` §3 is the sole owner of the logical role → concrete model/version mapping; F10 owns physical/technical local deployment only. Other specs use generic roles.
 
 ---
 
 ## Non-Negotiable Rules
 
 1. **PostgreSQL is the only canonical writer** — apps, n8n, AI never write directly
-2. **Backend defines the playing field** — Qwen plays within it
-3. **No AI cloud call without user trigger** — except local Qwen and OCR in user-initiated flows
+2. **Backend defines the playing field** — local_executor plays within it
+3. **No AI cloud call without user trigger** — except local_executor and OCR in user-initiated flows
 4. **Idempotency-Key on every POST** that mutates state
 5. **HMAC + timestamp on every internal callback** — never send the shared secret as a header
 6. **AI results need user validation** before becoming canonical actions
@@ -79,15 +79,15 @@ the transcription service for audio
 ```text
 Simple CRUD, deterministic compute → backend, no AI, no n8n
 Multi-step / async / external      → n8n
-Routing / classification / score   → Qwen local
+Routing / classification / score   → local_executor
 Receipt / screenshot / image       → the OCR service (static override)
 Audio                              → the transcription service
-Web fresh data                     → GPT-5.5 + web
-Medical reports                    → GPT-5.5
-WR analysis                        → Opus 4.7
+Web fresh data                     → web_fresh_data
+Medical reports                    → health_specialist
+WR analysis                        → high_reasoning
 Quick advice with context          → the local model
-Day reorganization (multi-factor)  → Sonnet 4.6
-Mentoring chat                     → Opus 4.7
+Day reorganization (multi-factor)  → first_cloud_tier
+Mentoring chat                     → high_reasoning
 ```
 
 ---
@@ -99,7 +99,7 @@ Mentoring chat                     → Opus 4.7
 3. AI tables (`ai_tasks`, `ai_results`, `ai_result_validations`)
 4. Backend services
 5. n8n workflows
-6. Qwen integration
+6. local_executor integration
 7. App frontends
 8. Visual polish (last)
 

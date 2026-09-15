@@ -1,5 +1,7 @@
 # Audit de cohérence — docs_master (61 fichiers)
 
+> **Historical audit / audit historique.** Findings and concrete model names below describe the state examined at the time, including superseded recommendations. They do not define current routing. Current logical mapping: doc 30 §3; physical/technical local deployment: F10.
+
 > Analyse complète du corpus documentaire pour repérer contradictions, doublons,
 > architecture périmée et problèmes de numérotation. Objectif : repartir sur des
 > bases saines avant de coder.

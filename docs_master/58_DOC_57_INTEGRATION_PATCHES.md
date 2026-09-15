@@ -8,7 +8,10 @@
 > in the target doc, apply the change. No rewrite of full docs needed.
 
 **Created:** 2026-05-17
-**Status:** Patches to apply when V1 backend coding starts
+**Status:** Historical integration patches (May 2026). Before/after excerpts retain
+old model names for comparison. They do not define current assignments: doc 30 §3
+owns the logical mapping and F10 owns physical deployment. Consult the current
+Vector spec before implementing any pending item.
 
 ---
 
@@ -107,7 +110,7 @@ CURRENT line:
   
 REPLACE WITH:
   Bolt ride scoring (3%):       CatBoost local (0€, <1ms)
-  Bolt ride explanation:        Qwen 7B local (on demand only)
+  Bolt ride explanation:        local_executor (on demand only; mapping doc 30 §3.3)
   
 ADD NOTE:
   "Ride scoring is the only Vector task that bypasses the AI routing
@@ -219,7 +222,7 @@ ADD this new signal category:
   
   RULE_REVISION_PROPOSALS:
     Based on per-rule performance analysis (doc 57 §10),
-    WRS now produces revision proposals for Opus to present
+    WRS now produces revision proposals for high_reasoning to present
     in the weekly review.
     
     Stored in vector_rule_revisions with proposed_by='opus_wr'.

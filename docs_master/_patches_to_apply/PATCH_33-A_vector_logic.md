@@ -1,5 +1,7 @@
 # Patch 33-A — Vector Logic Corrections (météo, surge, halos, CatBoost learning)
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Patch 33-A makes doc 33 the source of truth for Vector logic and aligns it with
 decisions from the June 2026 re-read. It also resolves a pending TODO in doc 57
 (§5.6 surge features) and adds a redirect note to doc 13.

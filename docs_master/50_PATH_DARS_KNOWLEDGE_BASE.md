@@ -103,7 +103,7 @@ CAPABILITY 3 — Q&A WITH SOURCE VERIFICATION
    → Fallback to local OCR if scanned PDF
 
 ✅ AUDIO RECORDINGS (cours recordings)
-   → faster-whisper large-v3 local
+   → transcription_service local (doc 30 §3.10)
    → Multilingual: French + Arabic + English
    → Code-switching aware
 
@@ -847,7 +847,7 @@ PHASE 1 — Schema migrations
 PHASE 2 — Local infrastructure
   ├─ local OCR service per doc 37
   ├─ local religious structuring / Q&A runtime
-  ├─ faster-whisper large-v3 deployment (~3 GB RAM)
+  ├─ transcription_service deployment (physical details: F10)
   ├─ PostgreSQL full-text search indexes
   └─ weasyprint setup with Dars CSS template
 

@@ -1056,7 +1056,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Widgets :** viewfinder frame, image quality helper.
 - **Assets :** Vault receipt scan asset, Material Symbols `photo_camera`, `flash_on`, `close`.
 - **Etats :** Loading=camera initializing ; Empty=permission not requested with CTA ; Error=camera unavailable/OCR upload failure with retry/manual entry ; Offline=camera can capture local draft but OCR disabled banner ; Syncing=photo upload/OCR service task creation line ; Synced=route to VAU-05 when draft ready ; Conflict=duplicate pending receipt task dialog.
-- **Backend deps :** `TBD POST /api/vault/receipt-extractions`, ai_task `vault.receipt_extract`, Gemini prompt doc 37 §3.
+- **Backend deps :** `TBD POST /api/vault/receipt-extractions`, ai_task `vault.receipt_extract`, ocr_service prompt doc 37 §3.
 - **Navigation :** opened from VAU-01 `Scan ticket`; VAU-04 --> VAU-05 after OCR draft; camera denied/manual exits to VAU-03.
 - **Tab S10 Ultra :** fullscreen route, preview centered max 1280dp, right 320dp panel for capture guidance.
 
@@ -1065,7 +1065,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Screen name:** VAU-05 Receipt Review & Validate.
 - **Type / slug :** `route`, `vault/receipts/{receipt_task_id}/review`, stable ID `VAU.TX.RECEIPT_REVIEW`.
 - **Composants :** receipt thumbnail, Draft Transaction Card list, line include checkboxes, Category Dropdown, low-confidence Warning chips, Primary "Valider", Secondary "Re-scanner", Ghost "Annuler".
-- **Données affichées :** merchant, date/time, total_eur, payment_method, OCR confidence, warnings, draft expense, line_items, Qwen category suggestions, food handoff preview.
+- **Données affichées :** merchant, date/time, total_eur, payment_method, OCR confidence, warnings, draft expense, line_items, local_executor category suggestions, food handoff preview.
 - **Widgets :** OCR confidence badge, total comparator, Pulse handoff summary.
 - **Assets :** receipt thumbnail image, Material Symbols `receipt_long`, `inventory_2`, `warning`.
 - **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=OCR service fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
@@ -1230,7 +1230,7 @@ Ces patterns assemblent les composants foundation pour Vault. Ils ne créent pas
 | **Money Display Hierarchy** | Un seul montant Display par écran. Dashboard: wallet total Display, week/month H3, row amounts Body Medium. Lists: Body Medium JetBrains Mono aligné à droite. Inputs: Body Large JetBrains Mono. | VAU-01, VAU-07, VAU-10 |
 | **Money Input** | Number input avec clavier numérique, devise EUR fixe V1, cents visibles, validation `amount > 0`, supporting text pour wallet source. | VAU-02, VAU-03, VAU-08, VAU-10 |
 | **Filter Chip Bar** | Segmented `business|personal|all`, date range picker, category chip, clear filter icon. | VAU-07, VAU-09 |
-| **Category Dropdown** | Defaults read-only par book, customs éditables, option "Autre" ouvrant TextField, suggestion Qwen en chip Warning jusqu'à validation. | VAU-02, VAU-03, VAU-05, VAU-09 |
+| **Category Dropdown** | Defaults read-only par book, customs éditables, option "Autre" ouvrant TextField, suggestion local_executor en chip Warning jusqu'à validation. | VAU-02, VAU-03, VAU-05, VAU-09 |
 | **Wallet Allocation Display** | Stack bar cash/bank/crypto + total dérivé. Ne stocke pas un solde indépendant. | VAU-01, VAU-10 |
 | **Upcoming Expense Row** | Title, amount JetBrains Mono, due date, countdown, recurrence chip, status `pending|paid|overdue`; overdue utilise Error + icon. | VAU-01, VAU-11 |
 | **Sync Pending Banner** | Banner Warning haut d'écran si mutation locale non confirmée ; snackbar Success uniquement après 200 backend. | tous VAU-* |
@@ -1527,7 +1527,7 @@ Mapping écran Pulse ↔ composants foundation ↔ assets ↔ états ↔ navigat
 | Stock decrement | Stock decrement is user-confirmed and idempotent. Aucune ligne proposée par AI ne décrémente le stock avant validation utilisateur. |
 | Workout adaptation | Adaptation suggérée si énergie <= 3/10, fatigue high, pain >= 7, fasting actif avec intensité haute, ou équipement manquant. Elle n'est jamais forcée. |
 | Body photo | Body photo upload is disabled in V1. PUL-08 peut référencer une photo locale Android, mais aucune image corporelle n'est envoyée au backend. |
-| Medical consent | Medical documents require explicit consent before upload, extraction GPT-5.5 static override, and user validation before activation. |
+| Medical consent | Medical documents require explicit consent before upload, extraction health_specialist static override, and user validation before activation. |
 | Medical authority | Pulse ne pose pas de diagnostic ; les règles médicales actives sont des contraintes validées par l'utilisateur. |
 | Health score | Health score must never render without explanation, confidence, and positive/negative factors. |
 | Fasting hydration | Si `hydration_limits.daytime=false`, PUL-04 désactive les quick buttons pendant la fenêtre de jeûne et affiche la raison Path. |
@@ -1716,7 +1716,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Widgets :** consent gate, extraction progress, active medical rule banner, document detail, validation checklist.
 - **Assets :** Material Symbols `medical_information`, `bloodtype`, `description`, `upload_file`, `verified_user`; no decorative medical hero.
 - **Etats :** Loading=documents/rules skeleton ; Empty=no document with consent upload CTA and disclaimer ; Error=upload/extraction/unsupported document failure ; Offline=medical upload disabled, cached read-only rules ; Syncing=upload/extraction validation line ; Synced=document uploaded or rule activated snackbar ; Conflict=rule already activated/deleted source dialog.
-- **Backend deps :** `TBD GET /api/pulse/medical-documents`, `TBD POST /api/pulse/medical-documents` with `Idempotency-Key`, `TBD GET /api/pulse/medical-rules/active`, `TBD POST /api/pulse/medical-rules/{rule_id}/activate` with `Idempotency-Key`, ai_task `pulse.medical_document_extract` using GPT-5.5 static override.
+- **Backend deps :** `TBD GET /api/pulse/medical-documents`, `TBD POST /api/pulse/medical-documents` with `Idempotency-Key`, `TBD GET /api/pulse/medical-rules/active`, `TBD POST /api/pulse/medical-rules/{rule_id}/activate` with `Idempotency-Key`, ai_task `pulse.medical_document_extract` using health_specialist static override.
 - **Navigation :** top-level Pulse tab; upload/detail/progress/rule validation are inline panes; PUL-14 --> IMPERIUM_REPLAN as backend/toast handoff only after validated `pulse.medical_rule.activated`.
 - **Tab S10 Ultra :** list/detail split: document/rule list max 880dp, right 320dp detail/consent/progress pane.
 
@@ -1812,7 +1812,7 @@ Pulse handles high and very-high privacy data. V1 rules:
 
 - Medical documents require explicit consent per upload and cite RGPD article 9.
 - PUL-14 displays `Pulse ne pose pas de diagnostic` before upload and near extracted rules.
-- GPT-5.5 static override is used for medical extraction; Qwen cannot activate medical rules.
+- health_specialist static override is used for medical extraction; local_executor cannot activate medical rules.
 - Raw medical document retention defaults to 90 days and user deletion must revoke derived active rules.
 - Medical rules stay inactive until user validation before activation.
 - Body photo upload is disabled in V1; no backend URI, OCR service task, or vector memory storage.
@@ -1841,7 +1841,7 @@ Mapping écran Path ↔ composants foundation ↔ assets ↔ états ↔ navigati
 | Sadaqa carry behavior | Partial donations roll remaining carry forward; overpayment clears oldest carry first and never renders negative spiritual debt. |
 | Path-Vault donation | PAT-03 creates a Path donation then automatic Vault personal expense handoff category `Sadaqa`; Vault failure becomes visible pending handoff. |
 | Path-Pulse fasting | PAT-05 pushes `hydration_limits.daytime=false` to Pulse only after backend confirmation and shows a Path handoff toast. |
-| Religious privacy | Religious data uses privacy gate before external GPT/Claude/Gemini calls; mosque patterns, ghusl addresses, sadaqa destination and GPS are redacted from logs. |
+| Religious privacy | Religious data uses privacy gate before external cloud model calls; mosque patterns, ghusl addresses, sadaqa destination and GPS are redacted from logs. |
 | Offline merge | Prayer uses explicit conflict review; adhkar increments merge sum by idempotency key; Quran regression requires confirmation; ghusl/fasting mutations sync in order. |
 | Qibla and Hijri | Hijri date and white days are dashboard/fasting context; Qibla is informational and asks sensor permission only on user action. |
 | Voice input | the transcription service can support PAT-03 notes and PAT-06 counting, but tactile/manual input remains canonical when confidence is low. |
@@ -2090,7 +2090,7 @@ Path handles high and very-high privacy data. V1 rules:
 
 - Religious data privacy policy cites RGPD article 9 by analogy for worship and donation data.
 - `sadaqa_destination`, `sadaqa_donation_amount`, `ghusl_required`, `ghusl_addresses`, mosque attendance patterns, precise GPS, and donation receipt text are redacted from logs.
-- External GPT/Claude/Gemini calls require a privacy gate and minimum necessary payload. Default Path classification/routing remains local Qwen where possible.
+- External cloud model calls require a privacy gate and minimum necessary payload. Default Path classification/routing remains local_executor where possible.
 - Donation receipts are local-only in V1 unless the user explicitly uploads for OCR; OCR goes through privacy gate.
 - Vector memory receives summary-only fields where doc 01 permits it; no raw mosque pattern, raw address, or raw charity destination is embedded.
 - Error messages never expose sensitive religious details.

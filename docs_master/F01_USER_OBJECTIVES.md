@@ -482,7 +482,7 @@ CREATE TABLE user_project_prompts (
   arbitration_rule         TEXT NULL,
   source_project_ids       UUID[] NOT NULL,
                            -- references to user_projects.id
-  prompt_model             VARCHAR(32) NOT NULL DEFAULT 'opus-4.7',
+  prompt_model             VARCHAR(32) NOT NULL DEFAULT 'opus-4.7', -- historical example ID; current role mapping: doc 30 §3
   generated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   superseded_at            TIMESTAMPTZ NULL,
   estimated_cost_eur       NUMERIC(6,4) NULL

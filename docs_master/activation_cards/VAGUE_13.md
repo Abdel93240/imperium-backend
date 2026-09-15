@@ -6,7 +6,7 @@ des procédures, le code vérifie, MAIS toutes les procédures sont encore inact
 ne s'exécute, rien n'est proposé. On observe la qualité de jugement à blanc.
 
 ```
-id: ACT-PLS-16    nom_fr: Interprète réel local (Qwen3-32B, temp 0, GBNF) — shadow
+id: ACT-PLS-16    nom_fr: Interprète réel local (local_executor, temp 0, GBNF) — shadow
 domaine: pulse    classe: ia_shadow   echelon_audace: 3   statut: NOT_CODED
 bascule_exacte: UPDATE ai_slot_transition SET tier='local_default' WHERE
   slot_code='pulse.interpreter';  -- avec real_ai_enabled=true (V6) ; procédures actives=0

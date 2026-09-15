@@ -94,7 +94,7 @@ CREATE TABLE ai_memories (
 
   -- Contenu
   content              TEXT NOT NULL,          -- le pattern en langage naturel
-  embedding            vector(1024) NOT NULL,  -- dim 1024 (cf. doc 38, Qwen3-Embedding)
+  embedding            vector(1024) NOT NULL,  -- dim 1024 (cf. doc 38, embedding_service)
   embedding_model      TEXT NOT NULL,          -- traçabilité du modèle d'embedding
 
   -- Catégorisation (deux axes distincts)
@@ -308,7 +308,7 @@ le trou de l'ex-`pgvector_memory` (pas de `privacy_level`) — définitivement b
 
 - **Le contenu exact de l'audit de sortie du WR** (structure, sections obligatoires) →
   doc WR (32 / 47). Ce doc pose seulement l'exigence « WR riche et autosuffisant » (§6).
-- **Le pipeline de l'[embedding service]** (chunking, modèle, quantification Q8/FP16, hardware) →
+- **Le pipeline de l'[embedding service]** (chunking et recherche ; mapping doc 30 §3, déploiement physique F10) →
   doc 38 (qui garde ce rôle).
 - **La cascade d'agrégation temporelle des signaux** → doc 09 (PATCH 08 déjà déployé) ;
   distincte de la présente table de patterns.

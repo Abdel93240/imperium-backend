@@ -1,5 +1,7 @@
 # Patch MÉCA-1 — Model hierarchy alignment (docs 16, 31, 34, 35, 03, 44)
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Mechanical corrections from the model-hierarchy rewrite (doc 30 is the source of
 truth). Removes legacy references: Qwen 2.5 7B → Qwen 32B, Opus 4.7 → Opus 4.8,
 Haiku removed → Sonnet 4.6 fallback, stale threshold tables → doc 30 §5.6 grid.

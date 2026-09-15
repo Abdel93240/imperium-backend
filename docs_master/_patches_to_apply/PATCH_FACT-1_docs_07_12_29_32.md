@@ -1,5 +1,7 @@
 # Patch FACT-1 — Corrections factuelles rapides (docs 07, 12, 29, 32)
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Quatre corrections factuelles issues de la relecture (passe 1). Chacune indique
 le remplacement exact à appliquer en place.
 

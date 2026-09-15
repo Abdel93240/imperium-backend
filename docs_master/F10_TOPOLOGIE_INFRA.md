@@ -2,8 +2,10 @@
 
 > **Statut : TOPOLOGIE ACTIVE.** Décrit la répartition physique actuellement en
 > service dans l'écosystème Imperium, y compris l'infrastructure Phase H. Ce
-> document est la référence pour les informations physiques et les noms concrets
-> des services/modèles d'infrastructure.
+> document est la référence pour le déploiement physique/technique local uniquement
+> (GPU, GGUF, quantification, SHA256, runtime, endpoint, systemd, mesures H3).
+> Le mapping logique ROLE → modèle concret/version appartient exclusivement à
+> `30_AI_ROUTING_AND_SCORING_POLICY.md` §3.
 
 ---
 
@@ -198,8 +200,8 @@ Le MTP n'est ni activé ni validé.
 ## 5-quater. Services modèles complémentaires — état futur
 
 Les autres specs parlent en termes génériques (« service OCR », « service de
-transcription »). Ce document est propriétaire des futurs noms concrets de
-modèles. Ces services ne sont pas actifs dans la topologie actuelle ; ils restent
+transcription »). Le mapping logique de ces rôles et leurs candidats appartiennent
+au doc 30 §3 ; ce document décrit uniquement leurs possibilités de déploiement physique. Ces services ne sont pas actifs dans la topologie actuelle ; ils restent
 réservés à la P40 ou à une future infrastructure dédiée.
 
 - Service OCR envisagé : modèle VLM local précis, par exemple PaddleOCR-VL-1.6

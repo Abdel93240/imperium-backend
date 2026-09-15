@@ -1,5 +1,7 @@
 # Patch 30-B — Critical-tier mechanics (§5.6)
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Patch 30-B enriches the top band of the dynamic routing table (§5.6). The current
 "180–200 → Opus 4.8 + guard" is replaced by an explicit two-step mechanic with an
 independent anti-hallucination check and bounded multi-model orchestration.

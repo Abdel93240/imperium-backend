@@ -70,7 +70,7 @@ docs:
     family: architecture
     categories: [ai]
     status: needs_alignment
-    notes: "Old model hierarchy (Haiku/Opus 4.7/Qwen 7B). Align on doc 30."
+    notes: "Deprecated strategy; generic roles refer to canonical mapping doc 30 §3."
 
   - file: "16_AI_BACKEND_LAYER_OVERVIEW.md"
     number: 16
@@ -112,7 +112,7 @@ docs:
     family: architecture
     categories: [ai]
     status: needs_alignment
-    notes: "Qwen 7B -> 32B; deployment (Ollama vs vLLM on V100) to confirm."
+    notes: "Role local_executor: doc 30 §3.3; active physical deployment: F10 §5-ter; product AI disabled."
 
   - file: "36_PROMPTS_CLOUD_AI.md"
     number: 36
@@ -134,7 +134,7 @@ docs:
     family: architecture
     categories: [ai, backend]
     status: to_review
-    notes: "Embedding V1 = bge-m3 local default (privacy)."
+    notes: "Role embedding_service: mapping doc 30 §3.12; local deployment F10; privacy-first."
 
   - file: "39_WRS_VECTOR_LEARNING_LOOP.md"
     number: 39

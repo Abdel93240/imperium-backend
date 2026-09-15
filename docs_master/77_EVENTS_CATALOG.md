@@ -79,9 +79,9 @@ En temps réel V1, le backend remplit le chaînage évident et immédiat : même
 session, même action, même conséquence directe. Ce chaînage doit être simple,
 sûr et déterministe.
 
-En Phase 3 du Weekly Review, Fable peut proposer un chaînage profond sur les
+En Phase 3 du Weekly Review, sustained_long_context peut proposer un chaînage profond sur les
 events signalés comme importants par l'audit d'entrée ou par l'utilisateur
-pendant la conversation. Fable cherche un pattern lié dans la mémoire
+pendant la conversation. sustained_long_context cherche un pattern lié dans la mémoire
 vectorielle, remonte aux events sources, propose le lien, puis l'utilisateur le
 valide. Si rien n'est trouvé, la question revient à l'utilisateur et sa réponse
 peut créer un nouveau pattern pour les revues suivantes.

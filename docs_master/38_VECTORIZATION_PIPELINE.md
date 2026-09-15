@@ -116,8 +116,8 @@ that retrieval depends on). FP16 = full quality when the hardware allows it.
 ### 5.2 Option de secours: cloud embedding (OpenAI / Voyage)
 
 ```text
-Model:    text-embedding-3-small (OpenAI) or voyage-3-lite
-Dimension: 1536 (small) or 1024 (voyage-3-lite)
+Role:     embedding_service (cloud fallback candidates: doc 30 §3.12)
+Dimension: candidate-dependent; adapt and re-embed before changing the 1024-dimensional contract
 Cost:     ~$0.02 per million tokens
 Latency:  ~200ms per element
 ```
@@ -420,7 +420,8 @@ def expiry_refresh(db: Session) -> dict:
 backend/app/services/ai/embedding.py
 ```
 
-Abstracts the embedding provider so we can swap later:
+Historical wrapper sketch: class names are preserved identifiers, not model assignments.
+It abstracts embedding_service so the mapped model can be replaced (doc 30 §3.12):
 
 ```python
 class EmbeddingProvider(Protocol):
@@ -428,7 +429,7 @@ class EmbeddingProvider(Protocol):
         ...
 
 class OpenAIEmbedding(EmbeddingProvider):
-    """Fallback option. Calls OpenAI text-embedding-3-small (non-default, privacy gate required)."""
+    """Fallback option for embedding_service (doc 30 §3.12; privacy gate required)."""
 
 class LocalQwen3Embedding(EmbeddingProvider):
     """V1 DEFAULT. Calls the local embedding service (privacy-first)."""
@@ -437,7 +438,7 @@ def get_embedding_provider() -> EmbeddingProvider:
     """Returns the configured provider based on env."""
 ```
 
-Configuration via env:
+Historical configuration example (not an active deployment recipe or role mapping):
 
 ```text
 EMBEDDING_PROVIDER=local
@@ -445,22 +446,10 @@ EMBEDDING_MODEL=Qwen3-Embedding
 OPENAI_API_KEY=sk-...
 ```
 
-Embedding hardware plan (transitional → final):
-- **Bridge (now):** a dedicated GPU for embedding — Tesla **P40 24GB** running
-  the embedding service in **Q8** (~99% quality, fast ~0.2 s/query). Chosen over M40:
-  Pascal (CC 6.1) is still supported by current CUDA/PyTorch, whereas Maxwell
-  (M40, CC 5.2) is being dropped. P40 needs an added blower+shroud (passive
-  card). The routing model stays on the V100; no VRAM conflict.
-- **Then:** migrate everything onto the server (full re-host).
-- **Final:** a 2nd V100 → the embedding service in **FP16** (100% quality, fast).
-
-Note: P40/M40 have weak FP16, which is why the bridge runs Q8 (not FP16). Full
-FP16 quality is deferred to the V100 stage. Q8 vs FP16 ≈ 1% quality, acceptable
-for the transition.
-
-Open item (backlog): confirm the exact embedding service size to serve
-(0.6B / 4B / 8B) given the bridge P40 (24GB is ample) vs final V100. Larger is
-fine on 24GB; the choice is quality vs load time. Track separately.
+Physical deployment and readiness are owned by F10 §5-quater. The embedding_service
+remains a future complementary service; its availability is not implied by the
+local_executor deployment. Logical model selection belongs exclusively to doc 30
+§3.12. No embedding flag is activated by this specification.
 
 ---
 

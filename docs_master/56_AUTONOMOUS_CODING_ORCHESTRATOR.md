@@ -12,7 +12,7 @@
 Build a **personal autonomous coding pipeline** that:
 
 - Reads instructions from ChatGPT (web interface, no API)
-- Routes prompts to Codex using the appropriate model (mini/5.4/5.5)
+- Routes prompts to Codex using the appropriate model role (first_cloud_tier / high_reasoning; mapping doc 30 §3)
 - Uploads code to VPS via SSH
 - Executes tests automatically
 - Reports results back to ChatGPT
@@ -106,7 +106,7 @@ ON THE TOWER (Tier 1):
 ├─ Python 3.12 with venv
 ├─ Playwright (Python) for web automation
 ├─ Chromium headless (managed by Playwright)
-├─ Ollama serving the local model
+├─ local_executor (deployment/runtime: F10)
 ├─ PostgreSQL for task queue (lightweight)
 ├─ Custom Python scripts:
 │   - orchestrator.py (main loop)
@@ -284,7 +284,7 @@ you MUST follow this strict format for ALL operational messages.
 FORMAT FOR NEW CODE PATCHES:
 === PATCH [N] ===
 COMPLEXITY: [simple|medium|complex|critical]
-MODEL: [gpt-5.4-mini|gpt-5.4|gpt-5.5]
+MODEL: [first_cloud_tier|high_reasoning]
 FAST_MODE: [yes|no]
 DESCRIPTION: [one-line description]
 
@@ -328,11 +328,11 @@ OR
 V1 COMPLETE
 
 MODEL ROUTING GUIDELINES:
-- gpt-5.4-mini: Simple CRUD, isolated functions, basic SQL,
+- first_cloud_tier (simple tasks): Simple CRUD, isolated functions, basic SQL,
   pure config files. Anything where context fits in <500 lines.
-- gpt-5.4: Default for everything moderate. API endpoints with
+- first_cloud_tier (moderate tasks): Default for everything moderate. API endpoints with
   business logic, multi-file changes within one module.
-- gpt-5.5: Architecture decisions, complex refactoring,
+- high_reasoning: Architecture decisions, complex refactoring,
   cross-module changes, subtle debugging, anything requiring
   deep system understanding.
 
@@ -384,7 +384,12 @@ User responds via Telegram, orchestrator forwards to ChatGPT.
 
 This is what makes the orchestrator **economically viable**.
 
-### 7.1 Codex pricing reality (May 2026)
+### 7.1 Historical Codex pricing assumptions (May 2026)
+
+> Historical pricing and distribution examples (§7.1–7.2) retain concrete names
+> to document the former development setup. They are not current prices or a
+> routing policy. Resolve current roles through doc 30 §3 and validate runner
+> compatibility separately; the development runner is distinct from product AI.
 
 ```text
 CODEX TOKEN PRICING (token-based since April 2, 2026):
@@ -406,7 +411,7 @@ RATE LIMITS: 5-hour windows + weekly limit
 WITH SMART ROUTING: ~2.5x more capacity per week vs all-5.5
 ```
 
-### 7.2 Routing distribution for V1
+### 7.2 Historical routing distribution assumed for V1
 
 ```text
 EXPECTED PATCH MIX FOR V1 IMPLEMENTATION:
@@ -446,9 +451,7 @@ EFFECTIVE RATE LIMIT GAIN: ~2-3x vs all-5.5 usage.
 CODEX CLI (preferred for orchestrator):
 
 To switch model:
-  /model gpt-5.4-mini
-  /model gpt-5.4
-  /model gpt-5.5
+  /model <concrete ID resolved for the requested role; doc 30 §3>
 
 To toggle fast mode:
   /fast on
@@ -485,7 +488,7 @@ CREATE TABLE orchestrator_tasks (
   complexity            VARCHAR(16) NOT NULL,
                         -- 'simple' | 'medium' | 'complex' | 'critical'
   model_requested       VARCHAR(32) NOT NULL,
-                        -- 'gpt-5.4-mini' | 'gpt-5.4' | 'gpt-5.5'
+                        -- historical runner IDs: 'gpt-5.4-mini' | 'gpt-5.4' | 'gpt-5.5'
   model_actually_used   VARCHAR(32) NULL,
                         -- may differ if model was switched by orchestrator
   fast_mode             BOOLEAN NOT NULL DEFAULT FALSE,
@@ -832,7 +835,7 @@ CREATE TABLE orchestrator_llm_classifications (
   
   -- PERFORMANCE
   duration_ms           INTEGER NULL,
-  model_version         VARCHAR(32) NOT NULL DEFAULT 'qwen-2.5-3b-q4',
+  model_version         VARCHAR(32) NOT NULL DEFAULT 'qwen-2.5-3b-q4', -- historical classifier default; not current routing
   
   -- QUALITY TRACKING
   was_correct           BOOLEAN NULL,
@@ -1332,9 +1335,8 @@ DAY 1:
 DAY 2:
 - Update packages
 - Install Python 3.12, Node.js 20, build-essential
-- Install Ollama: curl -fsSL https://ollama.com/install.sh | sh
-- Pull the local model: ollama pull qwen2.5:3b
-- Test: ollama run qwen2.5:3b "classify: hello world"
+- Local inference setup: follow the physical/technical deployment owner F10.
+- Resolve the local_executor role via doc 30 §3.3; deployment and smoke procedures belong to F10. The old build-classifier recipe is not the Phase H serving recipe.
 - Install Playwright + Chromium
 
 DAY 3:
@@ -1542,7 +1544,7 @@ MITIGATION:
 3. Persistent failure → escalate via Telegram
 4. ChatGPT (intelligent coordinator) catches obvious issues
 5. Weekly Claude Code audit catches subtle issues
-6. Model routing: complex patches use GPT-5.5 (less buggy)
+6. Model routing: complex patches use high_reasoning (doc 30 §3.6)
 ```
 
 ### 12.5 Risk: Tower hardware failure
@@ -1630,7 +1632,7 @@ WEEKLY:
 MONTHLY:
 - Update Ubuntu packages: sudo apt update && apt upgrade
 - Update Playwright: pip install --upgrade playwright
-- Update Ollama and the local model: ollama pull qwen2.5:3b
+- Consult F10 for local runtime/model maintenance; logical assignment remains in doc 30 §3.3.
 - Run Claude Code audit on V1 code so far
 - Review monthly stats trends
 
@@ -1793,7 +1795,7 @@ TO ANSWER WHEN IMPLEMENTING:
 
 - `08_NON_NEGOTIABLE_RULES.md` — backend authority
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — model selection patterns
-- `35_QWEN_SETUP_AND_PROMPTS.md` — local model deployment reference
+- `35_QWEN_SETUP_AND_PROMPTS.md` — local prompts; physical deployment owner: F10
 - ChatGPT custom instructions documentation
 - Codex pricing: https://chatgpt.com/codex/pricing/
 - Codex speed modes: https://developers.openai.com/codex/speed

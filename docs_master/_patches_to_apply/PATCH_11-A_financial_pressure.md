@@ -1,5 +1,7 @@
 # Patch 11-A — Recurring Expenses Truth, Wallets, and Classification Scoring
 
+> **Historical patch/audit archive.** This records the former state and proposed/applied changes; concrete model names are preserved for that comparison, not as current routing instructions. Resolve current assignments exclusively through doc 30 §3 and local deployment through F10. Any remaining backlog uses those owners; do not replay old model substitutions.
+
 Patch 11-A clarifies how required expenses are determined and how real pressure
 is computed. It resolves an ambiguity (the misleading `optional_required_expenses`
 name) and restores the user-owned recurring-expenses list as the source of truth.

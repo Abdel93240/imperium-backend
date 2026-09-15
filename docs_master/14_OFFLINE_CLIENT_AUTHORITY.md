@@ -358,7 +358,7 @@ Allowed local behavior:
 Forbidden local behavior:
 - decide mission creation from the recording
 - decide transaction creation from the recording
-- decide routing to GPT/Gemini/Claude
+- decide routing to cloud model roles (doc 30 §3)
 - store transcript as truth before backend processing
 
 ## Cached Recommendation Policy

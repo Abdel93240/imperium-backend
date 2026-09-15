@@ -6,80 +6,24 @@ It handles routing, triage, classification, adaptive questions, lightweight reas
 
 The n8n AI Agent is not part of the official V1 architecture. n8n orchestrates; the local model reasons.
 
-## 1. Official Deployment Choice
+## 1. Deployment ownership
 
-The local model runs through Ollama in Docker on the same Docker network as n8n and imperium-api.
+`local_executor` is mapped to its concrete model/version exclusively in doc 30 §3.3.
+The active physical deployment, runtime, endpoint, service configuration and H3
+measurements are owned by [F10 §5-ter](F10_TOPOLOGIE_INFRA.md#5-ter-local-executor--phase-h).
 
-Official V1 network rule:
+## 2. Deployment contract
 
-```text
-n8n -> ollama/qwen -> imperium-api
-```
+Use F10 as the operational reference. The service is deployed and validated at the
+infrastructure level; product AI remains disabled (`qwen_enabled=False`,
+`real_ai_enabled=False`). Technical availability does not authorize product calls.
 
-All services must be reachable by Docker service name inside the shared network.
+## 3. n8n call pattern
 
-Recommended internal Ollama URL:
-
-```text
-http://ollama:11434
-```
-
-## 2. Docker Compose Service Contract
-
-Example service definition to integrate into the deployment compose stack or a dedicated compose file attached to the same network:
-
-```yaml
-services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: imperium-ollama
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - n8n-network
-    ports:
-      - "127.0.0.1:11434:11434"
-
-volumes:
-  ollama_data:
-
-networks:
-  n8n-network:
-    external: true
-    name: n8n-postgresql_n8n-network
-```
-
-After container start:
-
-```bash
-docker exec -it imperium-ollama ollama pull qwen3:32b
-```
-
-If another exact local-model tag is selected later, document the tag and keep one official production tag in the deployment notes.
-
-## 3. n8n Call Pattern
-
-n8n calls the local model by HTTP:
-
-```text
-POST http://ollama:11434/api/chat
-```
-
-Payload shape:
-
-```json
-{
-  "model": "qwen3:32b",
-  "stream": false,
-  "messages": [
-    {"role": "system", "content": "You are Imperium's local AI router. Return strict JSON only."},
-    {"role": "user", "content": "...task envelope..."}
-  ]
-}
-```
-
-The local model output must be strict JSON. n8n must validate it before calling the backend.
+n8n orchestrates the task; the backend resolves `local_executor`, validates the
+structured output and controls canonical writes. The preserved dry-run bridge and
+callback contracts are documented in doc 31 (Patch 2E/2F). They do not redefine
+the active physical deployment. No model port is public.
 
 ## 4. Local Model Responsibilities
 
@@ -107,7 +51,7 @@ The local model must not:
 {
   "task_type": "weekly_report.analysis",
   "difficulty_score": 148,
-  "recommended_model": "claude_opus",
+  "recommended_model": "<concrete ID resolved for high_reasoning>",
   "needs_user_clarification": false,
   "clarification_question": null,
   "context_summary": "Short summary of the task.",
@@ -146,21 +90,11 @@ Respect the task contracts.
 Use anonymized summaries for cloud models when possible.
 ```
 
-## 8. Health Check
+## 8. Health check
 
-From the VPS:
-
-```bash
-docker exec imperium-ollama ollama list
-```
-
-From n8n network context:
-
-```bash
-curl -sS http://ollama:11434/api/tags
-```
-
-A successful response proves n8n can reach Ollama / the local model internally.
+Use the checks and measured results in F10 §5-ter. Distinguish service health from
+backend wrapper validation: the H3.7 `GpuServiceUnreachable/skip` scenario remains
+untested while `toolbox.llm` is absent. A health response alone does not activate AI.
 
 ## 9. Carrier Classification Prompt (doc 53)
 

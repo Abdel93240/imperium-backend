@@ -4,7 +4,7 @@
 
 Canonical home for **vision / OCR prompts** (OCR, screenshot analysis, image-based extraction).
 
-The concrete execution engine is defined in F10.
+The logical ocr_service mapping is defined exclusively in doc 30 §3.9; physical/technical local deployment is defined in F10.
 
 ---
 
@@ -36,11 +36,11 @@ Every OCR service call returns the standard JSON contract (per doc 31 §19), wit
 
 The OCR service is the canonical execution layer for every prompt in this file.
 
-- Main engine: local OCR, defined concretely in F10. All OCR uses the local engine by default.
-- Mandatory fallback: Gemini cloud, only if the local OCR tower is unavailable or down.
-- Gemini fallback must return JSON via `responseSchema` and `response_mime_type: application/json` (structured output, Gemini 2.5+).
-- Privacy gate is mandatory before any fallback to Gemini, because the data moves from local to cloud.
-- For `very_high` content (medical or religious), the privacy gate must prefer abstention over fallback to Gemini.
+- Main engine: local ocr_service, mapped in doc 30 §3.9; physical deployment in F10. All OCR uses the local engine by default.
+- Mandatory fallback: the cloud fallback of ocr_service (doc 30 §3.9), only if the local OCR tower is unavailable or down.
+- The cloud fallback must return strict JSON through its provider’s structured-output API (provider assignment: doc 30 §3.9).
+- Privacy gate is mandatory before any fallback to the cloud OCR provider, because the data moves from local to cloud.
+- For `very_high` content (medical or religious), the privacy gate must prefer abstention over fallback to the cloud OCR provider.
 - The fallback exists for continuity, never at the expense of confidentiality.
 
 ---
@@ -436,12 +436,12 @@ If `should_warn_user = true`, the user must explicitly confirm before processing
 
 ---
 
-## 8. Cost And Performance Notes (Gemini fallback only)
+## 8. Cost And Performance Notes (ocr_service cloud fallback only)
 
 ### 8.1 Cost estimation
 
 ```text
-Gemini fallback per image (typical):
+ocr_service cloud fallback per image (typical):
   Input:    ~$0.0003 per image
   Output:   ~$0.001 per image
   Total:    ~$0.0013 per image
@@ -453,7 +453,7 @@ Local OCR primary path:
 0 € for the local OCR engine
 ```
 
-For ~50 receipt scans / month through Gemini fallback:
+For ~50 receipt scans / month through ocr_service cloud fallback:
 
 ```text
 Monthly cost: ~$0.07 (~0.06 €)
@@ -462,8 +462,8 @@ Monthly cost: ~$0.07 (~0.06 €)
 ### 8.2 Latency
 
 ```text
-Typical Gemini fallback response time: 2-5 seconds
-For real-time Bolt overlay (V2): may need to use Gemini Flash variant
+Typical ocr_service cloud fallback response time: 2-5 seconds
+For real-time Bolt overlay (V2): may need a low-latency OCR variant (candidate mapping: doc 30 §3.9)
 ```
 
 ---
@@ -562,7 +562,7 @@ Header on each:
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` §6.1 — vision override
 - `31_AI_TASKS_AND_RESULTS_CONTRACT.md` §19 — output contract
 - `33_VECTOR_LOGIC_DETAIL.md` §5.2 — Bolt overlay V2
-- `34_PULSE_MEDICAL_FEED_AI.md` — medical (uses GPT-5.5, not the OCR service, by static override)
+- `34_PULSE_MEDICAL_FEED_AI.md` — medical (uses health_specialist, not the OCR service, by static override)
 - `10_RAW_MEDIA_RETENTION_POLICY.md` — media retention
 - `36_PROMPTS_CLOUD_AI.md` — sister prompts file
 

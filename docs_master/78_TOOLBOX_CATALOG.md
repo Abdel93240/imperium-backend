@@ -85,9 +85,9 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : spécifié (tables codées au socle ; moteur = passe Pulse).
 
 ### F1-03 `toolbox.llm` — client LLM local contraint + wrapper de tiers
-- description : appel Qwen local temp 0, sortie contrainte GBNF/guided decoding par JSON Schema, retry-avec-erreur, fallback déterministe, dry-run loggé (`real_ai_enabled=False`), tiers `local_default|cloud_forced|routed`.
+- description : appel local_executor temp 0, sortie contrainte GBNF/guided decoding par JSON Schema, retry-avec-erreur, fallback déterministe, dry-run loggé (`real_ai_enabled=False`), tiers `local_default|cloud_forced|routed`.
 - famille : F1
-- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; l'ancien modèle 7B en dur (écarté définitivement par PHASE_0 D6) a été purgé au socle (DV-6) : le modèle se résout via le rôle `local_executor` d'`ai_role_models` (seed `qwen3-32b`). Toujours pas de GBNF ni de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8.
+- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; l'ancien modèle 7B en dur (écarté définitivement par PHASE_0 D6) a été purgé au socle (DV-6) : le modèle se résout via le rôle `local_executor` d'`ai_role_models` (seed historique ; mapping actuel : doc 30 §3.3). Toujours pas de GBNF ni de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8.
 - consommateurs_actuels : WR conversation (dry-run, `weekly_review_conversation.py`), smoke endpoint.
 - consommateurs_prevus_par_specs : tous les slots LLM des specs Pulse (interpreter, p1..p10), WR (wr.probe_gen, wr.pair_verdict, wr.identity…), Daily (daily.disruption_classify, daily.conflict_arbitrate). Vector : AUCUN (zéro LLM, gravé spec §0).
 - consommateurs_probables_non_documentés : chatbot doc 72, conseils quotidiens doc 43 §12.3.
@@ -96,7 +96,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : spécifié (embryon codé).
 
 ### F1-04 `toolbox.router` — routage /200 (doc 30)
-- description : scoring de difficulté /200 (7 critères §5.2), seuils dynamiques, règles statiques §7, mécanique critique 180+ (re-score GPT-5.5 → orchestration Opus → circuit breaker), escalade/downgrade auto.
+- description : scoring de difficulté /200 (7 critères §5.2), seuils dynamiques, règles statiques §7, mécanique critique 180+ (re-score indépendant (doc 30 §3.8ter) → orchestration high_reasoning → circuit breaker), escalade/downgrade auto.
 - famille : F1
 - vit_aujourd_hui : politique complète = doc 30 (canonique). Code : ABSENT — audit_resync WR-c : « routage doc 30 PAS implémenté (pas de scoring /200, pas de router_decision, pas d'audit entrée/sortie) » ; ai_tasks n'a pas les colonnes routage requêtables (doc 31 §7 non codé, audit_resync ai_tasks_results).
 - consommateurs_actuels : aucun.
@@ -109,7 +109,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 ### F1-05 `toolbox.ocr` — services OCR (trois profils distincts)
 - description : (a) OCR système VLM précis (documents/médical/PDF) ; (b) OCR Bolt dédié léger (assistant course) ; (c) OCR embarqué tablette (ML Kit, spec Vector §3.3).
 - famille : F1 (modèles associés en F3-04/05)
-- vit_aujourd_hui : MANQUANT côté backend (seule mention : `app/schemas/ai.py`). Propriétaire des noms concrets : doc F10 §5-quater (PaddleOCR-VL-1.6/GLM-OCR sur P40 ; PP-OCRv4 pour Bolt ; accessibilité Android lue AVANT OCR pour Bolt). Spécifié : doc 37 (prompts), doc 42 §6.3 (reçus Vault), doc 34 (documents médicaux), doc 57 §7.2 (import historique Bolt), spec Vector §3.3 (ML Kit) + §4.7 (contre-lecture P40 nocturne), spec Pulse P5 (pdftotext d'abord, vision hors périmètre V1).
+- vit_aujourd_hui : MANQUANT côté backend (seule mention : `app/schemas/ai.py`). Mapping logique `ocr_service` : doc 30 §3.9 ; déploiement physique : F10 §5-quater. Spécifié : doc 37 (prompts), doc 42 §6.3 (reçus Vault), doc 34 (médical), doc 57 §7.2 (historique Bolt). Pour Bolt, suivre spec Vector §3.3 et F10 : OCR embarqué primaire, aucune accessibilité Android ; contre-lecture locale future hors temps réel.
 - consommateurs_actuels : aucun.
 - consommateurs_prevus_par_specs : Vector (templates + contre-lecture), Pulse (P5 file vision), + docs : Vault reçus, Pulse médical, import Bolt.
 - consommateurs_probables_non_documentés : Knowledge Inbox doc 70 (fichiers image/PDF), The Path (« donation receipts or charity scans… OCR uses a privacy gate », doc 41 §17).
@@ -120,7 +120,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 ### F1-06 `toolbox.transcription` — service de transcription audio
 - description : STT local (fr + ar), audio supprimé après transcription.
 - famille : F1 (modèle F3-06)
-- vit_aujourd_hui : MANQUANT. Propriétaire : F10 §5-quater (faster-whisper large-v3 sur P40). Docs : 30 §3.10, 45 §10, 72 §9 (audio supprimé après transcription), 41 §11 (comptage adhkar vocal avec confiance affichée).
+- vit_aujourd_hui : MANQUANT. Mapping logique `transcription_service` : doc 30 §3.10 ; déploiement physique : F10 §5-quater. Docs : 45 §10, 72 §9 (audio supprimé après transcription), 41 §11 (comptage adhkar vocal avec confiance affichée).
 - consommateurs_actuels : aucun.
 - consommateurs_prevus_par_specs : aucune des 4 specs ne l'utilise directement.
 - consommateurs_probables_non_documentés : chatbot (voix), Path (adhkar vocal), Vault (note vocale sur don/dépense, PAT-03 « optional voice transcript » doc 41 §9.4).
@@ -291,7 +291,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : existe_codé.
 
 ### F1-25 `toolbox.dev_orchestrator` — outillage d'orchestration de build (système)
-- description : bot Telegram de pilotage, table de routage de modèles dev (`model_routing.py` : alias → runner codex/claude/openrouter), pattern_matcher + classifieur LLM local (Qwen 3B via Ollama, `llm_classifier.py`), pipeline design/assets (asset_registry/naming/splitter, image_runner, design_review).
+- description : bot Telegram de pilotage, table de routage de modèles dev (`model_routing.py` : alias → runner codex/claude/openrouter), pattern_matcher + classifieur LLM local (audit historique du classifieur : `llm_classifier.py`), pipeline design/assets (asset_registry/naming/splitter, image_runner, design_review).
 - famille : F1 (colonne « système » de la matrice ; HORS produit)
 - vit_aujourd_hui : CODÉ — `/opt/orchestrator/` (tourne sur la machine orchestrateur, doc F10 §2).
 - consommateurs_actuels : le processus de build (Codex/Claude Code), le pipeline design F12.
@@ -358,7 +358,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 
 ### F2-12 `plan_versions` + `plan_deltas` + vue `v_plan_current`
 - vit : spécifiées (spec WR §3.5). MANQUANTES. Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 (imperium_daily_plan_versions annoncée, jamais codée) — voir FINDINGS DV-5.
-- consommateurs prévus : WR (deltas hebdo, régénérations), Daily (G1 périmètre « plan courant », §0.5), le 32B terrain (« le lit ENTIER »).
+- consommateurs prévus : WR (deltas hebdo, régénérations), Daily (G1 périmètre « plan courant », §0.5), le local_executor terrain (« le lit ENTIER »).
 - statut : spécifié.
 
 ### F2-13 définitions de signaux partagées (`signal_definitions`/`signal_values`)
@@ -366,7 +366,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : existe_codé (doublon latent pulse_/wr_ éteint — R2 appliquée).
 
 ### F2-14 `ai_call_logs` + `ai_model_pricing` — observabilité IA
-- vit : spécifiées (doc 43 §17, section « critique »). MANQUANTES en code. ⚠ seed pricing périmé (qwen-2.5-7b, claude-opus-4.7, haiku — doc 43 §17.2) vs doc 30 canonique.
+- vit : spécifiées (doc 43 §17, section « critique »). MANQUANTES en code. Seed pricing historique, non normatif (doc 43 §17.2) vs doc 30 canonique.
 - consommateurs prévus : TOUT appel IA (« ALL STEPS LOGGED », doc 43 §3.2) ; doc 58 patch 5 (vues Vector) ; console coûts.
 - statut : spécifié.
 
@@ -381,8 +381,8 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : manquant (divergence docs↔code DV-3 ; QUESTION Q9).
 
 ### F2-17 config role→model éditable (doc 73 PART B)
-- vit : CRÉÉE au socle — table `ai_role_models` (0038, identifier-not-call) + seed doc 30 §3 (0039 : `local_executor` → `qwen3-32b`, Fable 5 restauré au rôle `sustained_long_context` — §7.8 mis à jour).
-- consommateurs actuels : `toolbox.llm` (résolution du modèle local via `resolve_role`, DV-6).
+- vit : CRÉÉE au socle — table `ai_role_models` (0038, identifier-not-call) + seed historique 0039 (`local_executor` → `qwen3-32b`, Fable 5 restauré au rôle `sustained_long_context` à cette date). Ces identifiants décrivent la migration passée, pas le mapping actuel du doc 30 §3 ; aucune ligne ni migration n’est modifiée par cette passe.
+- consommateur prévu : `toolbox.llm` (résolution du modèle local via `resolve_role`, DV-6). État Phase H : wrapper absent, scénario H3.7 non testé (F10 §5-ter).
 - consommateurs prévus : toolbox.router, tous les appels cloud ; alias de rôles D6 (PHASE_0).
 - statut : existe_codé.
 
@@ -392,19 +392,19 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 
 | # | modèle | rôle | vit aujourd'hui | consommateurs (source) | statut |
 |---|---|---|---|---|---|
-| F3-01 | Qwen3-32B (V100, Q5) | routeur/scoreur/exécuteur/conducteur local | NON DÉPLOYÉ (GPU phase 2 à venir, F10 §5-bis) ; le code résout le modèle via le rôle `local_executor` d'`ai_role_models` (seed `qwen3-32b`) — plus aucune référence au 7B legacy (DV-6 soldé au socle) | doc 30 §3.3 ; tous slots local_default des 4 specs ; chatbot 72 ; dialogue 30 §6 | spécifié |
-| F3-02 | qwen3-embedding:8b (P40, Q8→FP16) | embeddings 1024 | NON DÉPLOYÉ (`embeddings_enabled=False`) ; client backend livré au socle (F1-07), unités systemd + smoke J+2 prêts | doc 38 §5/§11, F10 §5-ter ; mémoire, chaînage WR, corpus Pulse | spécifié |
-| F3-03 | Reranker Qwen3-4B (P40) | rerank candidats causaux | NON DÉPLOYÉ — brique V2 UNIQUEMENT (CONCEPTION_chainage : inutile tant que le juge est frontier) ; spec WR 5.2 : « si présent, sinon score composite » | WR W2 | spécifié (V2) |
-| F3-04 | OCR VLM système (PaddleOCR-VL-1.6 ou GLM-OCR, P40) | OCR documents/médical/PDF | NON DÉPLOYÉ (F10 §5-quater propriétaire) | Vault reçus (42 §6.3), Pulse médical (34), Inbox (70) | spécifié |
-| F3-05 | PP-OCRv4 (OCR Bolt dédié) | lecture écran offre (fallback de l'accessibilité Android) | NON DÉPLOYÉ (F10 §5-quater) ; la spec Vector §3.3 met ML Kit ON-DEVICE en primaire + P40 en contre-lecture §4.7 | Vector | spécifié |
-| F3-06 | faster-whisper large-v3 (P40) | transcription fr/ar | NON DÉPLOYÉ (F10 §5-quater) | chatbot, Path adhkar, notes vocales | spécifié |
-| F3-07 | fastText lid.176.ftz (CPU) | garde-fou langue sur artefacts | NON DÉPLOYÉ (F10 §5-quater) | artefacts générés (tous domaines) | spécifié |
+| F3-01 | `local_executor` | routeur/scoreur/exécuteur/conducteur local | DÉPLOYÉ ET VALIDÉ EN INFRASTRUCTURE (Phase H, F10 §5-ter) ; IA produit désactivée (`qwen_enabled=False`, `real_ai_enabled=False`) ; validation humaine Phase H non déclarée terminée ; H3.7 wrapper NON TESTÉ | doc 30 §3.3 ; slots local_default ; chatbot 72 ; dialogue 30 §6 | infra validée, produit OFF |
+| F3-02 | `embedding_service` (mapping doc 30 §3.12) | embeddings 1024 | NON DÉPLOYÉ (`embeddings_enabled=False`) ; client backend livré au socle (F1-07), unités systemd + smoke J+2 prêts | doc 38 §5/§11, F10 §5-quater ; mémoire, chaînage WR, corpus Pulse | spécifié |
+| F3-03 | Service de reranking candidat (V2) | rerank candidats causaux | NON DÉPLOYÉ — brique V2 UNIQUEMENT (CONCEPTION_chainage : inutile tant que le juge est frontier) ; spec WR 5.2 : « si présent, sinon score composite » | WR W2 | spécifié (V2) |
+| F3-04 | `ocr_service` (mapping doc 30 §3.9) | OCR documents/médical/PDF | NON DÉPLOYÉ (déploiement physique : F10 §5-quater) | Vault reçus (42 §6.3), Pulse médical (34), Inbox (70) | spécifié |
+| F3-05 | OCR Bolt embarqué | lecture écran offre ; aucune accessibilité Android | Voir spec Vector §3.3 et F10 §5-quater ; contre-lecture locale future, aucun service complémentaire actif | Vector | spécifié |
+| F3-06 | `transcription_service` (mapping doc 30 §3.10) | transcription fr/ar | NON DÉPLOYÉ (F10 §5-quater) | chatbot, Path adhkar, notes vocales | spécifié |
+| F3-07 | Garde-fou langue (déploiement : F10) | garde-fou langue sur artefacts | NON DÉPLOYÉ (F10 §5-quater) | artefacts générés (tous domaines) | spécifié |
 | F3-08 | CatBoost acceptation (ONNX embarqué) | €/h cycle complet → verdict halo | NON ENTRAÎNÉ (spec Vector §3.6/§4.4 ; docs 57/58 ; doc 30 §2.2/§7.7) | Vector tablette | spécifié |
 | F3-09 | CatBoost zones ×2 (zone_eph + zone_wait, même dataset) | temps mort/attente + « Où je vais » | NON ENTRAÎNÉ (spec Vector §4.5 — « un seul modèle de zones, deux consommateurs ») | scoreur embarqué + repositionnement | spécifié |
 | F3-10 | Prédicteur cause→surge (GBM) | surge attendu +15/+30 min | NON ENTRAÎNÉ (spec Vector §4.6) | feature CatBoost, modèle de zones, notifications capture | spécifié |
-| F3-11 | Rôles cloud : Sonnet 4.6 / Opus 4.8 / Fable 5 / GPT-5.5 (santé, finance, web ×3 rôles) | tiers cloud doc 30 §3 | CONFIGURÉS dans `ai_role_models` (seed 0039, identifier-not-call) ; aucun appel branché ; Fable 5 restauré au seed (§7.8 mis à jour au socle, demande CONCLUSIONS_test_papier soldée) | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
-| F3-12 | Qwen 3B classifier (Ollama, machine orchestrateur) | classification messages du bot de build | **SERVI ET CODÉ** (`/opt/orchestrator/llm_classifier.py`) — seul modèle local effectivement en service dans l'écosystème | orchestrateur (système) | existe_codé |
-| F3-13 | Futurs LoRA (32B juge chaînage ; 70B plan_delta/plan_regen) | trajectoires de sortie du cloud | FUTURS (doc 74 ; CONCEPTION_chainage V2/V3 ; spec WR §10 « trajectoire ») ; datasets = v_ai_training_pairs + Phase 4 | WR, Daily | spécifié (futur) |
+| F3-11 | `first_cloud_tier`, `high_reasoning`, `sustained_long_context`, `health_specialist`, `finance_specialist`, `web_fresh_data` | tiers cloud doc 30 §3 | Configuration historique du socle (0039, identifier-not-call), aucun appel branché ; mapping actuel exclusivement doc 30 §3, sans modification de `ai_role_models` | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
+| F3-12 | Classifieur local du bot de build | classification messages de développement | Audit du socle : **SERVI ET CODÉ** (`/opt/orchestrator/llm_classifier.py`) ; état historique du système de build, distinct du local_executor Phase H actuellement déployé | orchestrateur (système) | existe_codé (audit du socle) |
+| F3-13 | Futurs LoRA (juge local et génération de plans ; candidats à qualifier selon doc 30 §3) | trajectoires de sortie du cloud | FUTURS (doc 74 ; CONCEPTION_chainage V2/V3 ; spec WR §10 « trajectoire ») ; datasets = v_ai_training_pairs + Phase 4 | WR, Daily | spécifié (futur) |
 
 ---
 

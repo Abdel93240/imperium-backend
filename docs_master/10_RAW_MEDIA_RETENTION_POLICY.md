@@ -413,7 +413,7 @@ Audit-safe does not mean forever by accident. It must still have:
 ## Privacy Gate
 
 Before sending raw media to:
-- Gemini
+- ocr_service
 - GPT
 - Claude
 - OCR provider
@@ -493,7 +493,7 @@ Flow:
    - `privacy_level = very_high`
    - `delete_after_extraction = true`
    - `retention_reason = delete_after_extraction`
-3. Gemini or approved OCR provider extracts ride fields after privacy gate approval.
+3. The approved ocr_service provider extracts ride fields after privacy gate approval.
 4. Backend stores structured VTC event and extraction confidence.
 5. Raw screenshot is deleted after successful extraction.
 6. Structured extraction remains.
