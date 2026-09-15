@@ -19,7 +19,7 @@ observations: —
 ```
 
 ```
-id: ACT-DLY-12   nom_fr: daily.disruption_classify réel (32B local)
+id: ACT-DLY-12   nom_fr: daily.disruption_classify réel (local_executor)
 domaine: daily    classe: proposant   echelon_audace: 4   statut: NOT_CODED
 bascule_exacte: UPDATE ai_slot_transition SET tier='local_default' WHERE
   slot_code='daily.disruption_classify';

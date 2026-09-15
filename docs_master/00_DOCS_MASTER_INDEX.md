@@ -5,7 +5,7 @@ This archive is the cleaned working baseline for Imperium docs.
 ## Official decisions locked in this cleanup
 
 1. The local model is the official local AI router in V1.
-2. The local model runs through Ollama in Docker on the same Docker network as n8n.
+2. The local model is the `local_executor` role (logical mapping: doc 30 §3.3 only); its physical runtime, endpoint and hardware are owned by F10 §5-ter. The former "local runtime in Docker on the n8n network" statement is superseded.
 3. n8n orchestrates workflows but does not write directly to PostgreSQL.
 4. The n8n AI Agent is not part of the official V1 architecture.
 5. WR interactive flow uses backend state, n8n orchestration, local model routing, high reasoning model analysis, user clarification, user approval, then backend storage.
@@ -29,7 +29,7 @@ The next backend/n8n work should follow this order:
 2. Internal AI task result callback.
 3. WR conversational session tables and endpoints.
 4. n8n workflow for WR launch → the local model → the high reasoning model → callback.
-5. The local model / Ollama Docker deployment on shared n8n network.
+5. Backend integration of the `local_executor` (role: doc 30 §3.3; deployed runtime and endpoint: F10 §5-ter).
 
 ---
 

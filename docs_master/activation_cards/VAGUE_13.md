@@ -12,7 +12,7 @@ bascule_exacte: UPDATE ai_slot_transition SET tier='local_default' WHERE
   slot_code='pulse.interpreter';  -- avec real_ai_enabled=true (V6) ; procédures actives=0
 prerequis_activation: [ACT-SYS-11, ACT-PLS-11, ACT-PLS-12, ACT-PLS-14, ACT-SYS-10]
   (l'audit décroissant contre-lit au cloud → V12 obligatoire)
-protocole_terrain: dispatch_log : sorties RÉELLES du 32B (procedures_named, confidence,
+protocole_terrain: dispatch_log : sorties RÉELLES du local_executor (procedures_named, confidence,
   rationale_fr ≤400c) ; audit_sample_pct=100 → chaque sortie contre-lue (ai_audit_samples) ;
   14 j (Q21) — lire chaque rationale, annoter user_reaction (useful/useless/missed)
 critere_succes: sorties valides ≥95 % (retry compris, jamais de crash silencieux) ;
@@ -21,7 +21,7 @@ rollback: UPDATE ai_slot_transition SET tier='...' + real dispatch coupé en rem
   jobs runner en dry-run (une ligne) — les logs restent (donnée, R7)
 source: spec Pulse §6, §13 ; contrat interpreter_output.schema.json
 prompt_codex: « Basculer pulse.interpreter en réel (procédures toutes inactives) ; smoke :
-  dispatch → sortie 32B validée + échantillon d'audit ; consigner. »
+  dispatch → sortie local_executor validée + échantillon d'audit ; consigner. »
 observations: escalate=true / confidence=low → routage doc 30 (contre-lecture) : vérifier
   ces chemins pendant la fenêtre ; le plafond 3k tokens d'entrée est testé (whitelist)
 ```

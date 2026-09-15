@@ -8,7 +8,7 @@ on the high reasoning model for the core of Imperium.
 
 The means is a **LoRA** adapter carrying **the user's planning logic** (not the user's
 data — data lives in RAG / `ai_memories`), targeting the **local 70B** model (not the
-current local model), running on **3× V100** (phase 4, see F10).
+current local model), running on the **phase 4 multi-GPU local hardware** (hardware trajectory owned by F10 §5-bis/§7, no firm schedule).
 
 This document owns: the autonomy objective, the two-type replanning distinction, the
 training-example collection strategy, the cloud training + local inference split, and
@@ -141,10 +141,10 @@ the vectorized memory and is **not** the raw audit — it is a third, purpose-bu
 
 ## 8. Training in the cloud, inference at home
 
-- **Inference:** the 70B + LoRA **runs locally** on 3× V100 (phase 4). Day-to-day use
-  is fully local.
+- **Inference:** the 70B + LoRA **runs locally** on the phase 4 multi-GPU hardware (F10).
+  Day-to-day use is fully local.
 - **Training:** the LoRA is **trained on a rented cloud GPU** (one-off, a few hours on
-  a large card such as an A100). Local hardware (several V100) is enough to RUN a 70B,
+  a large card such as an A100). The phase 4 local hardware is enough to RUN a 70B,
   but NOT to train a LoRA on it correctly — only the training is offloaded.
 - Cloud to **build** the adapter; local to **use** it. Consistent with the local-first
   philosophy: only the one-off training leaves the premises.
@@ -202,6 +202,6 @@ the day of training; it does not affect collection.
   must be wired there.
 - Doc 30: model hierarchy (high reasoning model for monthly planning today; local 70B + LoRA is
   the future target).
-- F10: phase 4 hardware (local 70B on several recent Tesla cards).
+- F10: phase 4 hardware (dedicated / multi-GPU server for a ~70B local model; F10 owns the physical trajectory).
 - Docs 09 / 38: vectorization and memory — distinct from the training dataset (§7).
 - AI calibration console doc: the local model's inference levers (separate from LoRA).

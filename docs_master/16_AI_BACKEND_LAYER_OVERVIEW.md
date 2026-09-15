@@ -627,7 +627,7 @@ Step 4 — Internal callbacks
 Step 5 — Mock n8n workflow
   └─ generic_ai_task_router with fake local_executor + fake model
 
-Step 6 — Real local model via Ollama
+Step 6 — Real local_executor call (role: doc 30 §3.3; runtime: F10 §5-ter)
   └─ Replace mock in n8n
 
 Step 7 — First real cloud workflow

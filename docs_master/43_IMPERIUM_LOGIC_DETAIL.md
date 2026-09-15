@@ -1261,6 +1261,8 @@ ORDER BY cost_eur DESC
 LIMIT 10;
 
 -- local model hallucination rate by task type
+-- (historical slug example, see §17.1 note: filter on the slug actually logged for
+--  the local_executor role at call time; the current mapping lives in doc 30 §3)
 SELECT
   task_type,
   COUNT(*) FILTER (WHERE was_validated IS NOT NULL) AS checked,

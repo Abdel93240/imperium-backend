@@ -46,7 +46,7 @@ docs:
     family: meta
     categories: [meta]
     status: needs_alignment
-    notes: "Prose index; carries stale model language (Qwen-only/Ollama/Opus). Dust off during re-read."
+    notes: "Prose index; stale local-runtime language removed 2026-09-15 (roles per doc 30 §3, runtime per F10). Still to dust off during re-read."
 
   - file: "08_NON_NEGOTIABLE_RULES.md"
     number: 8

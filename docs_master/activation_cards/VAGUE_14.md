@@ -10,7 +10,7 @@ domaine: pulse    classe: proposant   echelon_audace: 4   statut: NOT_CODED
 bascule_exacte: UPDATE pulse_procedures SET active=true WHERE code='adapt_training_session';
 prerequis_activation: [ACT-PLS-16 (accord ≥ cible), ACT-PLS-09, ACT-PLS-14]
 protocole_terrain: pulse_proposals kind=session_adaptation : menu de coups légaux généré
-  par le code, coup choisi/paramétré par le 32B, proposition refusable ; 7-14 j — chaque
+  par le code, coup choisi/paramétré par le local_executor, proposition refusable ; 7-14 j — chaque
   refus expliqué = label
 critere_succes: ≥1 adaptation utile ACCEPTÉE ; ZÉRO effet appliqué avant validation
   (no-override testé) ; aucun coup violant un recovery gate ou un red flag ; fallback_move

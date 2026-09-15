@@ -45,7 +45,7 @@ id: ACT-SYS-18   nom_fr: Routeur /200 branché (T3 — chantier différé)
 domaine: system   classe: det_ecriture   echelon_audace: 2   statut: NOT_CODED
 bascule_exacte: flag router_200_enabled=true (les slots tier='routed' cessent de se
   comporter comme cloud_forced et passent par le scoring /200)
-prerequis_activation: [ACT-SYS-12 (32B servi), spec d'implémentation T3 écrite (L),
+prerequis_activation: [ACT-SYS-12 (local_executor servi), spec d'implémentation T3 écrite (L),
   colonnes routage doc 31 §7 codées]
 protocole_terrain: comparaison des décisions de routage vs l'ancien comportement
   cloud_forced sur 7 j (log par slot routed)

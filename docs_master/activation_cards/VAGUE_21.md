@@ -4,12 +4,12 @@
 dédiée, fenêtre longue. Durée : 7-14 j.
 
 ```
-id: ACT-WR-11    nom_fr: W2 découverte causale réelle (wr.probe_gen + wr.pair_verdict, 32B)
+id: ACT-WR-11    nom_fr: W2 découverte causale réelle (wr.probe_gen + wr.pair_verdict, local_executor)
 domaine: wr       classe: proposant   echelon_audace: 4   statut: NOT_CODED
 bascule_exacte: UPDATE ai_slot_transition SET tier='local_default' WHERE slot_code IN
   ('wr.probe_gen','wr.pair_verdict');  -- W2 déjà rotatif (V20), bascule dry→réel
 prerequis_activation: [ACT-WR-10, ACT-SYS-11, ACT-SYS-10 (audit 100 % contre-lu),
-  ACT-PLS-16 (32B éprouvé 2 semaines sur l'interprète)]
+  ACT-PLS-16 (local_executor éprouvé 2 semaines sur l'interprète)]
 protocole_terrain: chaque soir : 3-6 sondes par event notable, verdicts pairés
   (direct_cause/favoring_condition/correlation/no_link + mécanisme ≤200c + confiance),
   assemblage → items chain_proposal au docket ; RIEN n'entre dans le graphe E2 avant

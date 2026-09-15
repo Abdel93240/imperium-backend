@@ -273,9 +273,9 @@ The AI layer follows docs 30 and 31.
 ### 6.1 Official V1 router
 
 ```text
-Official local router / classifier: the local model
-Runtime target: Ollama/the local model in Docker
-Network target: same Docker network as n8n and imperium-api
+Official local router / classifier: local_executor (role mapping: doc 30 §3.3)
+Runtime target: the deployed local runtime documented in F10 §5-ter
+Network target: internal backend access only (endpoint owned by F10); no public model port
 ```
 
 the local model is responsible for:
@@ -305,7 +305,7 @@ This avoids ambiguity between the local model and Gemma.
 The n8n AI Agent is not part of the official V1 intelligence layer.
 ```
 
-n8n may execute workflows, call the local model/Ollama, call external models, wait for results, and send results back to the backend.
+n8n may execute workflows, call the local model (`local_executor`, through the backend bridge), call external models, wait for results, and send results back to the backend.
 
 But n8n does not become the AI decision authority.
 
@@ -419,7 +419,7 @@ Viability condition:
 
 ```text
 Adopt only if real expert dialogues become genuinely long AND measured embedding
-latency on the V100 is low enough to avoid a slow/choppy chat experience.
+latency on the local GPU (hardware: F10) is low enough to avoid a slow/choppy chat experience.
 ```
 
 ---
@@ -927,7 +927,7 @@ For Codex / Claude Code:
 5. Events are append-only audit/coordination records.
 6. ai_tasks and ai_results are the official AI work ledger.
 7. the local model is the official V1 local router.
-8. Ollama/the local model runs in Docker on the same network as n8n and imperium-api.
+8. The local model (`local_executor`) runs on the local runtime documented in F10 §5-ter, reachable by the backend only.
 9. n8n orchestrates triggers and workflows, but owns no truth.
 10. n8n sends all results back to backend internal endpoints.
 11. Backend validates and writes canonical results.

@@ -188,7 +188,7 @@ The local router-scorer is the router, not the sovereign. It must not be treated
 
 ### 3.4 Gemma
 
-Optional, not deployed by default. Future possible uses: A/B challenger to Qwen on a sample of decisions, local fallback when Qwen is unavailable, specialized micro-model if benchmarks prove it useful. Do not run Qwen + Gemma in parallel by default in V1.
+Optional, not deployed by default. Future possible uses: A/B challenger to the `local_executor` model on a sample of decisions, local fallback when the `local_executor` model is unavailable, specialized micro-model if benchmarks prove it useful. Do not run the `local_executor` model + Gemma in parallel by default in V1.
 
 ### 3.5 First cloud tier — `first_cloud_tier`
 
