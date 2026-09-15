@@ -1,165 +1,222 @@
 # Topologie de l'infrastructure physique — Référence
 
-> **Statut : RÉFÉRENCE D'ARCHITECTURE.** Décrit la répartition physique des
-> machines de l'écosystème. Les autres specs renvoient à ce document plutôt que
-> de répéter ces informations. Cible : réorganisation à venir (pas immédiate).
+> **Statut : TOPOLOGIE ACTIVE.** Décrit la répartition physique actuellement en
+> service dans l'écosystème Imperium, y compris l'infrastructure Phase H. Ce
+> document est la référence pour les informations physiques et les noms concrets
+> des services/modèles d'infrastructure.
 
 ---
 
 ## 1. Vue d'ensemble
 
-L'écosystème est réparti sur **trois lieux physiques distincts**, ce qui est un
-atout de sécurité : pas de point unique de défaillance physique.
+L'écosystème Imperium est réparti sur deux lieux physiques principaux.
 
-```
-CHEZ LE PÈRE                CHEZ L'UTILISATEUR        HÉBERGÉ (Hostinger)
-├─ Machine 1 :              ├─ Tablette Galaxy        └─ VPS
-│   Orchestrateur +         │   (apps, usage           (backend de prod :
-│   secret kill switch      │    quotidien)             FastAPI, n8n,
-├─ Machine 2 :              └─ Tower i7-4790 32 Go      PostgreSQL, Docker)
-│   NAS + Plex/Jellyfin         (machine perso,
-                                 hors écosystème)
-```
+CHEZ LE PÈRE
+- Tower principale : orchestrateur, backend Imperium/FastAPI, PostgreSQL,
+  infrastructure IA locale, Codex CLI, Claude Code, secret du kill switch et
+  services systemd.
+  - Tesla V100 PCIe 32 Go : `local_executor`.
+  - Tesla P40 : réservée aux futurs services IA complémentaires ; elle ne porte
+    aucun service produit actif à ce jour.
+- Machine 2 : NAS et Plex / Jellyfin.
+
+CHEZ L'UTILISATEUR
+- Tablette Galaxy : apps et interface Imperium.
+- Deuxième Tower i7 : machine personnelle, hors de l'écosystème Imperium.
+
+Hostinger/VPS ne fait pas partie de la topologie active. Il ne constitue ni le
+backend, ni une source de vérité, ni une migration planifiée.
 
 ---
 
-## 2. Chez le père (les deux machines récupérées)
+## 2. Chez le père
 
-Deux PC récupérés, reconvertis, qui **restent physiquement chez le père**.
+### Tower principale — orchestrateur, backend et IA locale
 
-### Machine 1 — Orchestrateur + secret kill switch
-- Fait tourner le **bot orchestrateur** (Python async), **Codex CLI** (login
-  ChatGPT Plus), **Claude Code** (login Claude Pro), PostgreSQL local, service
-  systemd.
-- Héberge le **secret de déverrouillage du kill switch** (cf. spec kill switch).
-- Linux serveur uniquement (pas de Windows).
-- > Specs précises à fournir ; choisir la plus costaude des deux machines pour ce
-  >  rôle (Codex / Claude Code aiment la RAM en pic). Ajout RAM/disque possible.
+La Tower principale est le nœud central actif d'Imperium. Elle réunit sur une
+même machine physique :
 
-### Machine 2 — NAS + streaming
-- **NAS** : stockage central — vidéos VTC, médias des projets (photos/vidéos),
-  fichiers.
-- **Plex / Jellyfin** : streaming média par-dessus le NAS.
+- l'orchestrateur ;
+- le backend Imperium (FastAPI) ;
+- PostgreSQL ;
+- l'infrastructure d'inférence IA locale ;
+- Codex CLI et Claude Code pour les workflows de développement ;
+- le secret de déverrouillage du kill switch ;
+- les services systemd associés.
+
+La V100 PCIe 32 Go héberge le `local_executor` de la Phase H. La P40 reste
+réservée à de futurs services IA complémentaires et n'est pas à présenter comme
+un service actif.
+
+### Machine 2 — NAS et streaming
+
+- NAS : stockage central des fichiers et médias de l'écosystème.
+- Plex / Jellyfin : streaming média.
 - Linux serveur.
-
-> Avantage sécurité : le **secret kill switch ET les données sensibles (NAS)**
-> sont hors du domicile de l'utilisateur. Un cambriolage chez lui ne compromet ni
-> le secret ni les données.
 
 ---
 
 ## 3. Chez l'utilisateur
 
 ### Tablette Galaxy
-- Appareil d'usage quotidien, fait tourner les **apps** de l'écosystème.
-- **C'est l'appareil à protéger** en priorité (cf. kill switch) : il contient
-  l'accès aux données sensibles (médical, Vault/finances).
 
-### Tower (i7-4790, 32 Go RAM)
-- **Sort de l'écosystème.** Le SSD Linux de l'orchestrateur est retiré ; la Tower
-  est ramenée chez l'utilisateur et redevient sa **machine perso sur le côté**.
-- N'héberge plus aucun rôle de l'écosystème.
-- > Raison : surdimensionnée pour le seul bot orchestrateur, qui consomme très
-  >  peu. Mieux vaut une machine récupérée dédiée et libérer la Tower.
+- Appareil d'usage quotidien.
+- Fait tourner les apps de l'écosystème.
+- Interface principale de l'utilisateur avec Imperium.
+- Appareil à protéger en priorité en raison de son accès aux fonctions et données
+  sensibles de l'écosystème.
+
+### Deuxième Tower i7
+
+- Machine personnelle de l'utilisateur.
+- Hors de l'écosystème Imperium.
+- N'héberge ni orchestrateur, ni backend, ni service IA de production.
 
 ---
 
-## 4. Hébergé (Hostinger)
+## 4. Hébergement externe
 
-### VPS
-- **Backend de production** : FastAPI (`imperium-api`), n8n, PostgreSQL, Docker,
-  nginx, traefik.
-- Source de vérité des données ; cœur du kill switch (couper l'API = couche 1).
+Le VPS Hostinger est retiré de la topologie active. Le backend Imperium, sa base
+de données et l'orchestration sont déjà locaux, sur la Tower principale chez le
+père. Hostinger ne doit donc pas être décrit comme un backend de production, une
+source de vérité ou une étape de migration future.
 
 ---
 
 ## 5. Réseau
 
-- **Tailscale** relie toutes les machines de confiance (Machine 1, Machine 2,
-  tablette, téléphone, VPS, etc.) en réseau privé.
-- Permet le déclenchement du kill switch depuis n'importe quelle machine, l'accès
-  au NAS à distance, etc.
+- **Tailscale** relie les machines de confiance de la topologie active : Tower
+  principale, Machine 2/NAS, tablette, téléphone et autres clients autorisés.
+- Il permet notamment l'accès distant au NAS et le déclenchement du kill switch
+  depuis une machine autorisée.
 
-> ⚠️ Point d'attention : avec orchestrateur + NAS + secret chez le père, la
-> **connexion internet de chez le père devient critique** pour l'écosystème. Si
-> elle tombe, bot et NAS injoignables (Tailscale reprend proprement au retour).
-> Non bloquant, mais à garder en tête.
+> ⚠️ Point d'attention : la connexion internet chez le père est critique pour
+> l'accès distant. En cas de panne, la Tower, le backend, l'orchestrateur,
+> l'infrastructure IA et le NAS sont injoignables à distance. Cela ne signifie
+> pas que les services locaux s'arrêtent ; Tailscale redevient disponible lorsque
+> la connectivité revient.
 
 ---
 
-## 5-bis. Phases temporelles de l'infra IA
+## 5-bis. État et trajectoire de l'infrastructure IA
 
-L'infrastructure IA évolue en quatre phases. Ne pas les confondre.
+Le backend est déjà local. La V100 est installée et le `local_executor` Phase H
+est déployé et validé au niveau de l'infrastructure. L'IA produit reste toutefois
+désactivée : cette disponibilité technique n'autorise ni génération produit, ni
+action canonique sans les validations backend et utilisateur prévues par les
+contrats.
 
-Phase 1 — actuelle (GPU non reçus). Backend Imperium sur VPS Hostinger. Aucune
-IA locale.
+La P40 et ses éventuels services complémentaires ne sont pas actifs. À plus long
+terme, l'infrastructure pourra évoluer vers un serveur GPU dédié ou multi-GPU,
+puis vers un modèle local de classe ~70B. Aucun calendrier ferme n'est défini.
 
-Phase 2 — bientôt, transitoire (GPU reçus, quelques jours). Les GPU (V100 32 Go
-+ P40 24 Go) sont branchés sur la Tower i7-4790 pour TEST et mesure. La Tower
-tourne à son maximum, alimentation 850 W (plafond, pics à décaler). Backend toujours
-sur Hostinger. But : valider que les modèles tournent avant l'achat du serveur.
-Embedding en Q8 sur la P40 (mode pont).
+Cette fiche ne déclare pas la validation humaine de la Phase H terminée.
 
-Phase 3 — cible (~novembre, fin de l'abonnement Hostinger). Achat d'un serveur
-dédié GPU (Supermicro 4028GR-TRT, ou config montée EPYC 7532 / carte mère SP3 /
-Corsair AX1600i, alimentation 1600 W). Migration de TOUT (Hostinger → serveur local) :
-backend et IA locale réunis sur une seule machine. Ajout de la 2e V100, embedding en
-FP16. C'est à partir de cette phase que le §3 devient vrai : la Tower sort de
-l'écosystème et redevient la machine perso de l'utilisateur.
+---
 
-Note de dimensionnement : le serveur cible a de la marge au-delà du besoin d'Imperium.
-Imperium peut tourner sur moins. Le surdimensionnement est un choix d'opportunité, pas
-une exigence d'Imperium.
+## 5-ter. Local executor — Phase H
 
-Phase 4 — certaine, lointaine : modèle local 70B. Passage à un modèle local ~70B
-(Qwen 70B), nécessitant PLUSIEURS cartes Tesla récentes (au-delà des V100/P40). Raison :
-finesse, précision et qualité de conversation supérieures au 32B. Cette phase arrivera
-dans tous les cas, indépendamment des performances du 32B — amélioration prévue, pas
-repli. Pont de secours (conditionnel) : SI le Qwen 32B se révèle insuffisant (scoring
-ou conversation) AVANT que la phase 4 soit prête, bascule temporaire sur Sonnet (cloud)
-en attendant. Collecte d'exemples d'entraînement et LoRA éventuel : hors topologie,
-voir doc 74.
+### Modèle et endpoint actifs en infrastructure
 
-## 5-ter. Allocation GPU et modèles
+- Modèle : `Qwen3.6-27B-Q6_K`.
+- Fichier : `/opt/models/Qwen3.6-27B-Q6_K.gguf`.
+- Source : `unsloth/Qwen3.6-27B-GGUF`.
+- SHA256 :
+  `ec1805fe87e6519c461c1ed2d179865464a875ed241032ead65a354f979cfe14`.
+- Matériel : Tesla V100 PCIe 32 Go.
+- Runtime : `llama.cpp`, exposé localement sur `127.0.0.1:8081`.
 
-Valable dès la phase 2 (Tower), puis sur le serveur en phase 3.
+### Fiche de déploiement
 
-- V100 32 Go : Qwen 32B (Q5) seul. Le FP16 de l'embedding est réservé à la 2e
-  V100 (phase 3).
-- P40 24 Go : embedding qwen3-embedding:8b (Q8) + service OCR + service de
-  transcription + OCR Bolt léger. Les 4 modèles restent résidents en permanence (pas
-  de décharge/recharge) ; les pics d'utilisation ne sont jamais simultanés.
-- Store de travail éphémère (vectorisation de session) : sur pgvector, voir doc
-  38 §7-bis.
-- Alimentation : 850 W en phase 2 → 1600 W en phase 3.
+- Répertoire llama.cpp : `/opt/llama.cpp`.
+- Commit : `16378d93f94012d4228c8c7683adce3f286aee5d`.
+- Version : `0.4.0-dev build 10905`.
+- Compilation : architectures CUDA `70;61`, GCC 12 et compilateur CUDA
+  `12.0.140`.
+- Service : `imperium-executor.service`.
+- Offload GPU : `-ngl 99`.
+- Contexte global : 65 536 tokens ; `parallel 2`, soit 32 768 tokens par slot.
+- Optimisations : Flash Attention et cache KV K/V `q8_0`.
+- Observabilité : métriques activées et journald.
+- Raisonnement de service : `--reasoning-budget 0` et
+  `--reasoning-format deepseek`.
+- Résilience et limites mémoire : `Restart=always`, `MemoryHigh=23G`,
+  `MemoryMax=24G`.
 
-## 5-quater. Services modèles (document PROPRIÉTAIRE des noms concrets)
+Le backend cible l'exécuteur exclusivement par
+`LOCAL_EXECUTOR_URL=http://127.0.0.1:8081`. Les drapeaux restent
+`qwen_enabled=False` et `real_ai_enabled=False` : aucune activation IA produit
+n'est effectuée par cette infrastructure. Aucun shadow slot n'est activé et
+aucune entrée `ai_role_models` n'est insérée.
 
-Les autres specs parlent en termes génériques ("service OCR", "service de
-transcription"). SEUL ce document nomme les modèles concrets. Changer de modèle =
-une ligne à modifier ici, aucun autre doc cassé.
+### Résultats de validation H3
 
-- Service OCR = modèle VLM local précis (PaddleOCR-VL-1.6 ou GLM-OCR), sur la P40.
-  Pour tout l'OCR du système (documents, médical, PDF).
-- OCR Bolt (cas particulier, modèle DÉDIÉ distinct du service OCR système) :
-  **PATCH 2026-07-15 (passe 0, décision utilisateur)** — le chemin PRIMAIRE de
-  l'assistant d'acceptation de course est la **capture + OCR embarqué**
-  (ML Kit on-device, spec Vector §3.3). L'accessibilité Android n'est
-  **JAMAIS** utilisée (ni lecture ni action). PP-OCRv4 (P40) sert de
-  **contre-lecture uniquement** (audit nocturne, spec Vector §4.7), jamais de
-  chemin temps réel.
-- Service de transcription = faster-whisper large-v3 (français ET arabe), sur la
-  P40. (large-v3 requis pour l'arabe.) Vigilance : arabe dialectal moins fiable.
-- Garde-fou langue = fastText lid.176.ftz (CPU, ~1 Mo, hors-ligne, aucun impact
-  GPU). Détecte les dérives massives de langue sur les artefacts conservés → drapeau →
-  régénération ou validation utilisateur. OUVERT/évolutif : escalade possible
-  (split-lang) si des contaminations ponctuelles passent au terrain.
+- Sous charge : environ 23 892 MiB de VRAM, inférieur à 30 Go ; GPU à 98–99 % ;
+  température stabilisée à 77–78 °C pendant 10 minutes.
+- `/health` répond `200` une fois le modèle chargé ; `/metrics` expose les
+  métriques Prometheus.
+- Génération : environ 22,98 tok/s, dans la cible de 15–25 tok/s (**PASS**).
+- Prefill : 5 996 tokens en environ 8 300,685 ms, soit environ 722,35 tok/s.
+- Prompts de 16k et 30k : **PASS** sans OOM ; le Q6 est conservé et aucun
+  fallback Q5 n'est requis.
+- Pulse Mode A, JSON strict avec thinking désactivé : 10/10.
+- WR pair verdict, Mode A JSON strict avec thinking désactivé : 10/10.
+- Mode B natif : validé avec budget de thinking 1 000, raisonnement séparé dans
+  `reasoning_content`, JSON final valide et `finish_reason=stop`.
+- Déterminisme Mode B à température 0 : contenu et raisonnement byte-identical,
+  3/3.
+- Stop/start : port et VRAM libérés, redémarrage réussi ; `/health` retourne
+  `503` pendant le chargement puis `200`.
+- Reboot réel : démarrage automatique et modèle disponible en environ 114 s,
+  inférieur à 3 minutes (**PASS**) ; warm restart en environ 63 s.
+- Aucun événement `MemoryHigh`, `MemoryMax`, OOM ou `oom_kill` durant la
+  validation. Le cgroup comptabilise le mmap/page-cache du GGUF comme mémoire
+  fichier, ce qui doit être pris en compte dans l'interprétation des mesures.
+
+H3.7 — le scénario backend `GpuServiceUnreachable/skip` reste **NON TESTÉ** :
+le wrapper `toolbox.llm` est absent. Il ne doit pas être marqué PASS.
+
+### Contrats de budget et de sortie
+
+Il n'existe pas de `max_tokens` global. Les profils par slot définissent :
+`context_max_tokens`, `thinking`, `thinking_budget_tokens`,
+`output_max_tokens`, `output_contract`, `grammar_mode`, `timeout_s` et
+`on_truncation`.
+
+- **Mode A** : thinking désactivé et schéma strict.
+- **Mode B** : thinking plafonné et raisonnement séparé.
+- Le wrapper ne parse jamais le raisonnement.
+- Une réponse avec `finish_reason=length` n'est jamais acceptée comme réponse
+  partielle.
+- Aucun auto-ajustement silencieux des budgets ou contrats n'est autorisé.
+
+Le CORS est actuellement permissif, mais le serveur n'écoute que sur localhost.
+Le MTP n'est ni activé ni validé.
+
+---
+
+## 5-quater. Services modèles complémentaires — état futur
+
+Les autres specs parlent en termes génériques (« service OCR », « service de
+transcription »). Ce document est propriétaire des futurs noms concrets de
+modèles. Ces services ne sont pas actifs dans la topologie actuelle ; ils restent
+réservés à la P40 ou à une future infrastructure dédiée.
+
+- Service OCR envisagé : modèle VLM local précis, par exemple PaddleOCR-VL-1.6
+  ou GLM-OCR.
+- OCR Bolt : le chemin primaire prévu reste la capture + OCR embarqué (ML Kit
+  on-device, spec Vector §3.3). L'accessibilité Android n'est jamais utilisée,
+  ni en lecture ni en action. Une contre-lecture locale future ne constitue pas
+  un chemin temps réel.
+- Service de transcription envisagé : faster-whisper large-v3 (français et
+  arabe), avec vigilance sur l'arabe dialectal.
+- Garde-fou langue envisagé : `fastText lid.176.ftz` sur CPU, hors ligne.
 
 ---
 
 ## 6. Implications pour les autres specs
 
-- **Kill switch** : secret de déverrouillage = Machine 1 (chez le père).
+- **Kill switch** : secret de déverrouillage = Tower principale (chez le père).
 - **Vidéo VTC** : stockage = NAS = Machine 2 (chez le père).
 - **Dossier projet enrichi** : médias lourds = NAS = Machine 2 (chez le père).
 
@@ -167,9 +224,8 @@ une ligne à modifier ici, aucun autre doc cassé.
 
 ## 7. Points ouverts
 
-- Specs précises des deux machines récupérées (à fournir) → choix de l'attribution
-  orchestrateur vs NAS selon la puissance.
-- Éventuels ajouts matériels (RAM, disque) sur la machine orchestrateur.
-- Calendrier de la réorganisation (pas immédiat).
-- Onduleur / sauvegarde de la connexion chez le père ? (vu la criticité — à
-  évaluer plus tard).
+- Éventuelle évolution vers un serveur GPU dédié ou multi-GPU.
+- Éventuel modèle local de classe ~70B, sans échéance ferme.
+- Ajouts matériels possibles (RAM, disque) sur la Tower principale.
+- Onduleur et/ou solution de secours de connexion chez le père, compte tenu de
+  la criticité de l'accès distant.
