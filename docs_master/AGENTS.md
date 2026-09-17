@@ -85,6 +85,7 @@ Audio                              → the transcription service
 Web fresh data                     → web_fresh_data
 Medical reports                    → health_specialist
 WR analysis                        → high_reasoning
+Independent re-score of a ≥180 score → high_reasoning_safeguard (doc 30 §5.6)
 Quick advice with context          → the local model
 Day reorganization (multi-factor)  → first_cloud_tier
 Mentoring chat                     → high_reasoning

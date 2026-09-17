@@ -702,7 +702,7 @@ exercises) and, per its own scoring:
   - adapts locally if within reach, OR
   - escalates to the health specialist (health) if it looks medically serious, OR
   - if the scored gravity is critical (>=180/200), the critical mechanism
-    (doc 30 §5.6 / Patch 30-B: the health specialist re-score -> the high reasoning model orchestration) engages.
+    (doc 30 §5.6 / Patch 30-B: `high_reasoning_safeguard` independent re-score -> the high reasoning model orchestration) engages.
 
 A high severity NATURALLY raises the local model's score (error consequences + health
 sensitivity) -> a deserved escalation, NOT a mechanical threshold.
@@ -776,7 +776,7 @@ Deterministic plumbing       : backend hard rules, CPU, NO model
 Health programming (grouped, rare) : the health specialist
   (workout_create, workout_revision_monthly, hydration_target, diet_weekly_program,
    medical_document_extract, escalations from the local model)
-Critical mechanism (very rare) : the local model score ≥180 → the health specialist re-score → the high reasoning model
+Critical mechanism (very rare) : the local model score ≥180 → `high_reasoning_safeguard` independent re-score → the high reasoning model
                                  orchestration (doc 30 §5.6 / Patch 30-B)
 WR contribution : per doc 32 + doc 30 WR rule (the sustained long-context model for re-planning, the high reasoning model
                   fallback while the sustained long-context model is unavailable)

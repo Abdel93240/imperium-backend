@@ -1626,7 +1626,7 @@ This is the **canonical V1 thresholds** (aligned with doc 30): doc 30 is the sou
 | 0–99 | the local model | Execute locally |
 | 100–139 | the first cloud tier | Balanced reasoning |
 | 140–179 | the high reasoning model | Deep analysis |
-| 180–200 | Critical mechanic (doc 30 §5.6 / Patch 30-B) | the health specialist re-score → the high reasoning model orchestration |
+| 180–200 | Critical mechanic (doc 30 §5.6 / Patch 30-B) | `high_reasoning_safeguard` independent re-score → the high reasoning model orchestration |
 
 These thresholds are adjustable after observing costs and results, but only with explicit decision (not silently).
 
@@ -1847,7 +1847,7 @@ n8n                : orchestrator only
 backend            : sole canonical writer
 imperium_core      : canonical storage
 pgvector           : semantic memory / search, never source of truth
-Routing thresholds : 0–99 local model / 100–139 the first cloud tier / 140–179 the high reasoning model / 180–200 critical mechanic (the health specialist re-score → the high reasoning model). the sustained long-context model only by static rule §7. See doc 30 §5 (authoritative).
+Routing thresholds : 0–99 local model / 100–139 the first cloud tier / 140–179 the high reasoning model / 180–200 critical mechanic (`high_reasoning_safeguard` independent re-score → the high reasoning model). the sustained long-context model only by static rule §7. See doc 30 §5 (authoritative).
 ```
 
 ---

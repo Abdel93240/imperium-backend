@@ -680,7 +680,9 @@ If issues found: feedback loop (Section 8.5).
 
 ### 8.5 The fallback loop
 
-> Historical cascade rationale: this section was written during the sustained_long_context unavailability period, with short initial contexts. Current availability and WR re-planning assignments are owned by doc 30 §3.7/§7.8. The third attempt uses the independent fallback model defined in doc 30 §3.8ter (generic last-resort generation, no additional role). The historical loop below is not an override of that canonical WR routing.
+> Historical cascade rationale: this section was written during the sustained_long_context unavailability period, with short initial contexts. Current availability and WR re-planning assignments are owned by doc 30 §3.7/§7.8. The historical loop below is not an override of that canonical WR routing.
+>
+> Role of the third attempt (clarified 2026-09-17): attempt 3 *generates* a plan with a model other than the one that failed twice; it does not audit or contradict a plan. The independent control in this loop is the deterministic local validation (§8.4), which is unchanged. It is therefore **not** `high_reasoning_safeguard` (doc 30 §3.8quater, reserved for contradictory verification of high-stakes reasoning). Under the current mapping the last-resort generator is `sustained_long_context` (doc 30 §3.7, durable long-horizon planning generator), which was unavailable when this cascade was written and was then stood in for by the §3.8ter model. Its unavailability is covered by the §3.7 availability fallback, not by this loop.
 
 ```text
 ATTEMPT 1 — the high reasoning model generates plan.
@@ -693,7 +695,7 @@ ATTEMPT 2 — the high reasoning model regenerates with the feedback.
   If OK: SAVED.
   If KO: escalate.
 
-ATTEMPT 3 — independent fallback model (doc 30 §3.8ter) takes over.
+ATTEMPT 3 — last-resort generator (sustained_long_context, doc 30 §3.7) takes over.
   Same prompt + the fallback context.
   Same local model validation.
   If OK: SAVED (logged as "fallback used").
@@ -708,7 +710,7 @@ ABORT — Last resort.
 
 This caps the cost at approximately:
 - 2 × the high reasoning model calls (~0.40€)
-- 1 × independent fallback model (doc 30 §3.8ter) call (~0.10€)
+- 1 × last-resort generator (sustained_long_context) call (historical estimate ~0.10€)
 - Worst case total: ~0.50€ per monthly generation
 - Annual: ~26€ if always worst case (highly unlikely)
 - Realistic annual: ~10€
@@ -1110,7 +1112,7 @@ CREATE TABLE mission_type_learned_durations (
 ├──────────────────────────────────────────────────────┤
 │ Monthly plan (the high reasoning model) │ 52 × /year │ ~10€    │
 │ Plan validation (the local model)       │ 52 × /year │ 0€      │
-│ Fallback independent fallback model (doc 30 §3.8ter) (rare)       │ ~5 × /year │ ~0.50€  │
+│ Fallback last-resort generator (sustained_long_context) (rare)     │ ~5 × /year │ ~0.50€  │
 │ Daily plan (the local model)       │ 365 × /year│ 0€      │
 │ Daily first cloud tier fallback         │ if needed  │ ~18€    │
 │ Mission scoring (the local model)        │ on trigger │ 0€      │
@@ -1195,7 +1197,7 @@ Phase 3 — Monthly plan generation
   ├─ high reasoning model prompt template
   ├─ Input assembly service (10 categories)
   ├─ local model validation logic
-  ├─ Fallback chain (the high reasoning model → the high reasoning model → independent fallback model (doc 30 §3.8ter))
+  ├─ Fallback chain (the high reasoning model → the high reasoning model → last-resort generator, sustained_long_context per §8.5)
   └─ Storage of plan history
 
 Phase 4 — Daily plan instantiation

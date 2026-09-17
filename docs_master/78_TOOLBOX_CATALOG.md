@@ -96,7 +96,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : spécifié (embryon codé).
 
 ### F1-04 `toolbox.router` — routage /200 (doc 30)
-- description : scoring de difficulté /200 (7 critères §5.2), seuils dynamiques, règles statiques §7, mécanique critique 180+ (re-score indépendant (doc 30 §3.8ter) → orchestration high_reasoning → circuit breaker), escalade/downgrade auto.
+- description : scoring de difficulté /200 (7 critères §5.2), seuils dynamiques, règles statiques §7, mécanique critique 180+ (re-score indépendant par `high_reasoning_safeguard` (doc 30 §3.8quater) → orchestration high_reasoning → circuit breaker), escalade/downgrade auto.
 - famille : F1
 - vit_aujourd_hui : politique complète = doc 30 (canonique). Code : ABSENT — audit_resync WR-c : « routage doc 30 PAS implémenté (pas de scoring /200, pas de router_decision, pas d'audit entrée/sortie) » ; ai_tasks n'a pas les colonnes routage requêtables (doc 31 §7 non codé, audit_resync ai_tasks_results).
 - consommateurs_actuels : aucun.
@@ -402,7 +402,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 | F3-08 | CatBoost acceptation (ONNX embarqué) | €/h cycle complet → verdict halo | NON ENTRAÎNÉ (spec Vector §3.6/§4.4 ; docs 57/58 ; doc 30 §2.2/§7.7) | Vector tablette | spécifié |
 | F3-09 | CatBoost zones ×2 (zone_eph + zone_wait, même dataset) | temps mort/attente + « Où je vais » | NON ENTRAÎNÉ (spec Vector §4.5 — « un seul modèle de zones, deux consommateurs ») | scoreur embarqué + repositionnement | spécifié |
 | F3-10 | Prédicteur cause→surge (GBM) | surge attendu +15/+30 min | NON ENTRAÎNÉ (spec Vector §4.6) | feature CatBoost, modèle de zones, notifications capture | spécifié |
-| F3-11 | `first_cloud_tier`, `high_reasoning`, `sustained_long_context`, `health_specialist`, `finance_specialist`, `web_fresh_data` | tiers cloud doc 30 §3 | Configuration historique du socle (0039, identifier-not-call), aucun appel branché ; mapping actuel exclusivement doc 30 §3, sans modification de `ai_role_models` | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
+| F3-11 | `first_cloud_tier`, `high_reasoning`, `sustained_long_context`, `health_specialist`, `finance_specialist`, `web_fresh_data` ; `high_reasoning_safeguard` (rôle doc 30 §3.8quater, 2026-09-17, sans ligne `ai_role_models` à ce jour) | tiers cloud doc 30 §3 | Configuration historique du socle (0039, identifier-not-call), aucun appel branché ; mapping actuel exclusivement doc 30 §3, sans modification de `ai_role_models` | WR P1/P3/P5, plan, spécialistes, mécanique critique | spécifié |
 | F3-12 | Classifieur local du bot de build | classification messages de développement | Audit du socle : **SERVI ET CODÉ** (`/opt/orchestrator/llm_classifier.py`) ; état historique du système de build, distinct du local_executor Phase H actuellement déployé | orchestrateur (système) | existe_codé (audit du socle) |
 | F3-13 | Futurs LoRA (juge local et génération de plans ; candidats à qualifier selon doc 30 §3) | trajectoires de sortie du cloud | FUTURS (doc 74 ; CONCEPTION_chainage V2/V3 ; spec WR §10 « trajectoire ») ; datasets = v_ai_training_pairs + Phase 4 | WR, Daily | spécifié (futur) |
 

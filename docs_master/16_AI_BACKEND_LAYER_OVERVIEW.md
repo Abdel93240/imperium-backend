@@ -48,6 +48,7 @@ Read this before implementing any AI-related backend code.
       ├─ the transcription service (local)
       ├─ the first cloud tier / the high reasoning model (cloud API)
       ├─ health_specialist / finance_specialist / web_fresh_data
+      ├─ high_reasoning_safeguard (independent re-score of the critical tier, doc 30 §5.6)
       └─ ocr_service
 ```
 

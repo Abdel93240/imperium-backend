@@ -616,7 +616,7 @@ exige une explication (decision_note) — c'est le label.
 **P5 — Écriture + audit de sortie.** (code) Appliquer les validations : chain_assemblies validées →
 écriture E2 dans la table events canonique (causation_id, correlation_id, depth) ; contradictions
 arbitrées → multiplicateurs ; deltas acceptés → plan_deltas applied ; décisions →
-review_memory_decisions. (LLM) Slot `wr.exit_audit` (cloud_forced, Opus — décision gravée) : entrée =
+review_memory_decisions. (LLM) Slot `wr.exit_audit` (cloud_forced, Opus = rôle `high_reasoning` du doc 30 §3 — décision gravée ; consolidation par l'orchestrateur, pas un second jugement indépendant : le rôle `high_reasoning_safeguard` du doc 30 §3.8quater n'intervient pas ici) : entrée =
 digest + hypothèses + résumé conversation + décisions de la session. Sortie (schema `exit_audit`) :
 ```json
 {"learning_facts": [{"statement_fr": "...atomique canonique...", "evidence_refs": ["..."],
@@ -641,7 +641,7 @@ va dans review_final_reports. Event review.completed ferme la session.
 | wr.conjunctive | synthèse conjonctive hebdo | cloud_forced | 70B local candidat |
 | wr.plan_delta | deltas de plan hebdo | cloud_forced | LoRA 70B (dataset nativement en forme delta) |
 | wr.plan_regen | régénérations (choc/mensuel) | cloud_forced | LoRA 70B, après plan_delta |
-| wr.exit_audit | consolidation vérité validée | cloud_forced (Opus, gravé) | reste Opus par décision utilisateur |
+| wr.exit_audit | consolidation vérité validée | cloud_forced (Opus = rôle `high_reasoning`, gravé) | reste Opus par décision utilisateur |
 
 L'audit décroissant s'applique aux slots local_default via ai_slot_transition (échantillon contre-lu,
 agreement mesuré, décroissance proposée au WR, jamais automatique). Budget cloud cible par WR avec

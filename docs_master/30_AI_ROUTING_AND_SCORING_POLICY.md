@@ -18,6 +18,8 @@ This version is a **full rewrite** (June 2026). It supersedes all previous versi
 - Opus 4.7 was the premium tier
 - Haiku 4.5 was a routing tier
 
+Mapping update (2026-09-17, documentation only): the §3 assignments dated June/July 2026 (Sonnet 4.6 as `first_cloud_tier`, Opus 4.8 as `high_reasoning`, Fable 5 as `sustained_long_context`, GPT-5.5 as the three specialists and as the §5.6 independent re-scorer) are superseded by the current §3 table, and a distinct role `high_reasoning_safeguard` (§3.8quater) now owns the independent re-scoring of §5.6. Historical audits, applied patches and authoring attributions keep the old names on purpose; they are not the current mapping.
+
 **Document ownership (canonical):**
 - §3 alone owns the logical ROLE → concrete model/version mapping, including fallback assignments and candidates.
 - `F10_TOPOLOGIE_INFRA.md` owns physical/technical local deployment only: hardware, GGUF, quantization, hashes, runtime, endpoints, systemd and H3 measurements.
@@ -149,6 +151,28 @@ This section is the single owner of the logical role → concrete model → vers
 > version de ligne, jamais un edit de code (DV-6 : plus aucune référence
 > concrète en dur).
 
+> **Note (2026-09-17) : rôle `high_reasoning_safeguard` (§3.8quater).** Rôle
+> documentaire ajouté à la liste ci-dessus ; il n'a pas encore de ligne dans
+> `ai_role_models`. L'ajouter sera une nouvelle ligne/migration hors de cette
+> passe, jamais un edit de code. Aucun flag ni paramètre runtime n'est modifié
+> par cette mise à jour.
+
+Current logical mapping (summary; the subsections below are normative):
+
+| Role | Current model | API identifier | Subsection |
+|---|---|---|---|
+| `local_executor` | `Qwen3.6-27B-Q6_K` (unchanged) | local, see F10 §5-ter | §3.3 |
+| `first_cloud_tier` | Claude Sonnet 5 | `claude-sonnet-5` | §3.5 |
+| `high_reasoning` | Claude Opus 5 | `claude-opus-5` | §3.6 |
+| `sustained_long_context` | Claude Fable 5.1 | `claude-fable-5-1` | §3.7 |
+| `health_specialist` | GPT-5.6 Sol | — | §3.8 |
+| `finance_specialist` | GPT-5.6 Sol | — | §3.8bis |
+| `web_fresh_data` | GPT-5.6 Sol | — | §3.8ter |
+| `high_reasoning_safeguard` | GPT-6 Astra | `gpt-6-astra` | §3.8quater |
+| `ocr_service` | not yet adopted | — | §3.9 |
+| `transcription_service` | faster-whisper large-v3 (planned) | — | §3.10 |
+| `embedding_service` | qwen3-embedding:8b (planned) | — | §3.12 |
+
 ### 3.1 Imperium Backend
 
 - Current model: backend service
@@ -192,7 +216,7 @@ Optional, not deployed by default. Future possible uses: A/B challenger to the `
 
 ### 3.5 First cloud tier — `first_cloud_tier`
 
-- Current model: Sonnet 4.6
+- Current model: Claude Sonnet 5 (API identifier `claude-sonnet-5`). Previous assignment: Sonnet 4.6 (superseded 2026-09-17).
 - Role: balanced cloud model, the first step above the local model.
 - Selection criteria: balanced cost/quality.
 - Use for: structured reasoning, daily reorganization (multi-factor), logic correction, medium-complexity code, decisions with moderate context, document transformation, detailed financial advice (Vault Level 2), weekly nutrition / recovery plans, structuring projects (project module).
@@ -201,33 +225,34 @@ Note: candidates MiniMax M3 / Qwen3.7 Max may later challenge this tier on cost/
 
 ### 3.6 High reasoning model — `high_reasoning`
 
-- Current model: Opus 4.8
+- Current model: Claude Opus 5 (API identifier `claude-opus-5`). Previous assignment: Opus 4.8 (superseded 2026-09-17).
 - Role: premium strategic model, the default when real depth is required.
 - Selection criteria: depth of reasoning.
-- Use for: deep analysis, complex priority arbitration, long-term strategy, multi-domain synthesis, serious architectural debugging, high-consequence decisions, strategic reflection in the project module.
+- Use for: deep analysis, complex priority arbitration, long-term strategy, multi-domain synthesis, serious architectural debugging, high-consequence decisions, strategic reflection in the project module; final orchestrator of the §5.6 critical tier (it may consult `sustained_long_context` and `high_reasoning_safeguard`, and it alone produces the final answer when the anti-loop breaker fires).
 
 Opus must never be called by reflex.
 
 ### 3.7 Sustained long-context model — `sustained_long_context`
 
-- Current model: Fable 5 (availability fallback: Gemini Pro 3.1; content-safeguard fallback: Opus 4.8)
+- Current model: Claude Fable 5.1 (API identifier `claude-fable-5-1`). Availability fallback: Gemini Pro 3.1. Provider-native content-safeguard redirection target: Claude Opus 5 (the `high_reasoning` model). Previous assignment: Fable 5 (superseded 2026-09-17).
 - Role: the most capable long-context model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably, so paying for Fable is only justified when task length and complexity let its endurance advantage materialize.
 - Selection criteria: endurance on long tasks.
-- Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence.
+- Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence; consultable by `high_reasoning` in §5.6 Step 2.
 
 #### Availability status
 
 **RESOLVED (2026-07-01, doc patched 2026-07-15).** Fable 5 was suspended by a US
 export-control directive on 2026-06-17 and access was restored on 2026-07-01
-(CONCLUSIONS_test_papier, PHASE_0 note). The role is served by Fable 5 again;
-Gemini Pro 3.1 stays the availability fallback and Opus 4.8 the
-content-safeguard fallback. The plan-generation cascade is Fable-5-based again.
+(CONCLUSIONS_test_papier, PHASE_0 note). The role was served by Fable 5 again
+from that date; since 2026-09-17 it is served by Fable 5.1. Gemini Pro 3.1 stays
+the availability fallback and Opus (the `high_reasoning` model) the target of the
+provider-native content safeguard. The plan-generation cascade is Fable-based again.
 
-Built-in safeguard: for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable blocks and falls back to Opus 4.8 on its own. This means the "sensitivity" routing criterion is partially handled model-side for Fable.
+Built-in safeguard (Anthropic-native mechanism): for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable 5.1 blocks and redirects to Opus 5 on its own, model-side. This means the "sensitivity" routing criterion is partially handled model-side for Fable. This native redirection is **not** the Imperium role `high_reasoning_safeguard` (§3.8quater): the former is a provider content filter that swaps the answering model; the latter is an independent contradictory verifier that Imperium's routing calls on purpose (§5.6).
 
 Two distinct fallbacks must not be conflated:
-(a) Content safeguard — Fable redirects sensitive topics on its own, model-side, to Opus 4.8 (above).
-(b) Total model unavailability — handled routing-side, see §7.8. When Fable 5 is
+(a) Content safeguard — Fable redirects sensitive topics on its own, model-side, to Opus 5 (above). Anthropic mechanism, not an Imperium role.
+(b) Total model unavailability — handled routing-side, see §7.8. When Fable 5.1 is
     unreachable, the routing layer must substitute Gemini Pro 3.1 wherever a static
     rule forced Fable.
 
@@ -235,30 +260,39 @@ Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the
 
 ### 3.8 Health specialist — `health_specialist`
 
-- Current model: GPT-5.5
+- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
 - Role: specialist for health/Pulse.
 - Selection criteria: GDPR/EU guarantees for health data.
-- Use for: health/ Pulse (weight/nutrition/recovery calculations and medical-feed analysis). GPT-5.5 is the de facto "owner" of Pulse reasoning.
+- Use for: health/ Pulse (weight/nutrition/recovery calculations and medical-feed analysis). `health_specialist` is the de facto "owner" of Pulse reasoning.
 
 ### 3.8bis Finance specialist — `finance_specialist`
 
-- Current model: GPT-5.5
-- Role: specialist for financial reasoning over Vault data, fresh data / web research, verification, and complex multimodal analysis.
+- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
+- Role: specialist for financial reasoning over Vault data, fresh data / web research, verification of financial figures, and complex multimodal analysis.
 - Selection criteria: hallucination resistance — must show reasoning and flag uncertainty, never invent a figure.
 - Use for: financial reasoning over Vault data (budgets, cash-flow, financial pressure, project cost reasoning), invoked by the chatbot and the Weekly Review, not by the Vault app; fresh data / web research / multimodal analysis; generating actionable rules from sensitive or complex documents.
 
-This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, GPT-5.5 must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.
+This reasoning lives in the Imperium brain and is invoked by the chatbot and the Weekly Review — NOT by the Vault app, which only displays/captures. In finance, `finance_specialist` must show its reasoning and flag uncertainty rather than invent a figure (hallucination resistance is the governing criterion); a confidently invented number is worse than useless.
 
 ### 3.8ter Web / fresh-data specialist — `web_fresh_data`
 
-- Current model: GPT-5.5
+- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
 - Role: real-time / fresh information specialist.
 - Selection criteria: must have web access / real-time retrieval.
-- Use for: fresh data (recent events around Paris for Vector — concerts, salons, sports), web retrieval, market/price comparison, regulatory research, real-time verification.
+- Use for: fresh data (recent events around Paris for Vector — concerts, salons, sports), web retrieval, market/price comparison, regulatory research, real-time verification of facts against current sources.
 
-Additional existing uses of the GPT-5.5 assignment: independent critical re-scoring (§5.6) and generic last-resort plan generation (doc 52 §8.5). These are referenced as the independent verification/fallback model in the specs; they do not introduce a new role or change the existing routing rules.
+Former overloads of this subsection, removed on 2026-09-17: (a) the independent critical re-scoring of §5.6 was attached here only because the same concrete model served it; it is now the dedicated role `high_reasoning_safeguard` (§3.8quater). (b) The generic last-resort plan generation of doc 52 §8.5 is a plan *generation* task, not a verification; it is now expressed under `sustained_long_context` (§3.7, durable long-horizon generator), see doc 52 §8.5. `web_fresh_data` keeps only its fresh-data function.
 
-Note: the three specialist roles (health 3.8, finance 3.8bis, web/fresh-data 3.8ter) are all served by the same concrete model today (GPT-5.5), but they remain distinct roles, each with its own selection criterion and may be served by a different model in the future.
+Note: the three specialist roles (health 3.8, finance 3.8bis, web/fresh-data 3.8ter) are all served by the same concrete model today (GPT-5.6 Sol), but they remain distinct roles, each with its own selection criterion and may be served by a different model in the future. `high_reasoning_safeguard` (§3.8quater) is deliberately served by a different model (GPT-6 Astra) so that the verifier is not the specialist being verified.
+
+### 3.8quater High-reasoning safeguard — `high_reasoning_safeguard`
+
+- Current model: GPT-6 Astra (API identifier `gpt-6-astra`). Role created 2026-09-17.
+- Role: independent contradictory verification / anti-hallucination check of high-stakes reasoning. It is an Imperium routing role, invoked on purpose by the backend; it is **not** the Anthropic-native content safeguard of Fable described in §3.7, which is a provider-side redirection and never becomes this role.
+- Selection criteria: provider independence from `high_reasoning` and `sustained_long_context` (Anthropic) and from the specialist model it may have to contradict; hallucination resistance; no stake in the execution it verifies (it never produces the final answer of the task it checks).
+- Use for: §5.6 Step 1 independent re-scoring of a local score ≥180 (re-score → reroute below 180, authorise Step 2 at ≥180); consultation by `high_reasoning` during §5.6 Step 2 as a contradictory reviewer; any spec that explicitly requires a second, independent judgment on a high-stakes reasoning (contradictory review of a conclusion, not a domain calculation).
+- Not for: domain second reads that belong to a specialist (health "never alone on the critical" rule → `health_specialist`; financial figure checks → `finance_specialist`), the WR input/output audits produced by `high_reasoning` (doc 47 §5), generation fallbacks, or fresh-data checks (`web_fresh_data`).
+- Not yet in `ai_role_models` (see the note at the top of §3). No activation: `qwen_enabled=False` and `real_ai_enabled=False` are unchanged.
 
 ### 3.9 OCR service — vision / OCR — `ocr_service`
 
@@ -380,13 +414,15 @@ Dynamic routing applies only if no static rule (§7) already forces a model. Hai
 
 A score ≥180/200 is extremely rare (it requires a task that is simultaneously very complex, long, ambiguous, high-consequence and sensitive). When it happens, the gravity of the decision justifies the cost — we do not pinch pennies on Anthropic credits at this level. But a high score from the local router-scorer may itself be a hallucination, so it must be independently verified before the heavy machinery runs.
 
-**Step 1 — Independent re-scoring (anti-hallucination).**
-The 180+ score was produced by the local router-scorer, which can hallucinate an inflated score. Before engaging the heavy machinery, **the independent verification model (§3.8ter)** (a different provider, hallucination-resistant, and with no stake in the execution) receives the situation + the scoring table (§5.2/5.3) and **re-evaluates the score**.
-- If the independent verification model (§3.8ter) lowers it below 180 → re-route to the band actually warranted (140–179 high_reasoning, etc.). No heavy orchestration.
-- If the independent verification model (§3.8ter) confirms ≥180 → Step 2.
+**Step 1 — Independent re-scoring (anti-hallucination) by `high_reasoning_safeguard`.**
+The 180+ score was produced by the local router-scorer, which can hallucinate an inflated score. Before engaging the heavy machinery, **`high_reasoning_safeguard` (§3.8quater)** (a different provider, hallucination-resistant, and with no stake in the execution) receives the situation + the scoring table (§5.2/5.3) and **re-evaluates the score**.
+- If `high_reasoning_safeguard` lowers it below 180 → re-route to the band actually warranted (140–179 high_reasoning, etc.). No heavy orchestration.
+- If `high_reasoning_safeguard` confirms ≥180 → Step 2 is authorised.
+
+(Until 2026-09-17 this re-scoring was attributed to the §3.8ter model; the function is unchanged, only its role owner is.)
 
 **Step 2 — Free orchestration by high_reasoning (gravity confirmed).**
-high_reasoning is given the capability profiles of sustained_long_context and the independent verification model (§3.8ter) and is left to **direct freely**: handle it itself, delegate, or combine. No cap on each model's depth of reasoning. At this gravity, cost is not a constraint.
+high_reasoning remains the final orchestrator. It is given the capability profiles of sustained_long_context and high_reasoning_safeguard and is left to **direct freely**: handle it itself, consult either of them (sustained_long_context for long durable reasoning, high_reasoning_safeguard for a contradictory review), delegate, or combine. No cap on each model's depth of reasoning. At this gravity, cost is not a constraint.
 
 **Anti-loop breaker (circuit breaker).**
 The real failure mode at this tier is not a single weak model — it is models relaying to each other indefinitely (hollow back-and-forth, everyone "thinking" without converging). To prevent it without throttling intelligence:
@@ -423,7 +459,7 @@ Emergency Mode is a **behavior modifier**, not a shortcut to the heaviest model.
 
 **Cross-references**
 - §5.2 — speed tolerance (inverted): urgency biases toward fast tiers; Emergency Mode honors this rather than overriding it.
-- §5.6 — if the emergency is genuinely critical (re-scored ≥180), the critical mechanic (independent verification model (§3.8ter) re-score → high_reasoning orchestration → anti-loop breaker) applies as usual; Emergency Mode simply guarantees priority and no cost retention.
+- §5.6 — if the emergency is genuinely critical (re-scored ≥180), the critical mechanic (`high_reasoning_safeguard` re-score → high_reasoning orchestration → anti-loop breaker) applies as usual; Emergency Mode simply guarantees priority and no cost retention.
 - §1.6 — Emergency Mode is an explicit, user-confirmed action, so it satisfies the "no expensive cloud call without explicit user action" rule by design.
 
 ### 5.8 Automatic escalation
@@ -542,9 +578,9 @@ Ride opportunity scoring → CatBoost (business ML, not an LLM, not the cloud)
 ```text
 WR Phase 3 (rolling 4-week re-planning) → sustained_long_context (forced)
 ```
-The one recurring task meeting long + complex + high-stakes/durable. sustained_long_context's own safeguard reroutes high-risk topics to high_reasoning.
+The one recurring task meeting long + complex + high-stakes/durable. sustained_long_context's own provider-native content safeguard (§3.7, an Anthropic mechanism) reroutes high-risk topics to the high_reasoning model; this is not the Imperium role `high_reasoning_safeguard` (§3.8quater), which the WR re-planning step does not invoke.
 
-Unavailability fallback: use the availability fallback assigned in §3.7 when the sustained_long_context model is unreachable. This is distinct from its content safeguard, which redirects high-risk topics to high_reasoning. Current availability and the dated suspension/restoration history are owned solely by §3.7.
+Unavailability fallback: use the availability fallback assigned in §3.7 when the sustained_long_context model is unreachable. This is distinct from its native content safeguard, which redirects high-risk topics to the high_reasoning model. Current availability and the dated suspension/restoration history are owned solely by §3.7.
 
 ### 7.9 Deterministic backend decision
 ```text
@@ -575,6 +611,7 @@ sustained_long_context → long + complex + high-stakes/durable; WR re-planning
 health_specialist      → health/Pulse reasoning
 finance_specialist     → financial reasoning over Vault data
 web_fresh_data         → fresh information and web research
+high_reasoning_safeguard → independent contradictory verification (§5.6 re-scoring; consulted by high_reasoning)
 embedding_service     → semantic embeddings
 ocr_service           → vision / OCR
 transcription_service → audio
