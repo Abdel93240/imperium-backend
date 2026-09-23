@@ -34,6 +34,7 @@ from app.schemas.imperium import (
     FailMissionRequest,
     FinishDayRequest,
     FinishDayResponse,
+    PlanningDayResponse,
     MissionDecisionScoreRead,
     MissionCompletionResponse,
     MissionDetailResponse,
@@ -49,6 +50,8 @@ from app.schemas.imperium import (
     ReplacePriorityRulesRequest,
     SkipPathItemRequest,
     StartMissionRequest,
+    StartPlanningDayRequest,
+    StartPlanningDayResponse,
     WeeklyReportResponse,
     WeeklyReviewStateResponse,
 )
@@ -111,6 +114,7 @@ from app.services.ai.memories import (
 from app.services.imperium.day_finish import (
     DayAlreadyFinishedError,
     IdempotencyConflictError as DayIdempotencyConflictError,
+    NoOpenPlanningDayError,
     finish_day,
     get_latest_day_review,
 )
@@ -119,12 +123,20 @@ from app.services.imperium.daily_plans import (
     DailyPlanNotFoundError,
     DailyPlanStateConflictError,
     IdempotencyConflictError as DailyPlanIdempotencyConflictError,
+    OperationalDayNotStartedError,
     activate_daily_plan,
     cancel_daily_plan,
     complete_daily_plan,
     create_daily_plan,
     get_daily_plan_for_date,
     get_today_daily_plan,
+)
+from app.services.imperium.planning_days import (
+    PlanningDayAlreadyOpenError,
+    PlanningDayIdempotencyConflictError,
+    PlanningDayTimezoneError,
+    get_current_planning_day,
+    start_planning_day,
 )
 from app.services.imperium.decision_framework import (
     DecisionFrameworkIdempotencyConflictError,
@@ -485,6 +497,51 @@ def weekly_report_route(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
+@router.post("/day/start", response_model=StartPlanningDayResponse, status_code=status.HTTP_201_CREATED)
+def start_planning_day_route(
+    payload: StartPlanningDayRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> StartPlanningDayResponse:
+    try:
+        result, duplicate = start_planning_day(
+            db,
+            current_user=current_user,
+            payload=payload,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except (PlanningDayAlreadyOpenError, PlanningDayIdempotencyConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except PlanningDayTimezoneError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Operational day conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.get("/day/current", response_model=PlanningDayResponse | None)
+def current_planning_day_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> PlanningDayResponse | None:
+    planning_day = get_current_planning_day(db, current_user=current_user)
+    if planning_day is None:
+        return None
+    return PlanningDayResponse.model_validate(planning_day)
+
+
 @router.post("/day/finish", response_model=FinishDayResponse, status_code=status.HTTP_201_CREATED)
 def finish_day_route(
     payload: FinishDayRequest,
@@ -510,6 +567,9 @@ def finish_day_route(
             request_path=request.url.path,
         )
     except DayAlreadyFinishedError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except NoOpenPlanningDayError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except DayIdempotencyConflictError as exc:
@@ -576,7 +636,10 @@ def create_daily_plan_route(
 
 @router.get("/day/plan/today", response_model=DailyPlanResponse)
 def today_daily_plan_route(current_user: CurrentUserDep, db: SessionDep) -> DailyPlanResponse:
-    plan = get_today_daily_plan(db, current_user=current_user)
+    try:
+        plan = get_today_daily_plan(db, current_user=current_user)
+    except OperationalDayNotStartedError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No daily plan found.")
     return DailyPlanResponse.model_validate(plan)

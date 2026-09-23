@@ -1,8 +1,7 @@
 import hashlib
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +19,7 @@ from app.schemas.imperium import CreateDailyPlanRequest, DailyPlanResponse, Dail
 from app.services.events.emitter import build_event
 from app.services.path.canonical import path_today_view
 from app.services.imperium.decision_framework import get_canonical_priority_order
+from app.services.imperium.planning_days import get_current_planning_day
 
 PARIS_TIMEZONE = "Europe/Paris"
 CANONICAL_PRIORITY_LABELS = {
@@ -43,6 +43,10 @@ class DailyPlanNotFoundError(ValueError):
 
 
 class DailyPlanStateConflictError(ValueError):
+    pass
+
+
+class OperationalDayNotStartedError(ValueError):
     pass
 
 
@@ -135,10 +139,15 @@ def get_today_daily_plan(
     db: Session,
     *,
     current_user: User,
-    timezone: str = PARIS_TIMEZONE,
 ) -> ImperiumDailyPlan | None:
-    today = datetime.now(UTC).astimezone(ZoneInfo(timezone)).date()
-    return get_daily_plan_for_date(db, current_user=current_user, local_date=today)
+    planning_day = get_current_planning_day(db, current_user=current_user)
+    if planning_day is None:
+        raise OperationalDayNotStartedError("Operational day has not been started.")
+    return get_daily_plan_for_date(
+        db,
+        current_user=current_user,
+        local_date=planning_day.start_local_date,
+    )
 
 
 def activate_daily_plan(

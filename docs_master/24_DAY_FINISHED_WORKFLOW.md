@@ -5,7 +5,7 @@
 Implement the first real Imperium backend workflow:
 
 ```text
-day.finished
+planning.day.finished
 ```
 
 This is the backend contract for the Imperium "Finish Day" button.
@@ -40,6 +40,10 @@ Idempotency-Key: <unique_key>
 
 The backend derives `user_id` from JWT.
 Client-supplied `user_id` is not accepted.
+
+An open row in `planning_days` is required. If none exists, the endpoint
+returns `409 Conflict`. The open row is always selected with the authenticated
+`user_id`.
 
 ## Payload
 
@@ -84,6 +88,11 @@ failed
 
 Score fields are optional integers from 1 to 10.
 
+`local_date` and `timezone` remain accepted for compatibility with the existing
+request contract. Canonical storage and the emitted event use
+`planning_days.start_local_date` and `planning_days.timezone`, so a day that
+continues after midnight is closed against its start date.
+
 ## Storage
 
 Table:
@@ -125,12 +134,17 @@ unique(user_id, local_date)
 The backend appends one canonical event:
 
 ```text
-event_type = day.finished
+event_type = planning.day.finished
 source_app = imperium
 privacy_level = medium
 ```
 
-The event payload contains the sanitized request payload.
+`build_event()` normalizes the legacy emitter name to
+`planning.day.finished`. The payload contains the sanitized request payload,
+the canonical operational `local_date` and `timezone`, and `planning_day_id`.
+
+The same transaction sets `planning_days.finished_at` and
+`planning_days.day_review_id`.
 
 ## Idempotency
 

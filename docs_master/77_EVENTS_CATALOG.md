@@ -166,7 +166,8 @@ calculé, pas au journal des faits.
 |---|---|---|---|---|
 | `planning.daily_plan.generated` | Actuel : `day.plan.created`. Existe, à renommer. | `plan_id` + champs de `CreateDailyPlanRequest` + `generated_from`. | V1 | Le plan du jour est né. |
 | `planning.daily_plan.replanned` | Actuels proches : `day.plan.activated`, `day.plan.completed`, `day.plan.cancelled`. À créer/aligner. | `{ version, reason, trigger }`. | V1 | D4 versionné. `causation_id` pointe vers le déclencheur selon E2. |
-| `planning.day.finished` | Actuel : `day.finished`. Existe, à renommer. | `FinishDayRequest` complet : `local_date`, `timezone`, `day_status`, `energy_level`, `fatigue_level`, `sleep_quality`, `stress_level`, `mood`, `main_win`, `main_problem`, `completed_items`, `missed_items`, `notes`, `free_text`. | V1 | Seul cas actuel avec `correlation_id` non totalement aléatoire : `corr_day_finish_{review.id}`. |
+| `planning.day.started` | Existe ; émis par `POST /api/imperium/day/start`. | `{ planning_day_id, felt_energy }`. | V1 | Racine de la journée opérationnelle. Le ressenti subjectif est borné de 1 à 5 ; la date locale et le fuseau restent dans `planning_days`. |
+| `planning.day.finished` | Actuel : `day.finished`, normalisé à l'émission. Existe. | `FinishDayRequest` complet + `planning_day_id`; `local_date` et `timezone` sont normalisés depuis la journée ouverte. | V1 | Ferme `planning_days`, lie `day_review_id` et conserve `corr_day_finish_{review.id}`. Sans journée ouverte, la mutation est rejetée. |
 | `planning.weekly_plan.*` | Futur/non codé. | Non détaillé dans les sources. | Futur | À créer quand les tables existeront. |
 | `planning.monthly_plan.*` | Futur/non codé. | Non détaillé dans les sources. | Futur | À créer quand les tables existeront. |
 

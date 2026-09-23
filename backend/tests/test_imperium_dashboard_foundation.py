@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
-from app.models.imperium import ImperiumMission, ImperiumPathCheckIn, ImperiumPathHabit, ImperiumPulseEntry
+from app.models.imperium import (
+    ImperiumMission,
+    ImperiumPathCheckIn,
+    ImperiumPathHabit,
+    ImperiumPulseEntry,
+    PlanningDay,
+)
 from app.models.vault import ImperiumVaultTransaction
 from app.services.imperium import dashboard as dashboard_service
 
@@ -148,6 +154,23 @@ def _pulse_entry(user_id, **overrides) -> ImperiumPulseEntry:
     )
 
 
+def _planning_day(user_id, **overrides) -> PlanningDay:
+    now = overrides.pop("started_at", datetime(2026, 5, 25, 14, 0, tzinfo=UTC))
+    return PlanningDay(
+        id=overrides.pop("id", uuid4()),
+        user_id=user_id,
+        started_at=now,
+        finished_at=None,
+        start_local_date=overrides.pop("start_local_date", date(2026, 5, 25)),
+        timezone="Europe/Paris",
+        felt_energy=3,
+        day_review_id=None,
+        idempotency_key="dashboard-open-day",
+        created_at=now,
+        updated_at=now,
+    )
+
+
 def _empty_dashboard_db() -> FakeDb:
     return FakeDb(scalar_results=[None], scalars_results=[[], [], []])
 
@@ -167,10 +190,11 @@ def test_dashboard_empty_returns_nulls_and_zero_sections() -> None:
 
     assert response.status_code == 200
     body = response.json()
+    assert body["day_status"] == "not_started"
     assert body["currency"] == "EUR"
     assert body["mission"] == {
         "active_mission": None,
-        "safe_explanation": "No active mission found for current user.",
+        "safe_explanation": "Operational day has not been started.",
     }
     assert body["vault"] == {
         "currency": "EUR",
@@ -212,12 +236,16 @@ def test_dashboard_empty_returns_nulls_and_zero_sections() -> None:
 def test_dashboard_returns_active_mission_for_current_user() -> None:
     current_user = _user()
     mission = _mission(current_user.id)
-    db = FakeDb(scalar_results=[None], scalars_results=[[mission], [], []])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), None],
+        scalars_results=[[mission], [], []],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
     assert response.status_code == 200
     body = response.json()
+    assert body["day_status"] == "open"
     assert body["mission"]["active_mission"]["id"] == str(mission.id)
     assert body["mission"]["active_mission"]["title"] == "Drive focused VTC block"
     assert "user_id" not in body["mission"]["active_mission"]
@@ -232,7 +260,10 @@ def test_dashboard_returns_vault_summary_for_current_user_only() -> None:
     own_income = _transaction(current_user.id, transaction_type="income", amount_cents=9000)
     own_expense = _transaction(current_user.id, transaction_type="expense", amount_cents=2500)
     foreign = _transaction(other_user.id, transaction_type="income", amount_cents=999999)
-    db = FakeDb(scalar_results=[None], scalars_results=[[], [own_income, own_expense], []])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), None],
+        scalars_results=[[], [own_income, own_expense], []],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
@@ -255,7 +286,10 @@ def test_dashboard_returns_path_today_for_current_user_only() -> None:
     habit = _habit(current_user.id)
     check_in = _check_in(current_user.id, habit.id)
     foreign_habit = _habit(other_user.id, title="Foreign habit")
-    db = FakeDb(scalar_results=[None], scalars_results=[[], [], [habit], [check_in]])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), None],
+        scalars_results=[[], [], [habit], [check_in]],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
@@ -278,7 +312,10 @@ def test_dashboard_returns_pulse_today_for_current_user_only() -> None:
     other_user = _user()
     entry = _pulse_entry(current_user.id, notes="Own pulse")
     foreign_entry = _pulse_entry(other_user.id, notes="Foreign pulse")
-    db = FakeDb(scalar_results=[entry], scalars_results=[[], [], []])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), entry],
+        scalars_results=[[], [], []],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
@@ -298,7 +335,10 @@ def test_dashboard_date_query_param_is_propagated_to_path_and_pulse() -> None:
     habit = _habit(current_user.id)
     check_in = _check_in(current_user.id, habit.id, check_date=target_date)
     entry = _pulse_entry(current_user.id, entry_date=target_date)
-    db = FakeDb(scalar_results=[entry], scalars_results=[[], [], [habit], [check_in]])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), entry],
+        scalars_results=[[], [], [habit], [check_in]],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard?date=2026-05-24")
 
@@ -326,7 +366,10 @@ def test_dashboard_default_date_uses_europe_paris_helper(monkeypatch) -> None:
 def test_dashboard_currency_query_param_is_propagated_to_vault_and_normalized_uppercase() -> None:
     current_user = _user()
     tx = _transaction(current_user.id, transaction_type="income", amount_cents=12000, currency="USD")
-    db = FakeDb(scalar_results=[None], scalars_results=[[], [tx], []])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), None],
+        scalars_results=[[], [tx], []],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard?currency=usd")
 
@@ -353,7 +396,10 @@ def test_dashboard_does_not_require_idempotency_key() -> None:
 def test_dashboard_is_read_only_and_creates_no_path_or_pulse_rows() -> None:
     current_user = _user()
     habit = _habit(current_user.id)
-    db = FakeDb(scalar_results=[None], scalars_results=[[], [], [habit], []])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), None],
+        scalars_results=[[], [], [habit], []],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 
@@ -373,7 +419,10 @@ def test_dashboard_does_not_expose_user_id() -> None:
     habit = _habit(current_user.id)
     check_in = _check_in(current_user.id, habit.id)
     entry = _pulse_entry(current_user.id)
-    db = FakeDb(scalar_results=[entry], scalars_results=[[mission], [tx], [habit], [check_in]])
+    db = FakeDb(
+        scalar_results=[_planning_day(current_user.id), entry],
+        scalars_results=[[mission], [tx], [habit], [check_in]],
+    )
 
     response = _client(db, current_user).get("/api/imperium/dashboard")
 

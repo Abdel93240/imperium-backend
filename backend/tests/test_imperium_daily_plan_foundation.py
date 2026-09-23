@@ -8,7 +8,13 @@ from fastapi.testclient import TestClient
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1.router import api_router
-from app.models.imperium import ImperiumMission, ImperiumPathCheckIn, ImperiumPathHabit, ImperiumPulseEntry
+from app.models.imperium import (
+    ImperiumMission,
+    ImperiumPathCheckIn,
+    ImperiumPathHabit,
+    ImperiumPulseEntry,
+    PlanningDay,
+)
 from app.services.imperium import daily_plan as daily_plan_service
 
 
@@ -130,6 +136,23 @@ def _pulse_entry(user_id, **overrides) -> ImperiumPulseEntry:
     )
 
 
+def _planning_day(user_id) -> PlanningDay:
+    now = datetime(2026, 5, 25, 14, 0, tzinfo=UTC)
+    return PlanningDay(
+        id=uuid4(),
+        user_id=user_id,
+        started_at=now,
+        finished_at=None,
+        start_local_date=date(2026, 5, 25),
+        timezone="Europe/Paris",
+        felt_energy=3,
+        day_review_id=None,
+        idempotency_key="daily-plan-open-day",
+        created_at=now,
+        updated_at=now,
+    )
+
+
 def _empty_daily_plan_db() -> FakeDb:
     return FakeDb(scalar_results=[None, None], scalars_results=[[], [], [], [], [], [], []])
 
@@ -238,7 +261,7 @@ def test_daily_plan_propagates_active_mission_path_and_pulse_today() -> None:
     check_in = _check_in(current_user.id, habit.id)
     entry = _pulse_entry(current_user.id)
     db = FakeDb(
-        scalar_results=[entry, entry],
+        scalar_results=[_planning_day(current_user.id), entry, entry],
         scalars_results=[[mission], [], [habit], [check_in], [mission], [habit], [check_in]],
     )
 
@@ -289,7 +312,7 @@ def test_daily_plan_is_strictly_user_scoped_and_does_not_require_idempotency_key
     foreign_habit = _habit(other_user.id, title="Foreign habit")
     foreign_entry = _pulse_entry(other_user.id, notes="Foreign pulse")
     db = FakeDb(
-        scalar_results=[own_entry, own_entry],
+        scalar_results=[_planning_day(current_user.id), own_entry, own_entry],
         scalars_results=[[own_mission], [], [own_habit], [own_check_in], [own_mission], [own_habit], [own_check_in]],
     )
 

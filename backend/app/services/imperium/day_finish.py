@@ -1,5 +1,6 @@
 import hashlib
 import json
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from app.services.events.emitter import build_event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumDayReview
 from app.schemas.imperium import DayReviewResponse, FinishDayRequest, FinishDayResponse
+from app.services.imperium.planning_days import get_current_planning_day
 
 
 class DayAlreadyFinishedError(ValueError):
@@ -18,6 +20,10 @@ class DayAlreadyFinishedError(ValueError):
 
 
 class IdempotencyConflictError(ValueError):
+    pass
+
+
+class NoOpenPlanningDayError(ValueError):
     pass
 
 
@@ -29,6 +35,7 @@ def finish_day(
     idempotency_key: str,
     request_method: str,
     request_path: str,
+    now: datetime | None = None,
 ) -> tuple[FinishDayResponse, bool]:
     request_hash = _hash_payload(payload)
     existing_key = db.scalar(
@@ -39,16 +46,24 @@ def finish_day(
     )
 
     if existing_key is not None:
+        if existing_key.request_path != request_path:
+            raise IdempotencyConflictError(
+                "Idempotency-Key already used on a different endpoint."
+            )
         if existing_key.request_hash != request_hash:
             raise IdempotencyConflictError("Idempotency key already used with different payload.")
         if existing_key.response_body is None:
             raise IdempotencyConflictError("Idempotency key is already processing.")
         return FinishDayResponse(**existing_key.response_body), True
 
+    planning_day = get_current_planning_day(db, current_user=current_user)
+    if planning_day is None:
+        raise NoOpenPlanningDayError("No operational day is open.")
+
     existing_review = db.scalar(
         select(ImperiumDayReview).where(
             ImperiumDayReview.user_id == current_user.id,
-            ImperiumDayReview.local_date == payload.local_date,
+            ImperiumDayReview.local_date == planning_day.start_local_date,
         )
     )
     if existing_review is not None:
@@ -59,8 +74,8 @@ def finish_day(
     event_id = f"evt_{uuid4().hex}"
     review = ImperiumDayReview(
         user_id=current_user.id,
-        local_date=payload.local_date,
-        timezone=payload.timezone,
+        local_date=planning_day.start_local_date,
+        timezone=planning_day.timezone,
         day_status=payload.day_status.value,
         energy_level=payload.energy_level,
         fatigue_level=payload.fatigue_level,
@@ -79,6 +94,9 @@ def finish_day(
     db.flush()
 
     event_payload = payload.model_dump(mode="json", exclude_none=True)
+    event_payload["local_date"] = planning_day.start_local_date.isoformat()
+    event_payload["timezone"] = planning_day.timezone
+    event_payload["planning_day_id"] = str(planning_day.id)
     # E2 (passe 0): canonical planning.day.finished; the deterministic
     # corr_day_finish_{review.id} dossier is kept (doc 77 cites it as the one
     # non-random correlation of the legacy code).
@@ -92,6 +110,13 @@ def finish_day(
         correlation_id=f"corr_day_finish_{review.id}",
     )
     db.add(event)
+    db.flush()
+
+    finished_at = now or datetime.now(UTC)
+    if finished_at.tzinfo is None:
+        raise ValueError("Operational day finish time must be timezone-aware.")
+    planning_day.finished_at = finished_at.astimezone(UTC)
+    planning_day.day_review_id = review.id
     db.flush()
 
     response = FinishDayResponse(

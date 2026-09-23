@@ -40,6 +40,7 @@ from app.schemas.dashboard import (
     ImperiumDashboardVaultSection,
 )
 from app.services.imperium.missions import get_current_active_mission
+from app.services.imperium.planning_days import get_current_planning_day
 from app.services.imperium.vault import get_vault_summary
 from app.services.path.habits import get_path_today_view
 from app.services.pulse.entries import get_pulse_today_entry
@@ -64,10 +65,18 @@ def get_imperium_dashboard_foundation(
     currency: str = "EUR",
 ) -> ImperiumDashboardFoundationResponse:
     snapshot_generated_at = datetime.now(UTC)
-    snapshot_date = local_date or get_default_local_date()
+    planning_day = get_current_planning_day(db, current_user=current_user)
+    day_status = "open" if planning_day is not None else "not_started"
+    snapshot_date = local_date or (
+        planning_day.start_local_date if planning_day is not None else get_default_local_date()
+    )
     normalized_currency = currency.strip().upper()
 
-    active_mission = get_current_active_mission(db, current_user=current_user)
+    active_mission = (
+        get_current_active_mission(db, current_user=current_user)
+        if planning_day is not None
+        else None
+    )
     vault_summary = get_vault_summary(
         db,
         current_user=current_user,
@@ -90,10 +99,15 @@ def get_imperium_dashboard_foundation(
 
     return ImperiumDashboardFoundationResponse(
         date=snapshot_date,
+        day_status=day_status,
         currency=vault_summary.currency,
         mission=ImperiumDashboardMissionSection(
-            active_mission=active_mission.mission,
-            safe_explanation=active_mission.safe_explanation,
+            active_mission=active_mission.mission if active_mission is not None else None,
+            safe_explanation=(
+                active_mission.safe_explanation
+                if active_mission is not None
+                else "Operational day has not been started."
+            ),
         ),
         vault=ImperiumDashboardVaultSection(
             currency=vault_summary.currency,
@@ -121,7 +135,9 @@ def get_imperium_dashboard_foundation(
             vault_available=True,
             path_available=True,
             pulse_available=True,
-            active_mission_present=active_mission.mission is not None,
+            active_mission_present=(
+                active_mission is not None and active_mission.mission is not None
+            ),
             vault_transaction_count=vault_summary.transaction_count,
             path_today_count=path_today.count,
             pulse_entry_present=pulse_today.entry is not None,
@@ -137,18 +153,26 @@ def get_imperium_dashboard_foundation(
 
 def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashboardResponse:
     generated_at = datetime.now(UTC)
-    today = generated_at.astimezone(ZoneInfo(PARIS_TIMEZONE)).date()
+    planning_day = get_current_planning_day(db, current_user=current_user)
+    day_status = "open" if planning_day is not None else "not_started"
+    today = (
+        planning_day.start_local_date
+        if planning_day is not None
+        else generated_at.astimezone(ZoneInfo(PARIS_TIMEZONE)).date()
+    )
     week_start = _current_local_week_start(PARIS_TIMEZONE, generated_at)
     week_end = week_start + timedelta(days=6)
 
     # NOTE: 7 sequential queries — acceptable V1 latency.
     # Optimize with joins or async in V2 if dashboard latency > 100ms.
-    current_mission = db.scalar(
-        select(ImperiumMission).where(
-            ImperiumMission.user_id == current_user.id,
-            ImperiumMission.status == "active",
+    current_mission = None
+    if planning_day is not None:
+        current_mission = db.scalar(
+            select(ImperiumMission).where(
+                ImperiumMission.user_id == current_user.id,
+                ImperiumMission.status == "active",
+            )
         )
-    )
     recent_missions = list(
         db.scalars(
             select(ImperiumMission)
@@ -179,16 +203,19 @@ def get_dashboard_snapshot(db: Session, *, current_user: User) -> ImperiumDashbo
     report_legacy_divergence(
         db, current_user=current_user, local_date=today, canonical=path_today
     )
-    daily_plan_today = db.scalar(
-        select(ImperiumDailyPlan).where(
-            ImperiumDailyPlan.user_id == current_user.id,
-            ImperiumDailyPlan.local_date == today,
+    daily_plan_today = None
+    if planning_day is not None:
+        daily_plan_today = db.scalar(
+            select(ImperiumDailyPlan).where(
+                ImperiumDailyPlan.user_id == current_user.id,
+                ImperiumDailyPlan.local_date == planning_day.start_local_date,
+            )
         )
-    )
 
     weekly_review_banner = get_weekly_review_banner(db, current_user=current_user)
 
     return ImperiumDashboardResponse(
+        day_status=day_status,
         current_mission=_dashboard_mission(current_mission) if current_mission else None,
         recent_missions=[_dashboard_mission(mission) for mission in recent_missions],
         priorities=[_dashboard_priority(priority) for priority in priorities],

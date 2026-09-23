@@ -1179,6 +1179,71 @@ Notes migration/ORM :
 - Divergence de nommage : la table codee reste `imperium_missions`; le nom
   cible documente est `planning_missions`.
 
+### planning_days
+
+Nom actuel : `planning_days`
+Nom cible : `planning_days` (conforme au domaine planning, sans prefixe
+d'application)
+Source code : migration `20260923_0042_planning_days.py`, modele
+`backend/app/models/imperium.py::PlanningDay`
+
+Role : porter la journee operationnelle explicite d'Imperium. Une journee est
+ouverte par l'action utilisateur « Demarrer la journee », reste rattachee a sa
+date civile de depart meme apres minuit, puis est fermee par « Finish Day ».
+`finished_at IS NULL` signifie que la journee est ouverte.
+
+Schema reel :
+
+```text
+id                UUID PRIMARY KEY
+user_id           UUID NOT NULL FK users.id
+started_at        TIMESTAMPTZ NOT NULL
+finished_at       TIMESTAMPTZ NULL
+start_local_date  DATE NOT NULL
+timezone          TEXT NOT NULL
+felt_energy       SMALLINT NOT NULL
+day_review_id     UUID NULL FK imperium_day_reviews.id
+created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+idempotency_key   TEXT NOT NULL
+```
+
+Contraintes et index :
+- PK : `planning_days.id`
+- FK : `planning_days.user_id -> users.id`
+- FK : `planning_days.day_review_id -> imperium_day_reviews.id`
+- Check `ck_planning_days_felt_energy_range` :
+  `felt_energy >= 1 AND felt_energy <= 5`
+- Check `ck_planning_days_finished_after_started` :
+  `finished_at IS NULL OR finished_at >= started_at`
+- Unique : `planning_days_user_idempotency_key_unique` sur
+  `(user_id, idempotency_key)`
+- Index unique partiel : `planning_days_one_open_per_user_idx` sur `user_id`
+  WHERE `finished_at IS NULL`
+- Index : `planning_days_user_started_at_idx` sur `(user_id, started_at)`
+
+Regles metier planning :
+- Une seule journee operationnelle peut etre ouverte par utilisateur. Le
+  service retourne `409` et l'index partiel protege aussi les courses
+  concurrentes.
+- `start_local_date` est calculee au demarrage dans le fuseau canonique
+  `Europe/Paris`. Elle devient la reference de « aujourd'hui »
+  jusqu'a la cloture, y compris si la journee depasse minuit.
+- `felt_energy` est le ressenti subjectif court du check-in de demarrage ; il
+  ne remplace pas les futurs signaux objectifs d'energie.
+- La cloture remplit `finished_at` et `day_review_id` dans la meme transaction
+  que la creation de `imperium_day_reviews` et de l'event canonique.
+- `idempotency_key` rattache le demarrage a la mutation idempotente. Les
+  reessais sont aussi gardes par la table technique `idempotency_keys`.
+
+Notes migration/ORM :
+- La migration ne met pas de default serveur sur `id`; le mixin ORM genere un
+  UUID cote Python.
+- `created_at` et `updated_at` ont des defaults serveur ; `updated_at` porte
+  aussi `onupdate=func.now()` cote ORM.
+- La migration est reversible et son downgrade supprime d'abord les index,
+  puis la table.
+
 ### planning_daily_plans
 
 Nom actuel : `imperium_daily_plans`

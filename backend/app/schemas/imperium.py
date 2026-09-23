@@ -72,6 +72,42 @@ class FinishDayResponse(BaseModel):
     status: str
 
 
+class StartPlanningDayRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    felt_energy: int = Field(ge=1, le=5)
+    idempotency_key: str = Field(min_length=1, max_length=255)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def strip_idempotency_key(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("idempotency_key cannot be empty.")
+        return stripped
+
+
+class PlanningDayResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    started_at: datetime
+    finished_at: datetime | None
+    start_local_date: date
+    timezone: str
+    felt_energy: int
+    day_review_id: UUID | None
+    idempotency_key: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class StartPlanningDayResponse(BaseModel):
+    planning_day: PlanningDayResponse
+    event_id: str
+    status: Literal["started"] = "started"
+
+
 class MissionStatus(StrEnum):
     backlog = "backlog"
     active = "active"
@@ -1108,6 +1144,7 @@ class DashboardWeeklyReviewBanner(BaseModel):
 
 
 class ImperiumDashboardResponse(BaseModel):
+    day_status: Literal["not_started", "open"]
     current_mission: DashboardMission | None
     recent_missions: list[DashboardMission]
     priorities: list[DashboardPriority]

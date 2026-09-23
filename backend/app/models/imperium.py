@@ -61,6 +61,56 @@ class ImperiumDayReview(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class PlanningDay(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "planning_days"
+    __table_args__ = (
+        CheckConstraint(
+            "felt_energy >= 1 AND felt_energy <= 5",
+            name="felt_energy_range",
+        ),
+        CheckConstraint(
+            "finished_at IS NULL OR finished_at >= started_at",
+            name="finished_after_started",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="planning_days_user_idempotency_key_unique",
+        ),
+        Index(
+            "planning_days_one_open_per_user_idx",
+            "user_id",
+            unique=True,
+            postgresql_where=text("finished_at IS NULL"),
+        ),
+        Index("planning_days_user_started_at_idx", "user_id", "started_at"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_local_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    timezone: Mapped[str] = mapped_column(Text, nullable=False)
+    felt_energy: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    day_review_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("imperium_day_reviews.id"),
+        nullable=True,
+    )
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class ImperiumEvent(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_events"
     __table_args__ = (

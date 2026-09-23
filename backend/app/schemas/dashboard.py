@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -66,6 +67,7 @@ class ImperiumDashboardFoundationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     date: date
+    day_status: Literal["not_started", "open"]
     currency: str
     mission: ImperiumDashboardMissionSection
     vault: ImperiumDashboardVaultSection

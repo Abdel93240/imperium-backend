@@ -76,6 +76,7 @@ def test_dashboard_contract_shape_and_query_params() -> None:
     body = response.json()
     assert set(body) == {
         "date",
+        "day_status",
         "currency",
         "mission",
         "vault",
@@ -85,6 +86,7 @@ def test_dashboard_contract_shape_and_query_params() -> None:
         "meta",
         "safe_explanation",
     }
+    assert body["day_status"] == "not_started"
     assert body["currency"] == "EUR"
     assert body["mission"]["active_mission"] is None
     assert set(body["readiness"]) == {
