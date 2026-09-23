@@ -3,11 +3,16 @@
 > **Livrable d'implémentation one-pass.** Prompt d'exécution destiné à Claude Code (Fable 5) sur
 > `/opt/imperium-backend`. Il implémente l'orchestration journalière des missions : moteur de
 > faisabilité déterministe, ensemble obligatoire, sélection à la complétion, gradation à trois
-> niveaux (code → 32B → frontier) avec détection déterministe du niveau, classes de préemption,
+> niveaux (code → Qwen3.6-27B local → frontier) avec détection déterministe du niveau, classes de préemption,
 > et boucle de feedback sur les barèmes. Il CONSOMME le scoring /100 du doc 52 sans le modifier.
 > Numérotation : nouveau doc au prochain numéro libre de `docs_master/` + patch de renvoi dans le
 > doc 52. Cette spec fait système avec les deux précédentes (Pulse Intelligence Layer, WR
 > Continuous Engine) : elle en référence les mécaniques au lieu de les dupliquer.
+
+> **Contrat de démarrage de journée :**
+> [`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md) fait foi
+> pour le déclencheur, le check-in, les deux axes d'énergie, l'état pré-démarrage et la journée
+> opérationnelle. La présente spec ne le contredit pas.
 
 ---
 
@@ -71,7 +76,7 @@ Principes :
    rejouées sur l'état frais à chaque complétion. L'intelligence a déjà été dépensée en amont
    (le plan mensuel par le frontier, les valeurs de l'utilisateur dans les barèmes).
 4. **La détection du niveau d'intelligence est elle-même déterministe.** Niveau 1 code (~95 %
-   des complétions) ; Niveau 2 local 32B sur CONDITIONS testables (ensemble faisable vide,
+   des complétions) ; Niveau 2 `Qwen3.6-27B-Q6_K` local sur CONDITIONS testables (ensemble faisable vide,
    conflit d'obligatoires, perturbation exprimée en langage) ; Niveau 3 frontier sur classe
    choc (régénération immédiate, mécanique WR §8.1). Le code sait qu'il ne sait pas : c'est
    un test d'infaisabilité, pas un jugement.
@@ -90,7 +95,7 @@ Principes :
 ## 2. ARCHITECTURE
 
 ```
-mission.completed / démarrage de journée / événement déclencheur
+mission.completed / clic explicite "Démarrer la journée" / événement déclencheur
         │
         ▼
 ┌─ NIVEAU 1 — SÉLECTION (code pur, < 500 ms) ────────────────────────────┐
@@ -104,15 +109,15 @@ mission.completed / démarrage de journée / événement déclencheur
                 │ conditions déterministes (§8.1) :
                 │  faisable vide │ obligatoires en conflit │ perturbation texte
                 ▼
-┌─ NIVEAU 2 — ARBITRAGE (32B local, slots contractualisés) ──────────────┐
+┌─ NIVEAU 2 — ARBITRAGE (Qwen3.6-27B local, slots contractualisés) ─────┐
 │ daily.disruption_classify : déviation locale / delta plan / choc       │
 │ daily.conflict_arbitrate : proposition d'ordre + sacrifice motivé      │
 └───────────────┬─────────────────────────────────────────────────────────┘
                 │ classe choc (taxonomie WR §13.6)
                 ▼
-┌─ NIVEAU 3 — RESTRUCTURATION (frontier) ────────────────────────────────┐
-│ Régénération complète immédiate du plan : mécanique WR spec §8.1,      │
-│ réutilisée telle quelle (plan_versions origin=shock_regen)             │
+┌─ NIVEAU 3 — RESTRUCTURATION (Claude Opus 5.5, frontier) ──────────────┐
+│ Régénération complète exceptionnelle, validée par l'utilisateur :      │
+│ mécanique WR spec §8.1, réutilisée (plan_versions origin=shock_regen) │
 └─────────────────────────────────────────────────────────────────────────┘
 Transverse : préemption (§9), feedback barèmes (§10), events E2 (§11).
 ```
@@ -253,7 +258,7 @@ créneau faisable aujourd'hui"). V1.1 potentielle, hors périmètre §16.
 
 ## 7. SÉLECTION & DÉPARTAGE (le cœur du Niveau 1)
 
-À chaque déclencheur (complétion, démarrage de journée, résolution de perturbation) :
+À chaque déclencheur (complétion, clic explicite de démarrage de journée, résolution de perturbation) :
 
 ```
 1. remaining_min = prochain engagement fixe − maintenant
@@ -387,9 +392,11 @@ uniquement** — la file reste invisible dans l'UI produit, décision UX gravée
 `GET selection-log?date=` ; `GET/PUT settings/scoring` (barèmes via store versionné, protégé) ;
 `POST arbitrations/{id}/decision`.
 
-**Workflows/crons** : `daily_scores_refresh` (06:30, critère A) ; `daily_day_start` (à la
-première ouverture du jour ou heure paramétrée : sélection initiale) ; `override_aggregation`
-(hebdo, → docket via W5) ; `gmaps_cache_gc` (quotidien).
+**Workflows/crons** : `daily_scores_refresh` (06:30, critère A ; ce cron ne démarre jamais une
+journée) ; `daily_day_start` (webhook du clic explicite "Démarrer la journée" : check-in de
+ressenti seul, sélection initiale déterministe, puis repli local seulement en conflit) ;
+`override_aggregation` (hebdo, → docket via W5) ; `gmaps_cache_gc` (quotidien). La journée est
+bornée par démarrage→clôture et peut traverser minuit, jamais par date civile.
 
 ---
 
@@ -415,7 +422,9 @@ daily.conflict_arbitrate (local_default, audit 100 %).
 4. Départage : bande de tête + moindre trajet ; cas de clustering émergent (3 missions proches
    moyennes vs 1 lointaine haute — dans la bande) ; hors bande → le score gagne.
 5. Pull-forward : activé/désactivé, seuil, flag au log ; "journée bouclée" sans invention.
-6. Niveaux : C1/C2/C3 purement déterministes ; **spy : zéro appel LLM sur le chemin nominal** ;
+6. Démarrage : seul le clic explicite démarre la journée ; check-in de ressenti seul ; état
+   pré-démarrage "Journée non démarrée" et programme masqué ; deux axes d'énergie, avec capacité
+   retenue au plus bas et écart journalisé. Niveaux : C1/C2/C3 purement déterministes ; **spy : zéro appel LLM sur le chemin nominal** ;
    latence < 500 ms sur fixture 50 missions (trajets depuis cache).
 7. Slot 8.2 : contrat + retry + effets par classe ; shock sans match taxonomie → rétrogradé ;
    régénération JAMAIS déclenchée sans acceptation utilisateur.

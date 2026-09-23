@@ -18,7 +18,7 @@ This is the **operational brain** of the entire ecosystem.
 
 ```text
 HORIZON 1 — DAILY (today)
-  Generated each morning after the morning checkin.
+  Started only by the explicit "Démarrer la journée" click.
   Reflects the rolling monthly plan AND the user's real-time state.
   Adapts via hooks throughout the day.
 
@@ -38,6 +38,31 @@ HORIZON 3 — LONG TERM (months / quarters / yearly)
 ```
 
 The daily plan is not generated in a vacuum. It instantiates the monthly plan for THIS specific day, adjusted to current reality.
+
+The canonical start-of-day contract is
+[`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md).
+
+---
+
+## 2A. Principe de résolution
+
+This is a transverse rule for every planner in the ecosystem. The AI never
+answers "impossible" or "too dangerous, stop" as its planning result. It searches
+the possible paths for the one that achieves the greatest share of the objective
+(target ≥80%) with the least danger.
+
+For VTC driving with a tired body, the constraint changes the **form** of work
+blocks — maximum continuous-driving duration based on objective energy — rather
+than stopping work. Financial pressure remains an objective: place shorter blocks
+in the highest-yield zone/time windows and sleep or nap in troughs. If no path can
+reach the objective, show a red banner, the best partial plan, and a quantified
+gap with options for the remainder; the user arbitrates. Never block without an
+alternative.
+
+The planner system prompt explicitly forbids a bare refusal. Its output
+validation rejects a "refusal without alternative" and escalates one tier. This
+rule makes the ecosystem do the solution search instead of leaving an exhausted
+user to do it alone.
 
 ---
 
@@ -741,43 +766,53 @@ All plans are kept forever. They feed the WR retrospective and the high reasonin
 
 ## 9. The Daily Plan (Instantiation)
 
-The daily plan is generated each morning AFTER the morning checkin.
+The daily plan is instantiated only when the user explicitly clicks
+**"Démarrer la journée"**. No scheduled morning popup, wake-time event, or first
+app opening may start it. Before that click, current mission is **"Journée non
+démarrée"**, the programme is hidden, and an unfinished mission from the prior
+operational day is not displayed as current.
+
+The operational day is bounded by start and closure, not by civil date; it may
+cross midnight (up to roughly 36 hours). This section implements the canonical
+contract in [`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md).
 
 ### 9.1 The flow
 
 ```text
-06:00 (or user's wake time): Morning checkin popup.
-User submits: energy, sleep, pain, mood, special context.
+User clicks "Démarrer la journée".
+Front immediately shows "Démarrage…" and prevents a double click.
+User submits exactly one check-in input: subjective feeling (short scale).
 
 Backend:
-  1. Read the active monthly plan
-  2. Read morning checkin
-  3. Read calendar events for today
-  4. Read recent hooks (e.g. last night's mission failures)
-  5. Check what was already scheduled by the high reasoning model for today
+  1. Select deterministically from the current plan (target <500 ms).
+  2. Verify freshness deterministically: calendar changes since generation,
+     unfinished missions from the preceding operational day, and recent constraints.
+  3. Estimate objective energy from wearable sleep, Pulse nutrition/caffeine/
+     hydration declarations, and the previous day's load.
+  4. Keep subjective energy as the check-in value; retained load capacity is the
+     lower of objective and subjective energy, and their gap is recorded for
+     calibration.
 
 DECISION TREE:
 
-  IF morning context matches what the high reasoning model expected:
-    → Plan = monthly plan for today, unchanged
-    → Quick generation by the local model (just timing refinements)
-    → Cost: 0€ (local)
+  IF selection is fresh, feasible and conflict-free:
+    → Open the deterministic programme; no model call.
 
-  ELSE (energy low, pain high, special event):
-    → Plan = adapted from monthly plan
-    → the local model considers monthly plan + current state
-    → Adjusts mission selection and timing
-    → Cost: 0€ (local)
-    → Logged as "adapted from monthly plan"
+  ELSE (conflict or infeasibility):
+    → Show "Préparation de votre journée…"
+    → `Qwen3.6-27B-Q6_K`, via scoring, arbitrates locally.
+
+  IF exceptional full regeneration is required:
+    → Cloud may be used only after user validation.
 ```
 
-### 9.2 Inputs to the local model (daily generation)
+### 9.2 Inputs to the local model (conflict arbitration only)
 
 Smaller context (~5,000 tokens):
 
 ```text
 - Today's row from the monthly plan (~500 tokens)
-- Morning checkin (~200 tokens)
+- Subjective check-in (~200 tokens; no sleep, pain, mood or special-context question)
 - Today's calendar events (~500 tokens)
 - Last 3 days hook history (~500 tokens)
 - Top 20 active missions from backlog (~2,000 tokens)
@@ -802,7 +837,9 @@ Daily plan with timed missions:
 - Aligns with monthly plan when possible
 - Documents deviations
 
-User sees the plan on Imperium dashboard.
+The user sees the programme on Imperium dashboard only after the explicit start.
+The nominal output is selected deterministically; local AI output is limited to a
+conflict/infeasibility alternative and cloud output requires user validation.
 Missions get status='active'.
 Throughout the day, hooks may trigger replans (per doc 43 §3).
 ```
@@ -811,18 +848,13 @@ Throughout the day, hooks may trigger replans (per doc 43 §3).
 
 ```text
 V1 MODEL CHOICE — DAILY PLAN:
-The daily plan is generated by the local model in V1. Reasons: the task is light
-instantiation (timing + adaptation), the local model is capable, it is free, and it keeps all
-sensitive daily data local (privacy).
-
-FALLBACK (documented, observation-based): if, in real use, the local model proves insufficient
-on this task (weak plans, continuity/priority errors), switch the daily plan to
-the first cloud tier. Cost would be ~18€/year — negligible — and justified only if a real
-quality gap is observed. This is a deliberate test-first decision, not an a-priori
-one.
+The nominal day-start path is deterministic and invokes no model. On a detected
+conflict or infeasibility, the local `Qwen3.6-27B-Q6_K` scorer arbitrates. Cloud
+is not a routine quality fallback: it is reserved for an exceptional full
+regeneration explicitly validated by the user.
 
 MONTHLY PLAN: unchanged — the monthly strategic plan is generated by the high reasoning model.
-Only the DAILY instantiation moves to the local model.
+Only the exceptional DAILY conflict path invokes the local model.
 ```
 
 ## 9A. Local Degradation & Cloud Fallback (access-regime principle)
@@ -1066,12 +1098,12 @@ CREATE TABLE imperium_monthly_plans (
 CREATE TABLE imperium_daily_plans (
   id                  UUID PK,
   user_id             UUID FK,
-  date                DATE,
+  date                DATE, -- display/legacy date; never the operational-day boundary
   monthly_plan_id     UUID FK NULL, -- if derived from monthly
   status              VARCHAR(32), -- 'draft' | 'active' | 'completed'
   plan_json           JSONB,
   generated_at        TIMESTAMPTZ,
-  generated_model     VARCHAR(32), -- historical example IDs: 'qwen-local'; 'sonnet-4.6' fallback
+  generated_model     VARCHAR(32), -- local model only on conflict/infeasibility; cloud exceptional and user-validated
   is_adapted          BOOLEAN,     -- TRUE if differs from monthly
   adaptation_reason   TEXT NULL,
   cost_eur            NUMERIC(6,4)
@@ -1113,8 +1145,9 @@ CREATE TABLE mission_type_learned_durations (
 │ Monthly plan (the high reasoning model) │ 52 × /year │ ~10€    │
 │ Plan validation (the local model)       │ 52 × /year │ 0€      │
 │ Fallback last-resort generator (sustained_long_context) (rare)     │ ~5 × /year │ ~0.50€  │
-│ Daily plan (the local model)       │ 365 × /year│ 0€      │
-│ Daily first cloud tier fallback         │ if needed  │ ~18€    │
+│ Daily deterministic selection     │ on explicit start │ 0€      │
+│ Daily local conflict arbitration  │ if needed    │ 0€      │
+│ Daily exceptional cloud regeneration (user-validated) │ rare │ variable │
 │ Mission scoring (the local model)        │ on trigger │ 0€      │
 │ Mission categorization (the local model) │ on add     │ 0€      │
 │ Failure analysis (the local model)       │ as needed  │ 0€      │
@@ -1201,8 +1234,9 @@ Phase 3 — Monthly plan generation
   └─ Storage of plan history
 
 Phase 4 — Daily plan instantiation
-  ├─ local model prompt for daily plan
-  ├─ Adaptation logic (vs monthly)
+  ├─ explicit-start handler + subjective check-in only
+  ├─ deterministic selection and freshness checks
+  ├─ local conflict/infeasibility arbitration
   └─ Hook integration
 
 Phase 5 — Refusal & feedback

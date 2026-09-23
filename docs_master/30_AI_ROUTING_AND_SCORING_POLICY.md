@@ -163,7 +163,7 @@ Current logical mapping (summary; the subsections below are normative):
 |---|---|---|---|
 | `local_executor` | `Qwen3.6-27B-Q6_K` (unchanged) | local, see F10 §5-ter | §3.3 |
 | `first_cloud_tier` | Claude Sonnet 5 | `claude-sonnet-5` | §3.5 |
-| `high_reasoning` | Claude Opus 5 | `claude-opus-5` | §3.6 |
+| `high_reasoning` | Claude Opus 5.5 | `claude-opus-5-5` | §3.6 |
 | `sustained_long_context` | Claude Fable 5.1 | `claude-fable-5-1` | §3.7 |
 | `health_specialist` | GPT-5.6 Sol | — | §3.8 |
 | `finance_specialist` | GPT-5.6 Sol | — | §3.8bis |
@@ -225,7 +225,7 @@ Note: candidates MiniMax M3 / Qwen3.7 Max may later challenge this tier on cost/
 
 ### 3.6 High reasoning model — `high_reasoning`
 
-- Current model: Claude Opus 5 (API identifier `claude-opus-5`). Previous assignment: Opus 4.8 (superseded 2026-09-17).
+- Current model: Claude Opus 5.5 (API identifier `claude-opus-5-5`). Previous assignment: Opus 4.8 (superseded 2026-09-17).
 - Role: premium strategic model, the default when real depth is required.
 - Selection criteria: depth of reasoning.
 - Use for: deep analysis, complex priority arbitration, long-term strategy, multi-domain synthesis, serious architectural debugging, high-consequence decisions, strategic reflection in the project module; final orchestrator of the §5.6 critical tier (it may consult `sustained_long_context` and `high_reasoning_safeguard`, and it alone produces the final answer when the anti-loop breaker fires).
@@ -234,7 +234,7 @@ Opus must never be called by reflex.
 
 ### 3.7 Sustained long-context model — `sustained_long_context`
 
-- Current model: Claude Fable 5.1 (API identifier `claude-fable-5-1`). Availability fallback: Gemini Pro 3.1. Provider-native content-safeguard redirection target: Claude Opus 5 (the `high_reasoning` model). Previous assignment: Fable 5 (superseded 2026-09-17).
+- Current model: Claude Fable 5.1 (API identifier `claude-fable-5-1`). Availability fallback: Gemini Pro 3.1. Provider-native content-safeguard redirection target: Claude Opus 5.5 (the `high_reasoning` model). Previous assignment: Fable 5 (superseded 2026-09-17).
 - Role: the most capable long-context model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably, so paying for Fable is only justified when task length and complexity let its endurance advantage materialize.
 - Selection criteria: endurance on long tasks.
 - Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence; consultable by `high_reasoning` in §5.6 Step 2.
@@ -248,10 +248,10 @@ from that date; since 2026-09-17 it is served by Fable 5.1. Gemini Pro 3.1 stays
 the availability fallback and Opus (the `high_reasoning` model) the target of the
 provider-native content safeguard. The plan-generation cascade is Fable-based again.
 
-Built-in safeguard (Anthropic-native mechanism): for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable 5.1 blocks and redirects to Opus 5 on its own, model-side. This means the "sensitivity" routing criterion is partially handled model-side for Fable. This native redirection is **not** the Imperium role `high_reasoning_safeguard` (§3.8quater): the former is a provider content filter that swaps the answering model; the latter is an independent contradictory verifier that Imperium's routing calls on purpose (§5.6).
+Built-in safeguard (Anthropic-native mechanism): for high-risk topics (cybersecurity, biology, chemistry, distillation), Fable 5.1 blocks and redirects to Opus 5.5 on its own, model-side. This means the "sensitivity" routing criterion is partially handled model-side for Fable. This native redirection is **not** the Imperium role `high_reasoning_safeguard` (§3.8quater): the former is a provider content filter that swaps the answering model; the latter is an independent contradictory verifier that Imperium's routing calls on purpose (§5.6).
 
 Two distinct fallbacks must not be conflated:
-(a) Content safeguard — Fable redirects sensitive topics on its own, model-side, to Opus 5 (above). Anthropic mechanism, not an Imperium role.
+(a) Content safeguard — Fable redirects sensitive topics on its own, model-side, to Opus 5.5 (above). Anthropic mechanism, not an Imperium role.
 (b) Total model unavailability — handled routing-side, see §7.8. When Fable 5.1 is
     unreachable, the routing layer must substitute Gemini Pro 3.1 wherever a static
     rule forced Fable.
@@ -481,6 +481,16 @@ If consequences ≥ 9 and sensitivity ≥ 8  → high_reasoning or the domain sp
 ### 5.9 Automatic downgrade
 
 Downgrade to a cheaper model if: the score is low, the request is repetitive, a similar response already exists in memory, the task is pure formatting, the output has no consequences, or latency must be very short.
+
+### 5.10 Planner output validation — no bare refusal
+
+For any planning result, a response equivalent to **"refusal without
+alternative"** is invalid output. The planner must instead search for the safest
+path that maximizes the objective (target ≥80%), or return the best partial plan
+with a quantified gap and options for the remainder. Invalid bare refusals are
+rejected and automatically escalated one tier. This validation rule implements
+the transverse resolution principle in
+[`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md).
 
 ---
 

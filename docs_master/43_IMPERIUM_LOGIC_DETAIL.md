@@ -20,7 +20,10 @@ The daily plan is NOT generated once and frozen.
 The daily plan is a LIVING entity reshaped throughout the day by HOOKS.
 
 Morning:
-  AI generates the first plan based on context.
+  The explicit "Démarrer la journée" click collects subjective feeling only,
+  then opens the plan through deterministic selection. Local AI arbitrates only
+  a detected conflict or infeasibility; cloud regeneration stays exceptional
+  and user-validated (canonical contract: DECISION_demarrage_journee.md).
 
 Day in progress:
   Each hook can re-trigger AI to reshape the plan.
@@ -106,36 +109,48 @@ Triggered when the user presses "commencer la journée" (start day). NOT a clock
 time/wake-time trigger and NOT merely first app open — Imperium days are bounded
 start→finish (doc 12), not by a 24h schedule.
 
-Imperium opens a popup BEFORE showing dashboard:
+Before this click, the current-mission state is "Journée non démarrée". Imperium
+does not surface a mission still active from a preceding operational day, and the
+programme du jour remains hidden.
 
-  "Bonjour. Comment ça va ce matin ?"
+At this click, Imperium opens one popup:
+
+  "Comment tu te sens aujourd'hui ?"
   
-  ┌─ energy_score: slider 0-10
-  ├─ sleep_hours: number input (or API from Pulse wearable)
-  ├─ pain or limitation: optional text
-  ├─ mood: optional emoji (one tap)
-  └─ special context: optional text
+  └─ ressenti subjectif: échelle courte
   
   [Continuer]
 
 → INSERT INTO imperium_morning_checkins
-→ Triggers FIRST replan of the day:
+→ Sélection déterministe dans le plan courant (< 500 ms), puis vérification de
+  fraîcheur : calendrier modifié, missions non faites de la journée opérationnelle
+  précédente, contraintes récentes.
+→ Seulement en cas de conflit ou d'infaisabilité : arbitrage local via le scoring
+  (`Qwen3.6-27B-Q6_K`). Une régénération cloud est exceptionnelle et soumise à la
+  validation de l'utilisateur.
+
+The system estimates objective energy automatically from wearable sleep, Pulse
+nutrition/caffeine/hydration declarations and prior-day load. It keeps it
+separate from the submitted subjective feeling, uses the lower axis as retained
+load capacity, and logs the gap for calibration. Pain or health changes are not
+asked here: they can be declared during the day through the chatbot and only
+cause a proposed replan after user agreement.
+
+→ If the local conflict arbitration creates a plan proposal:
    ai_task: imperium.morning_plan
    inputs:
-     - morning checkin
-     - yesterday's outcomes
-     - today's calendar items
-     - active medical rules
-     - business pressure
-     - WR insights from past 4 weeks (decay-weighted)
-   output: first daily plan
+     - subjective check-in
+     - deterministically assembled conflict/freshness context
+   output: an alternative proposal, never an automatic replacement
 
-→ Plan presented to user. User accepts globally (V1) or per-mission (V2).
 → ALL AI calls from this flow logged in ai_call_logs (§17)
 ```
 
-The morning checkin is the day's first replan, triggered by the explicit
-"commencer la journée" action (user-triggered, not clock-auto).
+The morning check-in is not a replan by default. It is the single subjective
+input collected by the explicit start action. The day is operational from start
+to closure and may cross midnight (up to roughly 36 hours), so it must not be
+bounded by civil date. The canonical contract is
+[`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md).
 
 ---
 
@@ -457,7 +472,7 @@ The brain is unified: Vector and Path don't argue. The brain decides.
 ## 10. Imperium AI Task Types
 
 ```text
-imperium.morning_plan              - first plan of the day (the first cloud tier)
+imperium.morning_plan              - local conflict/infeasibility arbitration at explicit day start; deterministic selection remains the nominal path
 imperium.day_replan                - hook-triggered replan (the first cloud tier, sometimes the high reasoning model)
 imperium.monthly_plan              - rolling 4-week plan (the high reasoning model, V2 doc 52)
 imperium.mission_scoring           - score mission intrinsèque (the local model, doc 52)
@@ -606,14 +621,14 @@ To add (operational):
 CREATE TABLE imperium_morning_checkins (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  date            DATE NOT NULL,
-  energy_score    INTEGER CHECK (energy_score BETWEEN 0 AND 10),
-  sleep_hours     NUMERIC(3,1),
-  pain_notes      TEXT NULL,
-  mood            VARCHAR(32) NULL,
-  special_context TEXT NULL,
+  date            DATE NOT NULL, -- legacy/display date; never the operational-day boundary
+  energy_score    INTEGER CHECK (energy_score BETWEEN 0 AND 10), -- subjective feeling only
+  sleep_hours     NUMERIC(3,1), -- legacy/import field; not requested at check-in
+  pain_notes      TEXT NULL,    -- not requested at check-in; use chatbot health entry
+  mood            VARCHAR(32) NULL, -- legacy/import field; not requested at check-in
+  special_context TEXT NULL, -- legacy/import field; not requested at check-in
   submitted_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (user_id, date)
+  UNIQUE (user_id, date) -- legacy display/snapshot constraint; not a day-boundary rule
 );
 
 CREATE TABLE imperium_replan_events (
@@ -672,12 +687,12 @@ CREATE TABLE imperium_discipline_scores (
 ```text
 Imperium Dashboard (the main user-facing screen):
 
-  ┌─ Top: Greeting + morning checkin status
+  ┌─ Top: day-start state / subjective check-in status
   ├─ Banner section:
   │   - Weekly Review available? (per doc 32)
   │   - Ghusl required?
   │   - Critical alert?
-  ├─ Current focus mission (the ONE thing now)
+  ├─ Current focus mission (the ONE thing now, only after day start)
   │   - Title + countdown to deadline
   │   - [Faite] [Ratée] [Annulée] buttons
   ├─ Daily AI Advice
@@ -686,8 +701,8 @@ Imperium Dashboard (the main user-facing screen):
   ├─ Projets en cours
   │   - top active projects with progress %
   │   - [Voir tous les projets] link to Operations tab (doc 71)
-  ├─ Today's plan (other active missions)
-  │   - Tap to expand
+  ├─ Today's plan (other active missions, only after day start)
+  │   - Hidden while state = "Journée non démarrée"; tap to expand after start
   ├─ Quick stats:
   │   - Discipline today: N/N missions
   │   - Pressure score
@@ -786,6 +801,7 @@ SYSTEM HEALTH (V3, doc 54):
 - `25_CURRENT_MISSION_WORKFLOW.md` — current mission detail
 - `26_PRIORITY_RULES_WORKFLOW.md` — priority rules
 - `28_DAILY_PLAN_WORKFLOW.md` — plan generation flow
+- [`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md) — canonical explicit day-start contract
 - `30_AI_ROUTING_AND_SCORING_POLICY.md` — Imperium routing
 - `32_WR_INTERACTIVE_WORKFLOW.md` — Weekly Review
 - `40_PULSE_LOGIC_DETAIL.md` — energy_score consumption

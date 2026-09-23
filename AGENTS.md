@@ -143,9 +143,9 @@ Use different models for different jobs.
 
 ### Local Router / Scorer
 
-**Qwen 2.5 7B Instruct** is the official V1 local router and scorer.
+**Qwen3.6-27B-Q6_K** is the official V1 local router and scorer.
 
-Qwen V1 should be used for:
+Qwen3.6 V1 should be used for:
 
 - routing
 - classification

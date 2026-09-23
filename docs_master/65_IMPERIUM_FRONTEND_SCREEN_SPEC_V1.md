@@ -1,7 +1,7 @@
 # 65 — Imperium Frontend Screen Spec V1
 
 **Version :** 1.0
-**Sources de verite :** `59_DESIGN_SYSTEM_V1_DRAFT.md`, `60_DESIGN_SYSTEM_TOKENS_KT.md`, `61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md`, `62_DESIGN_SYSTEM_COMPONENT_CATALOG.md`, `63_FRONTEND_ARCHITECTURE_V1.md`, `64_FRONTEND_GENERATION_PLAN_V1.md`, `71_IMPERIUM_OPERATIONS_TAB.md`, `07_ANDROID_APP_RESPONSIBILITIES.md`, `43_IMPERIUM_LOGIC_DETAIL.md`
+**Sources de verite :** `59_DESIGN_SYSTEM_V1_DRAFT.md`, `60_DESIGN_SYSTEM_TOKENS_KT.md`, `61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md`, `62_DESIGN_SYSTEM_COMPONENT_CATALOG.md`, `63_FRONTEND_ARCHITECTURE_V1.md`, `64_FRONTEND_GENERATION_PLAN_V1.md`, `71_IMPERIUM_OPERATIONS_TAB.md`, `07_ANDROID_APP_RESPONSIBILITIES.md`, `43_IMPERIUM_LOGIC_DETAIL.md`, [`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md)
 **Cible :** generation future Android natif Kotlin + Jetpack Compose + Material 3
 **Statut :** CANONICAL IMPERIUM FRONTEND SCREEN SPEC V1 — documentation only, aucun Kotlin, aucun dossier `android/`, aucun runtime frontend, aucun backend branche, aucune API reelle.
 **Last updated :** 2026-06-02
@@ -115,7 +115,7 @@ Regles communes :
 
 ### 3.2 Objectif metier
 
-Montrer ce que l'utilisateur doit faire maintenant, avec une seule mission active visible, les priorites du jour, les actions rapides et l'etat global Imperium.
+Montrer ce que l'utilisateur doit faire maintenant, avec une seule mission active visible après le démarrage de journée, les priorites du jour, les actions rapides et l'etat global Imperium.
 
 Le Dashboard ne choisit pas une nouvelle mission localement. Il affiche le read model mock en Phase 1/2, puis le backend en Phase 3 seulement.
 
@@ -154,8 +154,8 @@ Ordre telephone, une seule colonne :
 
 | Widget | Composant autorise | Contenu obligatoire |
 |---|---|---|
-| Daily Focus Card | `ImperiumCard` + `ImperiumSectionHeader` | focus label, raison, date locale mock, source `mock`. |
-| Active Mission Card | `MissionFocusCard` | mission id, titre, priorite, deadline, status, une action primary. |
+| Daily Focus Card | `ImperiumCard` + `ImperiumSectionHeader` | visible seulement après démarrage : focus label, raison, date locale mock, source `mock`. |
+| Active Mission Card | `MissionFocusCard` | visible seulement après démarrage : mission id, titre, priorite, deadline, status, une action primary. |
 | Priority Card | `ImperiumCard` + `ImperiumKpiBlock` | top priority, reason, urgency label. |
 | Quick Actions | `ImperiumCard` + buttons | focaliser module mission active, ouvrir chatbot docke, lancer replan mock, finish day mock. |
 | Weekly Progress | `ImperiumMetricCard` + `ImperiumProgressBar` | missions done, failures, weekly completion percent. |
@@ -169,6 +169,7 @@ Ordre telephone, une seule colonne :
 | Ouvrir chatbot | Secondary dans `Quick Actions` | ouvre la fenetre dockee `IMP.CHAT.CONVERSATION` avec champ vide. | message/chat backend-valide. |
 | Demander replan | Secondary dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.REPLAN.VALIDATE` si proposition backend existe. |
 | Finish day | Ghost dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.DAY.FINISH`. |
+| Démarrer la journée | `ImperiumPrimaryButton` dans l'état non démarré | ouvre le mock `IMP.CHECKIN.MORNING`; anti-double-clic visuel. | déclenche le démarrage explicite backend. |
 
 ### 3.7 Mock data
 
@@ -180,6 +181,7 @@ Fixture locale canonique : `dashboard_mock_v1`.
   "screen": "IMP.DASH.MAIN",
   "fixture_name": "dashboard_mock_v1",
   "sync_state": "mock",
+  "day_state": "started",
   "generated_at": "2026-06-02T07:30:00Z",
   "daily_focus": {
     "label": "Execution",
@@ -244,7 +246,8 @@ Fixture locale canonique : `dashboard_mock_v1`.
 | State | Specification |
 |---|---|
 | Loading state | `ImperiumSkeleton` for Daily Focus, Active Mission, two metric cards and status panel. No fake mission title. |
-| Empty state | `ImperiumEmptyState` inside Active Mission slot: title `No active mission`, body `Waiting for backend-confirmed next mission.`, CTA `Open Chatbot`. |
+| Not started state | State label `Journée non démarrée`; show only the explicit `Démarrer la journée` CTA. Hide Daily Focus, Active Mission and the programme du jour; never surface a mission active on the preceding day. The check-in asks only subjective feeling. |
+| Empty state | After a started day only: `ImperiumEmptyState` inside Active Mission slot: title `No active mission`, body `Waiting for backend-confirmed next mission.`, CTA `Open Chatbot`. |
 | Error state | `ImperiumErrorState` full main column if dashboard fixture/read fails; retry button visual only in Phase 1/2. |
 
 ### 3.9 Future backend endpoints
@@ -317,7 +320,7 @@ Ordre telephone :
 
 | Bloc | Composant autorise | Contenu obligatoire |
 |---|---|---|
-| Mission Header | `MissionFocusCard` | titre, status `active`, priority, deadline, sync chip. |
+| Mission Header | `MissionFocusCard` | titre, status `active`, priority, deadline, sync chip; unavailable while day state is `not_started`. |
 | Mission Description | `ImperiumCard` | description, reason, expected outcome. |
 | Progress Block | `ImperiumProgressBar` + `ImperiumKpiBlock` | current step, percent, time remaining. |
 | Decision Buttons | buttons | `Complete`, `Fail`, `Replan`, `Back`. |
@@ -379,7 +382,8 @@ Fixture locale canonique : `mission_active_mock_v1`.
 | State | Specification |
 |---|---|
 | Loading | Mission header skeleton, progress skeleton, disabled decision buttons. |
-| Empty | `ImperiumEmptyState`: title `No active mission`, CTA `Back to Dashboard`; no create mission button here. |
+| Not started | State label `Journée non démarrée`; no previous-day mission and no programme are displayed. CTA `Démarrer la journée` returns to the explicit start flow. |
+| Empty | After a started day only: `ImperiumEmptyState`: title `No active mission`, CTA `Back to Dashboard`; no create mission button here. |
 | Error | `ImperiumErrorState`: title `Active mission unavailable`, retry visual only, back button always available. |
 
 ### 4.9 Future endpoints
@@ -793,10 +797,11 @@ Mock data is documentary and local-only:
   "screen": "IMP.DASH.MAIN",
   "fixture_name": "dashboard_empty_v1",
   "sync_state": "mock",
+  "day_state": "not_started",
   "active_mission": null,
   "daily_focus": {
-    "label": "Waiting",
-    "reason": "No backend-confirmed mission in this mock state."
+    "label": "Journée non démarrée",
+    "reason": "Programme et mission active masqués avant le clic explicite de démarrage."
   },
   "weekly_progress": {
     "missions_done": 0,
@@ -826,10 +831,11 @@ Mock data is documentary and local-only:
   "screen": "IMP.MISSION.ACTIVE",
   "fixture_name": "mission_active_empty_v1",
   "sync_state": "mock",
+  "day_state": "not_started",
   "mission": null,
   "empty_state": {
-    "title": "No active mission",
-    "body": "Waiting for backend-confirmed next mission."
+    "title": "Journée non démarrée",
+    "body": "Aucune mission ni programme ne sont affichés avant le démarrage explicite."
   }
 }
 ```
@@ -885,6 +891,7 @@ Every screen must pass every item before Phase 3 backend wiring.
 Additional validation rules:
 
 - Dashboard must show no more than one active mission.
+- Before explicit day start, Dashboard and Mission Active must show the `Journée non démarrée` state and hide both programme and prior-day active mission.
 - Mission Active must remain a Dashboard module or quick access surface, not a top-level route.
 - Chatbot must remain `IMP.CHAT.CONVERSATION`, docked from Dashboard, not a recreated Inbox screen.
 - Weekly Review must remain a Dashboard banner/event window and must never finalize locally.

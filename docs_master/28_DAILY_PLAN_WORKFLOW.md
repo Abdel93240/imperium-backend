@@ -21,6 +21,34 @@ The plan is built from existing backend truth only:
 - top active priority rules as context
 - latest day review reference, if present
 
+## Canonical Day Start
+
+The canonical start-of-day contract is
+[`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md).
+This document describes the daily-plan snapshot layer; it does not itself make an
+AI call. The operational flow is nevertheless fixed:
+
+- A day starts only when the user explicitly clicks **"Démarrer la journée"**;
+  no clock, wake-time, or first-open event starts it.
+- Before that click, the current-mission state is **"Journée non démarrée"** and
+  the programme du jour is hidden. A mission left active yesterday is not shown
+  as today's active mission.
+- At the click, the only check-in input is the user's subjective feeling. The
+  deterministic selector reads the current plan in under 500 ms, then performs
+  freshness checks (calendar changes, unfinished prior-day missions, and recent
+  constraints). It invokes `Qwen3.6-27B-Q6_K` through scoring only for a
+  conflict or infeasibility. A cloud regeneration is exceptional and requires
+  user validation.
+- The operational day runs from this start to its closure and may pass midnight
+  (up to roughly 36 hours). `local_date` remains a snapshot/display attribute;
+  it must not be used to infer that an operational day has ended.
+
+Energy is deliberately two-dimensional: objective energy is estimated
+deterministically from wearable sleep, Pulse declarations (nutrition, caffeine,
+hydration), and prior-day load; subjective energy is the check-in feeling. The
+selected capacity is the lower value, and their difference is retained as an
+algorithm-calibration signal.
+
 Prayer awareness zones note (future brain planning): when daily planning becomes
 brain-generated/replanned, prayer awareness zones are part of the generated plan
 and are recomputed on every re-plan. They are not a separate prayer scheduler;
@@ -48,7 +76,8 @@ Columns:
 
 Constraints:
 
-- one plan per `user_id` and `local_date`
+- one snapshot per `user_id` and `local_date` (legacy display/snapshot constraint;
+  it must never determine the operational-day boundary)
 - `plan_status` allowed values only
 - `plan_blocks` must be a JSON array
 
@@ -94,7 +123,8 @@ Behavior:
 
 Behavior:
 
-- Uses `Europe/Paris` for V1 today calculation.
+- Resolves the currently started operational day; it must not infer "today" from
+  the civil date alone. `Europe/Paris` remains the V1 display timezone.
 - Returns `404` if no plan exists.
 
 ### Get Plan By Date
