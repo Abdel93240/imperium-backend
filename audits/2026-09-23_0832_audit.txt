@@ -1,0 +1,120 @@
+# Audit de code
+
+## Resume executif
+
+**Le parcours « Démarrer la journée » n’est pas implémenté de bout en bout dans le backend examiné** : les opérations existantes créent un instantané déterministe ou activent un plan, sans appel IA ni adaptation quotidienne ; le service déclare explicitement ces capacités désactivées. [daily_plans.py:49](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:49), [decision_framework.py:257](/opt/imperium-backend/backend/app/services/imperium/decision_framework.py:257)
+
+La documentation contient plusieurs cibles divergentes : génération matinale cloud, adaptation locale du plan mensuel, puis sélection déterministe sans LLM. Il faut donc distinguer ces intentions du comportement effectivement codé. [43:460](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:460), [52:810](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:810), [Daily Orchestrator:70](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:70)
+
+Audit statique strictement read-only : aucun fichier modifié, créé ou supprimé ; aucun test ni appel métier exécuté.
+
+## Issues CRITICAL
+
+Aucune identifiée dans le périmètre examiné.
+
+## Issues HIGH
+
+**H1 — Au clic : aucun contrat complet de démarrage de journée trouvé.**
+
+**Documenté :** le bouton ouvre un check-in — énergie, sommeil, douleur, humeur, contexte — puis sa soumission déclenche `imperium.morning_plan`, avec présentation du plan pour acceptation. L’appel IA est donc prévu après le check-in, pas nécessairement dès le clic initial. [43:102](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:102)
+
+**Codé :** les routes pertinentes exposent les opérations suivantes :
+
+| Opération | Comportement réel |
+|---|---|
+| `POST /api/imperium/day/plan` | Construit et stocke un plan `draft` depuis les données existantes. |
+| `GET /api/imperium/day/plan/today` | Lit le plan en base ; retourne `404` s’il manque. |
+| `POST /api/imperium/day/plan/{plan_id}/activate` | Charge le plan et passe son statut de `draft` à `active`. |
+| `POST /api/imperium/day/finish` | Enregistre un bilan journalier. |
+| `GET /api/imperium/day/latest` | Lit le dernier bilan. |
+
+Sources : [routes:488](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:488), [routes:530](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:530), [routes:538](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:538), [routes:577](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:577), [routes:597](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:597).
+
+La création collecte **la mission déjà active, les éléments Path, les priorités et une référence au dernier bilan**. Elle ne lit pas de plan mensuel/WR et n’appelle aucun modèle. L’activation ne sélectionne ni ne démarre une mission. [daily_plans.py:67](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:67), [daily_plans.py:293](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:293), [daily_plans.py:250](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:250)
+
+**Conclusion précise :** si le frontend utilise l’activation existante, il active un instantané stocké, **sans IA**. Mais rien ne permet d’affirmer que le bouton est effectivement raccordé à cette route. Le contrat du check-in reste `TBD`, et cet écran est explicitement hors génération frontend V1 jusqu’à réactivation par un contrat. [59:761](/opt/imperium-backend/docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md:761), [63:654](/opt/imperium-backend/docs_master/63_FRONTEND_ARCHITECTURE_V1.md:654)
+
+**H2 — Aucune vérification de fraîcheur lors de l’activation ; journée opérationnelle non représentée par ce parcours.**
+
+**Codé :** l’activation vérifie l’appartenance du plan à l’utilisateur et son statut, puis modifie celui-ci. Elle ne compare aucune version du calendrier, ne recharge pas les blocs et ne traite pas les missions non faites. Un ancien brouillon peut donc être activé sans réévaluation. [daily_plans.py:250](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:250), [daily_plans.py:374](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:374)
+
+Même à la création, le dernier bilan n’est conservé que par son identifiant dans `generated_from` : ses `missed_items` ne servent pas à reconstruire le programme. Le bilan lui-même stocke ces éléments sans clôturer les missions ni le plan. [daily_plans.py:303](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:303), [daily_plans.py:361](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:361), [day_finish.py:60](/opt/imperium-backend/backend/app/services/imperium/day_finish.py:60)
+
+**Documenté :** le doc 52 prévoit de relire le calendrier du jour, les hooks récents et les résultats de la veille avant l’adaptation. La spec Daily prévoit aussi des contrôles de faisabilité et la prise en compte des deadlines en retard. Ce sont des intentions plus fortes qu’une simple lecture du plan stocké. [52:752](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:752), [52:774](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:774), [Daily Orchestrator:218](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:218)
+
+Autre écart concret pour un conducteur VTC : « aujourd’hui » est calculé par date civile Europe/Paris, alors que le doc 12 définit une journée allant du démarrage à la clôture, éventuellement au-delà de minuit. **Cela peut faire rechercher un autre plan après minuit alors que la journée opérationnelle continue.** [daily_plans.py:134](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:134), [dates.py:8](/opt/imperium-backend/backend/app/core/dates.py:8), [12:47](/opt/imperium-backend/docs_master/12_DAILY_OBJECTIVE_PERIOD_LOGIC.md:47)
+
+**H3 — Les documents ne donnent pas une réponse unique à « lecture en base ou IA ? ».**
+
+| Source | Cible documentée |
+|---|---|
+| Doc 28 | Instantané déterministe, sans IA, n8n ni sélection automatique : correspond au service existant. |
+| Doc 43 | Check-in → `imperium.morning_plan` → premier palier cloud. |
+| Doc 52 §9 | Lecture du plan mensuel et du contexte récent → génération/adaptation locale ; cloud seulement en repli si qualité insuffisante. |
+| Spec Daily | Démarrage → sélection déterministe dans le plan courant ; IA locale seulement en cas d’infaisabilité/conflit/perturbation, cloud pour une régénération exceptionnelle validée. |
+
+Sources : [28:5](/opt/imperium-backend/docs_master/28_DAILY_PLAN_WORKFLOW.md:5), [43:123](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:123), [43:460](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:460), [52:752](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:752), [52:810](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:810), [Daily Orchestrator:93](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:93).
+
+**Modèles :** le mapping écrit dans le doc 30 associe `local_executor` à `Qwen3.6-27B-Q6_K`, `first_cloud_tier` à Claude Sonnet 5 et `sustained_long_context` à Claude Fable 5.1. Ce document précise que ce mapping documentaire n’active aucun appel produit. L’AGENTS.md conserve cependant Qwen 2.5 7B comme référence V1 : divergence supplémentaire à résoudre, sans conséquence sur le constat actuel d’absence d’appel dans ce parcours. [30:142](/opt/imperium-backend/docs_master/30_AI_ROUTING_AND_SCORING_POLICY.md:142), [30:164](/opt/imperium-backend/docs_master/30_AI_ROUTING_AND_SCORING_POLICY.md:164), [AGENTS.md:146](/opt/imperium-backend/AGENTS.md:146)
+
+**Weekly Review phase 3 :** le doc 32 prévoit une replanification glissante sur quatre semaines, avec validation utilisateur. Mais le renvoi ajouté au doc 52 donne désormais la responsabilité du mécanisme à la spec WR : plan complet régénéré mensuellement ou sur choc, deltas lors du WR ordinaire. Il serait donc incorrect de présenter « le WR pré-génère chaque semaine tous les plans quotidiens » comme un comportement établi. [32:1312](/opt/imperium-backend/docs_master/32_WR_INTERACTIVE_WORKFLOW.md:1312), [52:498](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:498), [WR spec:547](/opt/imperium-backend/specs/WR_CONTINUOUS_ENGINE_SPEC_V1.md:547)
+
+Le stockage cible `plan_versions` + deltas → `v_plan_current` est documenté ; sa réalisation, les deltas et la sélection quotidienne sont indiqués `NOT_CODED` dans la roadmap, en accord avec les capacités désactivées du service. [WR spec:260](/opt/imperium-backend/specs/WR_CONTINUOUS_ENGINE_SPEC_V1.md:260), [76:117](/opt/imperium-backend/docs_master/76_ACTIVATION_ROADMAP.md:117), [76:131](/opt/imperium-backend/docs_master/76_ACTIVATION_ROADMAP.md:131), [decision_framework.py:257](/opt/imperium-backend/backend/app/services/imperium/decision_framework.py:257)
+
+## Issues MEDIUM
+
+**M1 — Avant démarrage : les deux zones n’ont pas de contrat spécifique.**
+
+**« Mission actuelle » :**
+
+- **Codé :** le dashboard retourne la mission ayant `status="active"`, indépendamment d’un démarrage de journée et sans filtre de date. Une mission encore active de la veille peut donc apparaître ; sinon la valeur est `null`. [dashboard.py:70](/opt/imperium-backend/backend/app/services/imperium/dashboard.py:70), [missions.py:616](/opt/imperium-backend/backend/app/services/imperium/missions.py:616)
+- **Documenté :** un état vide générique « No active mission » est prévu. Ce n’est pas un état métier « journée non démarrée ». [65:242](/opt/imperium-backend/docs_master/65_IMPERIUM_FRONTEND_SCREEN_SPEC_V1.md:242)
+
+**« Programme du jour » :**
+
+- **Codé :** le contrat public de `/dashboard` ne contient pas de programme. `/daily-plan`, malgré son nom, agrège dashboard, mission, Path et Pulse ; il ne lit pas `imperium_daily_plans`. Pour lire les blocs persistés, il faut utiliser `/day/plan/today`, qui retourne `404` en leur absence. [dashboard schema:65](/opt/imperium-backend/backend/app/schemas/dashboard.py:65), [daily_plan.py:28](/opt/imperium-backend/backend/app/services/imperium/daily_plan.py:28), [routes:577](/opt/imperium-backend/backend/app/api/v1/routes/imperium.py:577)
+- **Attention à l’ancien agrégateur :** `get_dashboard_snapshot()` contient bien `daily_plan_today`, mais la route publique appelle `get_imperium_dashboard_foundation()`. Il ne faut pas attribuer le contenu du premier à la réponse actuelle. [dashboard.py:182](/opt/imperium-backend/backend/app/services/imperium/dashboard.py:182), [imperium_dashboard.py:14](/opt/imperium-backend/backend/app/api/v1/routes/imperium_dashboard.py:14)
+- **Documentation contradictoire :** le doc 43 affiche « Today's plan » ; la spec Daily impose une file invisible. Aucun contrat cohérent ne fixe donc ce que cette zone doit montrer **avant** démarrage. [43:689](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:689), [Daily Orchestrator:78](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:78)
+
+**M2 — Latence : une cible existe, aucune mesure ne prouve le délai du bouton.**
+
+**Code actuel :** création/activation effectuent des opérations SQL et enregistrent événement et idempotence ; aucun temps d’inférence IA n’intervient. Leur latence réelle n’a pas été mesurée dans cet audit. [daily_plans.py:49](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:49), [daily_plans.py:231](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:231)
+
+**Cible documentée :** la sélection déterministe vise **moins de 500 ms**, avec trajets en cache dans le test prévu. C’est une cible du futur moteur, pas une garantie de délai réseau/frontend ni une mesure du parcours actuel. [Daily Orchestrator:274](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:274), [Daily Orchestrator:418](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:418)
+
+**État de chargement frontend : oui.** Le check-in prévoit explicitement un spinner à la soumission, et le dashboard des squelettes. Je recommande de distinguer « démarrage en cours » et, seulement si nécessaire, « préparation du plan », avec prévention du double clic. Le délai maximal et le mécanisme d’attente d’une proposition IA restent à contractualiser. [59:760](/opt/imperium-backend/docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md:760), [65:246](/opt/imperium-backend/docs_master/65_IMPERIUM_FRONTEND_SCREEN_SPEC_V1.md:246)
+
+**M3 — Les événements ne prouvent pas une planification IA.**
+
+Les noms réellement émis sont normalisés :
+
+- `day.plan.created` → `planning.daily_plan.generated` ;
+- activation/complétion/annulation → `planning.daily_plan.replanned`, avec `trigger` ;
+- `day.finished` → `planning.day.finished`.
+
+Cette normalisation est codée, mais `replanned` accompagne ici une transition de statut, sans recalcul du plan. Le catalogue décrit pourtant un événement versionné avec `version` et `reason`, absents du payload de transition actuel. [nomenclature.py:25](/opt/imperium-backend/backend/app/services/events/nomenclature.py:25), [emitter.py:41](/opt/imperium-backend/backend/app/services/events/emitter.py:41), [daily_plans.py:244](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:244), [77:168](/opt/imperium-backend/docs_master/77_EVENTS_CATALOG.md:168)
+
+**Décisions restant à consolider ou à définir :**
+
+- **Déclencheur :** clic explicite dans le doc 43, heure de réveil dans le doc 52, première ouverture/heure paramétrée dans la spec Daily. [43:105](/opt/imperium-backend/docs_master/43_IMPERIUM_LOGIC_DETAIL.md:105), [52:749](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:749), [Daily Orchestrator:390](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:390)
+- **Affichage avant démarrage et visibilité du programme :** pas de décision commune entre les contrats frontend et la spec Daily. Références détaillées en M1.
+- **Contrats non trouvés, ni codés ni précisément documentés dans le parcours examiné :** démarrage sans plan mensuel initial, seuil de péremption du calendrier, politique exhaustive de report des missions restantes, délai maximal et reprise après échec de préparation. Les textes donnent des entrées et des intentions, mais pas ce protocole complet. [52:752](/opt/imperium-backend/docs_master/52_AI_DECISION_FRAMEWORK.md:752), [Daily Orchestrator:225](/opt/imperium-backend/specs/DAILY_ORCHESTRATOR_SPEC_V1.md:225), [59:760](/opt/imperium-backend/docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md:760)
+
+## Issues LOW
+
+Aucune retenue : les écarts utiles à cette question concernent les contrats et le comportement métier.
+
+## Points positifs
+
+- Le périmètre déterministe actuel est explicitement documenté, sans prétendre fournir une planification IA. [28:5](/opt/imperium-backend/docs_master/28_DAILY_PLAN_WORKFLOW.md:5)
+- Les mutations de plan disposent d’idempotence, de contrôles d’appartenance et d’événements tracés. [daily_plans.py:244](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:244), [daily_plans.py:374](/opt/imperium-backend/backend/app/services/imperium/daily_plans.py:374)
+- L’unicité de la mission active est protégée par un index PostgreSQL unique partiel. [models/imperium.py:143](/opt/imperium-backend/backend/app/models/imperium.py:143)
+- Des tests existants vérifient les réponses vides et l’absence d’écriture lors des lectures ; ils ont été consultés, pas exécutés. [test_dashboard:165](/opt/imperium-backend/backend/tests/test_imperium_dashboard_foundation.py:165), [test_daily_plan:313](/opt/imperium-backend/backend/tests/test_imperium_daily_plan_foundation.py:313)
+
+## Recommandations prioritaires
+
+1. **Fixer un contrat canonique « Démarrer la journée ».** Définir le déclencheur, le check-in, les deux zones avant/après démarrage et le choix entre adaptation IA et sélection déterministe ; harmoniser docs 43/52, spec Daily et contrats frontend.
+
+2. **Raccorder ce contrat à la journée opérationnelle et au plan courant.** Prévoir les contraintes récentes, les missions restantes, le cas sans plan et une validation de fraîcheur avant activation. Ne pas assimiler l’actuel changement de statut à ce parcours.
+
+3. **Définir et vérifier le contrat d’attente.** Chargement, idempotence, erreurs/reprise et délai cible mesurable ; tester notamment le passage de minuit, un calendrier modifié, une mission restante de la veille et un double clic.
