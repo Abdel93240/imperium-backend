@@ -274,11 +274,11 @@ perdent leurs derniers lecteurs.
 ## 10. CONFIG RÔLES→MODÈLES + NETTOYAGE DV-6
 
 Table minimale `ai_role_models` (doc 73 PART B, identifier-not-call) : role_code, provider,
-model_id, effort, sensitivity_route, version, active. Seed depuis doc 30 §3 ACTUEL (avec
-Fable 5 rétabli — le patch doc 30 §7.8 est dans cette passe). **DV-6** : les 6 références en
-dur `qwen2.5:7b-instruct` (config.py:51, providers/qwen.py, WR conversation, tests) sont
-remplacées par le rôle `local_executor` résolu via cette table ; valeur seedée =
-`qwen3-32b` (servi à J+2 ; tant que le endpoint n'existe pas, dry-run comme aujourd'hui).
+model_id, effort, sensitivity_route, version, active. Le seed est résolu exclusivement depuis
+le doc 30 §3 actuel. **DV-6** : les six références en dur à l'ancien identifiant local
+(config.py:51, providers/qwen.py, WR conversation, tests) sont remplacées par le rôle
+`local_executor` résolu via cette table ; tant que l'endpoint n'existe pas, le comportement
+reste en dry-run comme aujourd'hui.
 
 ## 11. PATCHES DOCS (appliqués dans cette passe, chacun = un commit dédié)
 
@@ -323,7 +323,7 @@ des jobs des passes suivantes NON créés (chaque passe seede les siens).
    requête sortante (spy réseau)** ; fallback marqué.
 8. Prayer : cache MAWAQIT, fallback ±2 min vs fixtures de référence, fenêtres correctes.
 9. Legacy : parité sur fixtures ; rapport d'écart sur divergences réelles.
-10. DV-6 : grep `qwen2.5:7b` = zéro hors changelog.
+10. DV-6 : le grep de l'ancien identifiant local est à zéro hors changelog.
 
 ## 14. ORDRE D'EXÉCUTION
 

@@ -35,7 +35,7 @@ LOCAL_EXECUTOR_MODEL = "Qwen3.6-27B-Q6_K"
 CANONICAL_MAPPING: dict[str, tuple[str, str | None]] = {
     "local_executor": (LOCAL_EXECUTOR_MODEL, None),
     "first_cloud_tier": ("Claude Sonnet 5", "claude-sonnet-5"),
-    "high_reasoning": ("Claude Opus 5", "claude-opus-5"),
+    "high_reasoning": ("Claude Opus 5.5", "claude-opus-5-5"),
     "sustained_long_context": ("Claude Fable 5.1", "claude-fable-5-1"),
     "health_specialist": ("GPT-5.6 Sol", None),
     "finance_specialist": ("GPT-5.6 Sol", None),

@@ -143,9 +143,11 @@ Use different models for different jobs.
 
 ### Local Router / Scorer
 
-**Qwen3.6-27B-Q6_K** is the official V1 local router and scorer.
+`local_executor` is the official V1 local router and scorer. Its concrete
+model/version assignment is owned exclusively by
+`docs_master/30_AI_ROUTING_AND_SCORING_POLICY.md` §3.
 
-Qwen3.6 V1 should be used for:
+`local_executor` V1 should be used for:
 
 - routing
 - classification
@@ -155,15 +157,15 @@ Qwen3.6 V1 should be used for:
 - low-cost daily interactions
 - privacy-sensitive lightweight tasks
 
-Patch 2E provides the backend adapter foundation for Qwen. It defaults to dry-run mode, returns structured JSON contracts, and must not create canonical actions without backend/user validation.
+Patch 2E provides the backend adapter foundation for `local_executor`. It defaults to dry-run mode, returns structured JSON contracts, and must not create canonical actions without backend/user validation.
 
-**Gemma local** is only a future optional challenger or fallback, not the default V1 router.
+A future local alternative may be evaluated as a challenger or fallback, but is not the default V1 router.
 
 ---
 
 ### Speech-to-Text
 
-Use **Whisper** or **faster-whisper** for:
+Use `transcription_service` for:
 
 - voice notes
 - commands while driving
@@ -173,9 +175,9 @@ Use **Whisper** or **faster-whisper** for:
 
 ---
 
-### Gemini
+### Vision / OCR
 
-Use **Gemini** for:
+Use `ocr_service` for:
 
 - image understanding
 - OCR
@@ -185,9 +187,9 @@ Use **Gemini** for:
 
 ---
 
-### GPT or Claude
+### Cloud reasoning
 
-Use **GPT** or **Claude** for:
+Use the cloud roles defined in `docs_master/30_AI_ROUTING_AND_SCORING_POLICY.md` §3 (not concrete model names) for:
 
 - complex reasoning
 - architecture

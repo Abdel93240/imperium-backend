@@ -125,9 +125,10 @@ At this click, Imperium opens one popup:
 → Sélection déterministe dans le plan courant (< 500 ms), puis vérification de
   fraîcheur : calendrier modifié, missions non faites de la journée opérationnelle
   précédente, contraintes récentes.
-→ Seulement en cas de conflit ou d'infaisabilité : arbitrage local via le scoring
-  (`Qwen3.6-27B-Q6_K`). Une régénération cloud est exceptionnelle et soumise à la
-  validation de l'utilisateur.
+→ Seulement en cas de conflit ou d'infaisabilité : arbitrage `local_executor` via
+  le scoring. Une régénération `high_reasoning` est exceptionnelle et soumise à la
+  validation de l'utilisateur ; les assignations de modèles sont définies par le
+  doc 30 §3.
 
 The system estimates objective energy automatically from wearable sleep, Pulse
 nutrition/caffeine/hydration declarations and prior-day load. It keeps it

@@ -1,9 +1,9 @@
 # SPEC — DAILY MISSION ORCHESTRATOR V1
 
-> **Livrable d'implémentation one-pass.** Prompt d'exécution destiné à Claude Code (Fable 5) sur
+> **Livrable d'implémentation one-pass.** Prompt d'exécution destiné à un agent d'implémentation sur
 > `/opt/imperium-backend`. Il implémente l'orchestration journalière des missions : moteur de
 > faisabilité déterministe, ensemble obligatoire, sélection à la complétion, gradation à trois
-> niveaux (code → Qwen3.6-27B local → frontier) avec détection déterministe du niveau, classes de préemption,
+> niveaux (code → `local_executor` → `high_reasoning`) avec détection déterministe du niveau, classes de préemption,
 > et boucle de feedback sur les barèmes. Il CONSOMME le scoring /100 du doc 52 sans le modifier.
 > Numérotation : nouveau doc au prochain numéro libre de `docs_master/` + patch de renvoi dans le
 > doc 52. Cette spec fait système avec les deux précédentes (Pulse Intelligence Layer, WR
@@ -13,6 +13,10 @@
 > [`DECISION_demarrage_journee.md`](../gap_analysis_v1/DECISION_demarrage_journee.md) fait foi
 > pour le déclencheur, le check-in, les deux axes d'énergie, l'état pré-démarrage et la journée
 > opérationnelle. La présente spec ne le contredit pas.
+
+> **Rôles IA :** les rôles ci-dessous se résolvent exclusivement via
+> [`30_AI_ROUTING_AND_SCORING_POLICY.md`](../docs_master/30_AI_ROUTING_AND_SCORING_POLICY.md) §3 ;
+> cette spec ne nomme aucun modèle concret.
 
 ---
 
@@ -76,8 +80,8 @@ Principes :
    rejouées sur l'état frais à chaque complétion. L'intelligence a déjà été dépensée en amont
    (le plan mensuel par le frontier, les valeurs de l'utilisateur dans les barèmes).
 4. **La détection du niveau d'intelligence est elle-même déterministe.** Niveau 1 code (~95 %
-   des complétions) ; Niveau 2 `Qwen3.6-27B-Q6_K` local sur CONDITIONS testables (ensemble faisable vide,
-   conflit d'obligatoires, perturbation exprimée en langage) ; Niveau 3 frontier sur classe
+   des complétions) ; Niveau 2 `local_executor` sur CONDITIONS testables (ensemble faisable vide,
+   conflit d'obligatoires, perturbation exprimée en langage) ; Niveau 3 `high_reasoning` sur classe
    choc (régénération immédiate, mécanique WR §8.1). Le code sait qu'il ne sait pas : c'est
    un test d'infaisabilité, pas un jugement.
 5. **Deux régimes de stabilité.** Le plan mensuel est un objet stable amendé par deltas (spec
@@ -109,13 +113,13 @@ mission.completed / clic explicite "Démarrer la journée" / événement déclen
                 │ conditions déterministes (§8.1) :
                 │  faisable vide │ obligatoires en conflit │ perturbation texte
                 ▼
-┌─ NIVEAU 2 — ARBITRAGE (Qwen3.6-27B local, slots contractualisés) ─────┐
+┌─ NIVEAU 2 — ARBITRAGE (`local_executor`, slots contractualisés) ──────┐
 │ daily.disruption_classify : déviation locale / delta plan / choc       │
 │ daily.conflict_arbitrate : proposition d'ordre + sacrifice motivé      │
 └───────────────┬─────────────────────────────────────────────────────────┘
                 │ classe choc (taxonomie WR §13.6)
                 ▼
-┌─ NIVEAU 3 — RESTRUCTURATION (Claude Opus 5.5, frontier) ──────────────┐
+┌─ NIVEAU 3 — RESTRUCTURATION (`high_reasoning`) ───────────────────────┐
 │ Régénération complète exceptionnelle, validée par l'utilisateur :      │
 │ mécanique WR spec §8.1, réutilisée (plan_versions origin=shock_regen) │
 └─────────────────────────────────────────────────────────────────────────┘

@@ -36,9 +36,9 @@ AI call. The operational flow is nevertheless fixed:
 - At the click, the only check-in input is the user's subjective feeling. The
   deterministic selector reads the current plan in under 500 ms, then performs
   freshness checks (calendar changes, unfinished prior-day missions, and recent
-  constraints). It invokes `Qwen3.6-27B-Q6_K` through scoring only for a
-  conflict or infeasibility. A cloud regeneration is exceptional and requires
-  user validation.
+  constraints). It invokes `local_executor` through scoring only for a
+  conflict or infeasibility. A `high_reasoning` regeneration is exceptional
+  and requires user validation; role assignments are defined in doc 30 §3.
 - The operational day runs from this start to its closure and may pass midnight
   (up to roughly 36 hours). `local_date` remains a snapshot/display attribute;
   it must not be used to infer that an operational day has ended.

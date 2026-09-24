@@ -12,7 +12,7 @@ Clic explicite "Démarrer la journée". Pas de démarrage automatique (heure, r�
 1. Check-in : UNE seule question, le ressenti subjectif ("Comment tu te sens aujourd'hui ?", échelle courte). Rien d'autre n'est demandé.
 2. Sélection déterministe dans le plan courant (cible < 500 ms).
 3. Vérification de fraîcheur déterministe : calendrier modifié depuis la génération, missions non faites de la journée précédente, contraintes récentes.
-4. Si conflit ou infaisabilité : IA locale (Qwen3.6-27B, via le scoring). Cloud uniquement pour une régénération exceptionnelle validée par l'utilisateur.
+4. Si conflit ou infaisabilité : repli `local_executor` (via le scoring). Le cloud `high_reasoning` n'est utilisé que pour une régénération exceptionnelle validée par l'utilisateur. Les assignations de modèles sont celles du doc 30 §3.
 5. Front : "Démarrage…" (quasi instantané) ; "Préparation de votre journée…" uniquement si le repli IA se déclenche. Anti double-clic. Délai max et reprise après échec : à définir.
 
 ## Énergie = deux axes
@@ -36,8 +36,8 @@ Pas de question au check-in. Déclaration à tout moment via le chatbot → heal
 Bornée démarrage → clôture, peut dépasser minuit (jusqu'à ~36 h). "Aujourd'hui" ne doit plus être calculé par date civile (bug relevé : daily_plans.py:134, core/dates.py:8).
 
 ## Modèles
-- Local : Qwen3.6-27B-Q6_K (doc 30 fait foi). Qwen 2.5 7B (AGENTS.md, ère CPU Hostinger) : obsolète, à retirer. Qwen3-32B : abandonné.
-- Cloud frontière : Claude Opus 5.5 (ID API claude-opus-5-5). L'appel réel utilise l'alias "opus", qui pointe toujours sur le dernier Opus.
+- Le repli local est `local_executor`. L'ancien modèle CPU est retiré et ne doit pas être réintroduit ; l'ancien candidat local plus grand est abandonné.
+- Le cloud frontière est `high_reasoning`. La résolution de son modèle et de tout alias fournisseur est exclusivement définie dans le doc 30 §3.
 
 ## À faire côté code
 Raccorder le bouton ; état "journée non démarrée" ; masquage du programme ; check-in ressenti ; vérification de fraîcheur ; journée opérationnelle au lieu de la date civile ; payload replanned avec version et reason (doc 77) ; principe de résolution dans le prompt du planificateur + validation de sortie anti-refus.
