@@ -101,6 +101,7 @@ SAFEGUARD_ROLE_CONSUMERS = {
     "31_AI_TASKS_AND_RESULTS_CONTRACT.md",  # §17 thresholds mirror doc 30 §5.6
     "40_PULSE_LOGIC_DETAIL.md",  # critical mechanism cross-reference
     "52_AI_DECISION_FRAMEWORK.md",  # §8.5 explicitly says attempt 3 is NOT the safeguard
+    "73_AI_ADVANCED_SETTINGS.md",  # direct-provider privacy/routing policy
     "78_TOOLBOX_CATALOG.md",  # F1-04 router description, F3-11 role list
     "AGENTS.md",  # "when to use what" quick table
 }

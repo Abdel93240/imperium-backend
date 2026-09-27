@@ -778,8 +778,8 @@ Health programming (grouped, rare) : the health specialist
    medical_document_extract, escalations from the local model)
 Critical mechanism (very rare) : the local model score ≥180 → `high_reasoning_safeguard` independent re-score → the high reasoning model
                                  orchestration (doc 30 §5.6 / Patch 30-B)
-WR contribution : per doc 32 + doc 30 WR rule (the sustained long-context model for re-planning, the high reasoning model
-                  fallback while the sustained long-context model is unavailable)
+WR contribution : per doc 32 + doc 30 WR rule (the sustained long-context model for re-planning, the sustained long-context
+                  availability fallback while the sustained long-context model is unavailable)
 ```
 
 Note: percentages intentionally dropped — they were invented and misleading. The

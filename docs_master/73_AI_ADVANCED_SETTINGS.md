@@ -144,6 +144,10 @@ Therefore the design is **hybrid, guided by the role's selection criterion (doc 
 - SENSITIVE roles (health specialist, finance specialist):
   → direct API key with a provider offering GDPR/EU guarantees, NOT via OpenRouter.
   → keeps exact control of provider and retention terms.
+- CRITICAL SAFEGUARD role (`high_reasoning_safeguard`):
+  → direct provider only, NOT via OpenRouter.
+  → this role may receive ≥180 critical-task context for independent verification;
+    provider/path control therefore takes precedence over routing convenience.
 - Religious / very-high content: already LOCAL (doc 50), never leaves at all.
 ```
 If a role's payloads are already minimized/anonymized upstream (per the privacy rule —

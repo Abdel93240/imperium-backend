@@ -1,0 +1,31 @@
+[Unit]
+Description=Imperium Local Executor - Qwen3.6 27B Q6_K
+After=network.target
+
+[Service]
+Type=simple
+User=abd
+WorkingDirectory=/opt/llama.cpp
+
+ExecStart=/opt/llama.cpp/build/bin/llama-server \
+  -m /opt/models/Qwen3.6-27B-Q6_K.gguf \
+  --host 127.0.0.1 \
+  --port 8081 \
+  -ngl 99 \
+  -c 65536 \
+  -fa on \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --parallel 2 \
+  --metrics \
+  --reasoning-budget 0 \
+  --reasoning-format deepseek
+
+Restart=always
+RestartSec=5
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
