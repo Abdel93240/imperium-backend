@@ -853,9 +853,14 @@ Navigation :
 |---|---|---|---|
 | Mission en cours | Imperium | mission active unique (titre, échéance, progression) | Terminer ; Échouer (raison obligatoire, cf. 59 §12.4) ; Demander une replanification complète de la journée |
 | Ajouter une transaction | Vault | formulaire court | Saisir une transaction : revenu OU dépense, montant, catégorie, business/perso (doc 42 §3) |
+| Raccourci Path | Path | aucun panneau | Tap = ouvre directement l'app Path |
+| Raccourci Pulse | Pulse | aucun panneau | Tap = ouvre directement l'app Pulse |
+| Raccourci Vector | Vector | aucun panneau | Tap = ouvre directement l'app Vector |
 
-Pas de bulle pour Path, Pulse ni Vector (décision 2026-10-15). L'absence de bulle
-Vector garde la règle du doc 08 (Vector V1 ne dépend d'aucun overlay) intacte.
+Les cinq apps ont leur bulle (décision 2026-10-15, révisée le même jour). Seules
+Imperium et Vault ont un panneau avec actions ; Path, Pulse et Vector sont de
+simples raccourcis de lancement. La bulle Vector est un lanceur optionnel : Vector
+V1 ne DÉPEND d'aucun overlay pour fonctionner, la règle du doc 08 reste respectée.
 
 ### 10.2 Technique et règles
 
@@ -871,7 +876,7 @@ Bulle (overlay)
 
 Règles :
 
-- le panneau lit l'état à l'ouverture (pas de snapshot périodique ; plus de
+- le panneau (Imperium, Vault) lit l'état à l'ouverture (pas de snapshot périodique ; plus de
   refresh WorkManager dédié) et affiche son état sync ;
 - toute action affiche `pending` jusqu'à confirmation backend ; pas de succès local ;
 - Terminer / Échouer passent par les endpoints mission existants
@@ -891,6 +896,7 @@ Règles :
 |---|---|---|
 | Mission en cours | Imperium | active mission Imperium |
 | Ajouter une transaction | Vault | ledger Vault |
+| Raccourcis Path / Pulse / Vector | app concernée | aucune (lancement d'app) |
 
 ---
 
