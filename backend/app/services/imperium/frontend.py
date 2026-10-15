@@ -212,9 +212,9 @@ IMPERIUM_FRONTEND_EMPTY_STATE_ITEMS: tuple[ImperiumFrontendEmptyStateItem, ...] 
         key="no_active_mission",
         module="mission",
         title="No active mission",
-        message="Create or promote a mission to focus your day.",
-        primary_action_label="Open missions",
-        primary_route="/missions",
+        message="Waiting for backend-confirmed next mission.",
+        primary_action_label="Open Chatbot",
+        primary_route="/chat",
     ),
     ImperiumFrontendEmptyStateItem(
         key="no_vault_transactions",

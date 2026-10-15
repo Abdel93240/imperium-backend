@@ -59,7 +59,7 @@ def test_frontend_empty_states_response_shape_and_deterministic_order() -> None:
     assert body["safe_explanation"] == "Frontend empty state metadata for Imperium V1."
 
     expected = [
-        ("no_active_mission", "mission", "Open missions", "/missions"),
+        ("no_active_mission", "mission", "Open Chatbot", "/chat"),
         ("no_vault_transactions", "vault", "Open Vault", "/vault"),
         ("no_path_habits", "path", "Open The Path", "/path"),
         ("no_pulse_entry", "pulse", "Open Pulse", "/pulse"),
