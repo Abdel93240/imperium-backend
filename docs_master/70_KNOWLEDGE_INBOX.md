@@ -139,12 +139,19 @@ AI can consult. Two mechanisms, two goals.
 V1 RULE: accept content files, including AUDIO and VIDEO. The Path needs this,
 for example optional invocation audio. Reject by SAFETY, not by media type.
 
-Likely ACCEPTED:
-  - documents: PDF, plain text, Word, Excel
-  - images: PNG, JPG
-  - AUDIO: common formats (e.g. mp3, m4a, wav, ogg)
-  - VIDEO: common formats (e.g. mp4, mov)
-  (exact allow-list TBD)
+ACCEPTED — exact allow-list (user decision 2026-10-15):
+  - documents: pdf, txt, md, docx, xlsx, csv, odt
+  - images:    jpg, jpeg, png, webp, heic
+  - AUDIO:     mp3, m4a, wav, ogg, opus
+  - VIDEO:     mp4, mov, webm
+  - ARCHIVE:   zip — unpacked SERVER-SIDE only, then EACH inner file goes through
+               the same allow-list + size check as a direct upload:
+                 · an inner file not on the allow-list is rejected (listed to the user);
+                 · nested archives (zip inside zip) are rejected;
+                 · guard against zip bombs (cap on total unpacked size and file count,
+                   values to set at implementation);
+                 · each accepted inner file becomes its own ingest item (own review).
+  Anything not listed is rejected (other archives such as rar/7z included).
 
 REJECTED (safety):
   - executables and unsafe/odd types
@@ -305,7 +312,7 @@ same feature in all five apps; only the entry point's surrounding settings diffe
 
 ## 14. Open Points (to finalize later)
 
-- Precise accepted file-type allow-list (§6).
+- ~~Precise accepted file-type allow-list~~ → DECIDED (§6), zip accepted with server-side unpacking.
 - ~~Max file size~~ → DECIDED: 25 MB documents/images, 500 MB audio/video (§6).
 - Audio/video storage and processing limits: larger uploads, transcription for
   audio, frame/OCR extraction for video, and vectorization cost/latency.
