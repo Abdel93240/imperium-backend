@@ -277,7 +277,7 @@ Une feature n'apparaît qu'une fois, à son écran d'origine. Les rappels ailleu
 
 | Feature | Écran d'origine | Aussi visible dans | Source |
 |---|---|---|---|
-| Mission active unique (MissionFocusCard) | `IMP.MISSION.ACTIVE` | `IMP.DASH.MAIN` (module + widget Android « Current mission ») | 65 §4, 63 §10 |
+| Mission active unique (MissionFocusCard) | `IMP.MISSION.ACTIVE` | `IMP.DASH.MAIN` (module) ; bulle flottante « Mission en cours » | 65 §4, 63 §10 |
 | Daily Focus / Priority / Quick Actions | `IMP.DASH.MAIN` | — | 65 §3.5 |
 | Weekly Progress (KPI hebdo) | `IMP.DASH.MAIN` | `IMP.WR.READ_ONLY` (Statistics) | 65 §3.5, 69 §3.4 |
 | Imperium Status / SyncStateChip | `IMP.DASH.MAIN` | tous écrans (chip par card/ligne, 63 §8.3) | 65 §3.5 |
@@ -318,14 +318,14 @@ Une feature n'apparaît qu'une fois, à son écran d'origine. Les rappels ailleu
 | Panneaux glissants Mission/Stats/Settings/Tools | HUD V6+ | reprennent VEC-01/03/11 et docs 46/48 | 55 §7.3 |
 | Health Score Display (score + confiance + facteurs) | `PUL-01` | `PUL-10` | 59 §15.17, 40 §9 |
 | Macros Estimation Card | `PUL-03` | `PUL-01`, `PUL-10` | 59 §15.17 |
-| Hydration Progress Ring + quick buttons | `PUL-04` | `PUL-01`, widget Android « Hydration » | 59 §15.17, 63 §10 |
+| Hydration Progress Ring + quick buttons | `PUL-04` | `PUL-01` | 59 §15.17, 63 §10 |
 | Workout Card / Live Tracker | `PUL-06` | `PUL-01`, `PUL-07`, `PUL-11` (card) | 59 §15.17 |
 | Adaptation Proposal Card | `PUL-07` | `PUL-11` (bannière) | 59 §15.17 |
 | Stock Item Row + Expiring Soon Banner | `PUL-12` | `PUL-01`, `PUL-03`, `PUL-13` | 59 §15.17 |
 | Pain Body Diagram | `PUL-09` | — | 59 §15.17 |
 | Medical Document Row + Active Medical Rule Banner | `PUL-14` | `PUL-01` (bannière) | 59 §15.17 |
 | Body Snapshot Comparison | `PUL-08` | — | 59 §15.17 |
-| Next Prayer Countdown Card | `PAT-01` | widget Android « Prayer countdown », `IMP.DASH.MAIN` (widget), HUD top bar / overlay Mosquées | 59 §16.14, 63 §10, 55 §7.1 |
+| Next Prayer Countdown Card | `PAT-01` | `IMP.DASH.MAIN` (widget), HUD top bar / overlay Mosquées | 59 §16.14, 63 §10, 55 §7.1 |
 | Prayer Times List Row (5 prières) | `PAT-01` | `PAT-08` | 59 §16.14 |
 | Prayer Mark Action Card | `PAT-02` | — | 59 §16.14 |
 | Sadaqa Target Card (cible, carry) | `PAT-01` | `PAT-03` | 59 §16.14 |

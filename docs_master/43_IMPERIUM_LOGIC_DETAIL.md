@@ -742,7 +742,8 @@ Imperium settings includes:
 CORE:
   - morning_popup_time (e.g. 06:30)
   - morning_popup_enabled (default true)
-  - widget_enabled (show/manage Imperium widget on home screen)
+  - bubble_enabled (show/manage the Imperium floating bubble: current mission +
+    complete / fail / full-day replan request; doc 63 §10, decision 2026-10-15)
   - notifications_enabled (missions, routines, alerts + manage)
     - channel: Android push ONLY (decision 2026-10-15, doc 76 Q24);
       the Telegram product channel stays in code, never activated.
