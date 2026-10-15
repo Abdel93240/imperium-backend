@@ -61,7 +61,7 @@ def test_imperium_frontend_screen_spec_v1_has_required_sections_in_order() -> No
         "## 3. Dashboard Screen",
         "## 4. Mission Active Dashboard Module",
         "## 5. Weekly Review Dashboard Event Surfaces",
-        "## 6. Operations Screen",
+        "## 6. Pilotage Screen",
         "## 7. History Screen",
         "## 8. Settings Screen",
         "## 9. Navigation Contract",
@@ -135,9 +135,9 @@ def test_imperium_frontend_screen_spec_v1_allowed_foundation_components_exist_in
             ),
         ),
         (
-            "6. Operations Screen",
-            "IMP.OPERATIONS.MAIN",
-            "imperium/operations",
+            "6. Pilotage Screen",
+            "IMP.PILOTAGE.MAIN",
+            "imperium/pilotage",
             (
                 "71_IMPERIUM_OPERATIONS_TAB.md",
                 "projets + routines",
@@ -179,7 +179,7 @@ def test_imperium_frontend_screen_spec_v1_locks_each_screen_route_and_widgets(
 
     assert f"Route ID | `{route_id}`" in screen
     assert f"Route path | `{route_path}`" in screen
-    if route_id != "IMP.OPERATIONS.MAIN":
+    if route_id != "IMP.PILOTAGE.MAIN":
         assert "Loading" in screen
         assert "Empty" in screen
         assert "Error" in screen
@@ -258,14 +258,14 @@ def test_imperium_frontend_screen_spec_v1_weekly_review_is_dashboard_event_surfa
 
 
 def test_imperium_frontend_screen_spec_v1_operations_top_level_is_registered_by_reference() -> None:
-    operations = _screen_section(_screen_spec_text(), "6. Operations Screen")
+    operations = _screen_section(_screen_spec_text(), "6. Pilotage Screen")
 
     for required in (
-        "Route ID | `IMP.OPERATIONS.MAIN`",
-        "Route path | `imperium/operations`",
-        "Titre visible | `Operations`",
+        "Route ID | `IMP.PILOTAGE.MAIN`",
+        "Route path | `imperium/pilotage`",
+        "Titre visible | `Pilotage`",
         "Type | Top-level route",
-        "Nom provisoire",
+        "Nom definitif",
         "71_IMPERIUM_OPERATIONS_TAB.md",
         "ne la recopie pas",
     ):
@@ -318,7 +318,7 @@ def test_imperium_frontend_screen_spec_v1_locks_navigation_contract() -> None:
 
     expected_routes = (
         "`IMP.DASH.MAIN`",
-        "`IMP.OPERATIONS.MAIN`",
+        "`IMP.PILOTAGE.MAIN`",
         "`IMP.HISTORY.MAIN`",
         "`IMP.SETTINGS.CORE`",
     )
@@ -333,7 +333,7 @@ def test_imperium_frontend_screen_spec_v1_locks_navigation_contract() -> None:
         "Stable Route IDs",
         "Telephone GO 65 bottom navigation contains exactly four visible top-level items",
         "Tablet GO 65 sidebar contains exactly four visible top-level items",
-        "| 2 | Operations | `IMP.OPERATIONS.MAIN` |",
+        "| 2 | Pilotage | `IMP.PILOTAGE.MAIN` |",
         "No other deep link is allowed in GO 65",
     ):
         assert required in navigation
@@ -348,7 +348,7 @@ def test_imperium_frontend_screen_spec_v1_locks_route_ids_and_four_item_nav() ->
     expected = (
         ("3. Dashboard Screen", "IMP.DASH.MAIN"),
         ("4. Mission Active Dashboard Module", "IMP.MISSION.ACTIVE"),
-        ("6. Operations Screen", "IMP.OPERATIONS.MAIN"),
+        ("6. Pilotage Screen", "IMP.PILOTAGE.MAIN"),
         ("7. History Screen", "IMP.HISTORY.MAIN"),
         ("8. Settings Screen", "IMP.SETTINGS.CORE"),
     )
@@ -361,7 +361,7 @@ def test_imperium_frontend_screen_spec_v1_locks_route_ids_and_four_item_nav() ->
     navigation = _section(text, "9. Navigation Contract")
     for label, route_id in (
         ("Dashboard", "IMP.DASH.MAIN"),
-        ("Operations", "IMP.OPERATIONS.MAIN"),
+        ("Pilotage", "IMP.PILOTAGE.MAIN"),
         ("History", "IMP.HISTORY.MAIN"),
         ("Settings", "IMP.SETTINGS.CORE"),
     ):
@@ -369,7 +369,7 @@ def test_imperium_frontend_screen_spec_v1_locks_route_ids_and_four_item_nav() ->
 
     for order, label, route_id in (
         (1, "Dashboard", "IMP.DASH.MAIN"),
-        (2, "Operations", "IMP.OPERATIONS.MAIN"),
+        (2, "Pilotage", "IMP.PILOTAGE.MAIN"),
         (3, "History", "IMP.HISTORY.MAIN"),
         (4, "Settings", "IMP.SETTINGS.CORE"),
     ):
@@ -415,7 +415,7 @@ def test_imperium_frontend_screen_spec_v1_locks_mock_data_contract_for_all_scree
 
     for fixture in (
         '"screen": "IMP.DASH.MAIN"',
-        '"screen": "IMP.OPERATIONS.MAIN"',
+        '"screen": "IMP.PILOTAGE.MAIN"',
         '"screen": "IMP.MISSION.ACTIVE"',
         '"screen": "IMP.HISTORY.MAIN"',
         '"screen": "IMP.SETTINGS.CORE"',
@@ -446,7 +446,7 @@ def test_imperium_frontend_screen_spec_v1_locks_screen_validation_checklist() ->
         "Mission Active must remain a Dashboard module or quick access surface",
         "Chatbot must remain `IMP.CHAT.CONVERSATION`, docked from Dashboard",
         "Weekly Review must remain a Dashboard banner/event window and must never finalize locally",
-        "Operations must remain the provisional top-level route `IMP.OPERATIONS.MAIN`",
+        "Pilotage is the final top-level route `IMP.PILOTAGE.MAIN`",
         "History must remain read-only",
         "Settings must never expose secrets",
         "Canonical Definition of Done Checklist",

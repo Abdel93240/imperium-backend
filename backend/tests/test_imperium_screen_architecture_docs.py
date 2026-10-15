@@ -23,7 +23,7 @@ IMPERIUM_ROUTE_PREFIXES = {
 
 IMPERIUM_ROUTE_IDS = [
     "IMP.DASH.MAIN",
-    "IMP.OPERATIONS.MAIN",
+    "IMP.PILOTAGE.MAIN",
     "IMP.HISTORY.MAIN",
     "IMP.CHECKIN.MORNING",
     "IMP.MISSION.OUTCOME",
@@ -706,7 +706,7 @@ def test_frontend_architecture_63_exists_references_design_docs_and_has_all_sect
         "## 7. Local Cache",
         "## 8. Sync Layer",
         "## 9. Feature Modules",
-        "## 10. Widgets",
+        "## 10. Bulles flottantes",
         "## 11. Tablet Strategy",
         "## 12. Offline Strategy",
         "## 13. Security",
@@ -845,7 +845,7 @@ def test_design_system_instantiates_states_widgets_assets_and_tablet_layout_per_
     surface_route_ids = [
         route_id
         for route_id in IMPERIUM_ROUTE_IDS
-        if route_id not in {"IMP.OPERATIONS.MAIN", "IMP.HISTORY.MAIN", "IMP.MISSION.ACTIVE"}
+        if route_id not in {"IMP.PILOTAGE.MAIN", "IMP.HISTORY.MAIN", "IMP.MISSION.ACTIVE"}
     ]
     for route_id in surface_route_ids:
         section = _screen_section(text, route_id)
@@ -872,7 +872,7 @@ def test_design_system_resolves_audit_ambiguities_without_adding_os_personnel_v1
     assert "V3" in imperium_decisions
     assert "is explicitly excluded from V1 navigation" in imperium_decisions
     assert "Top-level V1" in imperium_decisions
-    assert "`IMP.DASH.MAIN`, `IMP.OPERATIONS.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`" in imperium_decisions
+    assert "`IMP.DASH.MAIN`, `IMP.PILOTAGE.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`" in imperium_decisions
     assert "IMP.MISSION.DETAIL" in imperium_decisions
     assert "non une entrée top-level navigation" in imperium_decisions
 

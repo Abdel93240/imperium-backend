@@ -46,7 +46,7 @@ def test_frontend_architecture_v1_has_required_sections_in_order() -> None:
         "## 7. Local Cache",
         "## 8. Sync Layer",
         "## 9. Feature Modules",
-        "## 10. Widgets",
+        "## 10. Bulles flottantes",
         "## 11. Tablet Strategy",
         "## 12. Offline Strategy",
     ]
@@ -98,7 +98,7 @@ def test_frontend_architecture_defines_target_repository_structure_and_module_ro
         "`app/` ne contient pas de logique métier",
         "Le cache local n'est jamais source de vérité",
         "machine d'état sync",
-        "Android home widgets",
+        "bulles flottantes Android",
         "Chaque feature module contient",
     ):
         assert required_role in structure
@@ -241,17 +241,18 @@ def test_frontend_architecture_lists_feature_modules_with_screens_viewmodels_rep
 
 def test_frontend_architecture_widgets_tablet_and_offline_strategy_are_canonical_v1() -> None:
     text = _architecture_text()
-    widgets = _section(text, "10. Widgets")
+    widgets = _section(text, "10. Bulles flottantes (remplacent les widgets d'accueil)")
     tablet = _section(text, "11. Tablet Strategy")
     offline = _section(text, "12. Offline Strategy")
 
     for required in (
-        "Prayer countdown",
-        "Current mission",
-        "Hydration",
-        "Vault summary",
-        "Widget UI\n→ WidgetStateRepository\n→ Room widget snapshot",
-        "pas de success local sans confirmation backend",
+        "Mission en cours",
+        "Ajouter une transaction",
+        "Raccourci Path",
+        "Raccourci Pulse",
+        "Raccourci Vector",
+        "SYSTEM_ALERT_WINDOW",
+        "pas de succès local",
     ):
         assert required in widgets
 
