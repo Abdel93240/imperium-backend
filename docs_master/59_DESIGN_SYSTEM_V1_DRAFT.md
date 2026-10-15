@@ -744,7 +744,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Données affichées :** current focus mission, daily plan snapshot, quick stats, active banners, latest sync status.
 - **Widgets :** Next prayer countdown, Pressure score.
 - **Assets :** Imperium emblem 48dp, Material Symbols status icons, no hero image.
-- **Etats :** Loading=skeleton mission/cards ; Empty=no active mission with CTA "Ajouter une mission" ; Error=dashboard read-model failure with retry ; Offline=cached dashboard banner ; Syncing=top sync line ; Synced=snackbar after confirmed mutation ; Conflict=server conflict banner and diff dialog.
+- **Etats :** Loading=skeleton mission/cards ; Empty=no active mission with CTA "Ouvrir le chatbot" (décision 2026-10-15, aligné 65 §3.8 ; pas de création locale) ; Error=dashboard read-model failure with retry ; Offline=cached dashboard banner ; Syncing=top sync line ; Synced=snackbar after confirmed mutation ; Conflict=server conflict banner and diff dialog.
 - **Backend deps :** `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active`.
 - **Navigation :** entry after auth/onboarding/morning check-in ; exits to `IMP.CHECKIN.MORNING`, `IMP.MISSION.OUTCOME`, `IMP.REPLAN.VALIDATE`, `IMP.MISSION.ADD_MANUAL`, `IMP.PLAN.HISTORY`, `IMP.CHAT.CONVERSATION`, `IMP.DECISIONS.LOG`, `IMP.WR.LIST`, `IMP.SETTINGS.CORE`, plus top-level `IMP.PILOTAGE.MAIN` and `IMP.HISTORY.MAIN`.
 - **Tab S10 Ultra :** 3 columns: Sidebar 240dp, main dashboard max 1280dp, chatbot/context panel 320dp.
