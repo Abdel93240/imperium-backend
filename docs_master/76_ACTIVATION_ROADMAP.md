@@ -54,7 +54,7 @@ comptes/statuts du relevé initial ne sont pas réaudités par cette passe docum
 | ACT-WR-01 | WR conversationnel (plomberie, dry-run) | dE | 2 | ON | V0 | — | commit mémoire bloqué D5 |
 | ACT-SYS-06 | Runner de jobs + heartbeat : premier job actif | dE | 2 | NOT_CODED | V1 | — | socle 0a (T2) |
 | ACT-VLT-05 | Pression financière 0-100 + explication | dL | 1 | NOT_CODED | V1 | — | RÉSOLUES Q4/Q17 : échelle 0-100 ; V1 corrigée avec upcoming CRUD |
-| ACT-SYS-07 | Canal de notifications produit | No | 3 | NOT_CODED | V1 | — | RÉSOLUES Q3+Q18 : Telegram produit d'abord |
+| ACT-SYS-07 | Canal de notifications produit | No | 3 | NOT_CODED | V1 | — | RÉSOLUES Q3+Q18 : Telegram produit d'abord — REMPLACÉ par Q24 : push Android seul canal, Telegram éteint |
 | ACT-VLT-04 | Dépenses récurrentes + upcoming (CRUD) | dE | 2 | NOT_CODED | V1 | — | remonte de V3 pour pression V1 |
 | ACT-PTH-02 | Fenêtres de prière (MAWAQIT + fallback) | dL | 1 | NOT_CODED | V1 | — | RÉSOLUES Q6/Q19 : socle §8 |
 | ACT-SYS-19 | Backup nocturne restic (job system.backup_nightly) | dE | 2 | NOT_CODED | V1 | — | socle §12 |
@@ -254,6 +254,7 @@ livré avec ses états d'activation explicites.
 | Q21 | RÉSOLUE : 14 j ET ≥20 sorties auditées. |
 | Q22 | RÉSOLUE : 76 confirmé. |
 | Q23 | RÉSOLUE : validé. |
+| Q24 | RÉSOLUE (2026-10-15, remplace Q3+Q18) : push Android = seul canal de notification produit visible dans l'app ; le canal Telegram `telegram_prod` reste dans le code mais n'est jamais activé. Le niveau rouge est désactivable par l'utilisateur. |
 
 ## Journal des bascules (append-only — rempli à chaque activation/rollback)
 

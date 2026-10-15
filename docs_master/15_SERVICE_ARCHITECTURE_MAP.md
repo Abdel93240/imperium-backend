@@ -174,6 +174,7 @@ V1 excludes real-time Android automation.
 | service_name | phase | owner | deployment form | responsibilities | depends_on |
 |---|---|---|---|---|---|
 | `notification-service` | V1 | backend | module | Notification decisions and records | `imperium-db` |
+| `push-service` | V1 | backend | module | Android push provider integration ; sole product notification channel (moved from V2, doc 76 Q24, 2026-10-15) | `notification-service` |
 | `voice-command-service` | V1 | backend/media | module | Voice upload intake and transcription workflow trigger | `ai-audio-transcription-service` |
 | `file-upload-service` | V1 | backend/media | module | File upload metadata and processing trigger | `imperium-media-processor` |
 | `dashboard-state-service` | V1 | backend | module | Read-only app state summaries for Android apps | app domain services |
@@ -202,7 +203,6 @@ They should still remain centralized modules/workers unless separate deployment 
 | `traffic-monitor-service` | V2 | external intelligence | Traffic and road disruption signals | external APIs, `external-sync-service` |
 | `weather-monitor-service` | V2 | external intelligence | Weather context | external APIs, `external-sync-service` |
 | `mawaqit-sync-service` | V2 | external intelligence | Prayer time source sync | external source, `path-prayer-service` |
-| `push-service` | V2 | user interaction | Push provider integration | `notification-service` |
 | `performance-monitoring-service` | V2 | monitoring | Latency/performance tracking | `logs-service`, `health-check-service` |
 
 ## V3 Services

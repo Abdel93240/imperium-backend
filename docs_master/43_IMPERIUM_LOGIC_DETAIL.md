@@ -744,6 +744,9 @@ CORE:
   - morning_popup_enabled (default true)
   - widget_enabled (show/manage Imperium widget on home screen)
   - notifications_enabled (missions, routines, alerts + manage)
+    - channel: Android push ONLY (decision 2026-10-15, doc 76 Q24);
+      the Telegram product channel stays in code, never activated.
+    - red level: user-disableable (decision 2026-10-15, doc 76 Q24).
 
 PRIORITY HIERARCHY:
   - drag-to-reorder list of priority sources
@@ -753,7 +756,7 @@ MODE IA:
   - STRICT: the AI follows the priority hierarchy and rules to the letter.
   - ÉQUILIBRÉ: the AI seeks the best balance between priorities and context.
   - SOUPLE: the AI may deviate from the hierarchy when context justifies it.
-  - Default: to confirm, likely ÉQUILIBRÉ.
+  - Default: ÉQUILIBRÉ (decision 2026-10-15).
   - This influences daily plan, mission arbitration, advice, and recommendations.
   - This is not "quick mode": it changes firmness of priority-following, not
     content depth or validation.

@@ -613,7 +613,7 @@ Ordre telephone :
 |---|---|---|
 | User | `ImperiumCard`, `ImperiumListItem` | display name mock, timezone, language. |
 | Theme | `ImperiumSegmentedControl`, `ImperiumToggle` | mode system/light/dark mock, accent note. |
-| Notifications | `ImperiumToggle` rows | morning check-in, weekly review, mission reminders. |
+| Notifications | `ImperiumToggle` rows | morning check-in, weekly review, mission reminders ; red level toggle (disableable). Channel = Android push only, no channel selector (doc 76 Q24). |
 | Integrations | `ImperiumListItem` | n8n, PostgreSQL, AI router as status mock. |
 | Security | `ImperiumListItem` | auth state redacted, session status mock. |
 | Advanced | `ImperiumListItem`, `ImperiumAlertDialog` | priority rules link, cache mock, reset mock protected by dialog. |
@@ -649,7 +649,8 @@ Fixture locale canonique : `settings_mock_v1`.
   "notifications": {
     "morning_check_in": true,
     "mission_reminders": true,
-    "weekly_review": true
+    "weekly_review": true,
+    "red_level": true
   },
   "integrations": {
     "n8n": "not_connected_in_mock",

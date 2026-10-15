@@ -553,7 +553,8 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
   "notifications": {
     "morning_check_in": true,
     "mission_reminders": true,
-    "weekly_review": true
+    "weekly_review": true,
+    "red_level": true
   },
   "integrations": {
     "n8n": "not_connected_in_mock",
@@ -589,6 +590,7 @@ Ils ne declenchent aucune decision canonique, ne modifient aucune mission active
 | `notifications.morning_check_in` | Boolean. |
 | `notifications.mission_reminders` | Boolean. |
 | `notifications.weekly_review` | Boolean. |
+| `notifications.red_level` | Boolean, default `true` ; user-disableable (doc 76 Q24). |
 | `integrations.n8n` | Mock connection status. |
 | `integrations.postgresql` | Mock connection status. |
 | `integrations.ai_router` | Mock connection status. |
