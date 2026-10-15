@@ -1094,9 +1094,11 @@ l'expose pas). Contrat : `POST /api/auth/login` (`backend/app/schemas/auth.py`).
 
 Réponse stockée en stockage sécurisé (§13.2) : `access_token`, `refresh_token`,
 `device_id`. Refresh et logout envoient `{refresh_token, device_id}`
-(`/api/auth/refresh`, `/api/auth/logout`). Section Security des Settings : liste des
-appareils de confiance (`GET /api/auth/devices`) avec révocation
-(`POST /api/auth/devices/{id}/revoke`).
+(`/api/auth/refresh`, `/api/auth/logout`). V1 (décision utilisateur 2026-10-15) : UN
+seul appareil connecté, qui est l'appareil de confiance — PAS de liste d'appareils ni de
+révocation dans les Settings. Ajouter un autre appareil se fait à la main côté serveur
+(les endpoints `GET /api/auth/devices` et `POST /api/auth/devices/{id}/revoke` restent
+côté backend, sans écran).
 
 Le secret de déverrouillage du kill switch (doc F09 §4) est DISTINCT de la clé
 maître et ne doit jamais lui être identique : la clé maître est saisie sur la

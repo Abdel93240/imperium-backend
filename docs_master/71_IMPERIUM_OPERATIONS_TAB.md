@@ -102,19 +102,24 @@ Sous les fenêtres projets. Au clic, ouvre les actions de gestion des projets :
 |---|---|
 | Ajouter un projet | Crée un nouveau projet. |
 | Supprimer un projet | Retire un projet. |
-| Activer un projet | Le passe dans les actifs (dans la limite V1 = 2 actifs). |
-| Désactiver un projet | Le renvoie dans la liste des non-actifs (fenêtre 3). |
-| Modifier l'ordre / priorité | Bascule prioritaire ↔ secondaire (n°1 ↔ n°2). |
+| Modifier l'ordre / priorité | Monte / descend un projet dans le classement. |
 
-Note V1 — dépassement (activer un 3ᵉ projet alors que les 2 slots sont pleins)
-(décision utilisateur 2026-10-15) : une fenêtre affiche les 2 projets actifs et l'utilisateur choisit
-celui qui redevient non actif. Rien ne bascule sans ce choix explicite ; annuler
-laisse les 3 projets dans leur état précédent. Le projet activé prend le slot
-libéré.
+Note V1 — activation PAR LE CLASSEMENT (décision utilisateur 2026-10-15) : il n'y a
+PAS de bouton Activer / Désactiver en V1. Les 2 premiers projets du classement sont
+actifs (n°1 principal, n°2 secondaire), les suivants sont non actifs. Pour activer un
+projet, l'utilisateur le remonte dans les 2 premières places ; celui qu'il dépasse
+redescend en non actif. Libellé de la maquette : « Les deux premiers projets sont actifs ».
+Versions suivantes : boutons Activer / Désactiver + fenêtre « choisir quel projet
+actif désactiver » quand les slots sont pleins — seulement après avoir observé en V1
+comment l'IA gère 2 projets actifs (et si le nombre d'actifs doit devenir réglable).
+
+Note V1 (suppression) : toute suppression (projet, mission, routine, priorité) ouvre
+une petite fenêtre de confirmation (`ImperiumAlertDialog`, doc 67 : aucune action
+destructive sans confirmation) : « Supprimer <nom> ? » + Annuler / Supprimer.
 Note V1 (complétion) : la promotion automatique à la complétion d'un projet actif
 (cf. §3.1, règle de remontée) NE passe PAS par ce menu — elle est déclenchée par
 le système, pas par l'utilisateur. Ce menu "Modifier" ne couvre que les actions
-manuelles (ajouter / supprimer / activer / désactiver / réordonner).
+manuelles (ajouter / supprimer / réordonner).
 
 ---
 
@@ -128,6 +133,11 @@ V1 = liste SIMPLE.
   - Pas d'horaires, pas de fréquences complexes en V1 (réservé aux versions
     suivantes).
 ```
+
+Fréquence V1 (décision utilisateur 2026-10-15, maquette 12) : liste FERMÉE, sans
+option « Autre » ni récurrence personnalisée — Chaque jour / Chaque semaine /
+Toutes les 2 semaines / Chaque mois. L'aide « Exemples : deux fois par semaine… »
+de la maquette est à retirer.
 
 Les routines alimentent l'arbitrage d'Imperium (elles font partie du core loop),
 mais leur affichage V1 reste une liste cochable simple.
@@ -232,7 +242,8 @@ routine_daily_checks:
 
 - ~~Nom final de l'onglet~~ → RÉSOLU : "Pilotage" (décision utilisateur 2026-10-15).
 - ~~Route ID / path définitifs~~ → RÉSOLU : `IMP.PILOTAGE.MAIN`, `imperium/pilotage`.
-- ~~Comportement du 3ᵉ projet~~ → RÉSOLU : l'utilisateur choisit le projet à désactiver (§3.3).
+- ~~Comportement du 3ᵉ projet~~ → RÉSOLU : V1 = le classement décide (2 premiers = actifs) ;
+  fenêtre de choix Activer / Désactiver reportée aux versions suivantes (§3.3).
 - Confirmation du modèle de données projets/routines vs schéma existant (doc 05).
 
 ---

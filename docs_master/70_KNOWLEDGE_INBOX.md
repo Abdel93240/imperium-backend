@@ -194,6 +194,12 @@ criterion is danger, not media format.
 14. Confirmation shown; window can close
 ```
 
+UI V1 (décision utilisateur 2026-10-15, maquette 16) : les étapes 9 à 14 se déroulent
+comme une CONVERSATION avec le chatbot dans le terminal — l'IA y écrit ce qu'elle a
+compris, l'utilisateur corrige et choisit la destination en répondant. Ce n'est pas un
+formulaire dédié. La création d'un projet est confirmée par un simple message texte du
+chatbot (« J'ai créé le projet … ») : pas de fenêtre de création de projet.
+
 If the user cancels at the review/validation step, nothing is vectorized and no
 entity is created, and the raw upload is DELETED immediately (user decision 2026-10-15) — no
 pending item is kept. Note: a source that has reached step 7 for a VALIDATED item is

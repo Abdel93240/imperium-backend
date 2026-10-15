@@ -778,6 +778,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 ### 12.5 Day Finished Form (`IMP.DAY.FINISH`)
 
 - **Screen name:** Day Finished Form.
+- **V1 (décision utilisateur 2026-10-15) :** HORS V1. En V1, le bouton « Terminer la journée » du Dashboard termine la journée directement (`POST /api/imperium/day/finish`), sans formulaire ni fenêtre. Ce formulaire de bilan arrive dans une version suivante.
 - **Type / slug :** `dialog`, `imperium/day-finished`, stable ID `IMP.DAY.FINISH`.
 - **Composants :** fullscreen Dialog, H1 "Bilan du jour", sliders energy/fatigue/sleep/stress, mood segmented control, TextFields main win/problem, Primary "Terminer la journée", Ghost "Plus tard".
 - **Données affichées :** current local date, latest plan completion summary, existing day review if already submitted.
@@ -791,6 +792,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 ### 12.6 Replan Validation Screen (`IMP.REPLAN.VALIDATE`)
 
 - **Screen name:** Replan Validation Screen.
+- **V1 (décision utilisateur 2026-10-15) :** écran de résultat affiché après le bouton « Replanifier » : à GAUCHE la nouvelle planification proposée, à DROITE le chatbot (même terminal que `IMP.CHAT.CONVERSATION`) pour discuter ou faire corriger la proposition. Primary « Accepter », Ghost « Annuler ». Pas de bouton « Modifier » : les corrections passent par le chatbot, qui régénère la colonne de gauche. Remplace la présentation Avant/Après ci-dessous.
 - **Type / slug :** `dialog`, `imperium/replan/validation`, stable ID `IMP.REPLAN.VALIDATE`.
 - **Composants :** fullscreen modal, minimal Top Bar, Before/After plan columns, mission cards with delta badges, Info banner with model reason, Primary "Accepter", Secondary "Modifier", Ghost "Annuler".
 - **Données affichées :** previous plan, proposed plan, replan reason, replan source hook, confidence/status.
@@ -1048,6 +1050,11 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Tab S10 Ultra :** right side-sheet 480dp anchored to dashboard/list.
 
 ### 13.4 VAU-04 Scan Ticket Capture (`VAU-04`)
+
+> **Mécanique commune OCR (décision utilisateur 2026-10-15)** — identique pour Vault (VAU-04/05) et pour « Importer un justificatif » d'Imperium (maquette 05) :
+> 1. **Capture** : écran caméra classique (aperçu + bouton déclencheur) OU écran de sélection d'une photo déjà prise (galerie).
+> 2. **Analyse OCR** : réutilise l'écran de chargement standard existant (pas d'écran dédié).
+> 3. **Échec** : sur ce même écran de chargement, le texte devient le message d'erreur, affiché **10 secondes** (le temps de le lire ou de le recopier dans le chatbot), puis retour automatique à l'écran précédent.
 
 - **Screen name:** VAU-04 Scan Ticket Capture.
 - **Type / slug :** `route`, `vault/receipts/capture`, stable ID `VAU.TX.SCAN_CAPTURE`.
