@@ -188,9 +188,8 @@ Responsabilité :
 
 Responsabilité :
 
-- Android home widgets ;
-- snapshots cache lisibles sans démarrer toute l'app ;
-- refresh contrôlé par WorkManager ;
+- bulles flottantes Android (overlay, §10) — pas de widgets d'écran d'accueil ;
+- panneaux légers lisant l'état à l'ouverture ;
 - aucune décision métier locale.
 
 ### 2.8 `feature_*`
@@ -543,7 +542,7 @@ Une donnée stale reste affichable seulement si :
 - pending writes ;
 - sync attempts ;
 - conflict records ;
-- lightweight widget snapshots.
+- bubble panel state (léger, lu à l'ouverture).
 
 ### 7.2 Cache is not source of truth
 
@@ -563,7 +562,7 @@ Catégories V1 :
 - lists paginées ;
 - detail snapshots ;
 - pending mutation payloads ;
-- widget snapshots ;
+- état des panneaux de bulles ;
 - permission/cache metadata.
 
 ### 7.4 Cache invalidation
@@ -841,48 +840,57 @@ Navigation :
 
 ---
 
-## 10. Widgets
+## 10. Bulles flottantes (remplacent les widgets d'accueil)
 
-### 10.1 Home widgets Android
+> Décision utilisateur 2026-10-15 : PAS de widgets d'écran d'accueil. Les seuls
+> « widgets » V1 sont des **bulles flottantes**, sur le modèle de la bulle de
+> l'app Bolt chauffeur : une bulle déplaçable posée par-dessus les autres apps ;
+> un tap ouvre un petit panneau avec l'information et les actions rapides.
 
-Widgets V1 :
+### 10.1 Bulles V1
 
-- Prayer countdown ;
-- Current mission ;
-- Hydration ;
-- Vault summary.
+| Bulle | App | Contenu du panneau | Actions rapides |
+|---|---|---|---|
+| Mission en cours | Imperium | mission active unique (titre, échéance, progression) | Terminer ; Échouer (raison obligatoire, cf. 59 §12.4) ; Demander une replanification complète de la journée |
+| Ajouter une transaction | Vault | formulaire court | Saisir une transaction : revenu OU dépense, montant, catégorie, business/perso (doc 42 §3) |
 
-Les widgets affichent un snapshot cache. Ils ne créent pas de vérité locale.
+Pas de bulle pour Path, Pulse ni Vector (décision 2026-10-15). L'absence de bulle
+Vector garde la règle du doc 08 (Vector V1 ne dépend d'aucun overlay) intacte.
 
-### 10.2 Widget architecture
+### 10.2 Technique et règles
 
-Architecture :
+Technique : fenêtre en superposition Android (permission « Afficher par-dessus les
+autres apps », `SYSTEM_ALERT_WINDOW`), comme la bulle Bolt — pas l'API Bubbles
+(liée aux notifications de conversation).
 
 ```text
-Widget UI
-→ WidgetStateRepository
-→ Room widget snapshot
-→ WorkManager refresh
-→ API
-→ Backend
+Bulle (overlay)
+→ tap → panneau
+→ ViewModel → Repository → API → Backend
 ```
 
 Règles :
 
-- chaque widget affiche un timestamp ou état sync ;
-- taps ouvrent la route Compose correspondante ;
-- writes depuis widget sont limités aux actions explicitement autorisées et confirmables ;
-- pas de success local sans confirmation backend ;
-- pas d'exposition de données sensibles si device verrouillé, selon politique Android.
+- le panneau lit l'état à l'ouverture (pas de snapshot périodique ; plus de
+  refresh WorkManager dédié) et affiche son état sync ;
+- toute action affiche `pending` jusqu'à confirmation backend ; pas de succès local ;
+- Terminer / Échouer passent par les endpoints mission existants
+  (`POST …/missions/{id}/complete|fail`) ; jamais de seconde mission active ;
+- « Replanification complète » envoie la demande (TBD `POST /api/imperium/replans/request`) ;
+  la proposition s'ouvre ensuite dans `IMP.REPLAN.VALIDATE` pour validation — la bulle
+  ne valide jamais un plan elle-même ;
+- la transaction Vault passe par `POST /api/imperium/vault/transactions` avec
+  `Idempotency-Key` ;
+- la permission overlay est demandée au moment où l'utilisateur active une bulle,
+  avec explication (doc 07 §Permissions) ;
+- chaque bulle s'active / se désactive dans les Settings de son app.
 
-### 10.3 Widget ownership
+### 10.3 Bulle ownership
 
-| Widget | Feature owner | Source backend |
+| Bulle | Feature owner | Source backend |
 |---|---|---|
-| Prayer countdown | Path | prayer times/read model Path |
-| Current mission | Imperium | active mission Imperium |
-| Hydration | Pulse | hydration logs/read model Pulse |
-| Vault summary | Vault | wallet/weekly summary Vault |
+| Mission en cours | Imperium | active mission Imperium |
+| Ajouter une transaction | Vault | ledger Vault |
 
 ---
 
@@ -1109,7 +1117,7 @@ Memory rules :
 - ViewModels ne conservent pas de contexte Android long-lived ;
 - caches Room bornés par feature et horodatés ;
 - cleanup WorkManager pour uploads terminés ou abandonnés ;
-- widgets lisent des snapshots compacts ;
+- les panneaux de bulles lisent un état compact ;
 - navigation arguments limités aux IDs stables et paramètres courts.
 
 ---
