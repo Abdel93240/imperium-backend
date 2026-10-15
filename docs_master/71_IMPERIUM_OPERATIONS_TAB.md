@@ -1,8 +1,8 @@
-# 71 - Imperium Operations Tab (Projets + Routines) — V1 base
+# 71 - Imperium Pilotage Tab (Projets + Routines) — V1 base
 
-> ⚠️ **NOM PROVISOIRE : "Operations".** L'utilisateur souhaite rebaptiser cet
-> onglet (pistes : Direction, QG, Commandement, Stratégie, Pilotage...). Le nom
-> final reste à fixer. Tout le doc utilise "Operations" comme placeholder.
+> **NOM FINAL : "Pilotage"** (décision utilisateur 2026-10-15). Ancien nom provisoire : "Operations".
+> Le nom du fichier (`71_IMPERIUM_OPERATIONS_TAB.md`) est conservé pour ne pas
+> casser les renvois existants.
 >
 > Ce document décrit la **base V1** de l'onglet. Son enrichissement futur (dossier
 > projet riche, espace de travail, médias) est spécifié séparément dans
@@ -12,7 +12,7 @@
 
 ## 1. Purpose
 
-L'onglet **Operations** est le **2ᵉ écran top-level** d'Imperium (après le
+L'onglet **Pilotage** est le **2ᵉ écran top-level** d'Imperium (après le
 Dashboard). C'est là que l'utilisateur gère la matière première de son système :
 ses **projets** et ses **routines**.
 
@@ -25,8 +25,8 @@ Rôle dans le core loop (doc 00) : `Projects + Routines + Priorities → arbitra
 > priorités et du contexte. L'utilisateur ne crée pas de missions ici ; il crée
 > des projets.
 
-Route ID : `IMP.OPERATIONS.MAIN` (provisoire, à figer avec le nom final).
-Type : Top-level route. Path : `imperium/operations` (provisoire).
+Route ID : `IMP.PILOTAGE.MAIN` (définitif, décision utilisateur 2026-10-15).
+Type : Top-level route. Path : `imperium/pilotage` (définitif).
 
 ---
 
@@ -106,9 +106,11 @@ Sous les fenêtres projets. Au clic, ouvre les actions de gestion des projets :
 | Désactiver un projet | Le renvoie dans la liste des non-actifs (fenêtre 3). |
 | Modifier l'ordre / priorité | Bascule prioritaire ↔ secondaire (n°1 ↔ n°2). |
 
-Note V1 : avec 2 slots actifs, activer un 3ᵉ projet implique d'en désactiver un
-(ou un choix utilisateur explicite). Comportement exact de dépassement à
-préciser à l'implémentation.
+Note V1 — dépassement (activer un 3ᵉ projet alors que les 2 slots sont pleins)
+(décision utilisateur 2026-10-15) : une fenêtre affiche les 2 projets actifs et l'utilisateur choisit
+celui qui redevient non actif. Rien ne bascule sans ce choix explicite ; annuler
+laisse les 3 projets dans leur état précédent. Le projet activé prend le slot
+libéré.
 Note V1 (complétion) : la promotion automatique à la complétion d'un projet actif
 (cf. §3.1, règle de remontée) NE passe PAS par ce menu — elle est déclenchée par
 le système, pas par l'utilisateur. Ce menu "Modifier" ne couvre que les actions
@@ -131,7 +133,7 @@ Les routines alimentent l'arbitrage d'Imperium (elles font partie du core loop),
 mais leur affichage V1 reste une liste cochable simple.
 
 > Référence : `01_SIGNAL_VARIABLES_DICTIONARY.md` mentionne "Routines managed in
-> Operations" — c'est cet écran. (Le `routine_id` y est déjà défini.)
+> Pilotage" — c'est cet écran. (Le `routine_id` y est déjà défini.)
 
 ---
 
@@ -228,9 +230,9 @@ routine_daily_checks:
 
 ## 11. Points à trancher (utilisateur)
 
-- **Nom final** de l'onglet (remplacer "Operations").
-- Route ID / path définitifs.
-- Comportement exact quand on active un 3ᵉ projet alors que 2 slots sont pleins.
+- ~~Nom final de l'onglet~~ → RÉSOLU : "Pilotage" (décision utilisateur 2026-10-15).
+- ~~Route ID / path définitifs~~ → RÉSOLU : `IMP.PILOTAGE.MAIN`, `imperium/pilotage`.
+- ~~Comportement du 3ᵉ projet~~ → RÉSOLU : l'utilisateur choisit le projet à désactiver (§3.3).
 - Confirmation du modèle de données projets/routines vs schéma existant (doc 05).
 
 ---
@@ -242,10 +244,10 @@ routine_daily_checks:
 - `05_DATABASE_SCHEMA.md` — schéma à réconcilier.
 - `43_IMPERIUM_LOGIC_DETAIL.md` — chatbot, génération de missions, arbitrage.
 - `F06_DOSSIER_PROJET.md` — enrichissement futur du dossier projet.
-- `99_AUDIT_COHERENCE_FRONTEND.md` — décision : Operations = 2ᵉ top-level.
+- `99_AUDIT_COHERENCE_FRONTEND.md` — décision : Pilotage = 2ᵉ top-level.
 
 ---
 
-**Document version:** 1.0 (spec de base V1 — nom d'onglet provisoire)
-**Statut :** base V1 de l'onglet Operations ; enrichissement = F06 (futur)
+**Document version:** 1.0 (spec de base V1 — nom d'onglet définitif : Pilotage)
+**Statut :** base V1 de l'onglet Pilotage ; enrichissement = F06 (futur)
 **Last updated:** 2026-06-09

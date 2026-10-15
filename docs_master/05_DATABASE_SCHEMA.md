@@ -1404,7 +1404,7 @@ Invariants planning reintegres :
   terminal (`completed`, `failed`, `abandoned`, `cancelled`). Les notions
   `expired`, `stashed`, missions annexes et overlay restent hors schema code
   actuel.
-- Les projets actifs et routines d'Operations sont la source future de missions,
+- Les projets actifs et routines de Pilotage sont la source future de missions,
   mais leurs tables planning canoniques ne sont pas encore codees. La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la
   pile le permet, garder une liste non-active distincte, auto-promouvoir apres
@@ -1424,7 +1424,7 @@ Tables planning futures / non codees :
 - Morning check-ins : FUTUR / NON CODE. La doc 43 annonce le check-in du matin
   comme premier replan de la journee ; aucune table canonique `planning_*` n'est
   encore definie ici.
-- Projets Operations : FUTUR / NON CODE. Le nom canonique reste a definir dans
+- Projets Pilotage : FUTUR / NON CODE. Le nom canonique reste a definir dans
   ce dictionnaire avant migration ; ne pas reprendre `projects` comme schema
   officiel sans chantier dedie.
 - Routines recurrentes et checks quotidiens : FUTUR / NON CODE. Les noms cibles

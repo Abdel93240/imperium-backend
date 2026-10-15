@@ -28,7 +28,7 @@ Contrainte de 500 lignes : chaque fiche d'écran est rendue en une ligne de tabl
 ```mermaid
 graph TD
   APP[Imperium] --> DASH["IMP.DASH.MAIN Dashboard"]
-  APP --> OPS["IMP.OPERATIONS.MAIN Operations"]
+  APP --> OPS["IMP.PILOTAGE.MAIN Pilotage"]
   APP --> HIST["IMP.HISTORY.MAIN History"]
   APP --> SET["IMP.SETTINGS.CORE Settings"]
   DASH --> MA["IMP.MISSION.ACTIVE module principal"]
@@ -183,7 +183,7 @@ graph TD
 |---|---|---|---|---|---|
 | `IMP.DASH.MAIN` Dashboard | Montrer ce qu'il faut faire maintenant : une seule mission active, priorités, actions rapides, état global. | Daily Focus Card ; Active Mission Card ; Priority Card ; Quick Actions (mission, chatbot, replan, finish day) ; Weekly Progress ; Imperium Status/SyncStateChip ; bannières WR/Ghusl/Critical ; Today's Plan ; widgets Next prayer countdown + Pressure score ; chatbot docké. | ✔ `GET /api/imperium/dashboard` ; ✔ `GET /api/imperium/missions/active` ; ✔ `GET /api/imperium/weekly-review/state` ; ✔ `POST /api/imperium/day/finish` ; TBD `POST /api/imperium/replans/request`. | CODÉ (nav `/dashboard`, module card, action `open_dashboard`, région layout `hero`) | 65 §3, 69 §3.1, 59 §12.2, 67 §3, 68 §2.1, 99 §D#7 |
 | `IMP.MISSION.ACTIVE` Mission active | Comprendre et agir sur l'unique mission active sans en créer une seconde ; module principal du Dashboard + widget d'accès rapide. | Mission Header ; Mission Description ; Progress Block ; Decision Buttons Complete/Fail/Replan/Back ; Notes Area texte + voix. | ✔ `GET /api/imperium/missions/active` ; ✔ `GET /api/imperium/missions/{mission_id}` ; ✔ `POST …/missions/{id}/complete` ; ✔ `POST …/missions/{id}/fail` ; TBD `POST …/missions/{id}/notes` ; TBD `POST /api/imperium/replans/request`. | CODÉ (nav `/missions`, module card `mission`, empty state `no_active_mission`) — placement divergent, voir §4.1 | 65 §4, 69 §3.2, 99 §B, 63 §9.1 |
-| `IMP.OPERATIONS.MAIN` Operations (nom provisoire) | Gérer la matière première du système : 2 projets actifs, projets non actifs, routines quotidiennes cochables. | Fenêtre projet actif n°1 ; fenêtre projet actif n°2 ; liste projets non actifs ; bouton Modifier (ajouter/supprimer/activer/désactiver/réordonner) ; liste routines avec coche du jour ; bannière « Attention requise ». | Aucun endpoint réel ni TBD nommé (doc 59 §12.17 : « Operations project/routine endpoints, per 71 »). | SPÉCIFIÉ | 71, 65 §6, 59 §12.0, 99 §C.1, F06 (hors V1) |
+| `IMP.PILOTAGE.MAIN` Pilotage | Gérer la matière première du système : 2 projets actifs, projets non actifs, routines quotidiennes cochables. | Fenêtre projet actif n°1 ; fenêtre projet actif n°2 ; liste projets non actifs ; bouton Modifier (ajouter/supprimer/activer/désactiver/réordonner) ; liste routines avec coche du jour ; bannière « Attention requise ». | Aucun endpoint réel ni TBD nommé (doc 59 §12.17 : « Pilotage project/routine endpoints, per 71 »). | SPÉCIFIÉ | 71, 65 §6, 59 §12.0, 99 §C.1, F06 (hors V1) |
 | `IMP.HISTORY.MAIN` History | Chronologie read-only des missions, plans, décisions et événements. | Timeline ; Search ; Filters All/Missions/Decisions/Weekly/Failed ; History Detail Card ; lien mission liée. | ✔ `GET /api/imperium/missions/history` ; ✔ `GET /api/imperium/daily-plan` ; ✔ `GET /api/imperium/day/plan` ; TBD `GET /api/imperium/history/events` ; TBD `GET …/history/events/{event_id}`. | MAQUETTÉ (`history_mock_v1`) | 65 §7, 69 §3.5, 67 §7, 68 §2.5 |
 | `IMP.SETTINGS.CORE` Settings | Préférences frontend et liens de configuration, sans modifier une règle canonique sans backend. | Sections User ; Theme ; Notifications ; Integrations ; Security ; Advanced (lien priorités, cache, reset) ; sections doc 59 Morning popup, Replan policy, Chat retention, Discipline weights ; sous-section IA : Nourrir l'IA (doc 70), Logs (doc 72 §8). | ✔ `GET /api/imperium/frontend/app-manifest` ; ✔ `GET /api/imperium/decision-framework/priorities` ; TBD `GET/PATCH /api/imperium/settings` ; TBD endpoints doc 70 §11. | MAQUETTÉ (`settings_mock_v1` ; asset `nav_settings` déclaré mais aucun item navigation) | 65 §8, 69 §3.6, 59 §12.15, 70 §13, 72 §8 |
 | `IMP.SETTINGS.PRIORITIES` Priority Rules | Ordonner les priorités canoniques du Decision Framework. | Liste draggable ; rank labels ; aide schéma read-only ; Enregistrer / Réinitialiser. | ✔ `GET/POST /api/imperium/decision-framework/priorities` ; ✔ `GET /api/imperium/decision-framework/schema` ; ✔ `GET/POST /api/imperium/priorities` (legacy). | SPÉCIFIÉ | 59 §12.14, 65 §9.6 deep link |
@@ -284,8 +284,8 @@ Une feature n'apparaît qu'une fois, à son écran d'origine. Les rappels ailleu
 | Bannière Weekly Review (lancement → fait → cooldown) | `IMP.DASH.MAIN` | `IMP.WR.LIST` (readiness banner) | 99 §C.2, 59 §12.11 |
 | Chatbot conversation + voix + fermeture-extraction | `IMP.CHAT.CONVERSATION` | `IMP.DASH.MAIN` (dock 320dp) | 72, 59 §12.9 |
 | Decisions Log | `IMP.DECISIONS.LOG` | `IMP.CHAT.CONVERSATION` (bannière) | 59 §12.10 |
-| Projets actifs n°1/n°2 + non actifs + Modifier | `IMP.OPERATIONS.MAIN` | — | 71 §3 |
-| Routines quotidiennes cochables | `IMP.OPERATIONS.MAIN` | — | 71 §4 |
+| Projets actifs n°1/n°2 + non actifs + Modifier | `IMP.PILOTAGE.MAIN` | — | 71 §3 |
+| Routines quotidiennes cochables | `IMP.PILOTAGE.MAIN` | — | 71 §4 |
 | Timeline + Search + Filters historique | `IMP.HISTORY.MAIN` | `IMP.PLAN.HISTORY` (timeline plans) | 65 §7 |
 | Sections Settings User/Theme/Notifications/Integrations/Security/Advanced | `IMP.SETTINGS.CORE` | — | 65 §8 |
 | Priority Rules draggable | `IMP.SETTINGS.PRIORITIES` | `IMP.SETTINGS.CORE` (lien) | 59 §12.14 |
@@ -344,7 +344,7 @@ Une feature n'apparaît qu'une fois, à son écran d'origine. Les rappels ailleu
 
 La couche backend (`frontend.py`, v6 selon `design-handoff`) ne déclare que 7 items de navigation : `/home`, `/dashboard`, `/daily-plan`, `/missions`, `/vault`, `/path`, `/pulse`. Sont absents :
 
-- **`IMP.OPERATIONS.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`** : 3 des 4 top-level Imperium (65 §9, 99 §B). L'asset `nav_settings.svg` est déclaré dans `asset-registry` sans item de navigation correspondant.
+- **`IMP.PILOTAGE.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`** : 3 des 4 top-level Imperium (65 §9, 99 §B). L'asset `nav_settings.svg` est déclaré dans `asset-registry` sans item de navigation correspondant.
 - **Toutes les surfaces liées Imperium** : `IMP.CHAT.CONVERSATION`, `IMP.WR.*`, `IMP.CHECKIN.MORNING`, `IMP.MISSION.OUTCOME`, `IMP.DAY.FINISH`, `IMP.REPLAN.VALIDATE`, `IMP.MISSION.ADD_MANUAL`, `IMP.PLAN.HISTORY`, `IMP.DECISIONS.LOG`, `IMP.SETTINGS.PRIORITIES`. Aucune action `navigate` ni empty state ne les cible. Le groupe d'assets `weekly_review` existe pourtant, et `weekly_review` figure dans `supported_modules` du design-handoff.
 - **Façade Vector entière** (`VEC-01` … `VEC-11`, HUD) : `nav_vector.svg` et le groupe d'assets `vector` sont déclarés, `vector` est dans `supported_modules`, mais aucun item navigation, module card, action ni empty state.
 - **Sous-écrans Vault, Pulse, Path** : seule la route racine de chaque façade existe (`/vault`, `/path`, `/pulse`). Aucun des 11 sous-écrans Vault, 13 Pulse, 11 Path (+ PAT-12) n'a de métadonnée. L'asset `vault_receipt_scan` (VAU-04) est le seul indice d'un sous-écran.
@@ -369,7 +369,7 @@ La couche backend (`frontend.py`, v6 selon `design-handoff`) ne déclare que 7 i
 
 ### 4.4 Incohérences entre docs frontend (à réconcilier, pas tranchées ici)
 
-- Docs 63 §4.2/§9.1, 66 §8, 67 §2, 68 §2.3-2.4, 69 §3.3-3.4 listent encore Inbox et Weekly Review comme top-level (6 destinations) ; docs 65 §9, 59 §12.0 et 99 §B fixent 4 top-level (Dashboard, Operations, History, Settings). Le plan de correction 99 §E n'a été appliqué qu'aux docs 59 et 65.
+- Docs 63 §4.2/§9.1, 66 §8, 67 §2, 68 §2.3-2.4, 69 §3.3-3.4 listent encore Inbox et Weekly Review comme top-level (6 destinations) ; docs 65 §9, 59 §12.0 et 99 §B fixent 4 top-level (Dashboard, Pilotage, History, Settings). Le plan de correction 99 §E n'a été appliqué qu'aux docs 59 et 65.
 - Doc 63 §4.2 nomme toujours les écrans par `IMP-01…06`, abandonnés par 99 §A.2.
 - `PAT-12 Worship` existe dans 41 §19 mais pas dans 59 §16, 63 §9.5 ni le graphe Mermaid 59 §16.12.
 - Doc 59 §16.0 déclare PAT-09 et PAT-10 top-level ; doc 41 §19 les range sous Settings (PAT-11). HYP : PAT-11 reste le point d'entrée fonctionnel, PAT-09/10 restent des tabs de navigation par commodité.

@@ -43,7 +43,7 @@ Respecter strictement les documents suivants est obligatoire pour tout generateu
 | `62_DESIGN_SYSTEM_COMPONENT_CATALOG.md` | Component Catalog foundation `Imperium*`. |
 | `63_FRONTEND_ARCHITECTURE_V1.md` | Architecture Android, navigation, state, cache, sync. |
 | `64_FRONTEND_GENERATION_PLAN_V1.md` | Ordre de generation, phases et interdiction de backend avant validation visuelle. |
-| `71_IMPERIUM_OPERATIONS_TAB.md` | Spec de base Operations, top-level V1 provisoire. |
+| `71_IMPERIUM_OPERATIONS_TAB.md` | Spec de base Pilotage, top-level V1. |
 
 ### 2.2 Interdictions
 
@@ -415,27 +415,27 @@ La Weekly Review n'est pas un ecran top-level Imperium V1. Elle existe comme ban
 
 Cette section retire l'ancien faux top-level `Weekly Review` du doc 65. Le cycle precis de banniere, cooldown, message de fin et renvoi History sera documente separement ; il ne doit pas etre invente ici.
 
-## 6. Operations Screen
+## 6. Pilotage Screen
 
 ### 6.1 Identity
 
 | Champ | Valeur |
 |---|---|
-| Route ID | `IMP.OPERATIONS.MAIN` |
-| Route path | `imperium/operations` |
-| Titre visible | `Operations` |
+| Route ID | `IMP.PILOTAGE.MAIN` |
+| Route path | `imperium/pilotage` |
+| Titre visible | `Pilotage` |
 | Type | Top-level route |
 
-Nom provisoire : `Operations`. La spec de base de cet ecran est `71_IMPERIUM_OPERATIONS_TAB.md` ; ce document ne la recopie pas.
+Nom definitif : `Pilotage` (décision utilisateur 2026-10-15). La spec de base de cet ecran est `71_IMPERIUM_OPERATIONS_TAB.md` ; ce document ne la recopie pas.
 
 ### 6.2 Objectif metier
 
-Enregistrer Operations comme deuxieme ecran top-level Imperium V1 : projets + routines. Les projets et routines alimentent l'arbitrage backend d'Imperium, mais cet ecran ne cree pas directement de mission active.
+Enregistrer Pilotage comme deuxieme ecran top-level Imperium V1 : projets + routines. Les projets et routines alimentent l'arbitrage backend d'Imperium, mais cet ecran ne cree pas directement de mission active.
 
 ### 6.3 DoD
 
-- Route `IMP.OPERATIONS.MAIN` presente dans le contrat de navigation.
-- Path `imperium/operations` reserve.
+- Route `IMP.PILOTAGE.MAIN` presente dans le contrat de navigation.
+- Path `imperium/pilotage` reserve.
 - Spec fonctionnelle deleguee a `71_IMPERIUM_OPERATIONS_TAB.md`.
 - Aucun detail UI de doc 71 recopie ici.
 
@@ -699,7 +699,7 @@ Fixture locale canonique : `settings_mock_v1`.
 | Screen | Stable Route ID | Path | Navigation exposure |
 |---|---|---|---|
 | Dashboard | `IMP.DASH.MAIN` | `imperium/dashboard` | Top-level route. |
-| Operations | `IMP.OPERATIONS.MAIN` | `imperium/operations` | Top-level route. |
+| Pilotage | `IMP.PILOTAGE.MAIN` | `imperium/pilotage` | Top-level route. |
 | History | `IMP.HISTORY.MAIN` | `imperium/history` | Top-level route. |
 | Settings | `IMP.SETTINGS.CORE` | `imperium/settings` | Top-level route. |
 
@@ -726,7 +726,7 @@ Telephone GO 65 bottom navigation contains exactly four visible top-level items 
 | Order | Label | Route ID | Icon intent |
 |---|---|---|---|
 | 1 | Dashboard | `IMP.DASH.MAIN` | dashboard/home. |
-| 2 | Operations | `IMP.OPERATIONS.MAIN` | projects/routines. |
+| 2 | Pilotage | `IMP.PILOTAGE.MAIN` | projects/routines. |
 | 3 | History | `IMP.HISTORY.MAIN` | timeline/history. |
 | 4 | Settings | `IMP.SETTINGS.CORE` | settings. |
 
@@ -737,7 +737,7 @@ Tablet GO 65 sidebar contains exactly four visible top-level items in this order
 | Order | Label | Route ID |
 |---|---|---|
 | 1 | Dashboard | `IMP.DASH.MAIN` |
-| 2 | Operations | `IMP.OPERATIONS.MAIN` |
+| 2 | Pilotage | `IMP.PILOTAGE.MAIN` |
 | 3 | History | `IMP.HISTORY.MAIN` |
 | 4 | Settings | `IMP.SETTINGS.CORE` |
 
@@ -750,7 +750,7 @@ Every GO 65 screen uses `ImperiumTopBar`.
 | Screen | Title | Leading action | Trailing action |
 |---|---|---|---|
 | Dashboard | `Imperium` | none | `SyncStateChip`. |
-| Operations | `Operations` | none | `SyncStateChip`. |
+| Pilotage | `Pilotage` | none | `SyncStateChip`. |
 | History | `History` | none | filter icon if filters collapse. |
 | Settings | `Settings` | none | none. |
 
@@ -812,12 +812,12 @@ Mock data is documentary and local-only:
 }
 ```
 
-### 10.2 Operations
+### 10.2 Pilotage
 
 ```json
 {
-  "route_id": "IMP.OPERATIONS.MAIN",
-  "screen": "IMP.OPERATIONS.MAIN",
+  "route_id": "IMP.PILOTAGE.MAIN",
+  "screen": "IMP.PILOTAGE.MAIN",
   "fixture_name": "operations_empty_v1",
   "sync_state": "mock",
   "source_doc": "71_IMPERIUM_OPERATIONS_TAB.md"
@@ -885,7 +885,7 @@ Every screen must pass every item before Phase 3 backend wiring.
 | Screen | Responsive tablette | Responsive telephone | Design System conforme | Component Catalog conforme | Navigation conforme | Loading state | Empty state | Error state | Mock data fonctionnelle |
 |---|---|---|---|---|---|---|---|---|---|
 | Dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Operations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Pilotage | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | History | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -896,7 +896,7 @@ Additional validation rules:
 - Mission Active must remain a Dashboard module or quick access surface, not a top-level route.
 - Chatbot must remain `IMP.CHAT.CONVERSATION`, docked from Dashboard, not a recreated Inbox screen.
 - Weekly Review must remain a Dashboard banner/event window and must never finalize locally.
-- Operations must remain the provisional top-level route `IMP.OPERATIONS.MAIN` until renamed by product decision.
+- Pilotage is the final top-level route `IMP.PILOTAGE.MAIN` (renamed from provisional Operations, 2026-10-15).
 - History must remain read-only.
 - Settings must never expose secrets or internal auth state.
 
