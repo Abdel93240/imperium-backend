@@ -22,8 +22,13 @@ Imperium → Settings → AI Advanced Settings
   ├─ Vectorization     → opens the calibration console (HTML on the Tower)   [Part D]
   ├─ Role mapping      → edit which provider/model/effort serves each role   [Part B]
   ├─ Scoring /200      → routing thresholds (edited in app, applied on VPS)   [Part C]
-  └─ API keys          → provider credentials
+  └─ API keys          → provider credentials (WRITE-ONLY field, see below)
 ```
+
+API keys panel (user decision 2026-10-15) : one write-only field per provider. The
+builder pastes a key → it is sent once to the backend (stored server-side) → it is
+NEVER displayed back. The UI only shows a status per provider: « clé enregistrée ✓ »
+or « manquante », plus [Remplacer] / [Supprimer]. Consistent with doc 63 §13.4.
 
 Key point — **unified interface, distributed execution.** The menu is one place (where
 the builder goes), but the levers act where the thing they pilot runs:

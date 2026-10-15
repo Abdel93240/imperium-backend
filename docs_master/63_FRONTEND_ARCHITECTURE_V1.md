@@ -1074,6 +1074,33 @@ No secrets in UI :
 - les screenshots UI ne doivent pas révéler token, cookie, Authorization header, refresh token ou payload sensible ;
 - les erreurs affichées sont redaction-safe ;
 - toute clé nécessaire aux modèles AI reste côté backend ou orchestration n8n.
+- exception encadrée (décision 2026-10-15) : le panneau « Clés API » des AI Advanced
+  Settings (doc 73) est un champ en ÉCRITURE SEULE — la clé collée part au backend
+  et n'est jamais relue, stockée localement ni réaffichée ; seul un état
+  « enregistrée / manquante » est visible.
+
+### 13.5 Écran de connexion
+
+Décision utilisateur 2026-10-15 : l'app propose la connexion par **clé maître
+uniquement** (le backend accepte aussi email + mot de passe, doc 08, mais l'écran ne
+l'expose pas). Contrat : `POST /api/auth/login` (`backend/app/schemas/auth.py`).
+
+| Champ écran | Champ API | Règle |
+|---|---|---|
+| Adresse du serveur | — (base URL de l'app) | Bouton « Tester » : `GET /api/health` puis `/api/health/db`. |
+| Clé maître | `master_key` | Champ masqué ; jamais stocké ; effacé après la tentative. |
+| Nom de l'appareil | `device_label` | Obligatoire, pré-rempli avec le modèle (ex. « Galaxy Tab S10 Ultra »). |
+| (invisible) | `device_fingerprint`, `platform` | Remplis automatiquement. |
+
+Réponse stockée en stockage sécurisé (§13.2) : `access_token`, `refresh_token`,
+`device_id`. Refresh et logout envoient `{refresh_token, device_id}`
+(`/api/auth/refresh`, `/api/auth/logout`). Section Security des Settings : liste des
+appareils de confiance (`GET /api/auth/devices`) avec révocation
+(`POST /api/auth/devices/{id}/revoke`).
+
+Le secret de déverrouillage du kill switch (doc F09 §4) est DISTINCT de la clé
+maître et ne doit jamais lui être identique : la clé maître est saisie sur la
+tablette, le secret F09 ne doit jamais y vivre.
 
 ---
 
