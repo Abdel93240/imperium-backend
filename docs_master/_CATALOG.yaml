@@ -461,12 +461,12 @@ docs:
 
   - file: "71_IMPERIUM_OPERATIONS_TAB.md"
     number: 71
-    title: "Imperium Pilotage Tab"
+    title: "Imperium Operations Tab"
     family: architecture
     categories: [app:imperium, frontend]
     status: up_to_date
     last_reviewed: "2026-06-09"
-    notes: "Pilotage tab (final name, 2026-10-15; formerly Operations). Route IMP.PILOTAGE.MAIN."
+    notes: "Operations tab (final name confirmed 2026-10-15; "Pilotage" rename dropped). Route IMP.OPERATIONS.MAIN."
 
   - file: "70_KNOWLEDGE_INBOX.md"
     number: 70
@@ -654,7 +654,7 @@ docs:
     family: feature
     categories: [feature, app:imperium]
     status: to_review
-    notes: "Future enrichment of the Pilotage/project module."
+    notes: "Future enrichment of the Operations/project module."
 
   - file: "F07_VIDEO_VTC.md"
     number: 7

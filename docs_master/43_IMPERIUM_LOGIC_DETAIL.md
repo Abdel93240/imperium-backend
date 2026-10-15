@@ -701,7 +701,7 @@ Imperium Dashboard (the main user-facing screen):
   │   - [Voir pourquoi] [Ouvrir chatbot]
   ├─ Projets en cours
   │   - top active projects with progress %
-  │   - [Voir tous les projets] link to Pilotage tab (doc 71)
+  │   - [Voir tous les projets] link to Operations tab (doc 71)
   ├─ Today's plan (other active missions, only after day start)
   │   - Hidden while state = "Journée non démarrée"; tap to expand after start
   ├─ Quick stats:

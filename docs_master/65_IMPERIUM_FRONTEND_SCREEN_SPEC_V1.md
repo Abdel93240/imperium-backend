@@ -43,7 +43,7 @@ Respecter strictement les documents suivants est obligatoire pour tout generateu
 | `62_DESIGN_SYSTEM_COMPONENT_CATALOG.md` | Component Catalog foundation `Imperium*`. |
 | `63_FRONTEND_ARCHITECTURE_V1.md` | Architecture Android, navigation, state, cache, sync. |
 | `64_FRONTEND_GENERATION_PLAN_V1.md` | Ordre de generation, phases et interdiction de backend avant validation visuelle. |
-| `71_IMPERIUM_OPERATIONS_TAB.md` | Spec de base Pilotage, top-level V1. |
+| `71_IMPERIUM_OPERATIONS_TAB.md` | Spec de base Operations, top-level V1. |
 
 ### 2.2 Interdictions
 
@@ -168,7 +168,8 @@ Ordre telephone, une seule colonne :
 | Ouvrir mission active | Primary sur `Active Mission Card` | focalise le module `IMP.MISSION.ACTIVE` dans le Dashboard avec mock id. | lecture active mission confirmee par backend. |
 | Ouvrir chatbot | Secondary dans `Quick Actions` | ouvre la fenetre dockee `IMP.CHAT.CONVERSATION` avec champ vide. | message/chat backend-valide. |
 | Demander replan | Secondary dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.REPLAN.VALIDATE` si proposition backend existe. |
-| Finish day | Ghost dans `Quick Actions` | affiche snackbar `Mock only`. | ouvre `IMP.DAY.FINISH`. |
+| Finish day (« Terminer la journée ») | Ghost dans `Quick Actions` | affiche snackbar `Mock only`. | V1 : termine la journée directement (`POST /api/imperium/day/finish`), sans fenêtre ; `IMP.DAY.FINISH` hors V1 (doc 59 §12.5). |
+| Toucher une ligne du Programme du jour (chevron ›) | ligne `ImperiumListItem` avec chevron › à droite | ouvre les notes de cette mission (maquette 10) avec mock id. | lecture de la mission et de ses notes. |
 | Démarrer la journée | `ImperiumPrimaryButton` dans l'état non démarré | ouvre le mock `IMP.CHECKIN.MORNING`; anti-double-clic visuel. | déclenche le démarrage explicite backend. |
 
 ### 3.7 Mock data
@@ -415,27 +416,27 @@ La Weekly Review n'est pas un ecran top-level Imperium V1. Elle existe comme ban
 
 Cette section retire l'ancien faux top-level `Weekly Review` du doc 65. Le cycle de banniere (active non masquable, "Weekly Review faite" 10 s, puis snackbar "Tu peux retrouver ta Weekly Review dans History") est documente dans `32_WR_INTERACTIVE_WORKFLOW.md` §2.1 ; il ne doit pas etre invente ici.
 
-## 6. Pilotage Screen
+## 6. Operations Screen
 
 ### 6.1 Identity
 
 | Champ | Valeur |
 |---|---|
-| Route ID | `IMP.PILOTAGE.MAIN` |
-| Route path | `imperium/pilotage` |
-| Titre visible | `Pilotage` |
+| Route ID | `IMP.OPERATIONS.MAIN` |
+| Route path | `imperium/operations` |
+| Titre visible | `Operations` |
 | Type | Top-level route |
 
-Nom definitif : `Pilotage` (décision utilisateur 2026-10-15). La spec de base de cet ecran est `71_IMPERIUM_OPERATIONS_TAB.md` ; ce document ne la recopie pas.
+Nom definitif : `Operations` (décision utilisateur 2026-10-15). La spec de base de cet ecran est `71_IMPERIUM_OPERATIONS_TAB.md` ; ce document ne la recopie pas.
 
 ### 6.2 Objectif metier
 
-Enregistrer Pilotage comme deuxieme ecran top-level Imperium V1 : projets + routines. Les projets et routines alimentent l'arbitrage backend d'Imperium, mais cet ecran ne cree pas directement de mission active.
+Enregistrer Operations comme deuxieme ecran top-level Imperium V1 : projets + routines. Les projets et routines alimentent l'arbitrage backend d'Imperium, mais cet ecran ne cree pas directement de mission active.
 
 ### 6.3 DoD
 
-- Route `IMP.PILOTAGE.MAIN` presente dans le contrat de navigation.
-- Path `imperium/pilotage` reserve.
+- Route `IMP.OPERATIONS.MAIN` presente dans le contrat de navigation.
+- Path `imperium/operations` reserve.
 - Spec fonctionnelle deleguee a `71_IMPERIUM_OPERATIONS_TAB.md`.
 - Aucun detail UI de doc 71 recopie ici.
 
@@ -613,6 +614,9 @@ Ordre telephone :
 |---|---|---|
 | User | `ImperiumCard`, `ImperiumListItem` | display name mock, timezone, language. |
 | Theme | `ImperiumSegmentedControl`, `ImperiumToggle` | mode system/light/dark mock, accent note. |
+| Routine du matin | `ImperiumToggle`, sélecteur d'heure | popup du matin activé/désactivé (`morning_popup_enabled`, défaut oui) + heure (`morning_popup_time`, ex. 06:30) — doc 43 §15. |
+| Replanification | `ImperiumSegmentedControl`, champ minutes | `replan_on_mission_failure` : replanifier ou demander, réglé par niveau d'urgence (défaut : replanifier si mission urgente, demander sinon) ; délai anti-rafale `debounce_minutes` (défaut 5) — doc 43 §15. |
+| Chatbot | `ImperiumListItem` (choix) | durée de conservation de l'historique du chat (défaut 90 jours) — doc 43 §15. |
 | Notifications | `ImperiumToggle` rows | morning check-in, weekly review, mission reminders ; red level toggle (disableable). Channel = Android push only, no channel selector (doc 76 Q24). |
 | Integrations | `ImperiumListItem` | État des services (maquette 19) : serveur, base PostgreSQL, mémoire vectorielle, IA locale, IA cloud, n8n. Les lignes sont affichées même si leur health check backend n'existe pas encore (seuls `/api/health` et `/api/health/db` existent) — mock jusqu'à leur ajout. |
 | Intelligence Artificielle | `ImperiumListItem` | « Nourrir l'IA » (doc 70) ; « Logs de l'IA » = navigateur de logs sandboxé en lecture seule, arborescence à gauche + terminal d'affichage à droite (doc 72 §8). |
@@ -700,7 +704,7 @@ Fixture locale canonique : `settings_mock_v1`.
 | Screen | Stable Route ID | Path | Navigation exposure |
 |---|---|---|---|
 | Dashboard | `IMP.DASH.MAIN` | `imperium/dashboard` | Top-level route. |
-| Pilotage | `IMP.PILOTAGE.MAIN` | `imperium/pilotage` | Top-level route. |
+| Operations | `IMP.OPERATIONS.MAIN` | `imperium/operations` | Top-level route. |
 | History | `IMP.HISTORY.MAIN` | `imperium/history` | Top-level route. |
 | Settings | `IMP.SETTINGS.CORE` | `imperium/settings` | Top-level route. |
 
@@ -727,7 +731,7 @@ Telephone GO 65 bottom navigation contains exactly four visible top-level items 
 | Order | Label | Route ID | Icon intent |
 |---|---|---|---|
 | 1 | Dashboard | `IMP.DASH.MAIN` | dashboard/home. |
-| 2 | Pilotage | `IMP.PILOTAGE.MAIN` | projects/routines. |
+| 2 | Operations | `IMP.OPERATIONS.MAIN` | projects/routines. |
 | 3 | History | `IMP.HISTORY.MAIN` | timeline/history. |
 | 4 | Settings | `IMP.SETTINGS.CORE` | settings. |
 
@@ -738,7 +742,7 @@ Tablet GO 65 sidebar contains exactly four visible top-level items in this order
 | Order | Label | Route ID |
 |---|---|---|
 | 1 | Dashboard | `IMP.DASH.MAIN` |
-| 2 | Pilotage | `IMP.PILOTAGE.MAIN` |
+| 2 | Operations | `IMP.OPERATIONS.MAIN` |
 | 3 | History | `IMP.HISTORY.MAIN` |
 | 4 | Settings | `IMP.SETTINGS.CORE` |
 
@@ -751,7 +755,7 @@ Every GO 65 screen uses `ImperiumTopBar`.
 | Screen | Title | Leading action | Trailing action |
 |---|---|---|---|
 | Dashboard | `Imperium` | none | `SyncStateChip`. |
-| Pilotage | `Pilotage` | none | `SyncStateChip`. |
+| Operations | `Operations` | none | `SyncStateChip`. |
 | History | `History` | none | filter icon if filters collapse. |
 | Settings | `Settings` | none | none. |
 
@@ -813,12 +817,12 @@ Mock data is documentary and local-only:
 }
 ```
 
-### 10.2 Pilotage
+### 10.2 Operations
 
 ```json
 {
-  "route_id": "IMP.PILOTAGE.MAIN",
-  "screen": "IMP.PILOTAGE.MAIN",
+  "route_id": "IMP.OPERATIONS.MAIN",
+  "screen": "IMP.OPERATIONS.MAIN",
   "fixture_name": "operations_empty_v1",
   "sync_state": "mock",
   "source_doc": "71_IMPERIUM_OPERATIONS_TAB.md"
@@ -886,7 +890,7 @@ Every screen must pass every item before Phase 3 backend wiring.
 | Screen | Responsive tablette | Responsive telephone | Design System conforme | Component Catalog conforme | Navigation conforme | Loading state | Empty state | Error state | Mock data fonctionnelle |
 |---|---|---|---|---|---|---|---|---|---|
 | Dashboard | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Pilotage | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Operations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | History | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Settings | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
@@ -897,7 +901,7 @@ Additional validation rules:
 - Mission Active must remain a Dashboard module or quick access surface, not a top-level route.
 - Chatbot must remain `IMP.CHAT.CONVERSATION`, docked from Dashboard, not a recreated Inbox screen.
 - Weekly Review must remain a Dashboard banner/event window and must never finalize locally.
-- Pilotage is the final top-level route `IMP.PILOTAGE.MAIN` (renamed from provisional Operations, 2026-10-15).
+- Operations is the final top-level route `IMP.OPERATIONS.MAIN` (name confirmed 2026-10-15; the "Pilotage" rename was dropped).
 - History must remain read-only.
 - Settings must never expose secrets or internal auth state.
 

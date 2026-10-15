@@ -718,7 +718,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 | One active mission | Une seule mission active peut exister à la fois. Toute UI concurrente affiche un conflit et renvoie vers le backend. |
 | Current focus | `IMP.DASH.MAIN` contient la surface canonique de mission active ; les autres écrans ne créent pas une deuxième mission active. |
 | Mon OS personnel V3 | `Mon OS personnel` / System Health Dashboard is explicitly excluded from V1 navigation ; il reste V3 et ne doit pas apparaître dans Sidebar/Bottom Nav V1. |
-| Top-level V1 | Les seules entrees Sidebar/Bottom Nav V1 sont `IMP.DASH.MAIN`, `IMP.PILOTAGE.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`. |
+| Top-level V1 | Les seules entrees Sidebar/Bottom Nav V1 sont `IMP.DASH.MAIN`, `IMP.OPERATIONS.MAIN`, `IMP.HISTORY.MAIN`, `IMP.SETTINGS.CORE`. |
 | Mission active | `IMP.MISSION.ACTIVE` est un module/surface du Dashboard, pas une route top-level. |
 | Chatbot | `IMP.CHAT.CONVERSATION` est une fenêtre dockée du Dashboard ou une route liée directe, pas un écran Inbox. |
 | Mission detail V1 | `IMP.MISSION.DETAIL` est une surface `deep_link` read/detail contextuelle, non une entrée top-level navigation et non un écran V1 supplémentaire. |
@@ -746,7 +746,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Assets :** Imperium emblem 48dp, Material Symbols status icons, no hero image.
 - **Etats :** Loading=skeleton mission/cards ; Empty=no active mission with CTA "Ouvrir le chatbot" (décision 2026-10-15, aligné 65 §3.8 ; pas de création locale) ; Error=dashboard read-model failure with retry ; Offline=cached dashboard banner ; Syncing=top sync line ; Synced=snackbar after confirmed mutation ; Conflict=server conflict banner and diff dialog.
 - **Backend deps :** `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active`.
-- **Navigation :** entry after auth/onboarding/morning check-in ; exits to `IMP.CHECKIN.MORNING`, `IMP.MISSION.OUTCOME`, `IMP.REPLAN.VALIDATE`, `IMP.MISSION.ADD_MANUAL`, `IMP.PLAN.HISTORY`, `IMP.CHAT.CONVERSATION`, `IMP.DECISIONS.LOG`, `IMP.WR.LIST`, `IMP.SETTINGS.CORE`, plus top-level `IMP.PILOTAGE.MAIN` and `IMP.HISTORY.MAIN`.
+- **Navigation :** entry after auth/onboarding/morning check-in ; exits to `IMP.CHECKIN.MORNING`, `IMP.MISSION.OUTCOME`, `IMP.REPLAN.VALIDATE`, `IMP.MISSION.ADD_MANUAL`, `IMP.PLAN.HISTORY`, `IMP.CHAT.CONVERSATION`, `IMP.DECISIONS.LOG`, `IMP.WR.LIST`, `IMP.SETTINGS.CORE`, plus top-level `IMP.OPERATIONS.MAIN` and `IMP.HISTORY.MAIN`.
 - **Tab S10 Ultra :** 3 columns: Sidebar 240dp, main dashboard max 1280dp, chatbot/context panel 320dp.
 
 ### 12.3 Morning Check-In Popup (`IMP.CHECKIN.MORNING`)
@@ -925,7 +925,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 ```mermaid
 flowchart TD
   AUTH[Auth / Onboarding transverse] --> DASH[IMP.DASH.MAIN Dashboard]
-  DASH --> OPS[IMP.PILOTAGE.MAIN Pilotage]
+  DASH --> OPS[IMP.OPERATIONS.MAIN Operations]
   DASH --> HIST[IMP.HISTORY.MAIN History]
   DASH --> SETTINGS[IMP.SETTINGS.CORE Settings]
   DASH --> CHECKIN[IMP.CHECKIN.MORNING Morning Check-In]
@@ -960,7 +960,7 @@ Transitions conditionnelles canoniques V1 :
 | `IMP.MISSION.OUTCOME` --> `IMP.REPLAN.VALIDATE` | Mission ratée/annulée et hook replan accepté par le backend. |
 | `IMP.WR.INTERACTIVE` --> `IMP.WR.READ_ONLY` | Weekly Review approuvée puis stockée/affichable en read-only. |
 
-Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP.DASH.MAIN`), Pilotage (`IMP.PILOTAGE.MAIN`), History (`IMP.HISTORY.MAIN`), Settings (`IMP.SETTINGS.CORE`). `Mon OS personnel` is excluded from V1 navigation because `audits/2026-06-02_0519_audit.md` records the historical System Health Dashboard as V3; the referenced historical doc is not present in `docs_master/` and is not canonical for V1.
+Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP.DASH.MAIN`), Operations (`IMP.OPERATIONS.MAIN`), History (`IMP.HISTORY.MAIN`), Settings (`IMP.SETTINGS.CORE`). `Mon OS personnel` is excluded from V1 navigation because `audits/2026-06-02_0519_audit.md` records the historical System Health Dashboard as V3; the referenced historical doc is not present in `docs_master/` and is not canonical for V1.
 
 `IMP.MISSION.DETAIL` is a deep_link read surface backed by `GET /api/imperium/missions/{mission_id}` and may reuse the Mission card components; it is not counted as a top-level Imperium V1 route until product explicitly promotes it.
 
@@ -971,7 +971,7 @@ Top-level Sidebar/Bottom Nav V1: Dashboard (`IMP.DASH.MAIN`), Pilotage (`IMP.PIL
 | Route ID | Real endpoints | TBD endpoints |
 |---|---|---|
 | `IMP.DASH.MAIN` | `GET /api/imperium/dashboard`, `GET /api/imperium/weekly-review/state`, `GET /api/imperium/missions/active` | none |
-| `IMP.PILOTAGE.MAIN` | none | Pilotage project/routine endpoints, per `71_IMPERIUM_OPERATIONS_TAB.md` |
+| `IMP.OPERATIONS.MAIN` | none | Operations project/routine endpoints, per `71_IMPERIUM_OPERATIONS_TAB.md` |
 | `IMP.HISTORY.MAIN` | `GET /api/imperium/missions/history` | `GET /api/imperium/history/events`, `GET /api/imperium/history/events/{event_id}` |
 | `IMP.CHECKIN.MORNING` | none | `POST /api/imperium/morning-checkins` |
 | `IMP.MISSION.OUTCOME` | `POST /api/imperium/missions/{mission_id}/complete`, `POST /api/imperium/missions/{mission_id}/fail` | `POST /api/imperium/missions/{mission_id}/cancel` |

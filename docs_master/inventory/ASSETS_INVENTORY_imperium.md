@@ -14,13 +14,13 @@
 - `65_IMPERIUM_FRONTEND_SCREEN_SPEC_V1.md` (spec écrans corrigée — 4 top-level).
 - `66_IMPERIUM_USER_FLOWS_V1.md`, `67_FRONTEND_STATE_MATRIX_V1.md`.
 - `70_KNOWLEDGE_INBOX.md` (action "Nourrir l'IA" dans Settings).
-- `71_IMPERIUM_OPERATIONS_TAB.md` (onglet Pilotage — Projets + Routines).
+- `71_IMPERIUM_OPERATIONS_TAB.md` (onglet Operations — Projets + Routines).
 - `99_AUDIT_COHERENCE_FRONTEND.md` §D (résolutions d'assets actées).
 
 **Architecture verrouillée :** 4 écrans top-level Imperium V1
 1. `IMP.DASH.MAIN` — Dashboard (module mission active, chatbot docké, widget
    mission, bannière Weekly Review).
-2. `IMP.PILOTAGE.MAIN` — Pilotage (Projets + Routines, doc 71).
+2. `IMP.OPERATIONS.MAIN` — Operations (Projets + Routines, doc 71).
 3. `IMP.HISTORY.MAIN` — History.
 4. `IMP.SETTINGS.CORE` — Settings (contient l'action "Nourrir l'IA", doc 70).
 
@@ -80,7 +80,7 @@ droite (doc 65 §3.5).
 - description : surface de barre supérieure Imperium en `Primary` (`#1A2B4A`),
   hauteur 64dp tablette / 56dp téléphone, élévation L4.
 - réutilisé sur : tous les écrans Imperium top-level + surfaces secondaires
-  (Pilotage, History, Settings, Mission Outcome, Replan, Add Manual Mission,
+  (Operations, History, Settings, Mission Outcome, Replan, Add Manual Mission,
   WR Interactive, Priority Rules, Chatbot, Plan History, Decisions Log,
   WR List, WR Read-only).
 
@@ -295,7 +295,7 @@ phase (doc 65 §3.5). En tablette dans `ImperiumContextPanel` 320dp.
 - statut : à générer (custom)
 - description : séparateur vertical / horizontal interne au panel contextuel
   (doc 62 `ImperiumContextPanel.tokens = Divider`).
-- réutilisé sur : Pilotage (séparateur Projets ↔ Routines), History detail
+- réutilisé sur : Operations (séparateur Projets ↔ Routines), History detail
   panel, WR Statistics panel.
 
 ## Chatbot docké (fenêtre du Dashboard — `IMP.CHAT.CONVERSATION`)
@@ -381,7 +381,7 @@ Dashboard (doc 65 §9.6 deep link, doc 59 §12.9). N'est PAS un écran top-level
   12dp, height 56dp, label flottant (doc 59 §7.2, doc 62 `ImperiumTextField`).
 - réutilisé sur : Mission Active (Notes), Mission Outcome (Reason), Add Manual
   Mission (title/description/category), Day Finished (Main win/problem), WR
-  Interactive (answer), Priority Rules, History/Pilotage Search Field
+  Interactive (answer), Priority Rules, History/Operations Search Field
   (variante compact), Knowledge Inbox (file picker label).
 
 ### Search field shell
@@ -459,7 +459,7 @@ Dashboard (doc 65 §9.6 deep link, doc 59 §12.9). N'est PAS un écran top-level
 
 ---
 
-# Pilotage (`IMP.PILOTAGE.MAIN`)
+# Operations (`IMP.OPERATIONS.MAIN`)
 
 2ᵉ écran top-level : Projets (~2/3 gauche) + Routines (~1/3 droite) (doc 71).
 Layout : 2 projets actifs + liste des non-actifs + bouton Modifier ; liste de
@@ -502,7 +502,7 @@ routines cochables.
 - statut : à générer (custom)
 - description : séparateur vertical fixe (doc 71 §2 : « division fixe de la
   surface »). Réutilise le pattern `Context panel divider` du Dashboard.
-- réutilisé sur : Pilotage uniquement (mais asset commun).
+- réutilisé sur : Operations uniquement (mais asset commun).
 
 ### Liste des projets non-actifs (fenêtre 3)
 - scope : app
@@ -518,7 +518,7 @@ routines cochables.
 - statut : à générer (custom)
 - description : surface neutre `Surface` + divider opacité 60% entre lignes
   (doc 59 §1.2, doc 62 `ImperiumListItem`).
-- réutilisé sur : Pilotage (projets non-actifs, routines), History (timeline),
+- réutilisé sur : Operations (projets non-actifs, routines), History (timeline),
   Plan History, Decisions Log, WR List, Settings sections.
 
 ### Bouton "Modifier"
@@ -560,7 +560,7 @@ routines cochables.
   (pas fait).
 - réutilisé sur : History (mission_completed), WR Read-only.
 
-## États Pilotage
+## États Operations
 
 (doc 71 §7 : Loading / Empty / Ready / Editing / Error / Offline / Conflict.)
 
@@ -570,9 +570,9 @@ routines cochables.
 - scope : card
 - type : illustration
 - statut : à générer (custom)
-- description : illustration 240×240dp empty Pilotage avec CTA `Ajouter un
+- description : illustration 240×240dp empty Operations avec CTA `Ajouter un
   projet` (doc 71 §7 + doc 59 §6.2 standard illustrations 240×240).
-- réutilisé sur : (spécifique Pilotage).
+- réutilisé sur : (spécifique Operations).
 
 ### Error state illustration générique (partagé existant)
 
@@ -596,7 +596,7 @@ chronologique read-only (doc 65 §7).
 - type : icon
 - statut : système (Material Symbol, pas à générer)
 - description : Material Symbols `search`, `close`.
-- réutilisé sur : Pilotage (si search ajouté V2).
+- réutilisé sur : Operations (si search ajouté V2).
 
 ### Filter chip shell
 - scope : app
@@ -955,7 +955,7 @@ Type : `dialog`. Ajout manuel au backlog (doc 59 §12.7).
 - type : icon
 - statut : système (Material Symbol, pas à générer)
 - description : Material Symbols `add`, `remove`.
-- réutilisé sur : Pilotage (edition mode), Settings.
+- réutilisé sur : Operations (edition mode), Settings.
 
 ### Date picker pictogram
 - scope : app
@@ -1201,7 +1201,7 @@ Sub-route depuis Settings (doc 26, doc 43 §9, doc 59 §12.14).
 - statut : système (Material Symbol, pas à générer)
 - description : Material Symbols `drag_indicator` ou `drag_handle` pour la
   liste draggable.
-- réutilisé sur : Pilotage (edition mode reorder).
+- réutilisé sur : Operations (edition mode reorder).
 
 ### Rank label chip shell (partagé existant)
 - description : utilise le pattern `ImperiumStatusChip` neutre, déjà déclaré
@@ -1228,7 +1228,7 @@ Liste dédupliquée des assets `scope: app` à GÉNÉRER (statut `à générer
 3. Card surface shell standard (`Surface #16213A`, radius 16dp, L1).
 4. Card surface variant (`SurfaceVariant #1F2D4D`, nested rows/chips/segmented).
 5. List item row background + divider (opacité 60%).
-6. Context panel divider (vertical/horizontal — réutilisé en Pilotage
+6. Context panel divider (vertical/horizontal — réutilisé en Operations
    séparateur Projets ↔ Routines).
 
 **Frames & shells**
@@ -1300,7 +1300,7 @@ Assets spécifiques à une carte/écran, non partagés.
 | 6 | Premium review frame | WR List / Read-only / Interactive | frame |
 | 7 | Ledger ornament | WR List / Read-only / Interactive | illustration ornementale |
 | 8 | Empty state — "No active mission" | Dashboard (module mission) | 240×240 |
-| 9 | Empty state — "No projects yet" | Pilotage | 240×240 |
+| 9 | Empty state — "No projects yet" | Operations | 240×240 |
 | 10 | Empty state — "WR list empty" | WR List | 240×240 |
 | 11 | Empty state — "Settings defaults not initialized" | Settings | 240×240 |
 
@@ -1367,7 +1367,7 @@ redessiner.
 **AI confidence**
 - `verified`, `report`, `help` — mapping concret à figer pour high/medium/low.
 
-**Pilotage / Routines**
+**Operations / Routines**
 - Edition mode : `add`, `delete`, `play_arrow` (activer), `pause` (désactiver),
   `swap_vert`.
 - Routine completion : `check_circle`, `radio_button_unchecked`.
@@ -1390,17 +1390,17 @@ l'asset. À étoffer avant génération.
    du `Banner Info frame` est requis. Hypothèse actuelle : réutilisation du
    Banner Info frame avec un libellé/pictogramme différent.
 
-2. **Pilotage — Fenêtre 1 (projet actif principal) vs Fenêtre 2
+2. **Operations — Fenêtre 1 (projet actif principal) vs Fenêtre 2
    (secondaire)** (doc 71 §3.1). La doc dit « la plus grande, mise en avant »
    mais ne fixe ni ornement ni cadre distinct. Hypothèse : distinction par la
    taille uniquement (cohérent résolution audit #4). À confirmer côté product
    si un cadre visuel séparé est attendu.
 
-3. **Pilotage — composant cochable des routines** (doc 71 §4 : « texte +
+3. **Operations — composant cochable des routines** (doc 71 §4 : « texte +
    coche quotidienne »). Pas de précision sur le composant exact entre
    `ImperiumToggle` et une variante checkbox dédiée. Choix de DS à figer.
 
-4. **Pilotage — Empty state illustration scope**. Réutilisation possible du
+4. **Operations — Empty state illustration scope**. Réutilisation possible du
    "No history yet" partagé ou illustration "No projects yet" dédiée ? La doc
    71 §7 propose une CTA dédiée "Ajouter un projet" donc plutôt asset dédié
    ; à confirmer.
@@ -1414,7 +1414,7 @@ l'asset. À étoffer avant génération.
    La doc 43 §4 parle d'un emoji "one tap" sans préciser un nombre fixe
    d'options. À figer à la génération (déduit 3-5 niveaux).
 
-7. **Onglet Pilotage — nom final** : RÉSOLU, "Pilotage" (2026-10-15). N'impacte pas les assets mais le label visible dans Sidebar/
+7. **Onglet Operations — nom final** : RÉSOLU, "Operations" (2026-10-15). N'impacte pas les assets mais le label visible dans Sidebar/
    Bottom Nav et Top Bar changera : prévoir d'utiliser un slot libellé, pas
    un asset texturé.
 
