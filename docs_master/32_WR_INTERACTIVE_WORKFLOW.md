@@ -361,7 +361,26 @@ Weekly report ready.
 Button: Start weekly report
 ```
 
-The user does not have to start immediately. The banner stays active until the user starts or dismisses the WR according to the future UI rule.
+The user does not have to start immediately. The banner stays active until the user starts the WR.
+
+### 2.1 Banner lifecycle (user decision 2026-10-15)
+
+```text
+PASSIVE  "Weekly report not ready yet."
+   │ Tuesday 20:00 Europe/Paris (configurable)
+   ▼
+ACTIVE   "Weekly report ready." + [Start weekly report]
+   │ NOT dismissable: no "later" / "skip" action. It stays until the WR is
+   │ started, or until it expires at the next Tuesday 20:00 (doc 47 §16.2).
+   │ Interruption / explicit close / AI failure → doc 47 §16.
+   ▼ WR validated and stored
+DONE     "Weekly Review faite" — shown 10 seconds, then the banner disappears.
+   │
+   ▼ on disappearance
+Snackbar (no button): "Tu peux retrouver ta Weekly Review dans History"
+```
+
+This closes the open point of doc 99 §C.2 (done banner, cooldown, History pointer).
 
 ## 3. Patch 2B Implemented Backend Layer
 

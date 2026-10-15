@@ -413,7 +413,7 @@ La Weekly Review n'est pas un ecran top-level Imperium V1. Elle existe comme ban
 - `IMP.WR.READ_ONLY`
 - `IMP.WR.INTERACTIVE`
 
-Cette section retire l'ancien faux top-level `Weekly Review` du doc 65. Le cycle precis de banniere, cooldown, message de fin et renvoi History sera documente separement ; il ne doit pas etre invente ici.
+Cette section retire l'ancien faux top-level `Weekly Review` du doc 65. Le cycle de banniere (active non masquable, "Weekly Review faite" 10 s, puis snackbar "Tu peux retrouver ta Weekly Review dans History") est documente dans `32_WR_INTERACTIVE_WORKFLOW.md` §2.1 ; il ne doit pas etre invente ici.
 
 ## 6. Pilotage Screen
 

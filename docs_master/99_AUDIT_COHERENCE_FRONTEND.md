@@ -125,6 +125,9 @@ Décidée par l'utilisateur (la liste du doc 65 §9.1 était erronée).
      Comportement pressenti par l'utilisateur, **non encore décidé/documenté**.
 - **Action** : documenter ce cycle de bannière (lancement → fait → cooldown →
   disparition + renvoi History) dans le doc concerné (Dashboard / Weekly Review).
+- **RÉSOLU (2026-10-15)** : doc 32 §2.1 — bannière active non masquable,
+  « Weekly Review faite » 10 s, puis snackbar sans bouton « Tu peux retrouver
+  ta Weekly Review dans History ».
 
 ### C.3 Knowledge Inbox "Nourrir l'IA" — RÉSOLU
 - Était le trou #2 de l'audit Claude Code (Inbox sous-spécifié). **Résolu** par
@@ -209,7 +212,7 @@ d'assets.
 ## F. Points à trancher par l'utilisateur (restants)
 
 - Route ID exact de l'onglet Projet (`IMP.PROJECT.MAIN` ?).
-- Comportement final de la bannière Weekly Review (cooldown : durée ? message ?).
+- ~~Comportement final de la bannière Weekly Review~~ → RÉSOLU (2026-10-15) : doc 32 §2.1.
 - Imperium emblem vs AI emblem : une marque ou deux assets (#9) ?
 - Set mood : Material Symbols ou assets custom (#5) ?
 
