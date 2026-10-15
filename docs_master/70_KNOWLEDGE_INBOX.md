@@ -150,7 +150,7 @@ REJECTED (safety):
   - executables and unsafe/odd types
   - examples: .exe, .info, scripts, and other potentially dangerous file types
 
-Max file size: TBD. Audio/video imply a higher cap than documents, to define.
+Max file size (user decision 2026-10-15): 25 MB for documents and images; 500 MB for audio and video.
 ```
 
 The client does a soft pre-check; the backend does the HARD enforcement and
@@ -188,8 +188,8 @@ criterion is danger, not media format.
 ```
 
 If the user cancels at the review/validation step, nothing is vectorized and no
-entity is created. The raw upload may be kept as a non-vectorized pending item or
-removed (see §8). Note: a source that has reached step 7 for a VALIDATED item is
+entity is created, and the raw upload is DELETED immediately (user decision 2026-10-15) — no
+pending item is kept. Note: a source that has reached step 7 for a VALIDATED item is
 always retained — discarding only ever applies to a fully cancelled upload.
 
 ---
@@ -306,16 +306,17 @@ same feature in all five apps; only the entry point's surrounding settings diffe
 ## 14. Open Points (to finalize later)
 
 - Precise accepted file-type allow-list (§6).
-- Max file size (§6).
+- ~~Max file size~~ → DECIDED: 25 MB documents/images, 500 MB audio/video (§6).
 - Audio/video storage and processing limits: larger uploads, transcription for
   audio, frame/OCR extraction for video, and vectorization cost/latency.
-- Whether rejected/cancelled uploads are discarded immediately or kept as pending.
+- ~~Rejected/cancelled uploads~~ → DECIDED: deleted immediately, never kept as pending (§7).
 - Source retention: DECIDED — the original source is ALWAYS retained (PATCH 05),
   stored VPS-local in V1, NAS-ready (F06). What remains open is only the retention
   DURATION / purge rules and the VPS→NAS migration — owned by doc 20 (see PATCH 07),
   NOT by this document.
-- Whether the ingest history is per-app filtered in the UI (display only) while
-  retrieval stays global.
+- ~~Ingest history filtering~~ → DECIDED (user decision 2026-10-15): the history shows ALL ingests
+  from every app in each app's Settings → IA, each row labelled with its entry app
+  (`entry_app`, provenance only). No per-app filter.
 
 ---
 
