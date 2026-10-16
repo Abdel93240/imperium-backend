@@ -143,6 +143,43 @@ de la maquette est à retirer.
 Les routines alimentent l'arbitrage d'Imperium (elles font partie du core loop),
 mais leur affichage V1 reste une liste cochable simple.
 
+### 4.1 Modèle et placement des routines (décision utilisateur 2026-10-16)
+
+Remplace le « texte + coche quotidienne, pas de fréquences » ci-dessus : la
+fréquence fermée et les champs de la maquette 12 sont V1.
+
+```text
+CHAMPS VISIBLES (formulaire maquette 12)
+  name                 texte, obligatoire
+  frequency            daily | weekly | biweekly | monthly
+  estimated_minutes    entier, facultatif
+  priority             low | medium | high  (aide l'IA à arbitrer un report)
+  notes                texte, facultatif
+  active               booléen
+
+CHAMPS STOCKÉS, NON AFFICHÉS (posés seulement via le chatbot)
+  pinned_weekday       1-7, NULL par défaut      (weekly / biweekly)
+  pinned_month_day     1-31, NULL par défaut     (monthly ; 31 = dernier jour)
+  pinned_time          heure locale, NULL par défaut (toutes fréquences)
+
+PLACEMENT
+  daily      : chaque journée opérationnelle (entre deux sommeils, doc 12).
+  weekly / biweekly / monthly : à faire UNE fois dans la période ; l'IA
+    choisit la journée (un jour léger) et l'heure dans le plan. La routine
+    n'apparaît dans la liste du jour que la journée où elle est planifiée.
+    Pas faite → l'IA la replace plus tard dans la même période.
+    Période terminée sans la faire → comptée manquée, pas de report.
+  Forçage : si l'utilisateur demande au chatbot un jour ou une heure précis
+    (« l'entretien du véhicule toujours le samedi », « la lecture à 21h »),
+    le chatbot écrit pinned_* après validation, et l'IA respecte ce créneau.
+    Ces champs ne sont pas affichés dans l'UI ; on les retire aussi par le
+    chatbot.
+  Périodes par défaut : semaine = lundi → dimanche ; quinzaine = 14 jours
+    depuis la création de la routine ; mois = mois civil.
+  Total « aujourd'hui » = somme des estimated_minutes des seules routines
+    planifiées dans la journée.
+```
+
 > Référence : `01_SIGNAL_VARIABLES_DICTIONARY.md` mentionne "Routines managed in
 > Operations" — c'est cet écran. (Le `routine_id` y est déjà défini.)
 

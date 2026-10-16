@@ -1430,7 +1430,11 @@ Tables planning futures / non codees :
   ce dictionnaire avant migration ; ne pas reprendre `projects` comme schema
   officiel sans chantier dedie.
 - Routines recurrentes et checks quotidiens : FUTUR / NON CODE. Les noms cibles
-  restent a definir dans ce dictionnaire avant implementation.
+  restent a definir dans ce dictionnaire avant implementation. Champs cibles V1
+  (doc 71 §4.1, decision 2026-10-16) : name, frequency
+  (daily|weekly|biweekly|monthly), estimated_minutes, priority
+  (low|medium|high), notes, active, et pinned_weekday / pinned_month_day /
+  pinned_time (nullables, poses seulement via le chatbot, non affiches).
 - Expiration de mission, notes de mission, `source/source_ref`,
   `replan_version` et liens objectifs -> missions : FUTUR / NON CODE dans les
   tables planning actuelles.

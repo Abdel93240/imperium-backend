@@ -58,6 +58,9 @@ Pas de liste d'appareils de confiance : un seul appareil (doc 63 §13.5).
 - Menu Fréquence = liste fermée : Chaque jour / Chaque semaine / Toutes les 2 semaines /
   Chaque mois. Pas d'option « Autre », pas de récurrence personnalisée (doc 71 §4).
 - Retirer l'aide « Exemples : deux fois par semaine, toutes les deux semaines… ».
+- Pas de champ Jour ni Heure : l'IA place les routines ; un jour ou une heure forcés
+  passent par le chatbot et ne s'affichent pas (doc 71 §4.1). Le reste du formulaire
+  est inchangé (Nom, Fréquence, Durée estimée, Priorité, Notes, Active).
 - « Supprimer » ouvre la confirmation B2.
 
 ### A3. Maquettes 09, 11, 17 — Suppressions
