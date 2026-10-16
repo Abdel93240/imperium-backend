@@ -65,8 +65,8 @@ Pas de liste d'appareils de confiance : un seul appareil (doc 63 §13.5).
 
 ### A3. Maquettes 09, 11, 17 — Suppressions
 
-Tous les boutons « Supprimer » (projet, mission, priorité) ouvrent la confirmation B2.
-Rien d'autre à changer.
+Tous les boutons « Supprimer » (projet, mission, routine) ouvrent la confirmation B2.
+Rien d'autre à changer (les priorités ne se suppriment plus, voir A7).
 
 ### A4. Maquette 05 — Transaction (et bulle Vault plus tard)
 
@@ -153,11 +153,13 @@ Petite fenêtre centrée sur fond assombri (doc 67 : aucune action destructive s
 confirmation).
 
 - Titre : « Supprimer <nom> ? »
-- Une ligne d'explication selon le cas (ex. « Les missions de ce projet seront aussi
-  supprimées. »).
+- Une ligne d'explication selon le cas (doc 71, effets d'une suppression) :
+  - projet : « Ses missions à venir seront annulées ; l'historique est conservé. »
+  - routine : « Elle ne sera plus planifiée ; l'historique est conservé. »
+  - mission : « Elle sera retirée du plan. »
+  - élément de Nourrir l'IA : voir B10.
 - Boutons : **Annuler** (gris) / **Supprimer** (rouge).
-- Une seule maquette générique ; préciser les variantes de texte pour projet, mission,
-  routine, priorité, élément de Nourrir l'IA.
+- Une seule maquette générique (variante projet), les autres textes en annexe.
 
 ### B3. Justificatif — caméra
 

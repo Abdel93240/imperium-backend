@@ -114,9 +114,23 @@ Versions suivantes : boutons Activer / Désactiver + fenêtre « choisir quel pr
 actif désactiver » quand les slots sont pleins — seulement après avoir observé en V1
 comment l'IA gère 2 projets actifs (et si le nombre d'actifs doit devenir réglable).
 
-Note V1 (suppression) : toute suppression (projet, mission, routine, priorité) ouvre
+Note V1 (suppression) : toute suppression (projet, mission, routine) ouvre
 une petite fenêtre de confirmation (`ImperiumAlertDialog`, doc 67 : aucune action
 destructive sans confirmation) : « Supprimer <nom> ? » + Annuler / Supprimer.
+Les priorités ne se suppriment pas (4 domaines fixes, doc 52 §3).
+
+Effets d'une suppression — le passé est conservé (décision utilisateur 2026-10-16) :
+- Projet : retiré d'Opérations. Ses missions non faites (backlog, prévues, standby)
+  passent en `annulée` (raison « Projet supprimé ») et sortent du plan. Ses missions
+  passées (faites, ratées) restent dans l'Historique avec le nom du projet figé.
+  Texte : « Ses missions à venir seront annulées ; l'historique est conservé. »
+- Routine : ne revient plus. Les coches passées restent dans l'Historique et dans le
+  score des journées passées. Texte : « Elle ne sera plus planifiée ; l'historique
+  est conservé. »
+- Mission : seulement une mission non faite ; elle passe en `annulée`. Une mission
+  terminée ne se supprime pas. Texte : « Elle sera retirée du plan. »
+- Aucun recalcul des scores passés. La mémoire de l'IA dérivée d'un projet reste,
+  sauf suppression explicite dans Nourrir l'IA (doc 72 §4).
 Note V1 (complétion) : la promotion automatique à la complétion d'un projet actif
 (cf. §3.1, règle de remontée) NE passe PAS par ce menu — elle est déclenchée par
 le système, pas par l'utilisateur. Ce menu "Modifier" ne couvre que les actions
