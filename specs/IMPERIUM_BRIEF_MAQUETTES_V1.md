@@ -295,6 +295,32 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 - Lecture seule : aucun bouton de modification. Mention : « Pour corriger une extraction,
   parle au chatbot. »
 
+### B12. États secondaires (planche, point UI-31)
+
+Une planche qui montre chaque état une fois, sur le **Dashboard** et sur le **terminal**
+(maquette 06), pour servir de modèle à tous les écrans. Textes en tutoiement.
+
+- **Chargement** (doc 65 §3.8) : blocs gris qui scintillent (skeleton) à la place de la
+  carte mission, du programme, des finances et des projets. Aucun faux titre ni chiffre.
+- **Journée non démarrée** (doc 65 §3.8) : seulement « Journée non démarrée » et le
+  bouton « Démarrer la journée » ; ni mission, ni programme.
+- **Vide** (premier jour, rien encore) : dans chaque bloc, une ligne sobre, ex.
+  « Aucune mission pour l'instant », « Aucune transaction », « Aucun projet — parle au
+  chatbot pour en créer un », et le bouton « Ouvrir le chatbot ».
+- **Erreur** (serveur injoignable) : message « Impossible de joindre Imperium » + bouton
+  « Réessayer » à la place du contenu ; en-tête « Serveur : déconnecté » en rouge.
+- **Hors ligne** (doc 59 §12.4, doc 70 §8) : bannière fine en haut « Hors ligne — tes
+  actions seront envoyées au retour du réseau » ; contenu affiché depuis le cache ;
+  dans le terminal, message en attente marqué « en attente d'envoi ».
+- **Clavier ouvert** (Tab S8 portrait) : terminal — le champ de saisie et les boutons
+  micro/envoyer restent collés au-dessus du clavier, la conversation remonte, le dernier
+  message reste visible ; formulaire (ex. maquette 11) — la fenêtre remonte pour que le
+  champ actif et les boutons Annuler/Enregistrer restent visibles.
+- **Enregistrement en cours** : le bouton principal (ex. « Enregistrer », « Valider »)
+  affiche un petit indicateur de chargement et devient inactif jusqu'à la réponse.
+- Déjà couverts ailleurs, à ne pas redessiner : échec OCR (B5), droits refusés
+  (maquette 19), réponse IA en cours (terminal, maquette 06).
+
 ---
 
 ## C. Pas de maquette nécessaire
@@ -316,5 +342,6 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 ## D. Encore ouvert
 
 - ~~Historique ou Hall of Fame~~ → RÉSOLU : « Historique » partout (voir A5).
+- ~~États secondaires~~ → RÉSOLU : planche B12.
 - ~~Sous-missions de la maquette 03~~ → RÉSOLU : missions annexes V1 allégées (voir A8).
 - ~~Champs de la transaction~~ → RÉSOLU (doc 42 §7.0) : voir A4.
