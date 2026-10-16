@@ -3,7 +3,9 @@
 **Version :** 1.0
 **Sources de vérité :** `docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md`, `docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md`, `docs_master/61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md`, `docs_master/62_DESIGN_SYSTEM_COMPONENT_CATALOG.md`, `docs_master/63_FRONTEND_ARCHITECTURE_V1.md`, `docs_master/07_ANDROID_APP_RESPONSIBILITIES.md`
 **Cible :** génération future Android natif Kotlin + Jetpack Compose + Material 3
-**Device principal :** Samsung Galaxy Tab S10 Ultra, landscape primaire
+**Device principal :** Samsung Galaxy Tab S8, portrait (V1, décision 2026-10-16) — adaptation ultérieure : Samsung Galaxy Tab S10 Ultra, landscape
+
+> **Cible V1 (décision utilisateur 2026-10-16) : Samsung Galaxy Tab S8 (11"), PORTRAIT**, dimensions fluides (aucune taille en pixels figée), comme les maquettes de la revue UI du 2026-10-15. Sidebar à gauche conservée. Les mentions « Tab S10 Ultra landscape » de ce document décrivent désormais l'ADAPTATION ULTÉRIEURE (S10/S11 Ultra, paysage), pas la cible V1.
 **Statut :** CANONICAL FRONTEND GENERATION PLAN V1 — documentation only, aucun Kotlin, aucun dossier `android/`, aucun runtime frontend, aucun scaffold Android et aucun backend modifié.
 
 Ce document définit l'ordre officiel de génération du frontend V1. Il verrouille la séquence de travail avant toute génération massive afin de préserver la vision produit : les apps sont des interfaces, le backend reste le cerveau.

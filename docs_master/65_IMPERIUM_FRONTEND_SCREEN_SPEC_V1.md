@@ -78,7 +78,7 @@ Les ecrans GO 65 utilisent uniquement :
 
 ### 2.4 Layout global
 
-Tablet landscape, cible Samsung Galaxy Tab S10 Ultra :
+Cible V1 : Samsung Galaxy Tab S8 **portrait**, dimensions fluides, sidebar à gauche (décision utilisateur 2026-10-16). Le schéma ci-dessous est l'adaptation ultérieure en paysage (Tab S10 Ultra) :
 
 ```text
 ImperiumSidebar 240dp | Main content max 1280dp | Optional context panel 320-480dp

@@ -7,8 +7,7 @@ servent à vérifier, pas à recopier dans l'image.
 
 ## 0. Règles communes (identiques au paquet de revue)
 
-- Support : Galaxy Tab S8, portrait, dimensions fluides (spec de revue §01). Les docs
-  parlent encore de S10 Ultra paysage : on suit les maquettes.
+- Support : Galaxy Tab S8, portrait, dimensions fluides (spec de revue §01, docs 59, 63, 65 à jour).
 - Style : fond presque noir, doré champagne légèrement chaud, cadres absents ou très fins,
   séparateurs discrets, icônes simples. Titres Cormorant Garamond, corps Inter, nombres,
   heures et terminal en JetBrains Mono.

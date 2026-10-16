@@ -2,7 +2,9 @@
 
 **Version :** 1.0
 **Cible technique :** Android natif Kotlin + Jetpack Compose (Material 3)
-**Device principal :** Samsung Galaxy Tab S10 Ultra (14.6", 2960×1848, ~239 ppi, landscape primaire)
+**Device principal :** Samsung Galaxy Tab S8, portrait (V1, décision 2026-10-16) — adaptation ultérieure : Samsung Galaxy Tab S10 Ultra (14.6", 2960×1848, ~239 ppi, landscape)
+
+> **Cible V1 (décision utilisateur 2026-10-16) : Samsung Galaxy Tab S8 (11"), PORTRAIT**, dimensions fluides (aucune taille en pixels figée), comme les maquettes de la revue UI du 2026-10-15. Sidebar à gauche conservée. Les mentions « Tab S10 Ultra landscape » de ce document décrivent désormais l'ADAPTATION ULTÉRIEURE (S10/S11 Ultra, paysage), pas la cible V1.
 **Périmètre :** 5 apps (Imperium, Vault, Vector, Pulse, Path), 62 écrans V1
 **Statut :** CANONICAL V1 — toute déviation doit être justifiée par PR contre ce document.
 
@@ -494,7 +496,7 @@ Chaque écran expose obligatoirement les 7 états :
 
 ### 8.2 Priorité Tab S10 Ultra Landscape
 
-C'est **le device par défaut V1.** Toutes les maquettes V1 sont d'abord conçues pour ce form factor.
+~~C'est le device par défaut V1.~~ Remplacé (décision 2026-10-16) : le device par défaut V1 est la **Tab S8 portrait** ; ce layout paysage est l'adaptation ultérieure S10/S11 Ultra.
 
 Layout canonique Tab S10 Ultra landscape :
 
@@ -608,7 +610,7 @@ Avant d'implémenter un composant V1, l'équipe Compose vérifie :
 2. La radius / spacing / typography correspond-elle à l'échelle officielle ?
 3. Le composant gère-t-il les 7 states (§7.7) ?
 4. La couleur d'état (Success/Warning/Error/Info) est-elle accompagnée d'une icône + libellé ?
-5. Le device par défaut testé est-il Tab S10 Ultra landscape ?
+5. Le device par défaut testé est-il Tab S8 portrait (V1) ?
 6. Le composant respecte-t-il la règle "no fake success" ?
 
 Si une réponse est non, le composant n'est pas mergeable.

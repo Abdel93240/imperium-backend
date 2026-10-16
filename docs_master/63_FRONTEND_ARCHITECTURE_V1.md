@@ -3,7 +3,9 @@
 **Version :** 1.0
 **Sources de vérité :** `docs_master/59_DESIGN_SYSTEM_V1_DRAFT.md`, `docs_master/60_DESIGN_SYSTEM_TOKENS_KT.md`, `docs_master/61_DESIGN_SYSTEM_COMPOSITE_COMPONENTS.md`, `docs_master/62_DESIGN_SYSTEM_COMPONENT_CATALOG.md`, `docs_master/07_ANDROID_APP_RESPONSIBILITIES.md`
 **Cible :** Android natif Kotlin + Jetpack Compose + Material 3
-**Device principal :** Samsung Galaxy Tab S10 Ultra, landscape primaire
+**Device principal :** Samsung Galaxy Tab S8, portrait (V1, décision 2026-10-16) — adaptation ultérieure : Samsung Galaxy Tab S10 Ultra, landscape
+
+> **Cible V1 (décision utilisateur 2026-10-16) : Samsung Galaxy Tab S8 (11"), PORTRAIT**, dimensions fluides (aucune taille en pixels figée), comme les maquettes de la revue UI du 2026-10-15. Sidebar à gauche conservée. Les mentions « Tab S10 Ultra landscape » de ce document décrivent désormais l'ADAPTATION ULTÉRIEURE (S10/S11 Ultra, paysage), pas la cible V1.
 **Device secondaire :** téléphone Android
 **Statut :** CANONICAL FRONTEND ARCHITECTURE V1 — specification only, aucun Kotlin runtime ou scaffold Android n'est créé par ce document.
 
@@ -904,7 +906,7 @@ Règles :
 
 ### 11.1 Galaxy Tab S10 Ultra as primary
 
-La Galaxy Tab S10 Ultra landscape est la surface de référence. Les écrans sont conçus pour la décision rapide, la densité contrôlée et les panneaux persistants.
+Remplacé pour la V1 (décision 2026-10-16) : la surface de référence V1 est la **Galaxy Tab S8 portrait**, dimensions fluides ; ce qui suit décrit l'adaptation ultérieure S10/S11 Ultra paysage. La Galaxy Tab S10 Ultra landscape était la surface de référence. Les écrans sont conçus pour la décision rapide, la densité contrôlée et les panneaux persistants.
 
 ### 11.2 Three-column layout
 
@@ -1089,7 +1091,7 @@ l'expose pas). Contrat : `POST /api/auth/login` (`backend/app/schemas/auth.py`).
 |---|---|---|
 | Adresse du serveur | — (base URL de l'app) | Bouton « Tester » : `GET /api/health` puis `/api/health/db`. |
 | Clé maître | `master_key` | Champ masqué ; jamais stocké ; effacé après la tentative. |
-| Nom de l'appareil | `device_label` | Obligatoire, pré-rempli avec le modèle (ex. « Galaxy Tab S10 Ultra »). |
+| Nom de l'appareil | `device_label` | Obligatoire, pré-rempli avec le modèle (ex. « Galaxy Tab S8 »). |
 | (invisible) | `device_fingerprint`, `platform` | Remplis automatiquement. |
 
 Réponse stockée en stockage sécurisé (§13.2) : `access_token`, `refresh_token`,

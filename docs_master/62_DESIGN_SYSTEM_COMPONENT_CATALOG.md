@@ -23,7 +23,7 @@ Chaque composant foundation V1 doit respecter le meme contrat :
 | Variants | Rester V1, sans surface V2/V3. |
 | States | Rendre les etats requis, sans fake success. |
 | Accessibility rules | Label visible ou content description, ordre de focus stable, cible tactile adaptee, couleur jamais seule. |
-| Responsive behavior Tab S10 Ultra | Landscape tablet est la surface de reference : sidebar 240dp, contenu max 1280dp, panel contextuel 320-480dp quand utile. |
+| Responsive behavior Tab S10 Ultra | V1 = Tab S8 PORTRAIT, dimensions fluides (décision 2026-10-16) ; la colonne « Tab S10 Ultra » décrit l'adaptation paysage ultérieure. Landscape tablet etait la surface de reference : sidebar 240dp, contenu max 1280dp, panel contextuel 320-480dp quand utile. |
 | When to use | Cas clair et repetable dans plusieurs apps. |
 | When not to use | Cas metier compose, navigation V2/V3, automatisation non validee, decoration pure. |
 
