@@ -638,7 +638,7 @@ Ordre telephone :
 | Chatbot | `ImperiumListItem` (choix) | durée de conservation de l'historique du chat (défaut 90 jours) — doc 43 §15. |
 | Notifications | `ImperiumToggle` rows | morning check-in, weekly review, mission reminders ; red level toggle (disableable). Channel = Android push only, no channel selector (doc 76 Q24). |
 | Integrations | `ImperiumListItem` | État des services (maquette 19) : serveur, base PostgreSQL, mémoire vectorielle, IA locale, IA cloud, n8n. Les lignes sont affichées même si leur health check backend n'existe pas encore (seuls `/api/health` et `/api/health/db` existent) — mock jusqu'à leur ajout. |
-| Intelligence Artificielle | `ImperiumListItem` | « Nourrir l'IA » (doc 70) ; « Logs de l'IA » = navigateur de logs sandboxé en lecture seule, arborescence à gauche + terminal d'affichage à droite (doc 72 §8). |
+| Intelligence Artificielle | `ImperiumListItem` | « Nourrir l'IA » (doc 70, une seule entrée → liste des éléments transmis, « Importer » dedans) ; « Logs de l'IA » = navigateur de logs sandboxé en lecture seule, arborescence à gauche + terminal d'affichage à droite (doc 72 §8). |
 | Security | `ImperiumListItem` | auth state redacted, session status mock. Pas de liste d'appareils de confiance (un seul appareil, doc 63 §13.5). |
 | Advanced | `ImperiumListItem`, `ImperiumAlertDialog` | priority rules link, cache mock, reset mock protected by dialog. |
 

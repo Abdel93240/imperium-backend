@@ -178,8 +178,10 @@ criterion is danger, not media format.
 
 ```text
 1. User opens Settings → Intelligence Artificielle → "Nourrir l'IA"
-2. A small Inbox window opens
-3. User browses tablet folders → selects a file
+2. The list of elements already in the AI opens first (« Éléments transmis »,
+   managed from here), with an « Importer » button
+3. « Importer » opens the file-picker window: user browses tablet folders →
+   selects a file
 4. Client pre-check: type accepted? size acceptable?
       - if not → reject with clear message, stay on picker
 5. Upload to backend
@@ -204,6 +206,13 @@ comme une CONVERSATION avec le chatbot dans le terminal — l'IA y écrit ce qu'
 compris, l'utilisateur corrige et choisit la destination en répondant. Ce n'est pas un
 formulaire dédié. La création d'un projet est confirmée par un simple message texte du
 chatbot (« J'ai créé le projet … ») : pas de fenêtre de création de projet.
+
+Parcours des fenêtres (décision utilisateur 2026-10-16) : UNE seule entrée « Nourrir
+l'IA » dans les Réglages. Elle ouvre la liste des éléments déjà transmis (gestion).
+« Importer » ouvre le sélecteur de fichiers ; la sélection FERME le sélecteur et le
+REMPLACE par la conversation du terminal (ce que l'IA a compris, étapes 9 à 14).
+Après validation (ou annulation), retour automatique à la liste, où le nouvel
+élément apparaît. Pas de pile de fenêtres : chaque étape remplace la précédente.
 
 If the user cancels at the review/validation step, nothing is vectorized and no
 entity is created, and the raw upload is DELETED immediately (user decision 2026-10-15) — no

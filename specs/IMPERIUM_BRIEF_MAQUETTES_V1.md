@@ -42,7 +42,8 @@ Ordre proposé des sections :
 5. **Comportement de l'IA** : Strict / **Équilibré** (sélectionné par défaut) / Souple.
 6. **Priorités personnelles** : inchangé (→ maquette 17).
 7. **Intelligence artificielle** :
-   - Nourrir l'IA : « Importer des éléments › » et « Éléments enregistrés › » (maquette 16) ;
+   - « Nourrir l'IA › » : UNE seule entrée (maquette 16). Elle ouvre la liste des éléments
+     transmis ; le bouton « Importer » est dans cette liste (doc 70 §7) ;
    - « Logs de l'IA › » (→ B12) ;
    - « Conservation de l'historique du chat » : `90 jours` (choix).
 8. **Connexion et autorisations** : inchangé (→ maquette 19).
