@@ -767,6 +767,12 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 ### 12.4 Mission Outcome Form (`IMP.MISSION.OUTCOME`)
 
 - **Screen name:** Mission Outcome Form.
+- **V1 (décision utilisateur 2026-10-16, maquette 03) :** deux fenêtres.
+  « Fait » : missions annexes à cocher (facultatives, doc 53 §3.1) + Remarque facultative ;
+  si le temps prévu est dépassé, « Raison du dépassement » en plus. « Pas fait » : menu
+  Raison (Séance prolongée, Interruption, Imprévu, Fatigue, Autre) + « Détails de la raison ».
+  Le menu ne fait que préremplir le texte envoyé (`« Fatigue — <détails> »`) : le backend
+  garde une raison en texte libre, pas de `reason_code`.
 - **Type / slug :** `bottom_sheet`, `imperium/mission/{mission_id}/outcome`, stable ID `IMP.MISSION.OUTCOME`.
 - **Composants :** Bottom Sheet L3, compact mission header, action state selector "Faite/Ratée/Annulée", reason TextField, Voice input, user-reported signal segmented control, Primary "Envoyer".
 - **Données affichées :** selected mission title/status/deadline, allowed transition, reason draft.

@@ -214,6 +214,10 @@ Key points (authoritative source = doc 53):
   perceivable internal moment. The VTC session is a valid carrier; the user
   chooses when to act on an annex.
 - Front-end (FR): "mission principale" / "mission annexe".
+- V1 (décision utilisateur 2026-10-16) : version allégée — le cerveau accroche
+  jusqu'à 5 petites missions du backlog à une mission longue et peu prenante au
+  moment du plan (`annex_of_mission_id`), cochées dans la fenêtre « Fait ». Détail
+  et découpage V1/V3 : doc 53 §3.1.
 
 This supersedes any earlier "single active focus / others queued" wording.
 

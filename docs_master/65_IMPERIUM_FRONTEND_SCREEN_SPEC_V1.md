@@ -156,7 +156,7 @@ Ordre telephone, une seule colonne :
 | Widget | Composant autorise | Contenu obligatoire |
 |---|---|---|
 | Daily Focus Card | `ImperiumCard` + `ImperiumSectionHeader` | visible seulement après démarrage : focus label, raison, date locale mock, source `mock`. |
-| Active Mission Card | `MissionFocusCard` | visible seulement après démarrage : mission id, titre, priorite, deadline, status, une action primary. |
+| Active Mission Card | `MissionFocusCard` | visible seulement après démarrage : mission id, titre, priorite, deadline, status, une action primary. Bloc « Missions annexes » (facultatives, max 5) seulement si la mission en porte (doc 53 §3.1). |
 | Priority Card | `ImperiumCard` + `ImperiumKpiBlock` | top priority, reason, urgency label. |
 | Quick Actions | `ImperiumCard` + buttons | focaliser module mission active, ouvrir chatbot docke, lancer replan mock, finish day mock. |
 | Weekly Progress | `ImperiumMetricCard` + `ImperiumProgressBar` | missions done, failures, weekly completion percent. |

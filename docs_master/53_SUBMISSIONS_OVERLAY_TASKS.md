@@ -1,6 +1,8 @@
 # 53 - Submissions / Overlay Tasks (V3)
 
 > ⚠️ **V3 feature — quality of life, post-V1 and V2.**
+> **Exception (décision utilisateur 2026-10-16) :** une **version allégée** est
+> livrée en V1, voir §3.1. Le reste du document reste V3.
 > Optional secondary tasks displayed inside active missions, 
 > letting the user opportunistically handle small things 
 > during long carrier missions.
@@ -43,6 +45,47 @@ V3 — Submissions land here as a quality of life optimization.
 ```
 
 This requires the decision framework (doc 52) to already classify mission types correctly. Without that foundation, submissions wouldn't have reliable "carrier missions" to attach to.
+
+### 3.1 Version allégée V1 (décision utilisateur 2026-10-16)
+
+Les maquettes 01 (Dashboard) et 03 (Résultat de mission) affichent les missions
+annexes. Une version simple est livrée dès la V1 ; elle s'appuie sur ce qui existe
+déjà (score doc 52 codé dans `decision_framework.py`, `planned_start_at` /
+`planned_end_at` pour la durée, modèle local branché).
+
+```text
+V1 — CE QUI EST LIVRÉ
+  Attribution au moment du plan :
+    Quand le cerveau construit (ou replanifie) le plan du jour, il accroche
+    jusqu'à 5 petites missions du backlog (durée ≤ 15 min, statut backlog,
+    score hors priorité 9-10) à une mission longue et peu prenante du plan.
+    C'est le modèle qui juge, dans l'appel de planification : pas d'appel
+    de classement à chaque création de mission, pas de table de catégories.
+    Les exclusions par TYPE du §5.1 s'appliquent (prière, sport, Dars,
+    ghusl, sommeil, catégorie A) : ces missions ne portent jamais d'annexes.
+
+  Stockage : une seule colonne sur imperium_missions
+    annex_of_mission_id UUID NULL REFERENCES imperium_missions(id)
+    (la mission principale à laquelle l'annexe est accrochée pour ce plan)
+
+  Affichage : bloc « Missions annexes » (facultatives) dans la carte de
+    la mission actuelle, seulement si la mission en a.
+
+  Résultat : la fenêtre « Fait » de la mission principale liste les annexes
+    à cocher. Cochée → l'annexe passe en completed (même transition que
+    POST .../complete). Non cochée → retour au backlog, lien effacé,
+    aucune pénalité (§8). « Pas fait » sur la principale → toutes les
+    annexes retournent au backlog.
+    Contrat : POST /api/imperium/missions/{id}/complete accepte
+    completed_annex_mission_ids: list[UUID] (vide par défaut).
+
+V3 — CE QUI RESTE (reste du document)
+  is_carrier_mission / engagement_level / has_exploitable_pauses /
+  is_overlay_eligible / overlay_category, classement à la création (§6, §12),
+  table imperium_overlay_categories, bouton « Pas sa place ici » et
+  apprentissage (§7.3, §11.3), complétions hors porteuse (§15.3),
+  réglages (§13), stats du Weekly Review (§14).
+```
 
 ---
 

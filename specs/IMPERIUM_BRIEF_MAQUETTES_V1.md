@@ -87,6 +87,22 @@ monter / descendre. Retirer « Ajouter », « Renommer », « Supprimer » et la
 de nom. Sous-titre : « Ton ordre décide du poids de chaque domaine dans le plan. »
 Aperçu dans Réglages (maquette 15) : « 01 Religieux · 02 Business · 03 Finances · 04 Santé ».
 
+### A8. Maquettes 01 et 03 — Missions annexes
+
+Décision 2026-10-16 (doc 53 §3.1) : les « sous-missions » des maquettes sont les
+**missions annexes** du doc 53, livrées en V1 en version allégée.
+
+- Titre du bloc : « Missions annexes » (au lieu de « Sous-missions facultatives »),
+  mention « Facultatives » conservée.
+- Changer l'exemple : une séance de sport ne porte jamais d'annexes (doc 53 §5.1).
+  Mission actuelle « Travail VTC » (longue, peu prenante), annexes indépendantes et
+  courtes : « Appeler Yacine », « Confirmer RDV dentiste », « Vérifier prix garage »,
+  « Répondre à Marie », « Réserver contrôle technique ».
+- Maquette 01 : le bloc n'apparaît que si la mission porte des annexes (prévoir aussi
+  la carte sans bloc, ex. Séance de sport).
+- Maquette 03, « Fait » : « Missions annexes réalisées » à cocher, même mise en page ;
+  « Pas fait » : inchangé (menu Raison + Détails, le menu préremplit le texte).
+
 ### A5. Maquettes 13 et 14 — Historique
 
 Remplacer le titre « Hall of Fame » par « Historique » ; la barre de navigation dit déjà
@@ -278,4 +294,5 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 ## D. Encore ouvert
 
 - ~~Historique ou Hall of Fame~~ → RÉSOLU : « Historique » partout (voir A5).
+- ~~Sous-missions de la maquette 03~~ → RÉSOLU : missions annexes V1 allégées (voir A8).
 - ~~Champs de la transaction~~ → RÉSOLU (doc 42 §7.0) : voir A4.

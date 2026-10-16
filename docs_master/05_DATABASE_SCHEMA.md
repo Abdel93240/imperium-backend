@@ -1403,7 +1403,9 @@ Invariants planning reintegres :
 - Le mission lifecycle V1 code est volontairement simple : backlog -> active ->
   terminal (`completed`, `failed`, `abandoned`, `cancelled`). Les notions
   `expired`, `stashed`, missions annexes et overlay restent hors schema code
-  actuel.
+  actuel. Cible V1 (doc 53 §3.1, décision 2026-10-16) : une colonne
+  `annex_of_mission_id` nullable sur `imperium_missions` pour la version
+  allégée des missions annexes ; le reste de l'overlay reste V3.
 - Les projets actifs et routines d'Operations sont la source future de missions,
   mais leurs tables planning canoniques ne sont pas encore codees. La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la
