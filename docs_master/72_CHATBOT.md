@@ -30,6 +30,12 @@ degraded mode. Other docs refer here for anything chatbot-related.
   when used, work behind the scenes — the user never converses with them directly.
 - **Minimal interface.** Conversation view + keyboard input + a mic button (voice → text
   transcription only) + send + a close (cross). Nothing else is required of the user.
+- **Micro (décision utilisateur 2026-10-16).** Appui pour parler ; au relâchement, la
+  transcription est insérée dans le champ de saisie (à la suite du texte déjà tapé),
+  JAMAIS envoyée automatiquement. L'utilisateur relit, corrige, puis appuie sur
+  Envoyer. Échec de transcription → message court « Je n'ai pas compris, réessaie »
+  (snackbar), champ inchangé. Même comportement partout où `ImperiumVoiceInput`
+  apparaît (terminal, notes, écran de résultat du replan).
 
 ---
 
