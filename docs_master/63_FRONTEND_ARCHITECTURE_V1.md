@@ -852,7 +852,7 @@ Navigation :
 | Bulle | App | Contenu du panneau | Actions rapides |
 |---|---|---|---|
 | Mission en cours | Imperium | mission active unique (titre, échéance, progression) | Terminer ; Échouer (raison obligatoire, cf. 59 §12.4) ; Demander une replanification complète de la journée |
-| Ajouter une transaction | Vault | formulaire court | Saisir une transaction : revenu OU dépense, montant, catégorie, business/perso (doc 42 §3) |
+| Ajouter une transaction | Vault | formulaire court | Saisir une transaction : revenu OU dépense, montant, catégorie préremplie (table des libellés puis IA, doc 42 §7.0), livre business/perso déduit |
 | Raccourci Path | Path | aucun panneau | Tap = ouvre directement l'app Path |
 | Raccourci Pulse | Pulse | aucun panneau | Tap = ouvre directement l'app Pulse |
 | Raccourci Vector | Vector | aucun panneau | Tap = ouvre directement l'app Vector |

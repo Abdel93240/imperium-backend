@@ -19,7 +19,8 @@ Vault observes and reports. **It never decides on its own.** Investment decision
    - compute pressure score (per doc 11)
    - feed sadaqa target to Path
    - emit upcoming expense alerts
-   - propose categorization via the local model
+   - propose categorization: label lookup table first, local model only for an
+     unknown label (§7, user decision 2026-10-16)
    - parse receipts via the OCR service
 
 ❌ Vault must never:
@@ -202,10 +203,32 @@ User taps "Scanner ticket"
 
 ## 7. Categorization
 
-### 7.1 Initial categorization
+### 7.0 Label lookup table first (user decision 2026-10-16)
 
 ```text
-First time a description appears:
+Categorization is DETERMINISTIC first, AI second:
+
+1. A large hard-coded table maps known labels (libellés) → category, and therefore
+   → book (business | personal). E.g. "BOLT" → Plateformes/VTC income (business),
+   "TOTAL ENERGIES" → Carburant (business), "CARREFOUR" → Courses (personal).
+2. On every new transaction (manual form, bubble, OCR), the backend compares the label
+   with the table (normalized: case, accents, spacing). Expected to resolve ~99.9 % of
+   cases with no AI call.
+3. ONLY if the label is not in the table → the local model suggests a category (§7.1).
+4. Either way, the category (and the deduced book) is shown PREFILLED in the form and
+   stays editable before saving — never silent (§2).
+5. Once the user validates an AI-suggested category for an unknown label, the pair is
+   added to the user's part of the table (user_category_memory) → next time it is a
+   table hit.
+```
+
+The form therefore has a **Catégorie** field (menu, prefilled), and the book
+business/personal is deduced from it, not chosen separately.
+
+### 7.1 Initial categorization (unknown label only)
+
+```text
+First time a description appears AND it is not in the lookup table (§7.0):
   the local model suggests a category based on:
     - the description text
     - the amount

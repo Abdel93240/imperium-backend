@@ -65,6 +65,14 @@ Pas de liste d'appareils de confiance : un seul appareil (doc 63 §13.5).
 Tous les boutons « Supprimer » (projet, mission, priorité) ouvrent la confirmation B2.
 Rien d'autre à changer.
 
+### A4. Maquette 05 — Transaction (et bulle Vault plus tard)
+
+Ajouter un champ **Catégorie** (menu) sous le libellé, PRÉREMPLI dès que le libellé est
+saisi ou lu par l'OCR : d'abord par la table des libellés connus, sinon par l'IA locale
+(doc 42 §7.0). À côté, une étiquette non modifiable « Business » ou « Perso », déduite de
+la catégorie. Le champ reste modifiable avant « Enregistrer ». Montrer un état « catégorie
+proposée par l'IA » (petite icône IA commune) distinct d'un état « reconnu ».
+
 ---
 
 ## B. Nouveaux écrans
@@ -250,5 +258,4 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 ## D. Encore ouvert
 
 - Historique ou Hall of Fame : même libellé dans la barre et le titre (point UI-33).
-- Champs de la transaction : la maquette 05 a sens / montant / date / libellé /
-  portefeuille ; le doc 63 §10 et le doc 42 parlent aussi de catégorie et business/perso.
+- ~~Champs de la transaction~~ → RÉSOLU (doc 42 §7.0) : voir A4.
