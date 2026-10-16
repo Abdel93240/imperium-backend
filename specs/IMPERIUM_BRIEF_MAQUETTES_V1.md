@@ -119,6 +119,10 @@ Remplacer le titre « Hall of Fame » par « Historique » ; la barre de navigat
 « Historique ». Le mot « Hall of Fame » ne doit apparaître nulle part (doc 43 §7 : pas de
 cadrage trophée / gamification).
 
+Bloc Régularité (doc 43 §6.1) : le chiffre « 82 / 100 » dépend de la période choisie ;
+« +14 points sur la période » se lit « par rapport à la période précédente ». La courbe
+est quotidienne, sans lissage : elle doit paraître plus irrégulière que sur la maquette.
+
 ---
 
 ## B. Nouveaux écrans

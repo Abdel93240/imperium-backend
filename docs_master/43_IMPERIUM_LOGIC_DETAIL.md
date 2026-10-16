@@ -326,6 +326,22 @@ EXAMPLE:
 Stored daily, used for trend analysis and WR.
 ```
 
+### 6.1 Régularité affichée dans l'Historique (décision utilisateur 2026-10-16)
+
+```text
+Bloc « Régularité » (maquette 13), sur la période choisie (sélecteur) :
+
+  Chiffre principal = round(100 × SUM(faites × coef) / SUM(toutes × coef))
+    calculé sur TOUTES les missions des journées opérationnelles de la
+    période (même formule qu'en §6, agrégée sur la période, pas une moyenne
+    de scores quotidiens). Il change avec la période sélectionnée.
+  Courbe = discipline_score × 100 de chaque journée, sans lissage.
+  « +N points sur la période » = chiffre de la période moins chiffre de la
+    période précédente de même durée.
+  Exclus : missions annexes (doc 53 §8, sans pénalité). Fatigue et retards
+    ne comptent pas en V1.
+```
+
 The Path discipline (per doc 41 §11) feeds into a broader composite for the WR but is computed separately.
 
 ---

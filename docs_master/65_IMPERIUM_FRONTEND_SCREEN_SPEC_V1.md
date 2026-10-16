@@ -492,6 +492,7 @@ Ordre telephone :
 | Search | `ImperiumSearchField` | query, clear, result count. |
 | Filters | `ImperiumFilterChip` | All, Missions, Decisions, Weekly, Failed. |
 | History Detail Card | `ImperiumCard` | selected event details, source, linked route. |
+| Régularité | `ImperiumCard` + courbe | chiffre /100 calculé sur la période choisie, courbe quotidienne sans lissage, écart avec la période précédente — doc 43 §6.1. |
 
 ### 7.6 Actions
 
