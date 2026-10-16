@@ -13,7 +13,7 @@ servent à vérifier, pas à recopier dans l'image.
   séparateurs discrets, icônes simples. Titres Cormorant Garamond, corps Inter, nombres,
   heures et terminal en JetBrains Mono.
 - Logo Imperium original et icône IA commune (celle de Conseils IA). Pas de nouveau logo.
-- Navigation gauche : Dashboard, Opérations, Historique, Réglages.
+- Navigation gauche : Dashboard, Opérations, Historique, Réglages (« Historique » aussi en titre de page, jamais « Hall of Fame »).
 - Fenêtres : même gabarit que les maquettes 09 à 19 (titre serif, croix en haut à droite,
   boutons Annuler en contour gris / action principale en contour doré, action destructive
   en rouge).
@@ -72,6 +72,12 @@ saisi ou lu par l'OCR : d'abord par la table des libellés connus, sinon par l'I
 (doc 42 §7.0). À côté, une étiquette non modifiable « Business » ou « Perso », déduite de
 la catégorie. Le champ reste modifiable avant « Enregistrer ». Montrer un état « catégorie
 proposée par l'IA » (petite icône IA commune) distinct d'un état « reconnu ».
+
+### A5. Maquettes 13 et 14 — Historique
+
+Remplacer le titre « Hall of Fame » par « Historique » ; la barre de navigation dit déjà
+« Historique ». Le mot « Hall of Fame » ne doit apparaître nulle part (doc 43 §7 : pas de
+cadrage trophée / gamification).
 
 ---
 
@@ -257,5 +263,5 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 
 ## D. Encore ouvert
 
-- Historique ou Hall of Fame : même libellé dans la barre et le titre (point UI-33).
+- ~~Historique ou Hall of Fame~~ → RÉSOLU : « Historique » partout (voir A5).
 - ~~Champs de la transaction~~ → RÉSOLU (doc 42 §7.0) : voir A4.

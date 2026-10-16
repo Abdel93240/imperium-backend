@@ -119,8 +119,8 @@ Storage values:
 | project_title | Imperium | Imperium | string | `Buy VTC vehicle` | Imperium, AI planner | user | project changes | user_confirmed | high | yes | yes | summary_only | Can generate missions. |
 | project_priority_order | Imperium | Imperium | integer | `1` | Imperium, AI planner | user/AI suggestion after validation | on reorder | user_confirmed | high | yes | yes | summary_only | First active project is top priority. |
 | project_status | Imperium | Imperium | enum | `active` | Imperium, AI planner | user | project changes | user_confirmed | high | yes | yes | summary_only | `active`, `paused`, `future`, `completed`; abandoned later if needed. |
-| project_progress_percent | Imperium | Imperium | integer | `45` | Imperium, Hall of Fame, AI | user/system | project changes | mixed | medium | yes | yes | summary_only | Exact computation TODO. |
-| project_completed_at | Imperium | Imperium | timestamp nullable | `2026-04-25T12:00:00+02:00` | Imperium, Hall of Fame, learning | user/backend | explicit validation | user_confirmed | high | yes | yes | summary_only | Never purely automatic. |
+| project_progress_percent | Imperium | Imperium | integer | `45` | Imperium, History, AI | user/system | project changes | mixed | medium | yes | yes | summary_only | Exact computation TODO. |
+| project_completed_at | Imperium | Imperium | timestamp nullable | `2026-04-25T12:00:00+02:00` | Imperium, History, learning | user/backend | explicit validation | user_confirmed | high | yes | yes | summary_only | Never purely automatic. |
 | project_completion_method | Imperium | Imperium | enum | `manual` | Imperium, learning | user/backend | explicit validation | user_confirmed | medium | yes | yes | no | `suggested`, `manual`. |
 | routine_id | Imperium | Imperium | uuid | `routine_quran` | Imperium, n8n | user | routine changes | user_confirmed | medium | yes | yes | summary_only | Routines managed in Operations. |
 | routine_title | Imperium | Imperium | string | `Quran` | Imperium, Path, n8n | user/system | routine changes | user_confirmed | high | yes | yes | summary_only | Routine can generate mission. |

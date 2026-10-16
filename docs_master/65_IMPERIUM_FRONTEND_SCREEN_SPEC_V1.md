@@ -449,7 +449,7 @@ Enregistrer Operations comme deuxieme ecran top-level Imperium V1 : projets + ro
 | Route ID | `IMP.HISTORY.MAIN` |
 | Related canonical route | `IMP.PLAN.HISTORY` |
 | Route path | `imperium/history` |
-| Titre visible | `History` |
+| Titre visible | `History` (libellé UI « Historique », barre ET titre — décision utilisateur 2026-10-16 ; jamais « Hall of Fame », doc 43) |
 | Type | Top-level route |
 
 ### 7.2 Objectif metier
