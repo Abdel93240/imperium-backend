@@ -98,6 +98,14 @@ To avoid plan thrashing:
   - max 1 replan per 5 minutes (debounce)
   - if multiple hooks fire within 5 min, batch them
   - exceptions: ghusl_required, fasting_break (always immediate)
+  - MANUAL replans too (décision utilisateur 2026-10-16) : le délai s'applique
+    aussi au bouton « Replanifier la journée ». Pendant le délai qui suit la
+    dernière replanification (automatique ou manuelle), le bouton est grisé et
+    affiche le temps restant (« Disponible dans 3 min ») ; le backend refuse
+    une demande manuelle arrivée dans le délai. Les exceptions ci-dessus
+    restent immédiates. Corriger une proposition affichée passe par le
+    chatbot de l'écran de résultat (doc 59 §12.6) et ne compte pas comme une
+    nouvelle replanification.
 ```
 
 ---
@@ -774,7 +782,7 @@ MODE IA:
 
 REPLAN BEHAVIOR:
   - replan_on_mission_failure (default: yes for urgente, ask for others)
-  - debounce_minutes (default: 5)
+  - debounce_minutes (default: 5) — automatic AND manual replans (§3.3)
 
 CHATBOT:
   - default_routing (local_executor → ... → high_reasoning chain visible in advanced; doc 30 §3)

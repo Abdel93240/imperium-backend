@@ -800,7 +800,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 ### 12.6 Replan Validation Screen (`IMP.REPLAN.VALIDATE`)
 
 - **Screen name:** Replan Validation Screen.
-- **V1 (décision utilisateur 2026-10-15) :** écran de résultat affiché après le bouton « Replanifier » : à GAUCHE la nouvelle planification proposée, à DROITE le chatbot (même terminal que `IMP.CHAT.CONVERSATION`) pour discuter ou faire corriger la proposition. Primary « Accepter », Ghost « Annuler ». Pas de bouton « Modifier » : les corrections passent par le chatbot, qui régénère la colonne de gauche. Remplace la présentation Avant/Après ci-dessous.
+- **V1 (décision utilisateur 2026-10-15) :** écran de résultat affiché après le bouton « Replanifier » : à GAUCHE la nouvelle planification proposée, à DROITE le chatbot (même terminal que `IMP.CHAT.CONVERSATION`) pour discuter ou faire corriger la proposition. Primary « Accepter », Ghost « Annuler ». Pas de bouton « Modifier » : les corrections passent par le chatbot, qui régénère la colonne de gauche. Délai (2026-10-16) : le bouton « Replanifier la journée » est grisé pendant `debounce_minutes` après la dernière replanification, avec « Disponible dans N min » (doc 43 §3.3) ; les corrections dans le chatbot de cet écran ne sont pas soumises au délai. Remplace la présentation Avant/Après ci-dessous.
 - **Type / slug :** `dialog`, `imperium/replan/validation`, stable ID `IMP.REPLAN.VALIDATE`.
 - **Composants :** fullscreen modal, minimal Top Bar, Before/After plan columns, mission cards with delta badges, Info banner with model reason, Primary "Accepter", Secondary "Modifier", Ghost "Annuler".
 - **Données affichées :** previous plan, proposed plan, replan reason, replan source hook, confidence/status.

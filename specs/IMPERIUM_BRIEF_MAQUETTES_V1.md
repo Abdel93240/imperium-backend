@@ -38,7 +38,7 @@ Ordre proposé des sections :
    d'heure) (doc 43 §15).
 4. **Replanification** : « Après une mission échouée » → réglage par niveau d'urgence
    (défaut : replanifier si la mission est urgente, demander sinon) ; « Délai minimum
-   entre deux replanifications » : `5 min` (doc 43 §15).
+   entre deux replanifications » : `5 min` (doc 43 §15), automatiques et manuelles.
 5. **Comportement de l'IA** : Strict / **Équilibré** (sélectionné par défaut) / Souple.
 6. **Priorités personnelles** : inchangé (→ maquette 17).
 7. **Intelligence artificielle** :
@@ -105,6 +105,13 @@ Décision 2026-10-16 (doc 53 §3.1) : les « sous-missions » des maquettes sont
   la carte sans bloc, ex. Séance de sport).
 - Maquette 03, « Fait » : « Missions annexes réalisées » à cocher, même mise en page ;
   « Pas fait » : inchangé (menu Raison + Détails, le menu préremplit le texte).
+
+### A9. Maquettes 01 et 02 — Bouton « Replanifier » pendant le délai
+
+Décision 2026-10-16 (doc 43 §3.3) : le délai de 5 min s'applique aussi au replan
+manuel. Ajouter l'état grisé du bouton « Replanifier la journée » (maquette 01) et
+du bouton « Replanifier » (maquette 02), avec le texte « Disponible dans 3 min »
+(JetBrains Mono pour le nombre). Pas de fenêtre d'erreur : le bouton se réactive seul.
 
 ### A5. Maquettes 13 et 14 — Historique
 
