@@ -107,6 +107,15 @@ When user presses `Finish Day`:
 
 The Finish Day button is the truth source when available.
 
+Décision utilisateur 2026-10-16 (revue UI, point UI-03) :
+- La journée se termine UNIQUEMENT par « Terminer la journée » ou par la clôture
+  de secours ci-dessous. Le système ne détecte pas le sommeil principal.
+- Une sieste est une mission ordinaire (ex. « Sieste — 20 min »), planifiée par
+  l'IA ou demandée au chatbot ; elle ne termine pas la journée et ne porte jamais
+  de missions annexes (doc 53 §5.1, sommeil).
+- Pour un vrai sommeil, l'utilisateur termine la journée avant de dormir ; au
+  réveil, « Démarrer la journée » ouvre la suivante.
+
 ## Automatic Fallback Closure
 
 If user forgets `Finish Day`, the system must safely infer fallback closure without corrupting logic.
