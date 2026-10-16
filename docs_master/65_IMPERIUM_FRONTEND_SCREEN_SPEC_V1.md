@@ -493,6 +493,7 @@ Ordre telephone :
 | Filters | `ImperiumFilterChip` | All, Missions, Decisions, Weekly, Failed. |
 | History Detail Card | `ImperiumCard` | selected event details, source, linked route. |
 | Régularité | `ImperiumCard` + courbe | chiffre /100 calculé sur la période choisie, courbe quotidienne sans lissage, écart avec la période précédente — doc 43 §6.1. |
+| Sélecteur de période | `ImperiumSelect` « Période des graphiques » | Semaine / Mois / 3 mois / Année / Tout ; défaut 3 mois, mémorisé localement (préférence d'appareil). Agit sur : Régularité (chiffre, courbe, écart) et Finances (courbe + écart sur la période ; le solde total reste celui du jour). N'agit PAS sur : Projets accomplis et Historique des journées (listes complètes, récent → ancien), Bilan de l'IA (renouvelé après chaque Weekly Review, parcours global). « Tout » : pas de période précédente, l'écart se calcule depuis le début. Décision utilisateur 2026-10-16. |
 
 ### 7.6 Actions
 
