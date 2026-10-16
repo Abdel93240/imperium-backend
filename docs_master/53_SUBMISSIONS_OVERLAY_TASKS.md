@@ -50,14 +50,15 @@ This requires the decision framework (doc 52) to already classify mission types 
 
 Les maquettes 01 (Dashboard) et 03 (Résultat de mission) affichent les missions
 annexes. Une version simple est livrée dès la V1 ; elle s'appuie sur ce qui existe
-déjà (score doc 52 codé dans `decision_framework.py`, `planned_start_at` /
-`planned_end_at` pour la durée, modèle local branché).
+déjà (score doc 52 codé dans `decision_framework.py`, modèle local branché) et
+sur `estimated_minutes` (durée estimée de la mission, ajoutée en V1 — doc 43 §5.2,
+décision 2026-10-16), seule durée connue d'une mission encore au backlog.
 
 ```text
 V1 — CE QUI EST LIVRÉ
   Attribution au moment du plan :
     Quand le cerveau construit (ou replanifie) le plan du jour, il accroche
-    jusqu'à 5 petites missions du backlog (durée ≤ 15 min, statut backlog,
+    jusqu'à 5 petites missions du backlog (estimated_minutes ≤ 15, statut backlog,
     score hors priorité 9-10) à une mission longue et peu prenante du plan.
     C'est le modèle qui juge, dans l'appel de planification : pas d'appel
     de classement à chaque création de mission, pas de table de catégories.

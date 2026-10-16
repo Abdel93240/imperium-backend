@@ -1405,7 +1405,9 @@ Invariants planning reintegres :
   `expired`, `stashed`, missions annexes et overlay restent hors schema code
   actuel. Cible V1 (doc 53 §3.1, décision 2026-10-16) : une colonne
   `annex_of_mission_id` nullable sur `imperium_missions` pour la version
-  allégée des missions annexes ; le reste de l'overlay reste V3.
+  allégée des missions annexes ; le reste de l'overlay reste V3. Cible V1
+  (doc 43 §5.2, decision 2026-10-16) : `estimated_minutes` INTEGER nullable
+  sur `imperium_missions` (duree estimee, proposee par l'IA, modifiable).
 - Les projets actifs et routines d'Operations sont la source future de missions,
   mais leurs tables planning canoniques ne sont pas encore codees. La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la

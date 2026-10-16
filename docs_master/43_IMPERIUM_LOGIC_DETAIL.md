@@ -189,6 +189,9 @@ imperium_missions table (per doc 05):
   - source (ai_planner | path | vector | pulse | vault | manual)
   - source_ref (link to triggering item, e.g. ghusl_required event)
   - planned_for_at (when AI scheduled it)
+  - estimated_minutes (V1, nullable : durée estimée ; proposée par l'IA à la
+    création, modifiable dans le formulaire mission ; sert au plan et au
+    filtre ≤ 15 min des missions annexes, doc 53 §3.1 — décision 2026-10-16)
   - deadline_at (when it expires)
   - status (active | faite | ratée | annulée | expirée | stashed)
   - completed_at, failed_at, cancelled_at, expired_at, stashed_at
@@ -198,6 +201,7 @@ imperium_missions table (per doc 05):
   - is_carrier_mission (for submissions, V3 doc 53)
   - is_overlay_eligible (for submissions, V3 doc 53)
   - overlay_category (for submissions, V3 doc 53)
+  - annex_of_mission_id (V1 allégée, doc 53 §3.1)
 ```
 
 ### 5.3 Main mission + parallel annex missions (see doc 53)

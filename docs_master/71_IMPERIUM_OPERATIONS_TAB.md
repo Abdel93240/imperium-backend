@@ -236,17 +236,23 @@ projet-wide "rien de canonique sans aval").
 ```sql
 -- Projets (le concept existe déjà dans la vision/priorités ; à formaliser)
 projects:
-  id, user_id, title, description,
+  id, user_id, title,
+  description           -- libellé UI « Notes du projet » (maquette 11), facultatif
+                        -- (décision 2026-10-16 : pas de champ notes séparé)
   status (active | inactive),
   active_rank (1 = principal, 2 = secondaire, NULL si non-actif),
   created_at, source (chatbot | manual)
 
--- Routines quotidiennes (routine_id déjà au dictionnaire doc 01)
+-- Routines (routine_id déjà au dictionnaire doc 01) — champs : §4.1
 routines:
-  id (routine_id), user_id, label, active, created_at
+  id (routine_id), user_id, name, frequency, estimated_minutes, priority,
+  notes, active, pinned_weekday, pinned_month_day, pinned_time, created_at
 
-routine_daily_checks:
-  id, routine_id, user_id, date, done (bool), checked_at
+routine_checks:
+  id, routine_id, user_id, operational_day, done (bool), checked_at
+
+-- Missions de projet (formulaire maquette 11) : title, description,
+-- estimated_minutes (facultatif, doc 43 §5.2), notes.
 ```
 
 > À réconcilier avec `05_DATABASE_SCHEMA.md` (vérifier si des tables projects /
