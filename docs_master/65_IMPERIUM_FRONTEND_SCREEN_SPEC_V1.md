@@ -58,6 +58,7 @@ Respecter strictement les documents suivants est obligatoire pour tout generateu
 - Aucun placeholder visuel casse.
 - Aucun composant hors `62_DESIGN_SYSTEM_COMPONENT_CATALOG.md`.
 - Aucun changement de scope V2/V3.
+- Aucun vouvoiement : tous les textes de l'UI TUTOIENT l'utilisateur, comme le chatbot (décision utilisateur 2026-10-16). Ex. « Ta liste, dans ton ordre », « Utiliser ta position ».
 
 ### 2.3 Composants autorises
 

@@ -13,6 +13,7 @@ servent à vérifier, pas à recopier dans l'image.
   séparateurs discrets, icônes simples. Titres Cormorant Garamond, corps Inter, nombres,
   heures et terminal en JetBrains Mono.
 - Logo Imperium original et icône IA commune (celle de Conseils IA). Pas de nouveau logo.
+- Tutoiement partout, jamais de vouvoiement (doc 65 §2.2).
 - Navigation gauche : Dashboard, Opérations, Historique, Réglages (« Historique » aussi en titre de page, jamais « Hall of Fame »).
 - Fenêtres : même gabarit que les maquettes 09 à 19 (titre serif, croix en haut à droite,
   boutons Annuler en contour gris / action principale en contour doré, action destructive
@@ -72,6 +73,13 @@ saisi ou lu par l'OCR : d'abord par la table des libellés connus, sinon par l'I
 (doc 42 §7.0). À côté, une étiquette non modifiable « Business » ou « Perso », déduite de
 la catégorie. Le champ reste modifiable avant « Enregistrer ». Montrer un état « catégorie
 proposée par l'IA » (petite icône IA commune) distinct d'un état « reconnu ».
+
+### A6. Tutoiement (maquettes 15, 17, 19 et toutes les nouvelles)
+
+Corriger les textes au vouvoiement, par exemple :
+- 15 : « Votre liste, dans votre ordre. » → « Ta liste, dans ton ordre. »
+- 19 : « Utiliser votre position » → « Utiliser ta position ».
+- Vérifier aussi la 17 et tous les sous-titres des nouveaux écrans.
 
 ### A5. Maquettes 13 et 14 — Historique
 
