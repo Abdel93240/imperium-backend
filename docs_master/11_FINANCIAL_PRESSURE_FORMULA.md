@@ -346,6 +346,17 @@ else if score <= 80: label = "pressure"
 else: label = "critical"
 ```
 
+Libellés affichés (décision utilisateur 2026-10-16, revue UI point UI-07), lus
+dans « Pression financière : … » :
+
+| label interne | libellé UI | couleur de la jauge |
+|---|---|---|
+| `safe` | Très faible | vert |
+| `stable` | Faible | vert |
+| `attention` | Modérée | doré |
+| `pressure` | Forte | orange |
+| `critical` | Critique | rouge |
+
 ## Daily Objectives
 
 Daily objectives must come from:

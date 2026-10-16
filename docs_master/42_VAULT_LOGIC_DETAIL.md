@@ -298,7 +298,8 @@ Inputs:
   - days_until_next_major_outflow
 
 Output:
-  - pressure_score: 0-100 (5 labels, doc 11)
+  - pressure_score: 0-100 (5 labels, doc 11 ; libellés UI Très faible /
+    Faible / Modérée / Forte / Critique, doc 11 « Step 9 - Label »)
   - pressure_explanation: short text
   - critical_signals: list (e.g. "rent due in 3 days")
 ```
