@@ -565,6 +565,9 @@ IMPERIUM SECTION (execution + projects):
   ├─ projects
   ├─ routines
   └─ routine_daily_checks
+  OUTPUT ajouté (2026-10-16, doc 71 §3.1) : pour chaque projet actif,
+  project_progress_percent (0-100) + une phrase de justification, produits
+  dans le même appel que l'analyse de la section.
 ```
 
 The section service (per Section 13) handles the data assembly per section.

@@ -83,6 +83,16 @@ Chaque fenêtre de projet actif affiche le projet et son contexte de base
 (titre, et les éléments de base déjà documentés du projet ; l'enrichissement
 riche = F06, hors V1).
 
+« Progression indicative » (décision utilisateur 2026-10-16, maquette 08) :
+`project_progress_percent` est ESTIMÉ PAR L'IA PENDANT LE WEEKLY REVIEW, dans
+l'analyse de la section Imperium déjà prévue (doc 47 §11) — un champ de plus
+dans cet appel, pas d'appel dédié, aucune escalade cloud propre à ce chiffre.
+L'IA donne, pour chaque projet actif, un pourcentage 0-100 vers le résultat visé
+et une phrase de justification (visible dans « Gérer les projets »). La barre ne
+bouge donc qu'une fois par semaine ; avant la première WR d'un projet, elle est
+masquée. Raison : chiffre indicatif, non utilisé par la planification ni le
+score — il ne justifie pas d'appel IA à chaque mission terminée.
+
 ### 3.2 Fenêtre 3 — Liste des projets non-actifs
 
 ```text
