@@ -297,6 +297,9 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
 ## C. Pas de maquette nécessaire
 
 - « Terminer la journée » : termine la journée directement en V1, sans fenêtre (doc 59 §12.5).
+  Une mission non faite dont l'échéance est dépassée passe en standby et déclenche la
+  bannière « Intervention requise » existante (maquette 01) ; « Examiner » ouvre le
+  terminal (maquette 06). Pas de nouvel écran (doc 43 §5.4).
 - Chevrons du Programme du jour : ouvrent les notes de la mission (maquette 10).
 - Chevrons des Projets en attente : ouvrent « Gérer les projets » avec ce projet déplié
   (maquette 09).

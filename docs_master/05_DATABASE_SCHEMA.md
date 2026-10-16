@@ -1408,6 +1408,8 @@ Invariants planning reintegres :
   allégée des missions annexes ; le reste de l'overlay reste V3. Cible V1
   (doc 43 §5.2, decision 2026-10-16) : `estimated_minutes` INTEGER nullable
   sur `imperium_missions` (duree estimee, proposee par l'IA, modifiable).
+  Cible V1 (doc 43 §5.4, decision 2026-10-16) : statut `standby` (echeance
+  depassee constatee a la cloture de journee, attend une decision).
 - Les projets actifs et routines d'Operations sont la source future de missions,
   mais leurs tables planning canoniques ne sont pas encore codees. La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la

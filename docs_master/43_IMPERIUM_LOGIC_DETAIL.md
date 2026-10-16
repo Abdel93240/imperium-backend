@@ -173,6 +173,8 @@ faite      - user marked as completed
 ratée      - user marked as failed
 annulée    - user cancelled the mission
 expirée    - deadline passed without user action
+standby    - V1 (2026-10-16) : échéance dépassée constatée à la clôture de
+             journée ; attend une décision de l'utilisateur (§5.4)
 stashed    - user deferred indefinitely (V3, doc 54)
 ```
 
@@ -210,6 +212,30 @@ imperium_missions table (per doc 05):
   - is_overlay_eligible (for submissions, V3 doc 53)
   - overlay_category (for submissions, V3 doc 53)
   - annex_of_mission_id (V1 allégée, doc 53 §3.1)
+```
+
+### 5.4 Missions non faites à la clôture de journée (décision utilisateur 2026-10-16)
+
+```text
+« Terminer la journée » (sans fenêtre, doc 59 §12.5). Pour la mission en cours
+et les missions prévues mais pas faites :
+
+  Échéance non dépassée (ou sans échéance)
+    → retour au backlog : heure prévue et lien annexe (annex_of_mission_id)
+      effacés. Pas d'échec enregistré. L'IA les replace au plan suivant si
+      elles restent prioritaires.
+
+  Échéance dépassée
+    → statut standby (et non expirée), puis déclenchement de la bannière
+      « Intervention requise » du Dashboard. « Examiner » ouvre le terminal
+      avec le contexte (mission, échéance, date). L'utilisateur décide avec
+      le chatbot, sous validation (doc 72 §4) : nouvelle échéance (retour au
+      backlog), faite, ou annulée. La mission reste en standby tant qu'il
+      n'a pas tranché ; elle n'entre dans aucun plan.
+
+  Score : ces missions comptent comme non faites dans le discipline_score
+    de la journée (elles étaient prévues, §6). Les missions annexes non
+    cochées retournent au backlog sans compter (doc 53 §8).
 ```
 
 ### 5.3 Main mission + parallel annex missions (see doc 53)
