@@ -102,6 +102,11 @@ AI can consult. Two mechanisms, two goals.
      the DIRECT learning elements (via source_table/source_id); indirect already-
      propagated influences cannot be undone (supersession neutralizes future reliance,
      does not rewrite the past)
+     UI V1 (user decision 2026-10-16) : the « Supprimer… » button on an item of
+     « Éléments transmis » opens a confirmation dialog (« Supprimer « <nom> » ? Les
+     sources et les informations retenues seront supprimées ensemble. » + Annuler /
+     Supprimer). Confirming opens the terminal with the removal request; the chatbot
+     performs it (level 3 above) and confirms in text. Cancelling changes nothing.
 
 > Retention is frictionless at upload (the source is always kept, no extra question)
 > and reversible later on explicit user request through the chatbot. Consistent with

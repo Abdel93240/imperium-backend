@@ -1,0 +1,254 @@
+# Imperium — Brief des maquettes à générer (V1)
+
+Date : 2026-10-16. Suite de la revue `Imperium_Revue_UI_2026-10-15_v1` (19 maquettes).
+Chaque écran ci-dessous est soit absent du paquet, soit à retoucher. Le contenu vient des
+docs d'architecture (`docs_master`) et des décisions du 2026-10-15. Les renvois `doc NN §x`
+servent à vérifier, pas à recopier dans l'image.
+
+## 0. Règles communes (identiques au paquet de revue)
+
+- Support : Galaxy Tab S8, portrait, dimensions fluides (spec de revue §01). Les docs
+  parlent encore de S10 Ultra paysage : on suit les maquettes.
+- Style : fond presque noir, doré champagne légèrement chaud, cadres absents ou très fins,
+  séparateurs discrets, icônes simples. Titres Cormorant Garamond, corps Inter, nombres,
+  heures et terminal en JetBrains Mono.
+- Logo Imperium original et icône IA commune (celle de Conseils IA). Pas de nouveau logo.
+- Navigation gauche : Dashboard, Opérations, Historique, Réglages.
+- Fenêtres : même gabarit que les maquettes 09 à 19 (titre serif, croix en haut à droite,
+  boutons Annuler en contour gris / action principale en contour doré, action destructive
+  en rouge).
+- Pastilles d'état : vert = disponible/autorisé, orange = dégradé/partiel, rouge =
+  indisponible/erreur, gris = non vérifié. Dans les lignes, « Non autorisée » est ROUGE
+  (même couleur que la légende, point UI-29).
+- Données illustratives seulement.
+
+---
+
+## A. Retouches de maquettes existantes
+
+### A1. Maquette 15 — Réglages (refonte des sections)
+
+Ordre proposé des sections :
+
+1. **Bulle flottante** (remplace « Widget et bulle ») : un seul interrupteur « Bulle
+   flottante » + bouton « Gérer la bulle › » (→ B6). Supprimer l'interrupteur « Widget » et
+   le bouton « Gérer le widget » : il n'y a plus de widgets d'accueil (doc 63 §10).
+2. **Notifications** : interrupteur général + « Gérer les notifications › » (→ B7).
+3. **Routine du matin** : interrupteur « Popup du matin » + heure (ex. `06:30`, sélecteur
+   d'heure) (doc 43 §15).
+4. **Replanification** : « Après une mission échouée » → réglage par niveau d'urgence
+   (défaut : replanifier si la mission est urgente, demander sinon) ; « Délai minimum
+   entre deux replanifications » : `5 min` (doc 43 §15).
+5. **Comportement de l'IA** : Strict / **Équilibré** (sélectionné par défaut) / Souple.
+6. **Priorités personnelles** : inchangé (→ maquette 17).
+7. **Intelligence artificielle** :
+   - Nourrir l'IA : « Importer des éléments › » et « Éléments enregistrés › » (maquette 16) ;
+   - « Logs de l'IA › » (→ B12) ;
+   - « Conservation de l'historique du chat » : `90 jours` (choix).
+8. **Connexion et autorisations** : inchangé (→ maquette 19).
+9. **Paramètres avancés ›** (→ B8).
+
+En-tête : la flèche › à droite de « Serveur : connecté · IA : disponible » ouvre la
+fenêtre « Connexion à Imperium » (maquette 19, partie gauche).
+
+Pas de liste d'appareils de confiance : un seul appareil (doc 63 §13.5).
+
+### A2. Maquette 12 — Routines
+
+- Menu Fréquence = liste fermée : Chaque jour / Chaque semaine / Toutes les 2 semaines /
+  Chaque mois. Pas d'option « Autre », pas de récurrence personnalisée (doc 71 §4).
+- Retirer l'aide « Exemples : deux fois par semaine, toutes les deux semaines… ».
+- « Supprimer » ouvre la confirmation B2.
+
+### A3. Maquettes 09, 11, 17 — Suppressions
+
+Tous les boutons « Supprimer » (projet, mission, priorité) ouvrent la confirmation B2.
+Rien d'autre à changer.
+
+---
+
+## B. Nouveaux écrans
+
+### B1. Résultat de la replanification (`IMP.REPLAN.VALIDATE`)
+
+Ouvert après le bouton « Replanifier » de la maquette 02, et après « Replanification
+complète » depuis la bulle (doc 59 §12.6, doc 63 §10.2).
+
+- Pendant le calcul : l'écran de chargement standard existant (celui du démarrage de
+  journée).
+- Fenêtre plein écran en deux colonnes :
+  - **Gauche — « Nouvelle planification »** : liste des missions de la journée dans le
+    même style que le Programme du jour (heure, titre, durée). Les missions déplacées,
+    ajoutées ou retirées portent un petit badge (Déplacée / Nouvelle / Retirée).
+    En tête : la raison saisie (ex. « Fatigue — … »).
+  - **Droite — chatbot** : le terminal (même rendu que la maquette 06 : JetBrains Mono,
+    repères `> IMPERIUM` / `> VOUS`, champ, micro, envoyer). L'IA y explique ses choix ;
+    l'utilisateur demande des corrections, la colonne de gauche se met à jour.
+- Bas : **Annuler** (contour gris) / **Accepter** (contour doré). Pas de bouton
+  « Modifier » : on corrige en parlant au chatbot.
+- Sur Tab S8 portrait, si deux colonnes ne tiennent pas : plan en haut, terminal en
+  dessous (à trancher visuellement).
+
+### B2. Confirmation de suppression (fenêtre réutilisable)
+
+Petite fenêtre centrée sur fond assombri (doc 67 : aucune action destructive sans
+confirmation).
+
+- Titre : « Supprimer <nom> ? »
+- Une ligne d'explication selon le cas (ex. « Les missions de ce projet seront aussi
+  supprimées. »).
+- Boutons : **Annuler** (gris) / **Supprimer** (rouge).
+- Une seule maquette générique ; préciser les variantes de texte pour projet, mission,
+  routine, priorité, élément de Nourrir l'IA.
+
+### B3. Justificatif — caméra
+
+Ouvert par « Importer un justificatif » (maquette 05). Même mécanique que Vault (doc 59 §13.4).
+
+- Aperçu caméra plein écran, cadre de guidage du ticket, bouton déclencheur rond.
+- En bas : accès « Galerie » (→ B4) et « Annuler ».
+- Mention discrète : « L'image est envoyée au service OCR. »
+
+### B4. Justificatif — choisir une photo déjà prise
+
+Grille de photos de la galerie, sélection d'une image, bouton « Utiliser cette photo »,
+« Annuler ».
+
+### B5. Analyse OCR et échec (variante de l'écran de chargement)
+
+- Analyse : l'écran de chargement standard existant, texte « Lecture du justificatif… ».
+- Échec : MÊME écran, le texte devient le message d'erreur (en rouge discret), ex.
+  « Échec de la lecture : image trop floue ». Il reste affiché **10 secondes** (le temps de
+  le lire ou de le recopier dans le chatbot), puis retour automatique au formulaire de
+  transaction. Montrer les deux états côte à côte.
+- Succès : retour au formulaire de la maquette 05, champs préremplis et modifiables.
+
+### B6. Gérer la bulle (Imperium)
+
+Fenêtre ouverte depuis Réglages → Bulle flottante (doc 63 §10).
+
+- Interrupteur « Bulle flottante » (mission en cours).
+- État de l'autorisation Android « Afficher par-dessus les autres apps » avec pastille et
+  bouton « Autoriser » / « Gérer ». Quand on active la bulle sans l'autorisation : texte
+  d'explication puis renvoi vers les réglages Android.
+- Aperçu : la bulle et son panneau (reprendre la maquette 18) avec la liste fixe des
+  actions : Terminer, Échouer, Demander une replanification complète de la journée.
+- Boutons : Fermer.
+
+Hors Imperium (pour plus tard, pas dans ce lot) : bulle Vault (panneau d'ajout de
+transaction, reprendre le formulaire de la maquette 05) et bulles raccourcis Path, Pulse,
+Vector (simple icône, un tap ouvre l'app).
+
+### B7. Gérer les notifications
+
+Fenêtre ouverte depuis Réglages → Notifications (doc 43 §15, doc 65 §8.5, doc 76 Q24).
+
+- Mention : « Les notifications arrivent sur cette tablette (notifications Android). »
+  Pas de choix de canal.
+- Interrupteurs :
+  - Check-in du matin ;
+  - Weekly Review ;
+  - Rappels de mission ;
+  - **Alertes rouges** (urgentes, ex. solde insuffisant pour une dépense à venir) —
+    désactivable, avec une ligne d'avertissement sous l'interrupteur quand il est éteint.
+- Boutons : Fermer.
+
+### B8. Paramètres avancés (doc 73)
+
+Fenêtre-menu, puis un sous-panneau par entrée. Ton technique, mêmes composants que les
+autres fenêtres.
+
+**B8.0 Menu** — quatre lignes avec › :
+- Vectorisation — « Ouvre la console de calibration (Tower) » ;
+- Modèles par rôle ;
+- Seuils de score /200 ;
+- Clés API.
+
+**B8.1 Modèles par rôle** — tableau : rôle → modèle actuel → bouton « Modifier ».
+Rôles (doc 30 §3) : `local_executor` (Qwen3.6-27B), `first_cloud_tier` (Claude Sonnet 5),
+`high_reasoning` (Claude Opus 5.5), `sustained_long_context` (Claude Fable 5.1),
+`health_specialist`, `finance_specialist`, `web_fresh_data` (GPT-5.6 Sol),
+`high_reasoning_safeguard` (GPT-6 Astra), `ocr_service`, `transcription_service`,
+`embedding_service`. Bouton « Mettre à jour le catalogue » en haut.
+Petite fenêtre « Modifier le modèle — <rôle> » : Accès (menu fournisseur : OpenRouter,
+OpenAI, Anthropic, Google…), Modèle (menu, ou champ de recherche pour OpenRouter), Effort
+(menu, masqué si le modèle ne le gère pas), Annuler / Valider. On ne peut pas ajouter ni
+renommer un rôle.
+
+**B8.2 Seuils de score /200** (doc 30 §5.6) — tableau éditable :
+`0–99` IA locale · `100–139` premier niveau cloud · `140–179` raisonnement poussé ·
+`180–200` mécanique critique. Les bornes sont des champs numériques ; une ligne
+d'explication sous le tableau ; Annuler / Enregistrer.
+
+**B8.3 Clés API** — une ligne par fournisseur : nom, pastille « Clé enregistrée ✓ » ou
+« Manquante », boutons « Remplacer » / « Supprimer ». « Remplacer » ouvre un champ masqué
+en écriture seule + Enregistrer. La clé n'est JAMAIS réaffichée.
+
+**B8.4 Console de calibration (page HTML sur la Tower)** — optionnel, ce n'est pas un
+écran de l'app : champs Taille des chunks (400), Top-K (8), Seuil de similarité (0,75),
+Quantization (Q8 ▾), Température (0,7) ; champ « Sujet de test » + bouton « Lancer le
+test » ; zone Résultat avec les extraits retrouvés puis la réponse du modèle (doc 73 D.6).
+
+### B9. Configurer la connexion (doc 63 §13.5)
+
+Ouvert par « Configurer la connexion › » (maquette 19, gauche). Sert aussi d'écran de
+connexion au premier lancement.
+
+- Adresse du serveur + bouton « Tester » (pastille de résultat).
+- Clé maître : champ masqué (icône œil), jamais mémorisé.
+- Nom de l'appareil : prérempli avec le modèle (« Galaxy Tab S8 »).
+- Bouton principal « Se connecter » ; états : connexion en cours, erreur (« Clé maître
+  invalide »), connecté.
+- Pas d'email/mot de passe, pas de liste d'appareils.
+
+### B10. Nourrir l'IA — sous-écrans (maquette 16)
+
+Tous ouverts depuis la fiche d'un élément dans « Éléments transmis ».
+
+- **Sources** (aussi ouvert par « Voir les sources › » dans le terminal) : liste ou
+  vignettes des fichiers d'origine (nom, type, taille, date) ; un tap ouvre l'aperçu.
+  Lecture seule.
+- **Informations retenues** : le texte final que l'IA a enregistré (ce qui est entré en
+  mémoire), en lecture seule, avec la destination (Mémoire / Projet « … ») et la date.
+  Mention : « Pour corriger, parle au chatbot. »
+- **Conversation** : relecture du terminal de cette session (rendu maquette 06), lecture
+  seule.
+- **Élément « Erreur de lecture »** : la fiche montre le message d'erreur et deux boutons :
+  « Réessayer » et « Ouvrir le chatbot ».
+- **Élément « À valider »** : un tap rouvre la conversation dans le terminal pour terminer
+  la validation.
+- **Élément « À analyser »** : fiche avec l'état d'attente, sans action.
+- **Supprimer…** : confirmation B2, texte « Supprimer « <nom> » ? Les sources et les
+  informations retenues seront supprimées ensemble. » Après « Supprimer », le terminal
+  s'ouvre avec la demande et l'IA effectue puis confirme la suppression ; « Annuler » ne
+  change rien (doc 70 §4).
+
+### B11. Logs de l'IA (doc 72 §8)
+
+Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
+
+- Gauche : petit explorateur de fichiers limité aux dossiers de logs de l'IA, triés du plus
+  récent au plus ancien, noms explicites (ex. `2026-10-16 · Weekly Review`,
+  `2026-10-15 · Nourrir l'IA · Exemples de courses Bolt`).
+- Droite : terminal d'affichage (JetBrains Mono) avec le contenu du log sélectionné.
+- Lecture seule : aucun bouton de modification. Mention : « Pour corriger une extraction,
+  parle au chatbot. »
+
+---
+
+## C. Pas de maquette nécessaire
+
+- « Terminer la journée » : termine la journée directement en V1, sans fenêtre (doc 59 §12.5).
+- Chevrons du Programme du jour : ouvrent les notes de la mission (maquette 10).
+- Chevrons des Projets en attente : ouvrent « Gérer les projets » avec ce projet déplié
+  (maquette 09).
+- Activation des projets : par le classement (2 premiers actifs), pas de bouton
+  Activer/Désactiver en V1 (doc 71 §3.3).
+- Nourrir l'IA : résumé et destination dans la conversation, création de projet confirmée
+  en texte (doc 70 §7).
+
+## D. Encore ouvert
+
+- Historique ou Hall of Fame : même libellé dans la barre et le titre (point UI-33).
+- Champs de la transaction : la maquette 05 a sens / montant / date / libellé /
+  portefeuille ; le doc 63 §10 et le doc 42 parlent aussi de catégorie et business/perso.
