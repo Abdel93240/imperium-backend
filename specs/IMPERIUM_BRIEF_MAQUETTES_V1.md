@@ -80,6 +80,13 @@ Corriger les textes au vouvoiement, par exemple :
 - 19 : « Utiliser votre position » → « Utiliser ta position ».
 - Vérifier aussi la 17 et tous les sous-titres des nouveaux écrans.
 
+### A7. Maquette 17 — Priorités personnelles
+
+Exactement 4 lignes : Religieux, Business, Finances, Santé (doc 52 §3). Seules actions :
+monter / descendre. Retirer « Ajouter », « Renommer », « Supprimer » et la petite fenêtre
+de nom. Sous-titre : « Ton ordre décide du poids de chaque domaine dans le plan. »
+Aperçu dans Réglages (maquette 15) : « 01 Religieux · 02 Business · 03 Finances · 04 Santé ».
+
 ### A5. Maquettes 13 et 14 — Historique
 
 Remplacer le titre « Hall of Fame » par « Historique » ; la barre de navigation dit déjà

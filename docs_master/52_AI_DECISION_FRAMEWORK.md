@@ -88,6 +88,12 @@ User can:
 
 The 4 default domains are: Religieux, Business, Finances, Santé.
 
+UI V1 (user decision 2026-10-16, revue UI point UI-24) : the « Priorités personnelles »
+screen shows exactly these 4 domains and only lets the user REORDER them (monter /
+descendre). No add, rename or delete — a free list would leave missions without a
+domain coefficient (§5). A free list of personal values used only as AI context
+(no coefficient) may come in a later version.
+
 The hierarchy is **fully user-controllable**. If the user decides tomorrow that finances must come first, that's their right.
 
 Canonical storage/API vocabulary is English:

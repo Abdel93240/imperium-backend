@@ -750,8 +750,10 @@ CORE:
     - red level: user-disableable (decision 2026-10-15, doc 76 Q24).
 
 PRIORITY HIERARCHY:
-  - drag-to-reorder list of priority sources
-  - default order shown in §9
+  - reorder the 4 life domains (Religieux, Business, Finances, Santé) — canonical
+    source doc 52 §3 / imperium_user_priorities (Patch 7G); no add/rename/delete in V1
+    (decision 2026-10-16). The §9 source list is the brain's surfacing order, not
+    this screen.
 
 MODE IA:
   - STRICT: the AI follows the priority hierarchy and rules to the letter.
