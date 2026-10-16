@@ -125,9 +125,25 @@ Le Dashboard ne choisit pas une nouvelle mission localement. Il affiche le read 
 | Zone | Specification |
 |---|---|
 | Sidebar | 240dp, destinations top-level Imperium dans l'ordre du contrat navigation. |
-| Main column | Max 960dp, scroll vertical. |
+| Main column | Max 960dp. Dashboard : PAS de défilement de page sur Tab S8 portrait (décision 2026-10-16, voir « Densité » ci-dessous) ; seul le Programme du jour défile en interne. |
 | Context panel | 320dp, affiche `Imperium Status` et details sync/cache. |
 | Grille main | 2 colonnes apres la Daily Focus Card. |
+
+Densité du Dashboard (décision utilisateur 2026-10-16, revue UI points UI-01/UI-02) —
+tout tient sur un écran Tab S8 portrait :
+
+| Bloc | Règle |
+|---|---|
+| Titres (mission, projet, ligne de programme) | 1 ligne, ellipse « … ». |
+| Description de la mission actuelle | 3 lignes max, ellipse ; texte complet dans les notes de la mission (maquette 10, chevron). |
+| Missions annexes | 5 max (doc 53 §3.1), 2 colonnes, 1 ligne chacune, ellipse. |
+| Programme du jour | zone de hauteur fixe (~10 lignes), défilement interne, ouverte centrée sur la mission en cours. |
+| Bannières | 2 max simultanées, par priorité : Intervention requise > Weekly Review ; la suivante attend. |
+| Résumé financier | 3 dernières transactions ; « Voir tout » pour le reste. |
+| Projets en cours | 2 projets actifs, prochaine mission sur 1 ligne. |
+
+Le texte complet n'est jamais supprimé : il reste accessible par le chevron ou le
+détail correspondant.
 
 Ordre tablette :
 

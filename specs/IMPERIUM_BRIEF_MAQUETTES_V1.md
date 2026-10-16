@@ -303,6 +303,8 @@ Ouvert depuis Réglages → Intelligence artificielle → Logs de l'IA.
   bannière « Intervention requise » existante (maquette 01) ; « Examiner » ouvre le
   terminal (maquette 06). Pas de nouvel écran (doc 43 §5.4).
 - Chevrons du Programme du jour : ouvrent les notes de la mission (maquette 10).
+- Densité du Dashboard (doc 65 §3.3) : pas de défilement de page ; maquette 01 conforme.
+  Seul le Programme du jour défile en interne ; titres 1 ligne, description 3 lignes.
 - Chevrons des Projets en attente : ouvrent « Gérer les projets » avec ce projet déplié
   (maquette 09).
 - Activation des projets : par le classement (2 premiers actifs), pas de bouton
