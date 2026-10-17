@@ -1445,6 +1445,11 @@ Stock alimentaire Pulse (CODE, migration 20261017_0052, doc 40 §11) :
   receipt:{id}:{n} pour un ticket), status active|consumed|removed, version (>= 1,
   migration 20261017_0053, verrou optimiste des modifications).
 
+Scan du placard Pulse (CODE, migration 20261017_0055, doc 37 §5.4) :
+- `pulse_pantry_scans` : statut ready|failed|validated|cancelled, empreinte et taille de
+  la photo (jamais la photo), qualite, confiance, resume, proposition (jsonb : lignes
+  add|update avec version du stock), avertissements, resultat, Idempotency-Key unique.
+
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
   premiere lecture ; colonnes typees et contraintes (ai_mode, replan_on_failure_*,

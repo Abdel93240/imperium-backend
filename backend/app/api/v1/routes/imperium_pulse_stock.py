@@ -1,9 +1,13 @@
-"""Stock alimentaire de Pulse (doc 40 §11, écran PUL-12) : lecture, ajout et modification manuels."""
+"""Stock alimentaire de Pulse (doc 40 §11) : lecture, ajout et modification manuels (PUL-12),
+alertes de date limite, scan du placard (PUL-13)."""
 
+import io
 from typing import Annotated
+from urllib.parse import unquote
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
@@ -14,8 +18,10 @@ from app.schemas.pulse import (
     FoodStockItemRead,
     FoodStockItemUpdate,
     FoodStockListResponse,
+    PantryScanRead,
+    PantryScanValidateRequest,
 )
-from app.services.pulse import expiry, food_stock
+from app.services.pulse import expiry, food_stock, pantry_scan
 
 router = APIRouter()
 
@@ -92,4 +98,79 @@ def update_food_stock_route(
         )
     except food_stock.FoodStockIdempotencyConflictError as exc:
         db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/food-stock/scans", response_model=PantryScanRead, status_code=status.HTTP_201_CREATED)
+async def create_pantry_scan_route(
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    x_filename: Annotated[str, Header(alias="X-Filename")],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    content_length: Annotated[int | None, Header(alias="Content-Length")] = None,
+) -> PantryScanRead:
+    """Photo du placard en corps brut ; renvoie la proposition comparée au stock (photo non conservée)."""
+    key = _require_key(idempotency_key)
+    if content_length is not None and content_length > pantry_scan.MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Fichier refusé : 25 Mo maximum.")
+    buffer = bytearray()
+    async for chunk in request.stream():
+        buffer.extend(chunk)
+        if len(buffer) > pantry_scan.MAX_BYTES:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Fichier refusé : 25 Mo maximum.")
+    try:
+        # L'analyse peut prendre jusqu'à 60 s : hors de la boucle d'événements.
+        scan, duplicate = await run_in_threadpool(
+            pantry_scan.create_scan, db, current_user=current_user, filename=unquote(x_filename),
+            content_type=request.headers.get("content-type"), stream=io.BytesIO(bytes(buffer)), idempotency_key=key,
+        )
+    except pantry_scan.PantryScanFileError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return scan
+
+
+@router.get("/food-stock/scans/{scan_id}", response_model=PantryScanRead)
+def get_pantry_scan_route(scan_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> PantryScanRead:
+    try:
+        return pantry_scan.get_scan(db, current_user=current_user, scan_id=scan_id)
+    except pantry_scan.PantryScanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/food-stock/scans/{scan_id}/validate", response_model=PantryScanRead)
+def validate_pantry_scan_route(
+    scan_id: UUID,
+    payload: PantryScanValidateRequest,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Lignes gardées seulement ; une ligne de stock modifiée entre-temps → 409 avec la ligne actuelle."""
+    _require_key(idempotency_key)
+    try:
+        return pantry_scan.validate_scan(db, current_user=current_user, scan_id=scan_id, payload=payload)
+    except pantry_scan.PantryScanNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except pantry_scan.PantryScanStateError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except pantry_scan.PantryScanVersionConflictError as exc:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": str(exc), "code": "STOCK_VERSION_CONFLICT", "current": exc.current.model_dump(mode="json")},
+        )
+
+
+@router.post("/food-stock/scans/{scan_id}/cancel", response_model=PantryScanRead)
+def cancel_pantry_scan_route(scan_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> PantryScanRead:
+    try:
+        return pantry_scan.cancel_scan(db, current_user=current_user, scan_id=scan_id)
+    except pantry_scan.PantryScanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except pantry_scan.PantryScanStateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

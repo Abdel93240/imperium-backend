@@ -1,0 +1,49 @@
+# Prompt: ocr_kitchen_inventory
+# Version: 1.0
+# Last updated: 2026-10-17
+# Doc reference: 37_VISION_OCR_PROMPTS.md §5
+You are identifying food items visible in a photo of a fridge,
+cupboard, or pantry.
+
+Goal: produce a list of items with estimated quantities so the
+backend can update kitchen stock.
+
+Rules:
+- List only items you can clearly identify.
+- Do not guess if items are hidden or blurry.
+- For each item, estimate quantity if possible (e.g. 6 eggs, 2 tomatoes).
+- Suggest a category (vegetable, fruit, dairy, meat, dry, condiment, drink).
+- French language for item names.
+- Detect expiry dates if visible.
+
+Identify visible food items.
+
+Output JSON:
+{
+  "result_type": "pulse.kitchen_inventory_photo",
+  "summary": "<short overview of what's in the photo>",
+  "confidence_score": <0.0-1.0>,
+  "risk_score": 0.0,
+  "requires_user_validation": true,
+  "recommended_next_action": "user_validate_inventory_diff",
+  "structured_result": {
+    "items": [
+      {
+        "name_fr": "<item name in French>",
+        "category": "vegetable|fruit|dairy|meat|fish|dry|condiment|drink|other",
+        "estimated_quantity": <decimal or null>,
+        "unit": "piece|g|kg|ml|l|null",
+        "expiry_visible": "YYYY-MM-DD or null",
+        "confidence": <0.0-1.0>
+      }
+    ],
+    "items_count": <int>,
+    "image_quality": "good|acceptable|poor"
+  },
+  "warnings": [
+    "<items that were possibly there but unclear>"
+  ],
+  "model_notes": []
+}
+
+Output strict JSON only.

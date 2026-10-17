@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -1230,6 +1231,38 @@ class FoodStockItem(UUIDPrimaryKeyMixin, Base):
     source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PulsePantryScan(UUIDPrimaryKeyMixin, Base):
+    """Scan du placard (PUL-13) : proposition comparée au stock, photo jamais conservée."""
+
+    __tablename__ = "pulse_pantry_scans"
+    __table_args__ = (
+        CheckConstraint("status IN ('ready', 'failed', 'validated', 'cancelled')", name="status_check"),
+        CheckConstraint("image_quality IS NULL OR image_quality IN ('good', 'acceptable', 'poor')", name="image_quality_check"),
+        CheckConstraint("size_bytes >= 0", name="size_non_negative"),
+        Index("pulse_pantry_scans_user_created_idx", "user_id", "created_at"),
+        Index("pulse_pantry_scans_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    image_quality: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    warnings: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

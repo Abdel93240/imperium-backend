@@ -4,6 +4,8 @@ Le service tourne sur la Tower, exposé UNIQUEMENT sur son IP Tailscale, comme l
 service d'embeddings. Contrat (ops/gpu/OCR_SMOKE_CHECKLIST.md) :
   POST /ocr  corps brut (le fichier), Content-Type, X-Filename
              → {"text": "...", "confidence": 0.0..1.0 | null, "pages": int | null}
+  POST /vision corps JSON {"task", "prompt", "image_base64", "mime_type"}
+             → l'objet JSON strict demandé par le prompt (doc 37 §5 pour le stock)
   GET  /health → 200
 Né désactivé (OCR_ENABLED=false). Service injoignable → OcrServiceUnreachable, que
 les jobs transforment en « réessayer plus tard », jamais en échec.
@@ -12,6 +14,7 @@ Les docx, odt et xlsx n'ont pas besoin d'OCR : leur texte est lu localement
 (zip + XML, bibliothèque standard, taille décompressée plafonnée).
 """
 
+import base64
 import io
 import json
 import logging
@@ -21,6 +24,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
+from pathlib import Path
 from xml.etree import ElementTree  # nosec B405 - expat >= 2.4 protège des expansions d'entités ; XML issu d'un zip plafonné
 
 from app.core.config import Settings, get_settings
@@ -93,6 +97,46 @@ def recognize(data: bytes, *, filename: str, content_type: str | None, settings:
         confidence=float(confidence) if isinstance(confidence, int | float) else None,
         pages=pages if isinstance(pages, int) else None,
     )
+
+
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+def load_prompt(name: str) -> str:
+    """Prompt versionné (doc 37 §11) sans ses lignes d'en-tête « # »."""
+    lines = (PROMPTS_DIR / f"{name}.txt").read_text(encoding="utf-8").splitlines()
+    return "\n".join(line for line in lines if not line.startswith("# ")).strip()
+
+
+def analyze_image(
+    data: bytes, *, task: str, prompt: str, content_type: str | None, settings: Settings | None = None
+) -> dict:
+    """Analyse d'image par le service local (vision) ; renvoie l'objet JSON du prompt, non validé."""
+    settings = settings or get_settings()
+    if not ocr_available(settings):
+        raise OcrServiceUnreachable("OCR désactivé ou OCR_BASE_URL absent.")
+    url = settings.ocr_base_url.rstrip("/") + "/vision"
+    if not url.startswith(("http://", "https://")):
+        raise OcrServiceUnreachable("OCR_BASE_URL invalide.")
+    body = json.dumps({
+        "task": task,
+        "prompt": prompt,
+        "image_base64": base64.b64encode(data).decode("ascii"),
+        "mime_type": content_type or "application/octet-stream",
+    }).encode("utf-8")
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(  # nosec B310 - URL interne Tailscale configurée
+            request, timeout=settings.ocr_request_timeout_seconds
+        ) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise OcrServiceUnreachable(f"Service OCR injoignable : {exc}") from exc
+    except ValueError as exc:
+        raise OcrError("Réponse d'analyse illisible.") from exc
+    if not isinstance(payload, dict):
+        raise OcrError("Réponse d'analyse mal formée.")
+    return payload
 
 
 def health_check(settings: Settings | None = None) -> bool:

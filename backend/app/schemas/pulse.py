@@ -193,3 +193,68 @@ class FoodStockExpiryRead(BaseModel):
 
 class FoodStockListResponse(BaseModel):
     items: list[FoodStockItemRead]
+
+
+class PantryScanLineRead(BaseModel):
+    """Ligne proposée : ajout, ou mise à jour d'une ligne de stock existante (diff PUL-13)."""
+
+    index: int
+    name: str
+    category: str
+    quantity: float
+    quantity_estimated: bool  # False : le modèle n'a pas donné de quantité, 1 est proposé
+    unit: str
+    expiry_date: date | None
+    expiry_type: str
+    confidence: float | None
+    low_confidence: bool
+    action: str  # add | update
+    stock_item_id: UUID | None = None
+    stock_name: str | None = None
+    stock_quantity: float | None = None
+    stock_unit: str | None = None
+    stock_version: int | None = None
+
+
+class PantryScanRead(BaseModel):
+    id: UUID
+    status: str
+    image_quality: str | None
+    confidence: float | None
+    summary: str | None
+    lines: list[PantryScanLineRead]
+    warnings: list[str]
+    error_message: str | None
+    created_at: datetime
+    validated_at: datetime | None
+    stock_items: list[FoodStockItemRead] = Field(default_factory=list)
+
+
+class PantryScanLineIn(BaseModel):
+    """Ligne gardée par l'utilisateur ; les lignes absentes sont ignorées."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["add", "update"]
+    name: str = Field(min_length=1, max_length=120)
+    quantity: Decimal = Field(gt=Decimal("0"), max_digits=10, decimal_places=3)
+    unit: StockUnit = "piece"
+    expiry_type: Literal["DLC", "DDM", "unknown"] = "unknown"
+    expiry_date: date | None = None
+    category: str | None = Field(default=None, max_length=40)
+    stock_item_id: UUID | None = None
+    stock_version: int | None = Field(default=None, ge=1)
+
+    _strip_name = field_validator("name")(FoodStockLineIn.strip_name.__func__)
+
+    @model_validator(mode="after")
+    def update_needs_target(self) -> "PantryScanLineIn":
+        if self.action == "update" and (self.stock_item_id is None or self.stock_version is None):
+            raise ValueError("update needs stock_item_id and stock_version.")
+        return self
+
+
+class PantryScanValidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lines: list[PantryScanLineIn] = Field(max_length=100)
