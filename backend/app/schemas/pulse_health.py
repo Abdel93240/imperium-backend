@@ -77,3 +77,46 @@ class BodySnapshotListResponse(BaseModel):
 
 class DeletedCountRead(BaseModel):
     deleted: int
+
+
+PainZone = Literal[
+    "head", "neck", "shoulder", "upper_back", "lower_back", "chest", "abdomen", "arm", "elbow", "wrist", "hand", "hip",
+    "thigh", "knee", "calf", "ankle", "foot", "other",
+]
+
+
+class PainLogCreate(BaseModel):
+    """Saisie PUL-09 (ou proposée par le chatbot puis validée) ; aucune photo."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    body_zone: PainZone
+    side: Literal["left", "right", "both"] | None = None
+    severity: int = Field(ge=0, le=10)
+    pain_type: str | None = Field(default=None, max_length=80)
+    limitation_notes: str | None = Field(default=None, max_length=1000)
+    workout_impact: bool = False
+    workout_id: UUID | None = None
+    noted_at: datetime | None = None
+
+
+class PainLogRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    body_zone: str
+    side: str | None
+    severity: int
+    pain_type: str | None
+    limitation_notes: str | None
+    workout_impact: bool
+    workout_id: UUID | None
+    noted_at: datetime
+    resolved_at: datetime | None
+    created_at: datetime
+    suggest_replan: bool = False  # douleur forte : l'écran propose de replanifier, rien n'est fait seul
+    replan_message: str | None = None
+
+
+class PainLogListResponse(BaseModel):
+    items: list[PainLogRead]

@@ -1,4 +1,4 @@
-"""Santé sensible Pulse : consentement par domaine et relevé corporel PUL-08 (doc 40 §14, doc 05)."""
+"""Santé sensible Pulse : consentement par domaine, relevé corporel PUL-08 et douleurs PUL-09 (doc 40 §14, §16, doc 05)."""
 
 from typing import Annotated
 from uuid import UUID
@@ -16,8 +16,11 @@ from app.schemas.pulse_health import (
     ConsentRead,
     DeletedCountRead,
     HealthDomain,
+    PainLogCreate,
+    PainLogListResponse,
+    PainLogRead,
 )
-from app.services.pulse import body, health_consent
+from app.services.pulse import body, health_consent, pain
 
 router = APIRouter()
 
@@ -97,5 +100,66 @@ def delete_body_snapshot_route(snapshot_id: UUID, current_user: CurrentUserDep, 
     try:
         body.delete_snapshot(db, current_user=current_user, snapshot_id=snapshot_id)
     except body.BodySnapshotNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/pain-logs", response_model=PainLogListResponse)
+def list_pain_logs_route(current_user: CurrentUserDep, db: SessionDep, include_resolved: bool = False) -> PainLogListResponse:
+    """Douleurs en cours (toutes avec `include_resolved=true`), la plus récente d'abord."""
+    return pain.list_logs(db, current_user=current_user, include_resolved=include_resolved)
+
+
+@router.post("/pain-logs", response_model=PainLogRead, status_code=status.HTTP_201_CREATED)
+def create_pain_log_route(
+    payload: PainLogCreate,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Sans consentement « pain » actif → 403 `CONSENT_REQUIRED` ; douleur 8 à 10 → `suggest_replan`."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        read, duplicate = pain.create_log(db, current_user=current_user, payload=payload, idempotency_key=idempotency_key)
+    except health_consent.ConsentRequiredError as exc:
+        db.rollback()
+        return consent_required_response(exc)
+    except pain.PainLogNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except pain.PainIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.post("/pain-logs/{pain_log_id}/resolve", response_model=PainLogRead)
+def resolve_pain_log_route(pain_log_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        return pain.resolve_log(db, current_user=current_user, pain_log_id=pain_log_id)
+    except health_consent.ConsentRequiredError as exc:
+        db.rollback()
+        return consent_required_response(exc)
+    except pain.PainLogNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.delete("/pain-logs", response_model=DeletedCountRead)
+def delete_all_pain_logs_route(current_user: CurrentUserDep, db: SessionDep, confirm: bool = False) -> DeletedCountRead:
+    """Suppression réelle de tout le journal ; `confirm=true` obligatoire."""
+    if not confirm:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Add confirm=true to delete everything.")
+    return DeletedCountRead(deleted=pain.delete_all(db, current_user=current_user))
+
+
+@router.delete("/pain-logs/{pain_log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_pain_log_route(pain_log_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> Response:
+    try:
+        pain.delete_log(db, current_user=current_user, pain_log_id=pain_log_id)
+    except pain.PainLogNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

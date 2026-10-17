@@ -1451,3 +1451,38 @@ class PulseBodySnapshot(UUIDPrimaryKeyMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+PAIN_ZONES = (
+    "head", "neck", "shoulder", "upper_back", "lower_back", "chest", "abdomen", "arm", "elbow", "wrist", "hand", "hip",
+    "thigh", "knee", "calf", "ankle", "foot", "other",
+)
+
+
+class PulsePainLog(UUIDPrimaryKeyMixin, Base):
+    """Douleur (PUL-09) sous consentement « pain » : donnée d'entrée des séances, jamais un diagnostic."""
+
+    __tablename__ = "pulse_pain_logs"
+    __table_args__ = (
+        CheckConstraint(f"body_zone IN ({', '.join(repr(zone) for zone in PAIN_ZONES)})", name="body_zone_check"),
+        CheckConstraint("side IS NULL OR side IN ('left', 'right', 'both')", name="side_check"),
+        CheckConstraint("severity BETWEEN 0 AND 10", name="severity_range"),
+        Index("pulse_pain_logs_user_noted_idx", "user_id", "noted_at"),
+        Index("pulse_pain_logs_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    body_zone: Mapped[str] = mapped_column(Text, nullable=False)
+    side: Mapped[str | None] = mapped_column(Text, nullable=True)
+    severity: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    pain_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    limitation_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    workout_impact: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    workout_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_workouts.id", ondelete="SET NULL"), nullable=True
+    )
+    noted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -842,8 +842,8 @@ Sous-domaines Health/Pulse futurs non codes :
 - Food stock / stock alimentaire : FUTUR / NON CODE. Schema a definir au moment
   du chantier stock.
 - Workouts : CODE, table `pulse_workouts` (voir plus bas, migration 20261017_0059).
-- Pain logs : FUTUR / NON CODE. Schema a definir au moment du chantier pain,
-  avec garde-fous sante sensible.
+- Pain logs : CODE, table `pulse_pain_logs` (voir plus bas, migration 20261017_0062),
+  sous consentement « pain ».
 - Body snapshots : CODE, table `pulse_body_snapshots` (voir plus bas, migration
   20261017_0061), sous consentement « body ». Profils biologiques : FUTUR / NON CODE.
 - Health scores : FUTUR / NON CODE. Aucun score sante n'est calcule ou stocke
@@ -1484,6 +1484,11 @@ Consentement sante et releves corporels Pulse (CODE, migration 20261017_0061, do
 - `pulse_body_snapshots` : measured_at, poids (> 0), masse grasse (1..70 %), tours de
   taille, poitrine, bras, notes ; au moins une mesure ; aucune colonne photo ;
   Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
+
+Journal des douleurs Pulse (CODE, migration 20261017_0062, doc 40 §16) :
+- `pulse_pain_logs` : zone (liste fermee), cote left|right|both, intensite 0..10, type,
+  gene, impact sur la seance, seance liee (FK pulse_workouts, SET NULL), noted_at,
+  resolved_at, Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
