@@ -1299,6 +1299,9 @@ class PulseMeal(UUIDPrimaryKeyMixin, Base):
     warnings: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     stock_decrement_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    macros_estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    photo_sha256: Mapped[str | None] = mapped_column(Text, nullable=True)  # la photo n'est jamais conservée
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     confirm_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)

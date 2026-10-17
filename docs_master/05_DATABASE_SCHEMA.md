@@ -1454,7 +1454,8 @@ Repas Pulse (CODE, migration 20261017_0056, doc 40 §10) :
   text|voice|photo|manual|chatbot, eaten_at, macros facultatives (>= 0), proposition de
   decompte (jsonb), avertissements, stock_decrement_applied, resultat (lignes de stock
   touchees), Idempotency-Key unique du brouillon + empreinte, cle et empreinte de la
-  validation.
+  validation. Migration 20261017_0057 : confidence, macros_estimated, photo_sha256 (la
+  photo du repas n'est jamais conservee).
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la

@@ -16,9 +16,9 @@ GET  /health  → 200
 POST /ocr     corps brut = le fichier (PDF, JPEG, PNG, WebP, HEIC)
               en-têtes : Content-Type (type MIME), X-Filename (nom encodé en URL)
               → 200 {"text": "texte extrait", "confidence": 0.0..1.0 | null, "pages": int | null}
-POST /vision  corps JSON {"task": "pulse.kitchen_inventory_photo", "prompt": "<consigne complète>",
+POST /vision  corps JSON {"task": "pulse.kitchen_inventory_photo" | "pulse.meal_photo_macros", "prompt": "<consigne complète>",
                           "image_base64": "...", "mime_type": "image/jpeg"}
-              → 200 l'objet JSON strict demandé par la consigne (doc 37 §5.2 pour le stock)
+              → 200 l'objet JSON strict demandé par la consigne (doc 37 §5.2 stock, §5.3 repas)
 ```
 
 `/ocr` :
@@ -65,6 +65,13 @@ EOF
 - [ ] Photo d'un frigo avec des œufs et du lait : `POST /vision` renvoie `structured_result.items`
       avec `name_fr`, `estimated_quantity`, `confidence`
 - [ ] Photo floue : `image_quality` = `poor`
+- [ ] Réponse en moins de 60 s
+
+## 2 ter. Photo d'un repas
+
+- [ ] Photo d'une assiette : `POST /vision` (tâche `pulse.meal_photo_macros`) renvoie
+      `structured_result.detected_foods` et `structured_result.macros` (calories, protein_g, carbs_g, fat_g)
+- [ ] Assiette ambiguë : confiance plus basse et un avertissement sur la portion
 - [ ] Réponse en moins de 60 s
 
 ## 3. État des services

@@ -390,6 +390,23 @@ Output strict JSON only.
   seulement ; version de stock dépassée → 409 `STOCK_VERSION_CONFLICT`, rien n'est écrit),
   `POST /{id}/cancel`.
 
+### 5.5 Implémentation V1 de la photo du repas (CODÉ le 2026-10-17, migration 20261017_0057)
+
+- Consigne §5.3 versionnée dans `backend/app/services/ai/prompts/ocr_meal_photo_macros.txt`,
+  envoyée par `POST /vision` (même contrat que §5.4).
+- Route `POST /api/imperium/pulse/meals/photo-drafts` (corps brut, X-Filename,
+  Idempotency-Key, `eaten_at` facultatif) → brouillon de repas source photo (doc 40 §10).
+- Réponse validée strictement : aliments mal formés écartés ; unité g|ml|piece gardée,
+  portion ou absente → pièce, quantité supposée ; macros négatives, non numériques ou
+  démesurées → vides ; forme différente → « illisible » (422, aucun brouillon).
+- Macros présentes → `macros_estimated`, avertissement « Macros estimées depuis la photo :
+  vérifie-les avant de valider » ; qualité poor → « Photo trop floue » ; confiance < 0,6 →
+  « Estimation peu sûre ». Aliment de confiance < 0,6 → ligne de décompte décochée.
+- Service désactivé ou injoignable → 503 avec un message lisible, aucun brouillon.
+- **La photo n'est jamais conservée** : empreinte seulement (`pulse_meals.photo_sha256`).
+  Même clé + même photo → même brouillon sans nouvelle analyse ; autre photo → 409.
+- Rien n'est enregistré ni décompté avant `POST /meals/{id}/confirm` (doc 40 §10.3).
+
 ## 6. General Document OCR
 
 Used for: `media.image_ocr` task when no specific extractor matches.
@@ -542,7 +559,8 @@ The image binary is NOT stored in `ai_results` (too large). Only references.
 ```text
 Receipts:               keep indefinitely (user can delete)
 Bolt screenshots:       30 days max
-Food inventory photos:  7 days max (then deleted)
+Food inventory photos:  7 days max (then deleted) — V1 : jamais conservées (§5.4)
+Meal photos:            V1 : jamais conservées, empreinte seulement (§5.5)
 ID document checks:     never store images, only result
 Generic OCR:            user-configurable, default 90 days
 ```
