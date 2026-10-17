@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.schemas.pulse import FoodStockExpiryRead, PulseEntryRead
 from app.schemas.pulse_meals import MealTotalsRead
+from app.schemas.pulse_workouts import WorkoutRead
 
 
 class DashboardMealsRead(BaseModel):
@@ -33,6 +34,7 @@ class PulseDashboardRead(BaseModel):
     entry: PulseEntryRead | None  # sommeil, énergie, fatigue, poids, séance du jour
     meals: DashboardMealsRead
     hydration: DashboardHydrationRead
+    workouts: list[WorkoutRead]  # séances du jour, de la plus tôt à la plus tard
     stock: FoodStockExpiryRead
     health_score: None = None  # jamais affiché sans explication (doc 40 §9) : pas encore calculé
     banners: list[DashboardBannerRead]

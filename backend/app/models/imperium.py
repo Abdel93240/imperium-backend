@@ -1333,3 +1333,50 @@ class PulseHydrationLog(UUIDPrimaryKeyMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PulseWorkout(UUIDPrimaryKeyMixin, Base):
+    """Séance de sport (PUL-05/PUL-06) : planifiée, démarrée, terminée ou sautée avec raison."""
+
+    __tablename__ = "pulse_workouts"
+    __table_args__ = (
+        CheckConstraint("status IN ('planned', 'in_progress', 'completed', 'skipped')", name="status_check"),
+        CheckConstraint("intensity IS NULL OR intensity IN ('low', 'medium', 'high')", name="intensity_check"),
+        CheckConstraint("length(btrim(title)) > 0", name="title_not_blank"),
+        CheckConstraint("duration_minutes IS NULL OR duration_minutes BETWEEN 1 AND 600", name="duration_range"),
+        CheckConstraint(
+            "actual_duration_minutes IS NULL OR actual_duration_minutes BETWEEN 1 AND 600", name="actual_duration_range"
+        ),
+        CheckConstraint("intensity_score IS NULL OR intensity_score BETWEEN 1 AND 10", name="intensity_score_range"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("pulse_workouts_user_planned_idx", "user_id", "planned_at"),
+        Index("pulse_workouts_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="planned")
+    planned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    intensity: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exercises: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    equipment: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    source_mission_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id", ondelete="SET NULL"), nullable=True
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    intensity_score: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    body_state_at_start: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes_post_workout: Mapped[str | None] = mapped_column(Text, nullable=True)
+    skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    closing_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closing_request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
