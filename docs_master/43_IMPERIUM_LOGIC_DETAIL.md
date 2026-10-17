@@ -835,6 +835,14 @@ in §6 and §15.
 
 ## 15. Settings
 
+CODÉ le 2026-10-17 (migration 20261017_0049, table `imperium_user_settings`) :
+`GET|PATCH /api/imperium/settings` — bubble_enabled, notifications_enabled,
+notify_weekly_review, notify_mission_reminders, notify_red_alerts, morning_popup_enabled,
+ai_mode (strict|equilibre|souple, défaut equilibre), replan_on_failure_urgent /
+replan_on_failure_other (replan|ask, défauts replan / ask), replan_debounce_minutes
+(défaut 5, lu par la replanification §3.3), chat_retention_days (30|60|90|180|365,
+défaut 90). Priorités : route dédiée (doc 52 §3). composite_weights : non exposé en V1.
+
 ```text
 Imperium settings includes:
 

@@ -909,6 +909,37 @@ class ImperiumRoutineCheck(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class ImperiumUserSettings(UUIDPrimaryKeyMixin, Base):
+    """Réglages Imperium d'un utilisateur (doc 43 §15, doc 65 §8.5) ; une ligne par utilisateur."""
+
+    __tablename__ = "imperium_user_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="user_unique"),
+        CheckConstraint("ai_mode IN ('strict', 'equilibre', 'souple')", name="ai_mode_check"),
+        CheckConstraint("replan_on_failure_urgent IN ('replan', 'ask')", name="failure_urgent_check"),
+        CheckConstraint("replan_on_failure_other IN ('replan', 'ask')", name="failure_other_check"),
+        CheckConstraint("replan_debounce_minutes >= 1 AND replan_debounce_minutes <= 120", name="debounce_range"),
+        CheckConstraint("chat_retention_days IN (30, 60, 90, 180, 365)", name="retention_choices"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    bubble_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notify_weekly_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notify_mission_reminders: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    notify_red_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    morning_popup_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    ai_mode: Mapped[str] = mapped_column(Text, nullable=False, default="equilibre", server_default=text("'equilibre'"))
+    replan_on_failure_urgent: Mapped[str] = mapped_column(Text, nullable=False, default="replan", server_default=text("'replan'"))
+    replan_on_failure_other: Mapped[str] = mapped_column(Text, nullable=False, default="ask", server_default=text("'ask'"))
+    replan_debounce_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default=text("5"))
+    chat_retention_days: Mapped[int] = mapped_column(Integer, nullable=False, default=90, server_default=text("90"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class ImperiumWeeklyReviewState(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_weekly_review_states"
     __table_args__ = (

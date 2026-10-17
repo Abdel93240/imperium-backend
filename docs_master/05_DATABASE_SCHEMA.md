@@ -1426,6 +1426,11 @@ Invariants planning reintegres :
   passe : victoires, problemes, items manques, fatigue, humeur et signaux. Il
   ne remplace pas l'historique de missions ni les events.
 
+Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
+- `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
+  premiere lecture ; colonnes typees et contraintes (ai_mode, replan_on_failure_*,
+  replan_debounce_minutes 1-120, chat_retention_days dans 30/60/90/180/365).
+
 Vault — memoire de categories (CODE, migration 20261017_0048, doc 42 §7.0) :
 - `user_category_memory` : user_id, label_key (libelle normalise, unique par
   utilisateur), sample_label, category, confirmations (>= 1), last_confirmed_at.

@@ -629,6 +629,8 @@ Ordre telephone :
 
 ### 8.5 Sections minimum
 
+> Backend : `GET|PATCH /api/imperium/settings` (codé le 2026-10-17, doc 43 §15) ; priorités : `GET|POST /api/imperium/decision-framework/priorities`.
+
 | Section | Composant autorise | Contenu obligatoire |
 |---|---|---|
 | User | `ImperiumCard`, `ImperiumListItem` | display name mock, timezone, language. |

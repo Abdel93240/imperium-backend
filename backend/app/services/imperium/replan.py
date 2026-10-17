@@ -26,9 +26,11 @@ from app.schemas.imperium import (
 from app.services.events.emitter import build_event
 from app.services.imperium.daily_plans import get_daily_plan_for_date
 from app.services.imperium.planning_days import get_current_planning_day
+from app.services.imperium.settings import replan_debounce_minutes
 
-# doc 43 §3.3 / §15 : une replanification au plus toutes les 5 min, manuelles comprises.
-REPLAN_DEBOUNCE_MINUTES = 5
+# doc 43 §3.3 / §15 : une replanification au plus toutes les N min (réglage, 5 par défaut),
+# manuelles comprises.
+REPLAN_DEBOUNCE_MINUTES = 5  # valeur par défaut, voir services/imperium/settings.py
 # doc 43 §3.3 : déclencheurs toujours immédiats.
 DEBOUNCE_EXEMPT_HOOKS = frozenset({"ghusl_required", "fasting_break"})
 OPEN_STATUSES = ("requested", "proposed", "revising")
@@ -60,7 +62,7 @@ def get_replan_state(db: Session, *, current_user: User, now: datetime | None = 
     return ReplanStateResponse(
         eligible_at=eligible_at,
         can_request=open_request is None and (eligible_at is None or now >= eligible_at),
-        debounce_minutes=REPLAN_DEBOUNCE_MINUTES,
+        debounce_minutes=replan_debounce_minutes(db, current_user=current_user),
         open_request=ReplanRead.model_validate(open_request) if open_request else None,
     )
 
@@ -362,7 +364,7 @@ def _eligible_at(db: Session, *, current_user: User) -> datetime | None:
             PlanningReplanEvent.status != "failed",
         )
     )
-    return last + timedelta(minutes=REPLAN_DEBOUNCE_MINUTES) if last else None
+    return last + timedelta(minutes=replan_debounce_minutes(db, current_user=current_user)) if last else None
 
 
 def _open_request(db: Session, *, current_user: User) -> PlanningReplanEvent | None:
