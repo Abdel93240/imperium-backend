@@ -1438,6 +1438,12 @@ Justificatifs du Vault (CODE, migration 20261017_0051, doc 37 §3.4) :
   VAULT_RECEIPTS_STORAGE_DIR, transaction_id (obligatoire une fois validated),
   Idempotency-Key unique par utilisateur.
 
+Stock alimentaire Pulse (CODE, migration 20261017_0052, doc 40 §11) :
+- `food_stock_items` : nom, quantite (> 0), unite piece|kg|g|l|cl|ml, expiry_type
+  DLC|DDM|unknown, expiry_date, category, confidence, source
+  manual|vault_receipt|pantry_scan|chatbot, source_ref (unique par utilisateur,
+  receipt:{id}:{n} pour un ticket), status active|consumed|removed.
+
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
   premiere lecture ; colonnes typees et contraintes (ai_mode, replan_on_failure_*,

@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -87,3 +88,47 @@ class PulseStatsSummaryResponse(BaseModel):
     latest_weight_kg: float | None
     workout_count: int
     safe_explanation: str = "Pulse summary statistics for current user."
+
+
+StockUnit = Literal["piece", "kg", "g", "l", "cl", "ml"]
+
+
+class FoodStockLineIn(BaseModel):
+    """Une ligne cochée sur VAU-05, éventuellement corrigée, qui entre au stock Pulse."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    quantity: Decimal = Field(gt=Decimal("0"), max_digits=10, decimal_places=3)
+    unit: StockUnit = "piece"
+    expiry_type: Literal["DLC", "DDM", "unknown"] = "unknown"
+    expiry_date: date | None = None
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name is empty.")
+        return stripped
+
+
+class FoodStockItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    quantity: Decimal
+    unit: str
+    expiry_type: str
+    expiry_date: date | None
+    category: str | None
+    confidence: Decimal | None
+    source: str
+    source_ref: str | None
+    status: str
+    created_at: datetime
+
+
+class FoodStockListResponse(BaseModel):
+    items: list[FoodStockItemRead]

@@ -470,6 +470,8 @@ Vault tables (Vault remains the owner) AND writes a stock update into the Pulse
 domain. No app pushes a write into Vault — it is a deterministic brain rule.
 The receipt produces TWO separate backend writes (Vault expense + Pulse stock),
 each into its own domain table. Not a Vault↔Pulse dialogue.
+CODÉ (2026-10-17) : `imperium_vault_transactions` puis `food_stock_items`, dans la
+même validation (doc 37 §3.4) ; seules les lignes cochées par l'utilisateur entrent.
 ```
 
 ### 15.3 With Vector

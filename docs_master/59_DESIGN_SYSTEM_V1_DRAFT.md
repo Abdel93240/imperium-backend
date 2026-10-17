@@ -1086,7 +1086,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Widgets :** OCR confidence badge, total comparator, Pulse handoff summary.
 - **Assets :** receipt thumbnail image, Material Symbols `receipt_long`, `inventory_2`, `warning`.
 - **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=OCR service fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
-- **Backend deps :** `GET /api/imperium/vault/receipt-extractions/{id}` (+ `/image`), `POST …/{id}/validate`, `POST …/{id}/cancel` (CODÉS 2026-10-17, doc 37 §3.4) ; `TBD POST /api/pulse/food-stock/drafts/confirm`. Lignes d'articles et passage Pulse : pas encore.
+- **Backend deps :** `GET /api/imperium/vault/receipt-extractions/{id}` (+ `/image`), `POST …/{id}/validate`, `POST …/{id}/cancel` (CODÉS 2026-10-17, doc 37 §3.4). Lignes d'articles (`draft.line_items`, `to_stock` coché sur les lignes food) et passage Pulse par `stock_lines` dans la validation : CODÉS 2026-10-17.
 - **Navigation :** from VAU-04; VAU-05 --> VAU-01 on validation; VAU-05 --> PULSE_HANDOFF as backend event only, no second screen V1; re-scan returns VAU-04.
 - **Tab S10 Ultra :** two-column: receipt preview left 40%, draft cards right 60%, sticky validation bar bottom.
 
@@ -1224,7 +1224,7 @@ Transitions conditionnelles canoniques V1 :
 |---|---|---|
 | VAU-01 | `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly` | `GET /api/vault/pressure/current` |
 | VAU-02/03 | `POST /api/vault/transactions`, `POST /api/imperium/vault/transactions` | none |
-| VAU-04/05 | `POST /api/imperium/vault/receipt-extractions`, `GET …/{id}`, `GET …/{id}/image`, `POST …/{id}/validate`, `POST …/{id}/cancel` (codés 2026-10-17, doc 37 §3.4) | Pulse handoff des articles alimentaires |
+| VAU-04/05 | `POST /api/imperium/vault/receipt-extractions`, `GET …/{id}`, `GET …/{id}/image`, `POST …/{id}/validate` (+ `stock_lines` vers Pulse), `POST …/{id}/cancel` (codés 2026-10-17, doc 37 §3.4) | none |
 | VAU-06 | none | `GET /api/vault/pressure/current`, `POST /api/vault/advice/detail` |
 | VAU-07 | `GET /api/imperium/vault/transactions`, `GET /api/vault/transactions/recent` | none |
 | VAU-08 | `GET /api/imperium/vault/transactions/{transaction_id}`, `POST /api/imperium/vault/transactions/{transaction_id}/reverse` | `PATCH /api/imperium/vault/transactions/{transaction_id}` |
@@ -1707,7 +1707,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Widgets :** category stats, expiring soon banner, handoff badge, stock item detail pane.
 - **Assets :** empty-state illustration, Material Symbols `inventory_2`, `kitchen`, `event`, `warning`, `photo_camera`.
 - **Etats :** Loading=stock skeleton rows ; Empty=no stock with add/scan CTA, distinct from filter empty ; Error=stock fetch/update failure ; Offline=cached stock read-only plus queued local edits ; Syncing=pending row indicators ; Synced=snackbar after update ; Conflict=stock quantity/version diff dialog.
-- **Backend deps :** `TBD GET /api/pulse/food-stock`, `TBD POST /api/pulse/food-stock`, `TBD PATCH /api/pulse/food-stock/{stock_item_id}`, `TBD POST /api/pulse/food-stock/drafts/confirm`.
+- **Backend deps :** `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17), `TBD POST /api/pulse/food-stock`, `TBD PATCH /api/pulse/food-stock/{stock_item_id}` ; passage Vault par la validation du ticket (doc 37 §3.4).
 - **Navigation :** top-level Pulse tab; PUL-12 --> PUL-13 via scan CTA; item opens detail/edit pane; Vault VAU-05 may deep link to PUL-12 with handoff badge.
 - **Tab S10 Ultra :** list/detail split: stock list max 880dp, right 320dp selected item/expiring soon/handoff summary.
 
@@ -1798,7 +1798,7 @@ Transitions conditionnelles canoniques V1 :
 | PUL-09 | none | `POST /api/pulse/pain-logs`, `POST /api/imperium/replan-requests` |
 | PUL-10 | none | `GET /api/pulse/meals`, `POST /api/pulse/recommendations` |
 | PUL-11 | none | `GET /api/pulse/workouts`, `GET /api/pulse/recovery-state`, `POST /api/pulse/recommendations` |
-| PUL-12 | none | `GET /api/pulse/food-stock`, `POST /api/pulse/food-stock`, `PATCH /api/pulse/food-stock/{stock_item_id}`, `POST /api/pulse/food-stock/drafts/confirm` |
+| PUL-12 | `GET /api/imperium/pulse/food-stock` (codé 2026-10-17) | `POST /api/pulse/food-stock`, `PATCH /api/pulse/food-stock/{stock_item_id}` |
 | PUL-13 | none | `POST /api/pulse/food-stock/scan`, `POST /api/pulse/food-stock/scans/{scan_id}/validate` |
 | PUL-14 | none | `GET /api/pulse/medical-documents`, `POST /api/pulse/medical-documents`, `GET /api/pulse/medical-rules/active`, `POST /api/pulse/medical-rules/{rule_id}/activate` |
 

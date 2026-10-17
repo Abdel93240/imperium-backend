@@ -1200,3 +1200,35 @@ class ImperiumMemoryCandidateDecision(UUIDPrimaryKeyMixin, Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class FoodStockItem(UUIDPrimaryKeyMixin, Base):
+    """Stock alimentaire de Pulse : matières premières (doc 40 §10.5, §11.2)."""
+
+    __tablename__ = "food_stock_items"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        CheckConstraint("unit IN ('piece', 'kg', 'g', 'l', 'cl', 'ml')", name="unit_check"),
+        CheckConstraint("expiry_type IN ('DLC', 'DDM', 'unknown')", name="expiry_type_check"),
+        CheckConstraint("source IN ('manual', 'vault_receipt', 'pantry_scan', 'chatbot')", name="source_check"),
+        CheckConstraint("status IN ('active', 'consumed', 'removed')", name="status_check"),
+        Index("food_stock_items_user_status_idx", "user_id", "status"),
+        Index("food_stock_items_user_source_ref_idx", "user_id", "source_ref", unique=True,
+              postgresql_where=text("source_ref IS NOT NULL")),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(Text, nullable=False, default="piece", server_default=text("'piece'"))
+    expiry_type: Mapped[str] = mapped_column(Text, nullable=False, default="unknown", server_default=text("'unknown'"))
+    expiry_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
