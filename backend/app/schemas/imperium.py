@@ -70,6 +70,10 @@ class FinishDayResponse(BaseModel):
     review: DayReviewResponse
     event_id: str
     status: str
+    # doc 43 §5.4 : effets de la clôture sur les missions non faites.
+    missions_returned_to_backlog: int = 0
+    missions_to_standby: int = 0
+    standby_mission_ids: list[UUID] = Field(default_factory=list)
 
 
 class StartPlanningDayRequest(BaseModel):
@@ -115,6 +119,7 @@ class MissionStatus(StrEnum):
     failed = "failed"
     abandoned = "abandoned"
     cancelled = "cancelled"
+    standby = "standby"
 
 
 class MissionHistoryStatus(StrEnum):
@@ -366,6 +371,49 @@ class FailMissionRequest(BaseModel):
         return self
 
 
+class StandbyDecision(StrEnum):
+    """Sortie du standby (doc 43 §5.4) : nouvelle échéance, faite ou annulée."""
+
+    reschedule = "reschedule"
+    completed = "completed"
+    cancelled = "cancelled"
+
+
+class ResolveStandbyRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    decision: StandbyDecision
+    deadline_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def deadline_only_for_reschedule(self) -> "ResolveStandbyRequest":
+        if self.decision == StandbyDecision.reschedule and self.deadline_at is None:
+            raise ValueError("deadline_at is required to reschedule a standby mission.")
+        if self.decision != StandbyDecision.reschedule and self.deadline_at is not None:
+            raise ValueError("deadline_at is only allowed to reschedule.")
+        if self.deadline_at is not None and self.deadline_at.tzinfo is None:
+            raise ValueError("deadline_at must be timezone-aware.")
+        return self
+
+
+class StandbyMissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    domain: str | None
+    priority_level: int | None
+    deadline_at: datetime | None
+    estimated_minutes: int | None
+    updated_at: datetime
+
+
+class StandbyMissionListResponse(BaseModel):
+    missions: list[StandbyMissionRead]
+    intervention_required: bool
+
+
 class MissionAnnexRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -404,6 +452,7 @@ class MissionResponse(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
@@ -429,6 +478,7 @@ class ActiveMissionRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime
     created_at: datetime
@@ -457,6 +507,7 @@ class MissionCompletionRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
@@ -492,6 +543,7 @@ class MissionHistoryRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
@@ -520,6 +572,7 @@ class MissionDetailRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
@@ -555,6 +608,7 @@ class BacklogMissionRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
@@ -613,6 +667,7 @@ class PromotedBacklogMissionRead(BaseModel):
     planned_start_at: datetime | None
     planned_end_at: datetime | None
     estimated_minutes: int | None = None
+    deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
     started_at: datetime
     created_at: datetime

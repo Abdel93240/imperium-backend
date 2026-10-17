@@ -11,6 +11,8 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    ResolveStandbyRequest,
+    StandbyMissionListResponse,
     AttachAnnexesRequest,
     AttachAnnexesResponse,
     ActiveMissionResponse,
@@ -151,6 +153,8 @@ from app.services.imperium.decision_framework import (
     replace_user_priorities,
 )
 from app.services.imperium.missions import (
+    list_standby_missions,
+    resolve_standby_mission,
     AnnexValidationError,
     attach_annexes,
     ActiveMissionExistsError,
@@ -1321,6 +1325,53 @@ def recent_missions_route(
 ) -> list[MissionResponse]:
     missions = get_recent_missions(db, current_user=current_user, limit=limit)
     return [MissionResponse.model_validate(mission) for mission in missions]
+
+
+@router.get("/missions/standby", response_model=StandbyMissionListResponse)
+def standby_missions_route(current_user: CurrentUserDep, db: SessionDep) -> StandbyMissionListResponse:
+    """Missions en standby (doc 43 §5.4) : alimente la bannière « Intervention requise »."""
+    return list_standby_missions(db, current_user=current_user)
+
+
+@router.post("/missions/{mission_id}/standby/resolve", response_model=MissionWriteResponse)
+def resolve_standby_route(
+    mission_id: UUID,
+    payload: ResolveStandbyRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> MissionWriteResponse:
+    """Nouvelle échéance, faite ou annulée — après validation de l'utilisateur."""
+    _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = resolve_standby_mission(
+            db,
+            current_user=current_user,
+            mission_id=mission_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MissionStateConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except MissionIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mission or event conflicts with an existing record.",
+        ) from exc
+    response.status_code = status.HTTP_200_OK
+    return result
 
 
 @router.get(

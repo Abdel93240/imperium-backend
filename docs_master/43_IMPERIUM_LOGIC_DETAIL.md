@@ -248,6 +248,12 @@ et les missions prévues mais pas faites :
       backlog), faite, ou annulée. La mission reste en standby tant qu'il
       n'a pas tranché ; elle n'entre dans aucun plan.
 
+  CODE (2026-10-17, migration 20261017_0044) : POST /api/imperium/day/finish
+    applique la règle (réponse : missions_returned_to_backlog,
+    missions_to_standby, standby_mission_ids) ; GET /api/imperium/missions/standby
+    alimente la bannière ; POST /api/imperium/missions/{id}/standby/resolve
+    { decision: reschedule (+ deadline_at future) | completed | cancelled }.
+
   Score : ces missions comptent comme non faites dans le discipline_score
     de la journée (elles étaient prévues, §6). Les missions annexes non
     cochées retournent au backlog sans compter (doc 53 §8).

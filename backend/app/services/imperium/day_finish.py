@@ -12,6 +12,7 @@ from app.services.events.emitter import build_event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumDayReview
 from app.schemas.imperium import DayReviewResponse, FinishDayRequest, FinishDayResponse
+from app.services.imperium.missions import close_day_missions
 from app.services.imperium.planning_days import get_current_planning_day
 
 
@@ -93,7 +94,17 @@ def finish_day(
     db.add(review)
     db.flush()
 
+    finished_at = now or datetime.now(UTC)
+    if finished_at.tzinfo is None:
+        raise ValueError("Operational day finish time must be timezone-aware.")
+    finished_at = finished_at.astimezone(UTC)
+    # doc 43 §5.4 : missions non faites → backlog, ou standby si l'échéance est dépassée.
+    # Calculé AVANT l'événement : la table events est en ajout seul.
+    returned, standby_ids = close_day_missions(db, current_user=current_user, now=finished_at)
+
     event_payload = payload.model_dump(mode="json", exclude_none=True)
+    event_payload["missions_returned_to_backlog"] = returned
+    event_payload["standby_mission_ids"] = [str(mission_id) for mission_id in standby_ids]
     event_payload["local_date"] = planning_day.start_local_date.isoformat()
     event_payload["timezone"] = planning_day.timezone
     event_payload["planning_day_id"] = str(planning_day.id)
@@ -112,10 +123,7 @@ def finish_day(
     db.add(event)
     db.flush()
 
-    finished_at = now or datetime.now(UTC)
-    if finished_at.tzinfo is None:
-        raise ValueError("Operational day finish time must be timezone-aware.")
-    planning_day.finished_at = finished_at.astimezone(UTC)
+    planning_day.finished_at = finished_at
     planning_day.day_review_id = review.id
     db.flush()
 
@@ -123,6 +131,9 @@ def finish_day(
         review=DayReviewResponse.model_validate(review),
         event_id=event_id,
         status="stored",
+        missions_returned_to_backlog=returned,
+        missions_to_standby=len(standby_ids),
+        standby_mission_ids=standby_ids,
     )
     idempotency = IdempotencyKey(
         user_id=current_user.id,

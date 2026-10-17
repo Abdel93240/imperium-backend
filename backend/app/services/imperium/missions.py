@@ -12,6 +12,9 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import (
+    ResolveStandbyRequest,
+    StandbyMissionListResponse,
+    StandbyMissionRead,
     ActiveMissionWithAnnexesRead,
     AttachAnnexesRequest,
     AttachAnnexesResponse,
@@ -138,6 +141,7 @@ def start_mission(
         planned_start_at=payload.planned_start_at,
         planned_end_at=payload.planned_end_at,
         estimated_minutes=payload.estimated_minutes,
+        deadline_at=payload.deadline_at,
         started_at=now,
     )
     db.add(mission)
@@ -214,6 +218,7 @@ def create_backlog_mission(
         mission_type_category=payload.mission_type_category,
         status="backlog",
         estimated_minutes=payload.estimated_minutes,
+        deadline_at=payload.deadline_at,
         started_at=now,
     )
     db.add(mission)
@@ -729,6 +734,140 @@ def attach_annexes(
             response_status_code=200,
             response_body=response.model_dump(mode="json"),
         )
+    )
+    db.commit()
+    return response, False
+
+
+def close_day_missions(db: Session, *, current_user: User, now: datetime) -> tuple[int, list[UUID]]:
+    """Clôture de journée (doc 43 §5.4) : missions non faites → backlog, ou standby si échue.
+
+    Concerne la mission en cours (active) et les missions prévues (backlog avec une
+    heure prévue). Heure prévue et liens d'annexe effacés. Ne valide ni ne commit :
+    l'appelant (finish_day) porte la transaction.
+    """
+    unfinished = list(
+        db.scalars(
+            select(ImperiumMission).where(
+                ImperiumMission.user_id == current_user.id,
+                (ImperiumMission.status == "active")
+                | ((ImperiumMission.status == "backlog") & ImperiumMission.planned_start_at.is_not(None)),
+            )
+        )
+    )
+    returned = 0
+    standby_ids: list[UUID] = []
+    for mission in unfinished:
+        for annex in _annexes_of(db, mission=mission):
+            annex.annex_of_mission_id = None
+        mission.planned_start_at = None
+        mission.planned_end_at = None
+        mission.annex_of_mission_id = None
+        if mission.deadline_at is not None and mission.deadline_at < now:
+            mission.status = "standby"
+            standby_ids.append(mission.id)
+        else:
+            mission.status = "backlog"
+            returned += 1
+    return returned, standby_ids
+
+
+def list_standby_missions(db: Session, *, current_user: User) -> StandbyMissionListResponse:
+    missions = list(
+        db.scalars(
+            select(ImperiumMission)
+            .where(ImperiumMission.user_id == current_user.id, ImperiumMission.status == "standby")
+            .order_by(ImperiumMission.deadline_at.asc().nulls_last(), ImperiumMission.id.asc())
+        )
+    )
+    return StandbyMissionListResponse(
+        missions=[StandbyMissionRead.model_validate(mission) for mission in missions],
+        intervention_required=bool(missions),
+    )
+
+
+def resolve_standby_mission(
+    db: Session,
+    *,
+    current_user: User,
+    mission_id: UUID,
+    payload: ResolveStandbyRequest,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+    now: datetime | None = None,
+) -> tuple[MissionWriteResponse, bool]:
+    """Décision sur une mission en standby, validée par l'utilisateur (doc 43 §5.4, doc 72 §4)."""
+    request_hash = _hash_request(
+        "mission.standby.resolved",
+        {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
+    )
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        return _handle_existing_idempotency(existing_key, request_hash), True
+
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission is None:
+        raise MissionNotFoundError("Mission not found.")
+    if mission.status != "standby":
+        raise MissionStateConflictError("Mission is not in standby.")
+    now = now or datetime.now(UTC)
+    decision = payload.decision.value
+    if decision == "reschedule" and payload.deadline_at <= now:
+        raise MissionStateConflictError("The new deadline must be in the future.")
+
+    event_id = f"evt_{uuid4().hex}"
+    if decision == "completed":
+        event_type = "mission.completed"
+    elif decision == "cancelled":
+        event_type = "mission.abandoned"
+    else:
+        event_type = "planning.mission.rescheduled"
+    event_payload = {
+        "mission_id": str(mission.id),
+        "decision": decision,
+        "outcome": "completed" if decision == "completed" else None,
+        "reason": "standby_cancelled" if decision == "cancelled" else None,
+        "deadline_at": payload.deadline_at.isoformat() if payload.deadline_at else None,
+        "note": payload.note,
+    }
+    event = _build_event(
+        db,
+        current_user=current_user,
+        event_id=event_id,
+        event_type=event_type,
+        idempotency_key=idempotency_key,
+        payload={key: value for key, value in event_payload.items() if value is not None},
+    )
+    db.add(event)
+    db.flush()
+
+    if decision == "reschedule":
+        mission.status = "backlog"
+        mission.deadline_at = payload.deadline_at
+    else:
+        mission.status = decision
+        mission.ended_at = now
+        mission.ended_by_event_id = event.id
+        if decision == "completed":
+            mission.completion_note = payload.note
+    db.flush()
+
+    response = _write_response(
+        mission=mission,
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        status_text=f"standby_{decision}",
+    )
+    _store_idempotency(
+        db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_hash=request_hash,
+        response_status_code=200,
+        response=response,
     )
     db.commit()
     return response, False

@@ -1115,6 +1115,7 @@ completion_note         TEXT NULL
 failure_reason          TEXT NULL
 failure_reason_code     TEXT NULL   -- CODE (migration 20261017_0043) : no_time | too_tired | not_relevant | impediment (doc 52 §10)
 estimated_minutes       INTEGER NULL -- CODE (20261017_0043) : > 0 (doc 43 §5.2)
+deadline_at             TIMESTAMPTZ NULL -- CODE (20261017_0044) : échéance ; dépassée à la clôture → standby (doc 43 §5.4)
 annex_of_mission_id     UUID NULL FK imperium_missions.id ON DELETE SET NULL -- CODE (20261017_0043) : annexe V1 (doc 53 §3.1), <> id
 user_reported_signals   JSONB NULL
 ai_usable_reason        BOOLEAN NULL
@@ -1409,8 +1410,9 @@ Invariants planning reintegres :
   code actuel. CODE (migration 20261017_0043, 2026-10-17) : colonnes
   `annex_of_mission_id` (annexes V1 allegees, doc 53 §3.1), `estimated_minutes` (doc 43 §5.2)
   et `failure_reason_code` (doc 52 §10) sur `imperium_missions` ; le reste de l'overlay reste V3.
-  Cible V1 (doc 43 §5.4, decision 2026-10-16) : statut `standby` (echeance
-  depassee constatee a la cloture de journee, attend une decision).
+  CODE (migration 20261017_0044) : statut `standby` (echeance depassee
+  constatee a la cloture de journee, attend une decision, doc 43 §5.4) et
+  colonne `deadline_at`.
 - Les projets actifs et routines d'Operations sont la source future de missions,
   mais leurs tables planning canoniques ne sont pas encore codees. La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la

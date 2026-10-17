@@ -101,7 +101,7 @@ When user presses `Finish Day`:
 4. backend creates daily financial snapshot
 5. backend stores mission/day summary, then returns unfinished missions to
    the backlog, or sets them to `standby` + « Intervention requise » banner
-   if their deadline has passed (doc 43 §5.4, decision 2026-10-16)
+   if their deadline has passed (doc 43 §5.4, decision 2026-10-16 ; coded 2026-10-17)
 6. backend triggers n8n day finished workflow if needed
 7. objective logic recalculates remaining week targets
 

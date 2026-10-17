@@ -174,7 +174,7 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_missions"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('backlog', 'active', 'completed', 'failed', 'abandoned', 'cancelled')",
+            "status IN ('backlog', 'active', 'completed', 'failed', 'abandoned', 'cancelled', 'standby')",
             name="imperium_missions_status_check",
         ),
         CheckConstraint(
@@ -202,6 +202,11 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
         CheckConstraint(
             "annex_of_mission_id IS NULL OR annex_of_mission_id <> id",
             name="imperium_missions_annex_not_self",
+        ),
+        Index(
+            "imperium_missions_user_standby_idx",
+            "user_id",
+            postgresql_where=text("status = 'standby'"),
         ),
         Index(
             "imperium_missions_annex_of_idx",
@@ -242,6 +247,8 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # doc 52 §10 : raison codée d'une mission non faite ; failure_reason garde les détails.
     failure_reason_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # doc 43 §5.4 : échéance ; dépassée à la clôture de journée → standby.
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # doc 43 §5.2 : durée estimée (proposée par l'IA, modifiable).
     estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # doc 53 §3.1 : mission annexe accrochée à une mission porteuse.

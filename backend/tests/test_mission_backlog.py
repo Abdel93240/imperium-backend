@@ -681,6 +681,7 @@ def test_backlog_public_response_does_not_expose_coefficient_or_weighted_score()
         "planned_start_at",
         "planned_end_at",
         "estimated_minutes",
+        "deadline_at",
         "annex_of_mission_id",
         "created_at",
         "updated_at",

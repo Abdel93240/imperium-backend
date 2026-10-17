@@ -303,6 +303,7 @@ def test_complete_replays_same_idempotency_key_without_second_transition() -> No
             "failure_reason": None,
             "failure_reason_code": None,
             "estimated_minutes": None,
+            "deadline_at": None,
             "annex_of_mission_id": None,
             "user_reported_signals": None,
             "ai_usable_reason": None,
