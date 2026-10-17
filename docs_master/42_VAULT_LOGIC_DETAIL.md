@@ -225,6 +225,17 @@ Categorization is DETERMINISTIC first, AI second:
 The form therefore has a **Catégorie** field (menu, prefilled), and the book
 business/personal is deduced from it, not chosen separately.
 
+**CODÉ le 2026-10-17 (migration 20261017_0048).** Service
+`app/services/vault/categorization.py` : normalisation (casse, accents, ponctuation,
+références chiffrées), table en dur `LABEL_TABLE` (mot-clé → catégorie du référentiel
+`vault.category_map`), part utilisateur `user_category_memory` consultée EN PREMIER,
+3 confirmations identiques → confiance haute (§7.2), libellé inconnu → modèle local
+(sortie validée contre le référentiel ; sinon aucune catégorie, l'utilisateur choisit).
+Routes (module séparé du registre, qui reste sans IA) : `GET /api/imperium/vault/categories`,
+`POST /api/imperium/vault/categories/suggest { label, amount_cents?, transaction_type? }`
+→ `{ category, book, source: user_memory|table|ai|none, confidence }`,
+`POST /api/imperium/vault/categories/confirm { label, category }`.
+
 ### 7.1 Initial categorization (unknown label only)
 
 ```text

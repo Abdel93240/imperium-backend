@@ -20,7 +20,7 @@ export const OPERATIONS = {
   acceptReplan:       { route: "POST /api/imperium/day/replan/{id}/accept", etat: "existe" },
   cancelReplan:       { route: "POST /api/imperium/day/replan/{id}/cancel", etat: "existe" },
   getFinance:         { route: "GET /api/imperium/vault/summary + GET /api/imperium/vault/transactions + GET /api/vault/pressure", etat: "existe" },
-  suggestCategory:    { route: null, etat: "manquant", note: "Table libellé → catégorie (doc 42 §7.0) à exposer." },
+  suggestCategory:    { route: "POST /api/imperium/vault/categories/suggest (+ GET /categories, POST /categories/confirm)", etat: "existe", note: "Mémoire utilisateur, table en dur, puis modèle local (2026-10-17)." },
   runOcr:             { route: null, etat: "manquant", note: "ocr_service (doc 30)." },
   createTransaction:  { route: "POST /api/imperium/vault/transactions", etat: "existe", note: "Vérifier champ catégorie et livre dérivé." },
   getOperations:      { route: "GET /api/imperium/projects + GET /api/imperium/routines + GET /api/imperium/routines/today", etat: "existe", note: "Codé le 2026-10-17 (doc 71)." },

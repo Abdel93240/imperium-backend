@@ -214,3 +214,46 @@ class WeeklyFinanceSummaryRead(BaseModel):
     personal_expenses: Decimal
     computed_at: datetime
     detail: dict
+
+
+# ---------- Catégorie suggérée (doc 42 §7.0–§7.2) ----------
+
+class VaultCategoryRead(BaseModel):
+    category: str
+    book: Literal["business", "personal"]
+    kind: Literal["income", "expense"]
+
+
+class VaultCategoryListResponse(BaseModel):
+    categories: list[VaultCategoryRead]
+
+
+class VaultCategorySuggestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=200)
+    amount_cents: int | None = Field(default=None, gt=0)
+    transaction_type: Literal["income", "expense"] | None = None
+
+
+class VaultCategorySuggestionRead(BaseModel):
+    label_key: str
+    category: str | None
+    book: Literal["business", "personal"] | None
+    source: Literal["user_memory", "table", "ai", "none"]
+    confidence: Literal["high", "medium", "low"] | None
+    confirmations: int = 0
+
+
+class VaultCategoryConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=200)
+    category: str = Field(min_length=1, max_length=80)
+
+
+class VaultCategoryConfirmResponse(BaseModel):
+    label_key: str
+    category: str
+    book: Literal["business", "personal"]
+    confirmations: int

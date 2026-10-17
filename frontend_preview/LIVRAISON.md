@@ -61,7 +61,8 @@ Codé le 2026-10-17 : missions annexes, `estimated_minutes`, `failure_reason_cod
 Runner `imperium.rolling_replan` codé (proposition déterministe + corrections par le modèle
 local), semé désactivé : à activer selon le doc 76.
 Codé aussi : projets, missions de projet, routines et leurs coches, notes de mission.
-Manquant : catégorie suggérée,
+Codé aussi : catégorie suggérée d'une transaction (doc 42 §7.0).
+Manquant :
 OCR, réglages, modèles/seuils/clés, logs IA, Nourrir l'IA (import/enregistrement),
 santé mémoire/IA. Carte complète : panneau Démo → « Carte des
 opérations ».

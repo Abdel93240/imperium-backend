@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     desc,
     text,
 )
@@ -163,3 +164,25 @@ class PressureSnapshot(UUIDPrimaryKeyMixin, Base):
     factors: Mapped[dict] = mapped_column(JSONB, nullable=False)
     daily_targets: Mapped[dict] = mapped_column(JSONB, nullable=False)
     inputs_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+
+class UserCategoryMemory(UUIDPrimaryKeyMixin, Base):
+    """Part utilisateur de la table libellé → catégorie (doc 42 §7.0 point 5, §7.2)."""
+
+    __tablename__ = "user_category_memory"
+    __table_args__ = (
+        UniqueConstraint("user_id", "label_key", name="user_label_unique"),
+        CheckConstraint("length(btrim(label_key)) > 0", name="label_key_not_blank"),
+        CheckConstraint("confirmations >= 1", name="confirmations_positive"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    label_key: Mapped[str] = mapped_column(Text, nullable=False)
+    sample_label: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    confirmations: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
+    last_confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

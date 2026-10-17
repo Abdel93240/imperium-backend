@@ -16,6 +16,7 @@ from app.api.v1.routes import (
     imperium_path,
     imperium_pulse,
     imperium_vault,
+    imperium_vault_categories,
     internal,
     vault,
 )
@@ -36,5 +37,6 @@ api_router.include_router(imperium_pulse.router, prefix="/imperium/pulse", tags=
 api_router.include_router(imperium.router, prefix="/imperium", tags=["imperium"])
 api_router.include_router(imperium_operations.router, prefix="/imperium", tags=["imperium-operations"])
 api_router.include_router(imperium_vault.router, prefix="/imperium/vault", tags=["imperium-vault"])
+api_router.include_router(imperium_vault_categories.router, prefix="/imperium/vault", tags=["imperium-vault-categories"])
 api_router.include_router(vault.router, prefix="/vault", tags=["vault"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])
