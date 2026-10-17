@@ -61,7 +61,7 @@ Codé le 2026-10-17 : missions annexes, `estimated_minutes`, `failure_reason_cod
 Runner `imperium.rolling_replan` codé (proposition déterministe + corrections par le modèle
 local), semé désactivé : à activer selon le doc 76.
 Codé aussi : projets, missions de projet, routines et leurs coches, notes de mission.
-Codé aussi : catégorie suggérée d'une transaction (doc 42 §7.0), réglages (doc 43 §15), état des services (GET /api/health/services), Nourrir l'IA (doc 70).
+Codé aussi : catégorie suggérée d'une transaction (doc 42 §7.0), réglages (doc 43 §15), état des services (GET /api/health/services), Nourrir l'IA (doc 70), OCR des PDF et images pour Nourrir l'IA (né désactivé, ops/gpu/OCR_SMOKE_CHECKLIST.md).
 Codé aussi : logs de l'IA, modèles par rôle, seuils /200, clés API (écriture seule).
 Manquant :
 OCR,

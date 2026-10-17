@@ -26,6 +26,7 @@ from app.models.imperium import ImperiumProject  # noqa: E402
 from app.schemas.knowledge_inbox import ExtractionUpdate, InboxItemCreate, InboxValidateRequest  # noqa: E402
 from app.services.ai import knowledge_inbox as inbox  # noqa: E402
 from app.services.ai import knowledge_inbox_runner as runner  # noqa: E402
+from app.services.ai import ocr  # noqa: E402
 from app.services.ai.knowledge_files import KnowledgeFileError  # noqa: E402
 
 
@@ -69,9 +70,9 @@ def _upload(db, user, item, name, data: bytes):
                             stream=io.BytesIO(data))
 
 
-def _run(db, *, model=None, embed=None):
+def _run(db, *, model=None, embed=None, recognize=None):
     ctx = SimpleNamespace(db=db, items_in=None, items_out=None, detail={})
-    runner.process_inbox(ctx, call_model=model, embed_texts=embed)
+    runner.process_inbox(ctx, call_model=model, embed_texts=embed, recognize_file=recognize)
     db.commit()
     return ctx
 
@@ -257,3 +258,76 @@ def test_http_upload_raw_body_and_preview(db, engine) -> None:
     assert uploaded.json()["original_filename"] == "preferences.md"
     assert refused.status_code == 422 and "Fichier refusé" in refused.json()["detail"]
     assert preview.status_code == 200 and preview.content == b"# Le matin pour l'administratif"
+
+
+def test_images_and_pdfs_are_read_by_the_ocr_service(db) -> None:
+    user = _user(db)
+    item = _item(db, user, context=None)
+    _upload(db, user, item, "ticket.png", b"\x89PNG")
+    _upload(db, user, item, "audio.m4a", b"....")
+    calls = []
+
+    def recognize(data, filename, content_type):
+        calls.append((data, filename))
+        return ocr.OcrResult(text="TOTAL 52.40 EUR", confidence=0.91)
+
+    inbox.request_analysis(db, current_user=user, item_id=item.id)
+    _run(db, recognize=recognize)
+    analyzed = inbox.get_item(db, current_user=user, item_id=item.id)
+    assert analyzed.status == "to_validate" and "TOTAL 52.40 EUR" in analyzed.extraction_draft["summary"]
+    assert calls == [(b"\x89PNG", "ticket.png")]
+    assert analyzed.extraction_draft["sources_read"] == ["ticket.png"]
+    assert analyzed.extraction_draft["sources_unread"] == ["audio.m4a"]  # transcription pas encore branchée
+    assert analyzed.extraction_draft["sources_ocr"] == [{"name": "ticket.png", "confidence": 0.91}]
+
+
+def test_ocr_outage_defers_the_item_instead_of_half_reading_it(db) -> None:
+    user = _user(db)
+    first, second = _item(db, user), _item(db, user)
+    _upload(db, user, first, "a.pdf", b"%PDF")
+    _upload(db, user, second, "b.jpg", b"JPG")
+    calls = []
+
+    def down(data, filename, content_type):
+        calls.append(filename)
+        raise ocr.OcrServiceUnreachable("tower down")
+
+    for item in (first, second):
+        inbox.request_analysis(db, current_user=user, item_id=item.id)
+    ctx = _run(db, recognize=down)
+    for item in (first, second):
+        assert inbox.get_item(db, current_user=user, item_id=item.id).status == "to_analyze"
+    assert len(calls) == 1  # une seule tentative par réveil
+    assert ctx.detail["deferred_ocr"] >= 2
+
+    _run(db, recognize=lambda data, filename, content_type: ocr.OcrResult(text=f"lu : {filename}"))
+    assert inbox.get_item(db, current_user=user, item_id=first.id).status == "to_validate"
+
+
+def test_ocr_bad_reply_marks_the_source_unread(db) -> None:
+    user = _user(db)
+    item = _item(db, user)
+    _upload(db, user, item, "flou.png", b"PNG")
+
+    def bad(data, filename, content_type):
+        raise ocr.OcrError("illisible")
+
+    inbox.request_analysis(db, current_user=user, item_id=item.id)
+    _run(db, recognize=bad)
+    draft = inbox.get_item(db, current_user=user, item_id=item.id).extraction_draft
+    assert draft["sources_unread"] == ["flou.png"] and draft["sources_ocr"] == []
+
+
+def test_office_documents_are_read_locally_without_ocr(db) -> None:
+    user = _user(db)
+    item = _item(db, user, context=None)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                         "<w:body><w:p><w:r><w:t>Le matin pour l'administratif</w:t></w:r></w:p></w:body></w:document>")
+    _upload(db, user, item, "preferences.docx", buffer.getvalue())
+    inbox.request_analysis(db, current_user=user, item_id=item.id)
+    _run(db, recognize=None)
+    analyzed = inbox.get_item(db, current_user=user, item_id=item.id)
+    assert analyzed.status == "to_validate" and "administratif" in analyzed.extraction_draft["summary"]
+    assert analyzed.extraction_draft["sources_read"] == ["preferences.docx"]
