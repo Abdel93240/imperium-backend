@@ -830,8 +830,7 @@ Notes migration/ORM :
 
 Sous-domaines Health/Pulse futurs non codes :
 - Repas : CODE, table `pulse_meals` (voir plus bas, migration 20261017_0056).
-- Hydratation : FUTUR / NON CODE. Schema a definir au moment du chantier
-  hydratation.
+- Hydratation : CODE, table `pulse_hydration_logs` (voir plus bas, migration 20261017_0058).
 - Food stock / stock alimentaire : FUTUR / NON CODE. Schema a definir au moment
   du chantier stock.
 - Workouts : FUTUR / NON CODE. Schema a definir au moment du chantier workouts.
@@ -1456,6 +1455,10 @@ Repas Pulse (CODE, migration 20261017_0056, doc 40 §10) :
   touchees), Idempotency-Key unique du brouillon + empreinte, cle et empreinte de la
   validation. Migration 20261017_0057 : confidence, macros_estimated, photo_sha256 (la
   photo du repas n'est jamais conservee).
+
+Hydratation Pulse (CODE, migration 20261017_0058, doc 40 §12) :
+- `pulse_hydration_logs` : amount_ml (1..5000), logged_at, source quick|manual|chatbot,
+  stock_decrement_applied, resultat (reponse rejouee), Idempotency-Key unique + empreinte.
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la

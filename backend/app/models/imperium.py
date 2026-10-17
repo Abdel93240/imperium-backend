@@ -1311,3 +1311,25 @@ class PulseMeal(UUIDPrimaryKeyMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class PulseHydrationLog(UUIDPrimaryKeyMixin, Base):
+    """Eau bue (PUL-04) : une ligne par appui ou saisie ; l'eau est décomptée du stock en même temps."""
+
+    __tablename__ = "pulse_hydration_logs"
+    __table_args__ = (
+        CheckConstraint("amount_ml > 0 AND amount_ml <= 5000", name="amount_range"),
+        CheckConstraint("source IN ('quick', 'manual', 'chatbot')", name="source_check"),
+        Index("pulse_hydration_logs_user_logged_idx", "user_id", "logged_at"),
+        Index("pulse_hydration_logs_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    amount_ml: Mapped[int] = mapped_column(Integer, nullable=False)
+    logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    stock_decrement_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    result: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
