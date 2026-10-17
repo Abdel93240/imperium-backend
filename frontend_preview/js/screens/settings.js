@@ -15,7 +15,6 @@ export const settings = {
     const save = async (patch) => { try { await svc.saveSettings(patch); } catch { toast("Échec de l'enregistrement. Réessaie."); } };
     const navRow = (title, sub, onClick, ic) => h("button", { class: "listrow", style: "min-height:58px", onclick: onClick }, ic ? icon(ic, "gold", 22) : null, h("span", { class: "col" }, h("span", { class: "serif", style: "font-size:19px" }, title), sub ? h("span", { class: "small muted" }, sub) : null), icon("chevron_right", "gold", 18));
     const head = (ic, title, sub) => h("div", { class: "row", style: "margin-bottom:8px" }, icon(ic, "gold", 28), h("div", null, h("h2", { class: "h2" }, title), sub ? h("div", { class: "small muted" }, sub) : null));
-    const time = h("input", { class: "input mono", type: "time", value: s.morningTime, style: "width:130px", onchange: (e) => save({ morningTime: e.target.value }) });
     const modeDesc = h("div", { class: "small muted", style: "margin-top:8px" }, AI_MODES[s.aiMode]);
     return h("div", { class: "page-body" },
       isDemo ? h("div", { class: "demo-tag" }, "Exemple de configuration (démonstration)") : null,
@@ -27,7 +26,7 @@ export const settings = {
           btn("Gérer les notifications", { kind: "primary", block: true, icon: "chevron_right", iconRight: true, onClick: openNotifications }))),
       h("div", { class: "set-sec set-two" },
         h("section", null, head("sunrise", "Routine du matin"), h("div", { class: "set-row" }, h("span", { class: "grow" }, "Popup du matin"), toggle(s.morningPopup, (v) => save({ morningPopup: v }), "Popup du matin")),
-          h("div", { class: "set-row" }, h("span", { class: "grow" }, "Heure"), time)),
+          h("div", { class: "small muted" }, "Il s'ouvre quand tu démarres ta journée.")),
         h("div", { class: "vsep" }),
         h("section", null, head("replan", "Replanification"),
           h("div", { class: "small muted" }, "Après une mission échouée"),

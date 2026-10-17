@@ -633,7 +633,7 @@ Ordre telephone :
 |---|---|---|
 | User | `ImperiumCard`, `ImperiumListItem` | display name mock, timezone, language. |
 | Theme | `ImperiumSegmentedControl`, `ImperiumToggle` | mode system/light/dark mock, accent note. |
-| Routine du matin | `ImperiumToggle`, sélecteur d'heure | popup du matin activé/désactivé (`morning_popup_enabled`, défaut oui) + heure (`morning_popup_time`, ex. 06:30) — doc 43 §15. |
+| Routine du matin | `ImperiumToggle` | popup du matin activé/désactivé (`morning_popup_enabled`, défaut oui), affiché au clic « Démarrer la journée ». Pas de sélecteur d'heure (décision 2026-10-17) — doc 43 §4, §15. |
 | Replanification | `ImperiumSegmentedControl`, champ minutes | `replan_on_mission_failure` : replanifier ou demander, réglé par niveau d'urgence (défaut : replanifier si mission urgente, demander sinon) ; délai anti-rafale `debounce_minutes` (défaut 5), appliqué aussi au bouton manuel « Replanifier la journée » (grisé + « Disponible dans N min ») — doc 43 §3.3, §15. |
 | Chatbot | `ImperiumListItem` (choix) | durée de conservation de l'historique du chat (défaut 90 jours) — doc 43 §15. |
 | Notifications | `ImperiumToggle` rows | morning check-in, weekly review, mission reminders ; red level toggle (disableable). Channel = Android push only, no channel selector (doc 76 Q24). |

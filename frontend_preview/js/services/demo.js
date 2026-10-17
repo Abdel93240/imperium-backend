@@ -107,7 +107,7 @@ export function createDemoProvider() {
   ];
   db.aiReview = { date: now() - 3 * DAY, title: "Des progrès qui s'accumulent", text: ["Sur les trois derniers mois, ta régularité progresse et ton solde total augmente. Quatre projets ont été menés à terme. Ces avancées sont concrètes, même si elles restent peu visibles au quotidien.", "Certaines journées restent très chargées. L'enjeu est de consolider ce rythme en gardant une charge soutenable."] };
 
-  db.settings = { bubble: true, notif: true, morningPopup: true, morningTime: "06:30", replanUrgent: "replanifier", replanOther: "demander", debounce: 5, aiMode: "equilibre", chatRetention: 90,
+  db.settings = { bubble: true, notif: true, morningPopup: true, replanUrgent: "replanifier", replanOther: "demander", debounce: 5, aiMode: "equilibre", chatRetention: 90,
     notifs: { checkin: true, wr: true, reminders: true, red: true } };
   db.priorities = ["Religieux", "Business", "Finances", "Santé"];
   db.permissions = [

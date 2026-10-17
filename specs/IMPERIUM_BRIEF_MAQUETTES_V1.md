@@ -34,8 +34,8 @@ Ordre proposé des sections :
    flottante » + bouton « Gérer la bulle › » (→ B6). Supprimer l'interrupteur « Widget » et
    le bouton « Gérer le widget » : il n'y a plus de widgets d'accueil (doc 63 §10).
 2. **Notifications** : interrupteur général + « Gérer les notifications › » (→ B7).
-3. **Routine du matin** : interrupteur « Popup du matin » + heure (ex. `06:30`, sélecteur
-   d'heure) (doc 43 §15).
+3. **Routine du matin** : interrupteur « Popup du matin » seul, sans heure : le popup
+   s'ouvre au clic « Démarrer la journée » (doc 43 §4, décision 2026-10-17).
 4. **Replanification** : « Après une mission échouée » → réglage par niveau d'urgence
    (défaut : replanifier si la mission est urgente, demander sinon) ; « Délai minimum
    entre deux replanifications » : `5 min` (doc 43 §15), automatiques et manuelles.

@@ -792,7 +792,7 @@ Other tabs:
     - completed projects list with dates
     - AI note on the bilan (strong point / weak point / reading)
   - Decisions log (chatbot decisions)
-  - Settings (priorities, morning popup time, etc.)
+  - Settings (priorities, morning popup on/off, etc.)
   - Weekly Reviews (validated WRs)
   - Mon OS personnel (doc 54, system health dashboard)
 ```
@@ -813,8 +813,9 @@ in §6 and §15.
 Imperium settings includes:
 
 CORE:
-  - morning_popup_time (e.g. 06:30)
-  - morning_popup_enabled (default true)
+  - morning_popup_enabled (default true) — le popup s'ouvre au clic « Démarrer la
+    journée » (§4). Pas d'heure : `morning_popup_time` est supprimé (décision
+    utilisateur 2026-10-17), une journée Imperium ne suit pas l'horloge (doc 12).
   - bubble_enabled (show/manage the Imperium floating bubble: current mission +
     complete / fail / full-day replan request; doc 63 §10, decision 2026-10-15)
   - notifications_enabled (missions, routines, alerts + manage)

@@ -922,7 +922,7 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Screen name:** Imperium Settings (core).
 - **Type / slug :** `route`, `imperium/settings`, stable ID `IMP.SETTINGS.CORE`.
 - **Composants :** Top Bar, sections Morning popup, Replan policy, Chat retention, Discipline weights, links to Priority Rules, toggles, number steppers, safe reset confirmation dialogs.
-- **Données affichées :** morning_popup_time/enabled, debounce_minutes, replan_on_mission_failure, chat retention days, composite_weights.
+- **Données affichées :** morning_popup_enabled (sans heure, 2026-10-17), debounce_minutes, replan_on_mission_failure, chat retention days, composite_weights.
 - **Widgets :** settings completion badge, sync status chip.
 - **Assets :** Material Symbols only.
 - **Etats :** Loading=settings skeleton ; Empty=defaults not initialized CTA ; Error=validation/fetch failure ; Offline=cached settings read-only banner ; Syncing=save line ; Synced=saved snackbar ; Conflict=server settings changed diff dialog.
