@@ -25,6 +25,7 @@ from app.api.v1.routes import (  # noqa: E402
     imperium_pulse_hydration,
     imperium_pulse_meals,
     imperium_pulse_stock,
+    imperium_pulse_workouts,
 )
 from app.models.auth import User  # noqa: E402
 
@@ -57,7 +58,8 @@ def _user(db) -> User:
 
 def _client(db, user) -> TestClient:
     app = FastAPI()
-    for module in (imperium_pulse, imperium_pulse_dashboard, imperium_pulse_hydration, imperium_pulse_meals, imperium_pulse_stock):
+    for module in (imperium_pulse, imperium_pulse_dashboard, imperium_pulse_hydration, imperium_pulse_meals, imperium_pulse_stock,
+                   imperium_pulse_workouts):
         app.include_router(module.router, prefix="/api/imperium/pulse")
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db] = lambda: db
@@ -74,7 +76,7 @@ def test_empty_day_shows_zeros_and_hides_the_health_score(db) -> None:
     assert body["meals"] == {"count": 0, "totals": {"calories": "0.0", "protein_g": "0.0", "carbs_g": "0.0", "fat_g": "0.0"},
                              "without_macros": 0, "drafts_pending": 0}
     assert body["hydration"] == {"total_ml": 0, "target": None, "target_message": "Objectif personnalisé pas encore calculé."}
-    assert body["stock"]["level"] == "none" and body["health_score"] is None
+    assert body["stock"]["level"] == "none" and body["health_score"] is None and body["workouts"] == []
     assert body["banners"] == [{"kind": "health_score_incomplete", "level": "info",
                                 "message": "Score santé masqué : pas encore assez de données pour l'expliquer."}]
 
@@ -91,7 +93,9 @@ def test_day_combines_entry_meals_water_and_stock(db) -> None:
     client.post(f"{P}/hydration-logs", headers=_key(), json={"amount_ml": 500, "logged_at": "2026-10-17T09:00:00+00:00"})
     client.post(f"{P}/food-stock", headers=_key(), json={"name": "Yaourt", "quantity": 4, "expiry_type": "DLC",
                                                         "expiry_date": "2026-10-18"})
+    client.post(f"{P}/workouts", headers=_key(), json={"title": "Pompes", "planned_at": "2026-10-17T17:00:00+00:00"})
     body = client.get(f"{P}/dashboard", params={"day": "2026-10-17"}).json()
+    assert [w["title"] for w in body["workouts"]] == ["Pompes"]
     assert (body["entry"]["sleep_hours"], body["entry"]["energy_level"]) == (7.5, 7)
     assert (body["meals"]["count"], body["meals"]["totals"]["calories"], body["meals"]["without_macros"],
             body["meals"]["drafts_pending"]) == (2, "700.0", 1, 1)

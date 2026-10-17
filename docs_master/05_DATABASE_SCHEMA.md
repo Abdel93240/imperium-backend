@@ -833,7 +833,7 @@ Sous-domaines Health/Pulse futurs non codes :
 - Hydratation : CODE, table `pulse_hydration_logs` (voir plus bas, migration 20261017_0058).
 - Food stock / stock alimentaire : FUTUR / NON CODE. Schema a definir au moment
   du chantier stock.
-- Workouts : FUTUR / NON CODE. Schema a definir au moment du chantier workouts.
+- Workouts : CODE, table `pulse_workouts` (voir plus bas, migration 20261017_0059).
 - Pain logs : FUTUR / NON CODE. Schema a definir au moment du chantier pain,
   avec garde-fous sante sensible.
 - Body snapshots et profils biologiques : FUTUR / NON CODE. Schema a definir au
@@ -1459,6 +1459,13 @@ Repas Pulse (CODE, migration 20261017_0056, doc 40 §10) :
 Hydratation Pulse (CODE, migration 20261017_0058, doc 40 §12) :
 - `pulse_hydration_logs` : amount_ml (1..5000), logged_at, source quick|manual|chatbot,
   stock_decrement_applied, resultat (reponse rejouee), Idempotency-Key unique + empreinte.
+
+Seances de sport Pulse (CODE, migration 20261017_0059, doc 40 §13) :
+- `pulse_workouts` : titre, statut planned|in_progress|completed|skipped, planned_at,
+  duree prevue et reelle (1..600), intensite low|medium|high, intensity_score 1..10,
+  exercices et materiel (jsonb), mission liee (FK imperium_missions, SET NULL),
+  started_at, completed_at, etat au depart, notes, raison du saut, version (>= 1),
+  Idempotency-Key unique + empreinte, cle et empreinte de la cloture.
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la

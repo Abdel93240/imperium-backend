@@ -1,8 +1,8 @@
 """Tableau de bord Pulse du jour (PUL-01, doc 40 §9).
 
 Assemble ce qui existe pour un jour de Paris : saisie du jour (sommeil, énergie,
-fatigue, poids, séance), repas validés et leurs totaux, eau bue, dates limites du
-stock, et des bannières courtes. Lecture seule.
+fatigue, poids, séance), repas validés et leurs totaux, eau bue, séances du jour,
+dates limites du stock, et des bannières courtes. Lecture seule.
 
 Le score santé n'est jamais affiché sans explication : tant qu'il n'est pas calculé,
 il reste vide et une bannière « données incomplètes » le dit. Jeûne (Path), règles
@@ -23,7 +23,7 @@ from app.schemas.pulse_dashboard import (
     DashboardMealsRead,
     PulseDashboardRead,
 )
-from app.services.pulse import entries, expiry, hydration, meals
+from app.services.pulse import entries, expiry, hydration, meals, workouts
 
 HEALTH_SCORE_INCOMPLETE = "Score santé masqué : pas encore assez de données pour l'expliquer."
 
@@ -64,6 +64,7 @@ def build_dashboard(db: Session, *, current_user: User, day: date) -> PulseDashb
         meals=DashboardMealsRead(count=len(meal_day.meals), totals=meal_day.totals,
                                  without_macros=meal_day.meals_without_macros, drafts_pending=drafts),
         hydration=DashboardHydrationRead(total_ml=water.total_ml, target=water.target, target_message=water.target_message),
+        workouts=workouts.list_workouts(db, current_user=current_user, from_day=day, to_day=day).items,
         stock=stock,
         banners=banners,
     )

@@ -204,7 +204,7 @@ the score card is hidden and an incomplete-data banner is shown.
 > par défaut), lecture seule, sans nouvelle table : saisie du jour (`entry` : sommeil,
 > énergie, fatigue, poids, séance), repas validés (nombre, totaux, sans macros, brouillons
 > en attente), eau bue (cible vide tant que le programme santé n'existe pas), dates limites
-> du stock, bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
+> du stock, séances du jour (`workouts`), bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
 > `health_score_incomplete`. `health_score` reste vide (pas encore calculé) et la bannière
 > le dit. Jeûne (Path), règles médicales actives et douleurs : pas encore.
 
@@ -576,6 +576,26 @@ Headers: Idempotency-Key
 The `workouts` table tracks: title, status (`planned|in_progress|completed|
 skipped`), planned_at/started_at/completed_at, duration_minutes, intensity_score
 (1-10), exercises_json, body_state_at_start, notes_post_workout.
+
+> CODÉ (2026-10-17, migration 20261017_0059, table `pulse_workouts`), sous
+> `/api/imperium/pulse/workouts` :
+> - `POST` (Idempotency-Key) : séance planifiée à la main — titre, `planned_at`, durée
+>   1..600 min, intensité low|medium|high, 0 à 50 exercices `{name, sets, reps,
+>   duration_seconds, weight_kg, notes}`, matériel (chips, doublons retirés), mission liée
+>   facultative (doit appartenir à l'utilisateur, sinon 404).
+> - `GET ?from_day=&to_day=` (jours de Paris, 62 jours au plus ; défaut : aujourd'hui + 6
+>   jours) et `GET /{id}`.
+> - `PATCH /{id}` (Idempotency-Key + `version` lue) : séance planifiée seulement ; version
+>   dépassée → 409 `WORKOUT_VERSION_CONFLICT` avec la séance actuelle.
+> - `POST /{id}/start` `{body_state?}` : planned → in_progress (rejouer renvoie la séance).
+>   Pause/reprise et minuteur de repos restent côté écran.
+> - `POST /{id}/complete` (Idempotency-Key) : depuis planned ou in_progress ; `intensity_score`
+>   1..10, durée réelle, notes, résultats par exercice `{index, done_sets, done_reps,
+>   skipped, skip_reason}` (raison obligatoire si sauté). Événement `pulse.workout.completed`.
+> - `POST /{id}/skip` (Idempotency-Key) `{reason}` → skipped, `pulse.workout.skipped`.
+> - Une séance terminée ou sautée ne change plus (409). Même clé → même réponse.
+> - Programme du spécialiste santé (modes 1 et 3), adaptation PUL-07, fenêtre de
+>   récupération, matériel possédé (§13-EQUIP) et parc (§13-PARK) : pas encore.
 
 ### 13.3 Workout Adaptation (PUL-07)
 
@@ -957,9 +977,9 @@ must be implemented in backend patches before UI relies on them.
 | Meals | `POST /api/imperium/pulse/meals/{meal_id}/confirm` (CODÉ 2026-10-17) |
 | Meals | `GET /api/imperium/pulse/meals?day=` et `GET …/meals/{meal_id}` (CODÉS 2026-10-17) |
 | Hydration | `POST` et `GET /api/imperium/pulse/hydration-logs` (CODÉS 2026-10-17) |
-| Workouts | `TBD GET /api/pulse/workouts` |
-| Workouts | `TBD POST /api/pulse/workouts` |
-| Workouts | `TBD POST /api/pulse/workouts/{workout_id}/complete` |
+| Workouts | `GET /api/imperium/pulse/workouts` (CODÉ 2026-10-17) |
+| Workouts | `POST /api/imperium/pulse/workouts`, `PATCH …/{workout_id}`, `POST …/{workout_id}/start` (CODÉS 2026-10-17) |
+| Workouts | `POST /api/imperium/pulse/workouts/{workout_id}/complete` et `…/skip` (CODÉS 2026-10-17) |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/accept` |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/reject` |
 | Body | `TBD POST /api/pulse/body-snapshots` |
