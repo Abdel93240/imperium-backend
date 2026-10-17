@@ -416,6 +416,10 @@ Vector exploite
 
 ### 9.1 Décision officielle
 
+> Implémentation V1 (2026-10-17) : le backend appelle directement le service OCR local,
+> sans n8n (doc 37 §3.4). Le schéma ci-dessous reste la cible si un enrichissement par
+> n8n devient utile.
+
 n8n est utile pour l'OCR et la classification initiale.
 
 n8n ne reçoit jamais l'upload comme premier propriétaire canonique. Le backend possède l'enregistrement du fichier, la création de la tâche IA, le stockage du résultat et la création finale de la transaction.

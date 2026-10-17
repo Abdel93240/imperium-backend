@@ -1432,6 +1432,12 @@ Nourrir l'IA (CODE, migration 20261017_0050, doc 70 §10.1) :
   relatif a KNOWLEDGE_INBOX_STORAGE_DIR). Memoires : ai_memories.memory_type
   `user_knowledge`, source_table `knowledge_inbox_items`.
 
+Justificatifs du Vault (CODE, migration 20261017_0051, doc 37 §3.4) :
+- `vault_receipt_extractions` : statut ready|failed|validated|cancelled, texte OCR
+  brut, confiance, brouillon (jsonb), pointeur d'image relatif a
+  VAULT_RECEIPTS_STORAGE_DIR, transaction_id (obligatoire une fois validated),
+  Idempotency-Key unique par utilisateur.
+
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
   premiere lecture ; colonnes typees et contraintes (ai_mode, replan_on_failure_*,

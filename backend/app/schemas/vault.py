@@ -257,3 +257,58 @@ class VaultCategoryConfirmResponse(BaseModel):
     category: str
     book: Literal["business", "personal"]
     confirmations: int
+
+
+class VaultReceiptDraftRead(BaseModel):
+    merchant: str | None = None
+    purchase_date: date | None = None
+    purchase_time: str | None = None
+    total_cents: int | None = None
+    payment_method: str = "unknown"
+    wallet: str | None = None
+    category: str | None = None
+    book: str | None = None
+    category_source: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+class VaultReceiptExtractionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    entry_app: str
+    status: str
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    ocr_confidence: float | None
+    draft: VaultReceiptDraftRead | None
+    error_message: str | None
+    transaction_id: UUID | None
+    created_at: datetime
+    validated_at: datetime | None
+
+
+class VaultReceiptValidateRequest(BaseModel):
+    """Ce que l'utilisateur a vérifié ou corrigé sur l'écran VAU-05."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount_cents: int = Field(gt=0)
+    occurred_at: datetime
+    timezone: str | None = Field(default=None, min_length=1, max_length=80)
+    category: str | None = Field(default=None, max_length=80)
+    wallet: str = Field(default="cash", min_length=1, max_length=80)
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def require_timezone_aware_occurred_at(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("occurred_at must include timezone information.")
+        return value
+
+
+class VaultReceiptValidateResponse(BaseModel):
+    extraction: VaultReceiptExtractionRead
+    transaction: ImperiumVaultTransactionRead

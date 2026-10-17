@@ -85,6 +85,8 @@ class Settings(BaseSettings):
 
     # Nourrir l'IA (doc 70) : sources toujours conservées, pointeur abstrait relatif à ce dossier.
     knowledge_inbox_storage_dir: str = "data/knowledge_inbox"
+    # Justificatifs du Vault (doc 37 §3) : images des tickets validés, hors dépôt en production.
+    vault_receipts_storage_dir: str = "data/vault_receipts"
     # Clés des fournisseurs IA (doc 73) : un fichier 0600 par fournisseur, hors dépôt.
     provider_keys_dir: str = "data/provider_keys"
 
