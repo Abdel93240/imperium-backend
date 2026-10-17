@@ -1,5 +1,5 @@
 """Stock alimentaire de Pulse (doc 40 §11) : lecture, ajout et modification manuels (PUL-12),
-alertes de date limite, scan du placard (PUL-13)."""
+alertes de date limite, scan du placard (PUL-13), ajout par le chatbot."""
 
 import io
 from typing import Annotated
@@ -20,8 +20,12 @@ from app.schemas.pulse import (
     FoodStockListResponse,
     PantryScanRead,
     PantryScanValidateRequest,
+    StockDeclarationCreate,
+    StockDeclarationPreviewRead,
+    StockDeclarationPreviewRequest,
+    StockDeclarationRead,
 )
-from app.services.pulse import expiry, food_stock, pantry_scan
+from app.services.pulse import expiry, food_stock, pantry_scan, stock_declaration
 
 router = APIRouter()
 
@@ -99,6 +103,37 @@ def update_food_stock_route(
     except food_stock.FoodStockIdempotencyConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/food-stock/declarations/preview", response_model=StockDeclarationPreviewRead)
+def preview_stock_declaration_route(
+    payload: StockDeclarationPreviewRequest, current_user: CurrentUserDep, db: SessionDep
+) -> StockDeclarationPreviewRead:
+    """Phrase du chatbot → proposition de lignes ; rien n'est écrit."""
+    return stock_declaration.preview(db, current_user=current_user, text=payload.text, today=expiry.paris_today())
+
+
+@router.post("/food-stock/declarations", response_model=StockDeclarationRead, status_code=status.HTTP_201_CREATED)
+def create_stock_declaration_route(
+    payload: StockDeclarationCreate,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> StockDeclarationRead:
+    """Lignes validées dans le chatbot → stock (source chatbot), une ligne par achat."""
+    try:
+        read, duplicate = stock_declaration.create_declaration(
+            db, current_user=current_user, payload=payload, idempotency_key=_require_key(idempotency_key),
+            request_path=request.url.path,
+        )
+    except food_stock.FoodStockIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
 
 
 @router.post("/food-stock/scans", response_model=PantryScanRead, status_code=status.HTTP_201_CREATED)

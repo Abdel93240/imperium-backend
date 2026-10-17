@@ -373,7 +373,15 @@ Cross-module links:
 > quantité reste > 0 : ligne finie → status `consumed`, erreur de saisie → `removed`
 > (jamais supprimée physiquement). Migration 20261017_0053 pour `version`.
 > Scan du placard : CODÉ (2026-10-17, doc 37 §5.4, routes `/food-stock/scans`, source
-> pantry_scan). Chatbot, décompte après repas : pas encore.
+> pantry_scan). Chatbot : CODÉ (2026-10-17) — `POST /food-stock/declarations/preview`
+> `{text}` lit la phrase sans IA et sans écrire (« 2kg de riz, 6 œufs et un litre de
+> lait » ; unités kg, g, l, cl, ml, contenants → pièce ; nombres en lettres, douzaine,
+> demi ; « dlc 20/10 », « ddm 03/02/2027 », « périme le 5/1 » ; quantité absente → 1,
+> signalée `quantity_assumed`) et signale le produit déjà en stock (`in_stock`, info
+> seulement). La validation (doc 72 §5) : `POST /food-stock/declarations` (Idempotency-Key,
+> 1 à 50 lignes corrigées) → lignes nouvelles source chatbot, `source_ref`
+> chat:{declaration_id}:{n}. Un achat n'est jamais fusionné avec une ligne existante.
+> Décompte après repas : pas encore (attend PUL-03).
 
 ### 11.2 Stock item fields (V1)
 

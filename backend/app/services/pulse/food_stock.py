@@ -3,8 +3,8 @@
 V1 : lecture du stock, ajout et modification manuels (PUL-12), et entrée des
 articles alimentaires d'un ticket validé (passage Vault → Pulse, doc 42 §15.2).
 Chaque achat est une ligne à part : deux paquets de riz achetés à des dates
-différentes n'ont pas la même date limite. Scan du placard, chatbot, décompte après
-repas : pas encore.
+différentes n'ont pas la même date limite. Scan du placard : pantry_scan ; chatbot :
+stock_declaration ; décompte après repas : pas encore.
 
 Mutations (doc 40 §7–§8) : Idempotency-Key obligatoire (même clé + même contenu →
 même réponse ; contenu différent → conflit) ; une modification porte la version lue,
@@ -17,6 +17,7 @@ import json
 from decimal import Decimal
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -116,10 +117,10 @@ def add_from_receipt(
 def create_item(
     db: Session, *, current_user: User, payload: FoodStockItemCreate, idempotency_key: str, request_path: str
 ) -> tuple[FoodStockItemRead, bool]:
-    request_hash = _hash("pulse.food_stock.create", payload.model_dump(mode="json"))
-    replay = _replay(db, current_user, idempotency_key, request_hash, request_path)
-    if replay is not None:
-        return replay, True
+    fingerprint = request_hash("pulse.food_stock.create", payload.model_dump(mode="json"))
+    previous = replay(db, current_user, idempotency_key, fingerprint, request_path)
+    if previous is not None:
+        return previous, True
     item = FoodStockItem(
         user_id=current_user.id,
         name=payload.name,
@@ -137,7 +138,7 @@ def create_item(
     db.refresh(item)  # quantité relue telle que stockée (2.000), comme dans la liste
     read = FoodStockItemRead.model_validate(item)
     _emit_manual(db, current_user, item, "created")
-    _remember(db, current_user, idempotency_key, "POST", request_path, request_hash, 201, read)
+    remember(db, current_user, idempotency_key, "POST", request_path, fingerprint, 201, read)
     db.commit()
     return read, False
 
@@ -151,10 +152,10 @@ def update_item(
     idempotency_key: str,
     request_path: str,
 ) -> FoodStockItemRead:
-    request_hash = _hash("pulse.food_stock.update", {"item_id": str(item_id), **payload.model_dump(mode="json", exclude_unset=True)})
-    replay = _replay(db, current_user, idempotency_key, request_hash, request_path)
-    if replay is not None:
-        return replay
+    fingerprint = request_hash("pulse.food_stock.update", {"item_id": str(item_id), **payload.model_dump(mode="json", exclude_unset=True)})
+    previous = replay(db, current_user, idempotency_key, fingerprint, request_path)
+    if previous is not None:
+        return previous
     item = db.get(FoodStockItem, item_id, with_for_update=True)
     if item is None or item.user_id != current_user.id:
         raise FoodStockNotFoundError("Stock item not found.")
@@ -171,7 +172,7 @@ def update_item(
     read = FoodStockItemRead.model_validate(item)
     action = changes.get("status") if changes.get("status") in ("consumed", "removed") else "updated"
     _emit_manual(db, current_user, item, action, fields=sorted(changes))
-    _remember(db, current_user, idempotency_key, "PATCH", request_path, request_hash, 200, read)
+    remember(db, current_user, idempotency_key, "PATCH", request_path, fingerprint, 200, read)
     db.commit()
     return read
 
@@ -191,13 +192,14 @@ def _emit_manual(db: Session, current_user: User, item: FoodStockItem, action: s
     )
 
 
-def _hash(namespace: str, payload: dict) -> str:
+def request_hash(namespace: str, payload: dict) -> str:
     return hashlib.sha256(json.dumps({"ns": namespace, "payload": payload}, sort_keys=True).encode()).hexdigest()
 
 
-def _replay(
-    db: Session, current_user: User, idempotency_key: str, request_hash: str, request_path: str
-) -> FoodStockItemRead | None:
+def replay(
+    db: Session, current_user: User, idempotency_key: str, request_hash: str, request_path: str,
+    model: type[BaseModel] = FoodStockItemRead,
+):
     existing = db.scalar(
         select(IdempotencyKey).where(IdempotencyKey.user_id == current_user.id, IdempotencyKey.idempotency_key == idempotency_key)
     )
@@ -207,12 +209,12 @@ def _replay(
         raise FoodStockIdempotencyConflictError("Idempotency key already used with a different request.")
     if existing.response_body is None:
         raise FoodStockIdempotencyConflictError("Idempotency key is already processing.")
-    return FoodStockItemRead.model_validate(existing.response_body)
+    return model.model_validate(existing.response_body)
 
 
-def _remember(
+def remember(
     db: Session, current_user: User, idempotency_key: str, method: str, path: str, request_hash: str, code: int,
-    read: FoodStockItemRead,
+    read: BaseModel,
 ) -> None:
     db.add(
         IdempotencyKey(
