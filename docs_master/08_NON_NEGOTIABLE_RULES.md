@@ -433,6 +433,14 @@ Enforcement layers:
   affected_docs_or_modules: [05_DATABASE_SCHEMA.md, 09_PGVECTOR_MEMORY_POLICY.md]
   example_violation: Workout plan ignores repeated fatigue-related mission failures.
   expected_behavior: Backend/AI may lower intensity or recommend recovery when supported by current data and memory.
+
+- rule_id: PULSE-004
+  rule: Sensitive health domains (body, pain, medical) are written only under an active, explicit, dated, revocable consent per domain.
+  severity: critical
+  enforcement_layer: [backend_api]
+  affected_docs_or_modules: [05_DATABASE_SCHEMA.md, 40_PULSE_LOGIC_DETAIL.md]
+  example_violation: A body snapshot or pain log is stored without consent, a photo is uploaded, or a measurement is copied into an event payload.
+  expected_behavior: No consent → 403 CONSENT_REQUIRED; no server-side photo; events carry ids only; the user can always read and really delete their data (décision utilisateur 2026-10-17).
 ```
 
 ## Offline Mode

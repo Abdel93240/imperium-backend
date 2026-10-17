@@ -710,9 +710,20 @@ Captures: weight, optional waist/chest/arm measurements, optional notes, optiona
 local photo reference.
 
 ```text
-TBD POST /api/pulse/body-snapshots
+POST /api/imperium/pulse/body-snapshots   (CODÉ 2026-10-17)
 Headers: Idempotency-Key
 ```
+
+> CODÉ (2026-10-17, migration 20261017_0061) sous le cadre santé (doc 08 PULSE-004) :
+> - Consentement : `GET /api/imperium/pulse/consents` (état + texte versionné par domaine
+>   body|pain|medical), `POST /consents/{domain}` `{text_version}` (texte changé → 409),
+>   `DELETE /consents/{domain}` (retrait daté).
+> - `POST /body-snapshots` : sans consentement « body » → 403 `CONSENT_REQUIRED` ; au moins
+>   une mesure (poids, masse grasse, tours de taille, poitrine, bras) ; tout champ photo →
+>   422. `GET /body-snapshots` : plus récent d'abord, `weight_change_kg` brut (aucune
+>   interprétation), accessible même après retrait. `DELETE /body-snapshots/{id}` et
+>   `DELETE /body-snapshots?confirm=true` : suppression réelle.
+> - Événements `pulse.body_snapshot.created|deleted` : identifiants et compte seulement.
 
 **Body photo upload is disabled in V1.** The Android app may keep a local-only
 photo reference for comparison, but the backend payload must not include the
@@ -989,7 +1000,7 @@ must be implemented in backend patches before UI relies on them.
 | Workouts | `POST /api/imperium/pulse/workouts/{workout_id}/complete` et `…/skip` (CODÉS 2026-10-17) |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/accept` |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/reject` |
-| Body | `TBD POST /api/pulse/body-snapshots` |
+| Body | `GET/POST/DELETE /api/imperium/pulse/body-snapshots` + `/consents` (CODÉS 2026-10-17) |
 | Pain | `TBD POST /api/pulse/pain-logs` |
 | Stock | `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `POST /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |

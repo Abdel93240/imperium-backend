@@ -1402,3 +1402,52 @@ class PulseOwnedEquipment(UUIDPrimaryKeyMixin, Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PulseHealthConsent(UUIDPrimaryKeyMixin, Base):
+    """Consentement explicite à un domaine de santé sensible (body, pain, medical) : daté, retirable."""
+
+    __tablename__ = "pulse_health_consents"
+    __table_args__ = (
+        CheckConstraint("domain IN ('body', 'pain', 'medical')", name="domain_check"),
+        CheckConstraint("revoked_at IS NULL OR revoked_at >= granted_at", name="revoked_after_granted"),
+        Index(
+            "pulse_health_consents_user_domain_active_idx", "user_id", "domain", unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    domain: Mapped[str] = mapped_column(Text, nullable=False)
+    text_version: Mapped[str] = mapped_column(Text, nullable=False)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PulseBodySnapshot(UUIDPrimaryKeyMixin, Base):
+    """Relevé corporel (PUL-08) : mesures seulement, jamais de photo ; suppression réelle à la demande."""
+
+    __tablename__ = "pulse_body_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            "weight_kg IS NOT NULL OR body_fat_percent IS NOT NULL OR waist_cm IS NOT NULL OR chest_cm IS NOT NULL "
+            "OR arm_cm IS NOT NULL",
+            name="one_measure",
+        ),
+        CheckConstraint("weight_kg IS NULL OR weight_kg > 0", name="weight_positive"),
+        CheckConstraint("body_fat_percent IS NULL OR body_fat_percent BETWEEN 1 AND 70", name="body_fat_range"),
+        Index("pulse_body_snapshots_user_measured_idx", "user_id", "measured_at"),
+        Index("pulse_body_snapshots_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    body_fat_percent: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
+    waist_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)
+    chest_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)
+    arm_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 1), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

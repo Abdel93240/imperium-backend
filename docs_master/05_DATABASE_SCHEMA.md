@@ -810,6 +810,14 @@ Garde-fous sante sensible :
   biologiques relevent de donnees de sante sensibles. Avant activation, il faut
   definir le cadre RGPD, le consentement explicite, la retention, le chiffrement,
   l'export/suppression et les controles d'acces.
+- Cadre retenu (decision utilisateur 2026-10-17, CODE migration 20261017_0061, doc 08
+  PULSE-004) : consentement explicite par domaine body|pain|medical, texte versionne,
+  date, retirable (`pulse_health_consents`) ; sans consentement actif, ecriture refusee
+  (403 CONSENT_REQUIRED) ; aucune photo cote serveur ; evenements sans mesure (identifiants
+  seulement, privacy high) ; lecture et suppression reelle toujours ouvertes a
+  l'utilisateur ; retention = jusqu'a suppression par l'utilisateur ; acces limite au
+  proprietaire. Chiffrement : celui du disque et des sauvegardes (ops), pas de chiffrement
+  par colonne en V1.
 - Aucune donnee sante sensible brute ne doit etre vectorisee. Le privacy gate du
   doc 09 doit s'appliquer : seules des syntheses minimales, utiles et validees
   peuvent eventuellement devenir des elements de memoire, jamais les documents ou
@@ -836,9 +844,8 @@ Sous-domaines Health/Pulse futurs non codes :
 - Workouts : CODE, table `pulse_workouts` (voir plus bas, migration 20261017_0059).
 - Pain logs : FUTUR / NON CODE. Schema a definir au moment du chantier pain,
   avec garde-fous sante sensible.
-- Body snapshots et profils biologiques : FUTUR / NON CODE. Schema a definir au
-  moment du chantier body/biological profiles, avec cadre RGPD/consentement
-  avant activation.
+- Body snapshots : CODE, table `pulse_body_snapshots` (voir plus bas, migration
+  20261017_0061), sous consentement « body ». Profils biologiques : FUTUR / NON CODE.
 - Health scores : FUTUR / NON CODE. Aucun score sante n'est calcule ou stocke
   par la V1 codee.
 - Medical documents et medical rules : FUTUR / NON CODE. Les docs 34/40
@@ -1470,6 +1477,13 @@ Seances de sport Pulse (CODE, migration 20261017_0059, doc 40 §13) :
 Materiel possede Pulse (CODE, migration 20261017_0060, doc 40 §13-EQUIP) :
 - `pulse_owned_equipment` : nom, cle de nom (sans accents ni casse, unique par
   utilisateur parmi les lignes actives), notes, statut active|removed, removed_at.
+
+Consentement sante et releves corporels Pulse (CODE, migration 20261017_0061, doc 40 §14) :
+- `pulse_health_consents` : domaine body|pain|medical, version du texte accepte,
+  granted_at, revoked_at ; un seul consentement actif par domaine (index unique partiel).
+- `pulse_body_snapshots` : measured_at, poids (> 0), masse grasse (1..70 %), tours de
+  taille, poitrine, bras, notes ; au moins une mesure ; aucune colonne photo ;
+  Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
