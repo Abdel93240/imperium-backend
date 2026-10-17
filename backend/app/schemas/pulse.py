@@ -258,3 +258,60 @@ class PantryScanValidateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     lines: list[PantryScanLineIn] = Field(max_length=100)
+
+
+class StockDeclarationPreviewRequest(BaseModel):
+    """Phrase de l'utilisateur dans le chatbot (« 2kg de riz et 6 œufs »)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("text")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("text is empty.")
+        return value
+
+
+class InStockRead(BaseModel):
+    """Produit déjà en stock sous un nom proche : information seulement (un achat reste une ligne nouvelle)."""
+
+    stock_item_id: UUID
+    name: str
+    quantity: Decimal
+    unit: str
+
+
+class StockDeclarationLineRead(BaseModel):
+    index: int
+    name: str
+    quantity: Decimal
+    unit: str
+    quantity_assumed: bool  # True : aucune quantité dans la phrase, 1 est proposé
+    expiry_type: str
+    expiry_date: date | None
+    in_stock: InStockRead | None = None
+
+
+class StockDeclarationPreviewRead(BaseModel):
+    lines: list[StockDeclarationLineRead]
+    warnings: list[str]
+
+
+class StockDeclarationLineIn(FoodStockLineIn):
+    category: str | None = Field(default="food", max_length=40)
+
+
+class StockDeclarationCreate(BaseModel):
+    """Lignes validées dans le chatbot, éventuellement corrigées ; les lignes retirées ne sont pas envoyées."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lines: list[StockDeclarationLineIn] = Field(min_length=1, max_length=50)
+
+
+class StockDeclarationRead(BaseModel):
+    declaration_id: UUID
+    stock_items: list[FoodStockItemRead]

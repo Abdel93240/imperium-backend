@@ -29,7 +29,7 @@ export const OPERATIONS = {
   deleteRoutine:      { route: "DELETE /api/imperium/routines/{id}", etat: "existe" },
   getHistory:         { route: "GET /api/imperium/missions/history + GET /api/imperium/weekly-review/history", etat: "partiel", note: "Série de régularité (doc 43 §6.1) et bilan IA à exposer." },
   getHistoryDay:      { route: "GET /api/imperium/day/latest", etat: "partiel" },
-  terminalSend:       { route: "POST /api/imperium/weekly-review/{session_id}/chat/messages", etat: "partiel", note: "Existe pour la WR seulement ; chatbot universel (doc 72) sans route." },
+  terminalSend:       { route: "POST /api/imperium/weekly-review/{session_id}/chat/messages", etat: "partiel", note: "Existe pour la WR seulement ; chatbot universel (doc 72) sans route. Ajout au stock Pulse codé : POST /api/imperium/pulse/food-stock/declarations/preview {text} puis POST …/declarations (Idempotency-Key)." },
   startWR:            { route: "POST /api/imperium/weekly-review/launch", etat: "existe" },
   finishWR:           { route: "POST /api/imperium/weekly-review/{session_id}/approve", etat: "existe" },
   resolveIntervention:{ route: "GET /api/imperium/missions/standby + POST /api/imperium/missions/{id}/standby/resolve", etat: "existe", note: "Décision validée par l'utilisateur via le chatbot (doc 43 §5.4)." },

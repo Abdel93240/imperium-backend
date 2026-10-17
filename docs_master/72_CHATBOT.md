@@ -89,6 +89,11 @@ The chatbot can, ALWAYS on explicit user validation:
 The "validation required" rule is an inviolable non-negotiable → owned by doc 08. This
 document describes the capability; doc 08 owns the guardrail.
 
+Première action codée (2026-10-17) : l'ajout au stock Pulse (doc 40 §11.1). La phrase
+passe par `POST /api/imperium/pulse/food-stock/declarations/preview` (proposition, rien
+d'écrit), puis la validation par `POST /api/imperium/pulse/food-stock/declarations`.
+Le moteur de conversation lui-même (§3) n'a pas encore de route.
+
 ---
 
 ## 5. Validation as the Tipping Point
