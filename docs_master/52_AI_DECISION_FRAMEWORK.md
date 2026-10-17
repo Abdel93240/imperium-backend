@@ -899,6 +899,12 @@ Application cases (all refer back here):
 
 A mission can be marked as failed (status='ratée') with one of 4 reasons:
 
+> **V1 confirmé (décision utilisateur 2026-10-17)** — cette liste prévaut sur l'ancienne
+> liste de la maquette 03 (doc 59 §12.4). Stockage : `failure_reason_code`
+> (`no_time` | `too_tired` | `not_relevant` | `impediment`) + `failure_reason` (texte,
+> = `failure_detail` ci-dessous, champ Détails facultatif). « Pas pertinent » et
+> « Empêchement » ouvrent le chatbot (§10.2, §10.3). Le Weekly Review compte les codes.
+
 ```text
 WHEN USER TAPS "NON" ON A MISSION:
 

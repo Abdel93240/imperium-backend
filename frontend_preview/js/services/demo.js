@@ -186,7 +186,7 @@ export function createDemoProvider() {
     },
     async failMission(mid, body) {
       await io(700);
-      const m = db.plan.find((p) => p.id === mid); if (m) { m.status = "ratée"; m.reason = body.reason; }
+      const m = db.plan.find((p) => p.id === mid); if (m) { m.status = "ratée"; m.reasonCode = body.reasonCode; m.reason = body.reason; }
       const nxt = db.plan.find((p) => p.status === "prévue"); if (nxt) nxt.status = "active";
       return { ok: true };
     },

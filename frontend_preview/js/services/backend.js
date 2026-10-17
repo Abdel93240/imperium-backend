@@ -10,7 +10,7 @@ export const OPERATIONS = {
   finishDay:          { route: "POST /api/imperium/day/finish", etat: "existe", note: "Retour backlog / standby à coder (doc 43 §5.4)." },
   getDashboard:       { route: "GET /api/imperium/dashboard + GET /api/imperium/missions/active + GET /api/imperium/day/plan/today", etat: "existe", note: "Annexes (annex_of_mission_id) et estimated_minutes à coder." },
   completeMission:    { route: "POST /api/imperium/missions/{id}/complete", etat: "partiel", note: "completed_annex_mission_ids à ajouter (doc 53 §3.1)." },
-  failMission:        { route: "POST /api/imperium/missions/{id}/fail", etat: "existe", note: "Raison en texte libre." },
+  failMission:        { route: "POST /api/imperium/missions/{id}/fail", etat: "partiel", note: "failure_reason (texte) existe ; failure_reason_code à ajouter (doc 52 §10)." },
   getNotes:           { route: null, etat: "manquant", note: "Notes de mission : FUTUR / NON CODÉ (doc 05)." },
   saveNotes:          { route: null, etat: "manquant" },
   getReplanState:     { route: null, etat: "manquant", note: "Délai : timestamp d'éligibilité à fournir par le backend (doc 43 §3.3)." },

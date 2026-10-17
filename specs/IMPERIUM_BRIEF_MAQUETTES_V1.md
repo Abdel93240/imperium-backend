@@ -105,7 +105,9 @@ Décision 2026-10-16 (doc 53 §3.1) : les « sous-missions » des maquettes sont
 - Maquette 01 : le bloc n'apparaît que si la mission porte des annexes (prévoir aussi
   la carte sans bloc, ex. Séance de sport).
 - Maquette 03, « Fait » : « Missions annexes réalisées » à cocher, même mise en page ;
-  « Pas fait » : inchangé (menu Raison + Détails, le menu préremplit le texte).
+  « Pas fait » (décision 2026-10-17, doc 52 §10) : menu Raison à 4 valeurs — Pas eu le
+  temps, Trop fatigué, Pas pertinent, Empêchement — + « Détails » facultatif. L'ancien menu
+  (Séance prolongée, Interruption, Imprévu…) ne sert plus qu'à « Raison du dépassement ».
 
 ### A9. Maquettes 01 et 02 — Bouton « Replanifier » pendant le délai
 

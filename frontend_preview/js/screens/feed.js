@@ -54,7 +54,11 @@ export function importStep(close) {
     iconBtn("close", "Retirer " + f.name, () => { files.splice(i, 1); paint(); }))) : [h("div", { class: "small dim", style: "padding:10px 0" }, "Aucun fichier sélectionné.")]));
   paint();
   // Sélecteur générique : aucun présélecteur de type (doc 70). Formats et limites : doc 70 §6.
-  const input = h("input", { type: "file", multiple: true, accept: ACCEPT, style: "display:none", onchange: (e) => { files.push(...e.target.files); e.target.value = ""; paint(); } });
+  // Pré-contrôle client (doc 70 §6) : 25 Mo par document/image, 500 Mo par audio/vidéo ; le backend fait le contrôle ferme.
+  const limitOf = (f) => (/^(audio|video)\//.test(f.type) || /\.(mp3|m4a|wav|ogg|opus|mp4|mov|webm)$/i.test(f.name) ? 500 : 25) * 1024 * 1024;
+  const input = h("input", { type: "file", multiple: true, accept: ACCEPT, style: "display:none", onchange: (e) => {
+    const ok = [], refused = []; for (const f of e.target.files) (f.size > limitOf(f) || !ACCEPT.split(",").some((x) => f.name.toLowerCase().endsWith(x)) ? refused : ok).push(f);
+    files.push(...ok); err.textContent = refused.length ? `Refusé : ${refused.map((f) => f.name).join(", ")} (type non accepté ou taille > 25 Mo documents/images, 500 Mo audio/vidéo).` : ""; e.target.value = ""; paint(); } });
   const ctx = h("textarea", { class: "textarea", style: "min-height:120px", placeholder: "Explique ce que contiennent ces éléments et ce que l'IA doit en retenir…" });
   const err = h("div", { class: "err" });
   const back = () => { close(); openFeed(); };
@@ -66,7 +70,7 @@ export function importStep(close) {
   } });
   return modal({ title: "Nourrir l'IA", subtitle: "Importer des éléments", close: back,
     body: [h("div", { class: "h3" }, "Éléments sélectionnés"), list, input, btn("Ajouter des éléments", { kind: "primary", block: true, icon: "plus", onClick: () => input.click() }),
-      h("div", { class: "tiny dim" }, "Formats acceptés : pdf, txt, md, docx, xlsx, csv, odt, images, audio, vidéo, zip (doc 70)."),
+      h("div", { class: "tiny dim" }, "Formats acceptés : pdf, txt, md, docx, xlsx, csv, odt, images, audio, vidéo, zip. Max 25 Mo par document ou image, 500 Mo par audio ou vidéo."),
       field("Contexte ou information à transmettre", ctx, { hint: "Tu peux aussi transmettre un texte sans fichier." }), err],
     foot: [btn("Annuler", { kind: "neutral", onClick: back }), analyse] });
 }

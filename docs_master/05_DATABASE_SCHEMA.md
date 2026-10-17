@@ -1113,6 +1113,7 @@ started_at              TIMESTAMPTZ NOT NULL
 ended_at                TIMESTAMPTZ NULL
 completion_note         TEXT NULL
 failure_reason          TEXT NULL
+failure_reason_code     TEXT NULL   -- cible V1 (doc 52 §10, 2026-10-17) : no_time | too_tired | not_relevant | impediment ; NON CODE
 user_reported_signals   JSONB NULL
 ai_usable_reason        BOOLEAN NULL
 created_by_event_id     UUID NULL FK events.id

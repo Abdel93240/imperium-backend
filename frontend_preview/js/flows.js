@@ -27,15 +27,19 @@ export function openResult(mission, mode) {
   const overtime = clock.now() > mission.plannedStart + mission.durationMin * MIN;
   const overMs = clock.now() - (mission.plannedStart + mission.durationMin * MIN);
   const draft = { annexes: new Set(), remark: "", reasonKey: "Séance prolongée", reasonText: "" };
-  const REASONS = ["Séance prolongée", "Interruption", "Imprévu", "Fatigue", "Autre"];
+  // Dépassement : menu qui préremplit le texte (doc 59 §12.4). Pas fait : 4 raisons codées (doc 52 §10).
+  const OVER = ["Séance prolongée", "Interruption", "Imprévu", "Autre"];
+  const FAIL = [{ value: "no_time", label: "Pas eu le temps" }, { value: "too_tired", label: "Trop fatigué" }, { value: "not_relevant", label: "Pas pertinent" }, { value: "impediment", label: "Empêchement" }];
+  const CHAT = { not_relevant: "Tu as marqué cette mission comme non pertinente. Pourquoi ?", impediment: "Tu as marqué un empêchement. Qu'est-ce qui a empêché ?" };
   modals.open((close) => {
     let save;
-    const reasonText = h("textarea", { class: "textarea", placeholder: "Explique ce qui s'est passé…" });
-    const reasonSel = select(REASONS, mode === "done" ? "Séance prolongée" : "Imprévu", (v) => { draft.reasonKey = v; prefill(); });
-    draft.reasonKey = reasonSel.value;
-    // Le menu préremplit le texte libre (doc 59 §12.4) ; les détails restent modifiables.
+    const reasonText = h("textarea", { class: "textarea", placeholder: mode === "done" ? "Explique ce qui s'est passé…" : "Ajoute des détails si tu veux…" });
+    const reasonSel = mode === "done" ? select(OVER, "Séance prolongée", (v) => { draft.reasonKey = v; prefill(); }) : select(FAIL, "no_time", (v) => { draft.code = v; hintChat(); });
+    draft.reasonKey = reasonSel.value; draft.code = "no_time";
     const prefill = () => { const cur = reasonText.value.replace(/^[^—]*—\s?/, ""); reasonText.value = `${draft.reasonKey} — ${cur}`; };
-    prefill();
+    const chatHint = h("div", { class: "small gold", style: "display:none" }, "Après confirmation, le chatbot s'ouvre pour que tu expliques.");
+    const hintChat = () => { chatHint.style.display = CHAT[draft.code] ? "" : "none"; };
+    if (mode === "done") prefill();
     const body = mode === "done" ? [
       overtime ? h("div", { class: "red mono small" }, `Temps dépassé · +${fmtDur(overMs)}`) : null,
       overtime ? field("Raison du dépassement", reasonSel) : null,
@@ -45,14 +49,15 @@ export function openResult(mission, mode) {
         mission.annexes.map((a) => check(false, a.title, (v) => v ? draft.annexes.add(a.id) : draft.annexes.delete(a.id)))) : null,
       field("Remarque", h("textarea", { class: "textarea", placeholder: "Ajouter une précision…", oninput: (e) => (draft.remark = e.target.value) }), { optional: true }),
     ] : [
-      field("Raison", reasonSel),
-      field("Détails de la raison", reasonText, { hint: "Précise pourquoi la mission n'a pas été faite. Le texte complet est envoyé." }),
+      field("Raison", reasonSel), chatHint,
+      field("Détails", reasonText, { optional: true }),
     ];
     save = btn(mode === "done" ? "Valider" : "Confirmer", { kind: mode === "done" ? "success" : "danger", onClick: () => busy(save, async () => {
       try {
         if (mode === "done") await svc.completeMission(mission.id, { remark: draft.remark, overtimeReason: overtime ? reasonText.value : null, completedAnnexIds: [...draft.annexes] });
-        else { if (!reasonText.value.replace(/^[^—]*—\s?/, "").trim() && draft.reasonKey === "Autre") { toast("Précise la raison."); return; } await svc.failMission(mission.id, { reason: reasonText.value }); }
+        else await svc.failMission(mission.id, { reasonCode: draft.code, reason: reasonText.value.trim() || null });
         close(); toast(mode === "done" ? "Mission validée." : "Mission enregistrée comme non faite."); app.refresh();
+        if (mode !== "done" && CHAT[draft.code]) openTerminal({ ctx: { kind: "standard", label: "MISSION NON FAITE" }, initial: [["IMPERIUM", CHAT[draft.code]]] });
       } catch (e) { toast(e.message || "Échec de l'enregistrement. Réessaie."); }
     }) });
     return modal({ title: mode === "done" ? "Valider la mission" : "Mission non effectuée", subtitle: mission.title, close, size: "small",

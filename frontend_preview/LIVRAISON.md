@@ -61,7 +61,9 @@ opérations ».
 ## Limites connues
 - Caméra, galerie, micro (onde et transcription de démonstration), notifications,
   autorisations et bulle : **simulés**, aucune capacité Android réelle.
-- Menus de raisons (replan, Pas fait) : valeurs de démonstration, liste réelle à confirmer.
-- Limites d'import 25 Mo / 500 Mo non appliquées (portée non précisée, doc 70).
+- « Pas fait » : 4 raisons codées du doc 52 §10 (décision 2026-10-17). Menu de la
+  replanification : valeurs de démonstration, liste réelle à confirmer.
+- Limites d'import (doc 70 §6) : pré-contrôle client par fichier, 25 Mo documents/images,
+  500 Mo audio/vidéo ; le contrôle ferme reste côté backend.
 - Console de calibration Tower : URL non fournie, lien non branché.
 - Le format des dates et heures dépend de la langue du navigateur.

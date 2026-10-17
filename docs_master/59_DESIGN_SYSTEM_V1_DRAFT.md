@@ -769,10 +769,12 @@ Règle d'architecture : un écran Imperium n'invente pas la stratégie. Il affic
 - **Screen name:** Mission Outcome Form.
 - **V1 (décision utilisateur 2026-10-16, maquette 03) :** deux fenêtres.
   « Fait » : missions annexes à cocher (facultatives, doc 53 §3.1) + Remarque facultative ;
-  si le temps prévu est dépassé, « Raison du dépassement » en plus. « Pas fait » : menu
-  Raison (Séance prolongée, Interruption, Imprévu, Fatigue, Autre) + « Détails de la raison ».
-  Le menu ne fait que préremplir le texte envoyé (`« Fatigue — <détails> »`) : le backend
-  garde une raison en texte libre, pas de `reason_code`.
+  si le temps prévu est dépassé, « Raison du dépassement » en plus : menu (Séance prolongée,
+  Interruption, Imprévu, Autre) qui préremplit le texte de la remarque, sans code.
+  « Pas fait » (décision utilisateur 2026-10-17, doc 52 §10) : 4 raisons codées — Pas eu le
+  temps (`no_time`), Trop fatigué (`too_tired`), Pas pertinent (`not_relevant`),
+  Empêchement (`impediment`) — + « Détails » facultatif. « Pas pertinent » et
+  « Empêchement » ouvrent ensuite le chatbot pour expliquer.
 - **Type / slug :** `bottom_sheet`, `imperium/mission/{mission_id}/outcome`, stable ID `IMP.MISSION.OUTCOME`.
 - **Composants :** Bottom Sheet L3, compact mission header, action state selector "Faite/Ratée/Annulée", reason TextField, Voice input, user-reported signal segmented control, Primary "Envoyer".
 - **Données affichées :** selected mission title/status/deadline, allowed transition, reason draft.
