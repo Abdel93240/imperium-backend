@@ -84,6 +84,8 @@ class MealRead(BaseModel):
     stock_lines: list[MealStockLineRead]
     warnings: list[str]
     stock_decrement_applied: bool
+    macros_estimated: bool = False  # macros proposées par l'estimation de la photo, à vérifier
+    confidence: float | None = None
     stock_items: list[FoodStockItemRead] = Field(default_factory=list)
     confirmed_at: datetime | None
     created_at: datetime

@@ -256,8 +256,11 @@ but no stock quantity changes until the user validates the lines.
 > CODÉ (2026-10-17, migration 20261017_0056, table `pulse_meals`) :
 > - `POST /api/imperium/pulse/meals/drafts` (Idempotency-Key ; même clé + contenu différent → 409) :
 >   description tapée ou dictée (source text|voice|manual|chatbot), heure, macros facultatives.
->   Estimation automatique des macros (texte ou photo, doc 37 §5.3) : pas encore ; sans macros
->   le brouillon porte l'avertissement « Macros non estimées automatiquement ».
+>   Estimation depuis le texte : pas encore ; sans macros le brouillon porte l'avertissement
+>   « Macros non estimées automatiquement ».
+> - Photo : `POST /meals/photo-drafts` (CODÉ 2026-10-17, doc 37 §5.5) → brouillon source photo,
+>   macros estimées (`macros_estimated`, `confidence`), aliments vus comparés au stock ; photo
+>   jamais conservée.
 > - Proposition de décompte lue sans IA dans la description (« 200 g de riz avec 2 œufs »),
 >   comparée au stock actif : confiance `high` (même nom, quantité donnée, unité convertible)
 >   cochée ; sinon `low`, décochée. Produit absent du stock et stock insuffisant → avertissements.
@@ -270,7 +273,7 @@ but no stock quantity changes until the user validates the lines.
 >   deux fois ; autre clé → 409.
 > - `POST /meals/{id}/cancel` (brouillon seulement) ; `GET /meals/{id}` ;
 >   `GET /meals?day=AAAA-MM-JJ` : repas validés du jour de Paris, totaux, nombre sans macros.
-> - Photo du repas, avertissement de jeûne (Path) : pas encore.
+> - Avertissement de jeûne (Path) : pas encore.
 
 ### 10.4 Recipe catalogue
 
@@ -928,7 +931,8 @@ must be implemented in backend patches before UI relies on them.
 | Domain | Endpoint |
 |---|---|
 | Dashboard | `TBD GET /api/pulse/dashboard` |
-| Meals | `POST /api/imperium/pulse/meals/drafts` (CODÉ 2026-10-17, sans estimation automatique) |
+| Meals | `POST /api/imperium/pulse/meals/drafts` (CODÉ 2026-10-17, texte, macros saisies) |
+| Meals | `POST /api/imperium/pulse/meals/photo-drafts` (CODÉ 2026-10-17, macros estimées depuis la photo) |
 | Meals | `POST /api/imperium/pulse/meals/{meal_id}/confirm` (CODÉ 2026-10-17) |
 | Meals | `GET /api/imperium/pulse/meals?day=` et `GET …/meals/{meal_id}` (CODÉS 2026-10-17) |
 | Hydration | `TBD POST /api/pulse/hydration-logs` |
