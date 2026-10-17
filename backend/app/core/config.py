@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     embedding_expected_dimensions: int = 1024
     embedding_batch_size: int = 32
 
+    # Nourrir l'IA (doc 70) : sources toujours conservées, pointeur abstrait relatif à ce dossier.
+    knowledge_inbox_storage_dir: str = "data/knowledge_inbox"
+
     # Travel v0 (Google Directions). very_high privacy NEVER reaches a provider.
     google_directions_api_key: str | None = None
     travel_request_timeout_seconds: int = 5

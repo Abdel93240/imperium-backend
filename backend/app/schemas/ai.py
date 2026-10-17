@@ -43,6 +43,8 @@ SUPPORTED_AI_MEMORY_TYPES = frozenset(
         "worship_preference",
         "correction",
         "system_note",
+        # Connaissance transmise par l'utilisateur via Nourrir l'IA (doc 70).
+        "user_knowledge",
     }
 )
 

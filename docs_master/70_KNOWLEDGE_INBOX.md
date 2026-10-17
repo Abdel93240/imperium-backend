@@ -288,7 +288,33 @@ use. It is provenance, not a scope.
 
 ---
 
+### 10.1 Implémentation (CODÉ le 2026-10-17, migration 20261017_0050)
+
+Écart assumé avec le §10 indicatif, pour suivre l'interface validée (maquette 16,
+B10) : un ÉLÉMENT regroupe un texte de contexte et zéro, un ou plusieurs fichiers.
+- `knowledge_inbox_items` : entry_app (provenance seulement), title, context_text,
+  status uploading|to_analyze|analyzing|to_validate|validated|vectorized|failed|deleted
+  (UI : À analyser / À valider / Enregistré / Erreur), extraction_draft, extraction_final,
+  destination memory|project, created_entity_type/id, horodatages, deleted_at.
+- `knowledge_inbox_documents` : sources toujours conservées — original_filename, kind,
+  mime_type, size_bytes, sha256, storage_pointer (relatif à KNOWLEDGE_INBOX_STORAGE_DIR,
+  VPS en V1), storage_location vps_local|nas, source_retained_at, deleted_at.
+- Mémoire : `ai_memories` avec memory_type `user_knowledge`, source_domain `system`
+  (provenance, pas un périmètre), source_table `knowledge_inbox_items`, source_id = élément.
+- Job runner `ai.knowledge_inbox` (semé désactivé) : analyse (fichiers texte lus ; PDF,
+  images, audio, vidéo listés « non lus » tant que l'OCR et la transcription ne sont pas
+  branchés ; modèle local si activé, sinon brouillon déterministe) puis vectorisation des
+  seuls éléments validés vers la mémoire (GPU injoignable → reste validé).
+
 ## 11. Endpoints (V1, indicative — TBD)
+
+CODÉ (2026-10-17) sous `/api/ai/knowledge-inbox` : `POST /items` (Idempotency-Key),
+`GET /items`, `GET /items/{id}`, `POST /items/{id}/sources` (corps brut, X-Filename,
+Content-Type ; zip déplié en éléments séparés), `GET /items/{id}/sources/{document_id}`,
+`POST /items/{id}/analyze`, `PATCH /items/{id}/extraction`, `POST /items/{id}/validate`
+(`memory` | `project` + project_title), `POST /items/{id}/retry`, `POST /items/{id}/cancel`
+(avant validation : tout est supprimé), `DELETE /items/{id}` (sources effacées, mémoires
+directes neutralisées). Le tableau ci-dessous reste la cible d'origine.
 
 ```text
 TBD POST   /api/ai/knowledge-inbox/upload          (multipart, type/size enforced)

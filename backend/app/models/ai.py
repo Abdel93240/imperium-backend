@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -207,3 +207,75 @@ class AIMemory(UUIDPrimaryKeyMixin, Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+
+class KnowledgeInboxItem(UUIDPrimaryKeyMixin, Base):
+    """Élément transmis à l'IA (doc 70) : contexte + sources, brouillon puis version validée."""
+
+    __tablename__ = "knowledge_inbox_items"
+    __table_args__ = (
+        CheckConstraint("entry_app IN ('imperium', 'vector', 'vault', 'pulse', 'path')", name="entry_app_check"),
+        CheckConstraint(
+            "status IN ('uploading', 'to_analyze', 'analyzing', 'to_validate', 'validated', 'vectorized', 'failed', 'deleted')",
+            name="status_check",
+        ),
+        CheckConstraint("destination IS NULL OR destination IN ('memory', 'project')", name="destination_check"),
+        CheckConstraint("created_entity_type IS NULL OR created_entity_type IN ('project')", name="created_entity_type_check"),
+        Index("knowledge_inbox_items_user_status_idx", "user_id", "status"),
+        Index(
+            "knowledge_inbox_items_user_idempotency_idx",
+            "user_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Provenance UI seulement : ne restreint jamais l'usage de la connaissance (doc 70 §2).
+    entry_app: Mapped[str] = mapped_column(Text, nullable=False, default="imperium", server_default=text("'imperium'"))
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    context_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="uploading", server_default=text("'uploading'"))
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extraction_draft: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    extraction_final: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    destination: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_entity_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_entity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    vectorized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class KnowledgeInboxDocument(UUIDPrimaryKeyMixin, Base):
+    """Fichier source d'un élément, toujours conservé (pointeur abstrait, doc 70 §4)."""
+
+    __tablename__ = "knowledge_inbox_documents"
+    __table_args__ = (
+        CheckConstraint("kind IN ('document', 'image', 'audio', 'video')", name="kind_check"),
+        CheckConstraint("storage_location IN ('vps_local', 'nas')", name="storage_location_check"),
+        CheckConstraint("size_bytes >= 0", name="size_non_negative"),
+        Index("knowledge_inbox_documents_item_idx", "item_id"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("knowledge_inbox_items.id", ondelete="CASCADE"), nullable=False
+    )
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_pointer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storage_location: Mapped[str] = mapped_column(Text, nullable=False, default="vps_local", server_default=text("'vps_local'"))
+    source_retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

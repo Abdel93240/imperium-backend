@@ -48,10 +48,10 @@ export const OPERATIONS = {
   replaceApiKey:      { route: null, etat: "manquant" },
   deleteApiKey:       { route: null, etat: "manquant" },
   listLogs:           { route: null, etat: "manquant", note: "Navigateur de logs sandboxé (doc 72 §8)." },
-  feedList:           { route: "GET /api/ai/memories", etat: "partiel", note: "Mémoires IA existent ; parcours Nourrir l'IA (doc 70 §11) TBD." },
-  feedImport:         { route: null, etat: "manquant" },
-  feedSave:           { route: null, etat: "manquant" },
-  feedDelete:         { route: "POST /api/ai/memories/{id}/archive", etat: "à confirmer" },
+  feedList:           { route: "GET /api/ai/knowledge-inbox/items", etat: "existe", note: "Codé le 2026-10-17 (doc 70)." },
+  feedImport:         { route: "POST /api/ai/knowledge-inbox/items + POST /items/{id}/sources (corps brut) + POST /items/{id}/analyze", etat: "existe" },
+  feedSave:           { route: "PATCH /items/{id}/extraction + POST /api/ai/knowledge-inbox/items/{id}/validate", etat: "existe", note: "Vectorisation par le job ai.knowledge_inbox après validation." },
+  feedDelete:         { route: "DELETE /api/ai/knowledge-inbox/items/{id} (et POST /items/{id}/cancel avant validation)", etat: "existe" },
 };
 
 export class NotConnected extends Error {

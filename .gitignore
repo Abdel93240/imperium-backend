@@ -22,3 +22,6 @@ venv/
 *.log
 docs_master/*.bak
 *.bak
+
+# Nourrir l'IA : sources transmises par l'utilisateur (données personnelles, jamais versionnées)
+backend/data/
