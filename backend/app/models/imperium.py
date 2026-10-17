@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     text,
 )
@@ -230,6 +231,12 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
             postgresql_where=text("status = 'backlog'"),
         ),
         Index("imperium_missions_user_mission_type_category_idx", "user_id", "mission_type_category"),
+        Index(
+            "imperium_missions_project_position_idx",
+            "project_id",
+            "project_position",
+            postgresql_where=text("project_id IS NOT NULL"),
+        ),
     )
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -247,6 +254,13 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # doc 52 §10 : raison codée d'une mission non faite ; failure_reason garde les détails.
     failure_reason_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # doc 71 §8 : mission d'un projet, ordonnée ; description et notes (maquettes 10, 11).
+    project_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_projects.id"), nullable=True
+    )
+    project_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     # doc 43 §5.4 : échéance ; dépassée à la clôture de journée → standby.
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # doc 43 §5.2 : durée estimée (proposée par l'IA, modifiable).
@@ -777,6 +791,118 @@ class PlanningReplanEvent(UUIDPrimaryKeyMixin, Base):
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ImperiumProject(UUIDPrimaryKeyMixin, Base):
+    """Projet d'Opérations (doc 71 §3) : les 2 premiers du classement sont actifs."""
+
+    __tablename__ = "imperium_projects"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'completed', 'deleted')", name="status_check"),
+        CheckConstraint("source IN ('manual', 'chatbot')", name="source_check"),
+        CheckConstraint("length(btrim(title)) > 0", name="title_not_blank"),
+        CheckConstraint("rank_order > 0", name="rank_positive"),
+        CheckConstraint(
+            "progress_percent IS NULL OR (progress_percent >= 0 AND progress_percent <= 100)", name="progress_range"
+        ),
+        CheckConstraint(
+            "completion_method IS NULL OR completion_method IN ('suggested', 'manual')", name="completion_method_check"
+        ),
+        Index("imperium_projects_user_status_rank_idx", "user_id", "status", "rank_order"),
+        Index(
+            "imperium_projects_user_idempotency_idx",
+            "user_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rank_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open", server_default=text("'open'"))
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="manual", server_default=text("'manual'"))
+    # Estimée par l'IA pendant la Weekly Review (doc 71 §3.1) ; masquée tant que NULL.
+    progress_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    progress_why: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completion_method: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ImperiumRoutine(UUIDPrimaryKeyMixin, Base):
+    """Routine (doc 71 §4.1) : 4 fréquences fermées ; jour/heure forcés seulement via le chatbot."""
+
+    __tablename__ = "imperium_routines"
+    __table_args__ = (
+        CheckConstraint("frequency IN ('daily', 'weekly', 'biweekly', 'monthly')", name="frequency_check"),
+        CheckConstraint("priority IN ('low', 'medium', 'high')", name="priority_check"),
+        CheckConstraint("length(btrim(name)) > 0", name="name_not_blank"),
+        CheckConstraint("estimated_minutes IS NULL OR estimated_minutes > 0", name="estimated_minutes_positive"),
+        CheckConstraint(
+            "pinned_weekday IS NULL OR (pinned_weekday >= 1 AND pinned_weekday <= 7)", name="pinned_weekday_range"
+        ),
+        CheckConstraint(
+            "pinned_month_day IS NULL OR (pinned_month_day >= 1 AND pinned_month_day <= 31)", name="pinned_month_day_range"
+        ),
+        Index("imperium_routines_user_active_idx", "user_id", "active"),
+        Index(
+            "imperium_routines_user_idempotency_idx",
+            "user_id",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    frequency: Mapped[str] = mapped_column(Text, nullable=False)
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    priority: Mapped[str] = mapped_column(Text, nullable=False, default="medium", server_default=text("'medium'"))
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    pinned_weekday: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    pinned_month_day: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    pinned_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    # Ancre des périodes (quinzaine = 14 jours depuis la création, doc 71 §4.1).
+    anchor_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ImperiumRoutineCheck(UUIDPrimaryKeyMixin, Base):
+    """Occurrence d'une routine sur une journée opérationnelle : planned | done | missed."""
+
+    __tablename__ = "imperium_routine_checks"
+    __table_args__ = (
+        CheckConstraint("status IN ('planned', 'done', 'missed')", name="status_check"),
+        UniqueConstraint("routine_id", "operational_date", name="routine_day_unique"),
+        Index("imperium_routine_checks_user_date_idx", "user_id", "operational_date"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    routine_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("imperium_routines.id"), nullable=False)
+    planning_day_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("planning_days.id"), nullable=True)
+    operational_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

@@ -574,6 +574,10 @@ class MissionDetailRead(BaseModel):
     estimated_minutes: int | None = None
     deadline_at: datetime | None = None
     annex_of_mission_id: UUID | None = None
+    # Fenêtre des notes (maquette 10) : contexte projet, description et notes.
+    project_id: UUID | None = None
+    description: str | None = None
+    notes: str | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
     created_at: datetime

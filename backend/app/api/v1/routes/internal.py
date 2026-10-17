@@ -5,6 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.schemas.imperium import ReplanProposalAttachRequest, ReplanRead
+from app.schemas.operations import ProjectProgressUpdate, ProjectRead
+from app.services.imperium.operations import OperationsNotFoundError, record_project_progress
 from app.services.imperium.replan import ReplanNotFoundError, ReplanStateConflictError, attach_replan_proposal
 from app.api.deps import SessionDep
 from app.core.internal_webhooks import (
@@ -201,3 +203,18 @@ def attach_replan_proposal_route(
     except ReplanStateConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/projects/{project_id}/progress", response_model=ProjectRead)
+def record_project_progress_route(
+    project_id: UUID,
+    payload: ProjectProgressUpdate,
+    context: Annotated[InternalWebhookContext, Depends(verify_internal_webhook)],
+    db: SessionDep,
+) -> ProjectRead:
+    """La Weekly Review dépose l'estimation de progression d'un projet (doc 71 §3.1, doc 47 §11)."""
+    try:
+        return record_project_progress(db, project_id=project_id, payload=payload)
+    except OperationsNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

@@ -10,6 +10,7 @@ from app.api.v1.routes import (
     imperium_daily_plan,
     imperium_contracts,
     imperium_home,
+    imperium_operations,
     imperium,
     imperium_dashboard,
     imperium_path,
@@ -33,6 +34,7 @@ api_router.include_router(imperium_frontend.router, prefix="/imperium", tags=["i
 api_router.include_router(imperium_path.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_pulse.router, prefix="/imperium/pulse", tags=["imperium-pulse"])
 api_router.include_router(imperium.router, prefix="/imperium", tags=["imperium"])
+api_router.include_router(imperium_operations.router, prefix="/imperium", tags=["imperium-operations"])
 api_router.include_router(imperium_vault.router, prefix="/imperium/vault", tags=["imperium-vault"])
 api_router.include_router(vault.router, prefix="/vault", tags=["vault"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])

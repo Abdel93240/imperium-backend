@@ -1413,14 +1413,15 @@ Invariants planning reintegres :
   CODE (migration 20261017_0044) : statut `standby` (echeance depassee
   constatee a la cloture de journee, attend une decision, doc 43 §5.4) et
   colonne `deadline_at`.
-- Les projets actifs et routines d'Operations sont la source future de missions,
-  mais leurs tables planning canoniques ne sont pas encore codees. La regle
+- Les projets actifs et routines d'Operations sont la source de missions ; leurs
+  tables canoniques sont codees (`imperium_projects`, `imperium_routines`,
+  `imperium_routine_checks`, migration 20261017_0047). La regle
   documentee par la doc 71 est V1 cible : viser deux projets actifs quand la
   pile le permet, garder une liste non-active distincte, auto-promouvoir apres
   completion et rendre un projet incomplet inerte en "Attention requise".
-- Les routines quotidiennes simples sont FUTURES / NON CODEES dans le domaine
-  planning. Elles devront alimenter l'arbitrage et le daily plan, sans devenir
-  une logique UI autonome.
+- Les routines sont codees (doc 71 §4.1). Leur branchement sur l'arbitrage et le
+  daily plan (placement automatique des routines non quotidiennes) reste a faire
+  par le planificateur ; V1 expose `POST /routines/{id}/place` pour ce placement.
 - Le bilan de journee (`planning_day_reviews`) sert a expliquer ce qui s'est
   passe : victoires, problemes, items manques, fatigue, humeur et signaux. Il
   ne remplace pas l'historique de missions ni les events.
@@ -1436,15 +1437,15 @@ Tables planning futures / non codees :
 - Morning check-ins : FUTUR / NON CODE. La doc 43 annonce le check-in du matin
   comme premier replan de la journee ; aucune table canonique `planning_*` n'est
   encore definie ici.
-- Projets Operations : FUTUR / NON CODE. Le nom canonique reste a definir dans
-  ce dictionnaire avant migration ; ne pas reprendre `projects` comme schema
-  officiel sans chantier dedie.
-- Routines recurrentes et checks quotidiens : FUTUR / NON CODE. Les noms cibles
-  restent a definir dans ce dictionnaire avant implementation. Champs cibles V1
-  (doc 71 §4.1, decision 2026-10-16) : name, frequency
-  (daily|weekly|biweekly|monthly), estimated_minutes, priority
-  (low|medium|high), notes, active, et pinned_weekday / pinned_month_day /
-  pinned_time (nullables, poses seulement via le chatbot, non affiches).
+- Projets Operations : CODE (migration 20261017_0047, 2026-10-17). Nom canonique
+  `imperium_projects` (rank_order, status open|completed|deleted, source manual|chatbot,
+  progress_percent 0-100 + progress_why + progress_at deposes par la WR, completed_at,
+  completion_method, deleted_at). Les 2 premiers `open` du classement sont actifs (doc 71).
+  `imperium_missions` gagne project_id, project_position, description, notes.
+- Routines recurrentes et checks quotidiens : CODE (migration 20261017_0047). Noms
+  canoniques `imperium_routines` (champs doc 71 §4.1, pinned_* poses par le chatbot,
+  anchor_date, deleted_at) et `imperium_routine_checks` (une ligne par routine et par
+  journee operationnelle, status planned|done|missed ; conservees apres suppression).
 - Expiration de mission, notes de mission, `source/source_ref`,
   `replan_version` et liens objectifs -> missions : FUTUR / NON CODE dans les
   tables planning actuelles.

@@ -257,6 +257,16 @@ projet-wide "rien de canonique sans aval").
 
 ## 8. Données (indicatif, V1 — à aligner avec le schéma existant)
 
+> **CODÉ le 2026-10-17 (migration 20261017_0047)** sous les noms canoniques
+> `imperium_projects`, `imperium_routines`, `imperium_routine_checks` (+ project_id,
+> project_position, description, notes sur `imperium_missions`). Routes `/api/imperium` :
+> `GET|POST /projects`, `POST /projects/reorder`, `PATCH|DELETE /projects/{id}`,
+> `POST /projects/{id}/complete`, `GET /projects/completed`, `POST /projects/{id}/missions`,
+> `POST /projects/{id}/missions/reorder`, `PATCH|DELETE /missions/{id}`,
+> `GET|POST /routines`, `GET /routines/today`, `PATCH|DELETE /routines/{id}`,
+> `POST /routines/{id}/place`, `POST /routines/{id}/check` ; WR :
+> `POST /api/internal/projects/{id}/progress`. Le tableau ci-dessous reste la cible d'origine.
+
 ```sql
 -- Projets (le concept existe déjà dans la vision/priorités ; à formaliser)
 projects:
