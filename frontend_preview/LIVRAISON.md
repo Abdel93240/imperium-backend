@@ -62,8 +62,9 @@ Runner `imperium.rolling_replan` codé (proposition déterministe + corrections 
 local), semé désactivé : à activer selon le doc 76.
 Codé aussi : projets, missions de projet, routines et leurs coches, notes de mission.
 Codé aussi : catégorie suggérée d'une transaction (doc 42 §7.0), réglages (doc 43 §15), état des services (GET /api/health/services), Nourrir l'IA (doc 70).
+Codé aussi : logs de l'IA, modèles par rôle, seuils /200, clés API (écriture seule).
 Manquant :
-OCR, modèles/seuils/clés, logs IA,
+OCR,
 Carte complète : panneau Démo → « Carte des
 opérations ».
 

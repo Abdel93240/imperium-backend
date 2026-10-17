@@ -68,6 +68,15 @@ typing error-prone commands in a terminal.
 
 ---
 
+> **CODÉ le 2026-10-17** — `/api/ai/advanced` : `GET /roles`, `PUT /roles/{role}` (11 rôles
+> fixes du doc 30 §3 ; nouvelle version dans `ai_role_models`, l'ancienne désactivée ;
+> local_only → fournisseur local, direct → jamais OpenRouter), `GET /catalog` (modèles
+> déjà connus ; catalogue distant NON branché, identifiant saisi à la main),
+> `GET|PUT /thresholds` (paramètre versionné `ai.routing_thresholds`, 4 plages continues
+> 0..200), `GET /api-keys`, `PUT|DELETE /api-keys/{provider}` (écriture seule : un fichier
+> 0600 par fournisseur dans PROVIDER_KEYS_DIR, dossier 0700, hors base et hors dépôt ;
+> aucune route ne relit une clé). Console de calibration (PART D) : non incluse.
+
 ## PART A — The unified entry point
 
 "AI Advanced Settings" is a category the builder enters rarely, but is glad exists the

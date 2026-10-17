@@ -80,6 +80,8 @@ class Settings(BaseSettings):
 
     # Nourrir l'IA (doc 70) : sources toujours conservées, pointeur abstrait relatif à ce dossier.
     knowledge_inbox_storage_dir: str = "data/knowledge_inbox"
+    # Clés des fournisseurs IA (doc 73) : un fichier 0600 par fournisseur, hors dépôt.
+    provider_keys_dir: str = "data/provider_keys"
 
     # Travel v0 (Google Directions). very_high privacy NEVER reaches a provider.
     google_directions_api_key: str | None = None
