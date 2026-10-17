@@ -2,7 +2,9 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api.deps import SessionDep
+from app.api.deps import CurrentUserDep, SessionDep
+from app.core.config import get_settings
+from app.services.service_health import ServiceHealthReport, check_services, default_probes
 
 router = APIRouter()
 
@@ -22,3 +24,10 @@ def database_health_check(db: SessionDep) -> dict[str, str]:
             detail="Database health check failed.",
         ) from exc
     return {"status": "ok"}
+
+
+@router.get("/health/services", response_model=ServiceHealthReport)
+def services_health_check(current_user: CurrentUserDep, db: SessionDep) -> ServiceHealthReport:
+    """État détaillé des services (écran « Connexion à Imperium ») ; réservé à l'utilisateur connecté."""
+    settings = get_settings()
+    return check_services(settings=settings, probes=default_probes(db, settings))

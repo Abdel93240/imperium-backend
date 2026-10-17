@@ -4,7 +4,7 @@
 // « manquant » si aucun contrat n'existe. Aucune route n'est inventée.
 
 export const OPERATIONS = {
-  getStatus:          { route: "GET /api/health + GET /api/health/db", etat: "existe", note: "Mémoire vectorielle, IA locale, IA cloud : aucun endpoint → « Non vérifié » en réel." },
+  getStatus:          { route: "GET /api/health/services", etat: "existe", note: "Codé le 2026-10-17 : API, base, mémoire vectorielle, IA locale, IA cloud (grey tant qu'aucun fournisseur cloud n'est branché)." },
   getDay:             { route: "GET /api/imperium/day/current", etat: "existe" },
   startDay:           { route: "POST /api/imperium/day/start", etat: "existe" },
   finishDay:          { route: "POST /api/imperium/day/finish", etat: "existe", note: "Retour backlog / standby codés (2026-10-17)." },
