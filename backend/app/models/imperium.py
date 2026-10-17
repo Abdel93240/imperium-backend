@@ -1267,3 +1267,44 @@ class PulsePantryScan(UUIDPrimaryKeyMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class PulseMeal(UUIDPrimaryKeyMixin, Base):
+    """Repas (PUL-02/PUL-03) : brouillon, puis validation qui décompte le stock une seule fois."""
+
+    __tablename__ = "pulse_meals"
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'confirmed', 'cancelled')", name="status_check"),
+        CheckConstraint("source IN ('text', 'voice', 'photo', 'manual', 'chatbot')", name="source_check"),
+        CheckConstraint("length(btrim(description)) > 0", name="description_not_blank"),
+        CheckConstraint("calories IS NULL OR calories >= 0", name="calories_non_negative"),
+        CheckConstraint("protein_g IS NULL OR protein_g >= 0", name="protein_g_non_negative"),
+        CheckConstraint("carbs_g IS NULL OR carbs_g >= 0", name="carbs_g_non_negative"),
+        CheckConstraint("fat_g IS NULL OR fat_g >= 0", name="fat_g_non_negative"),
+        Index("pulse_meals_user_eaten_idx", "user_id", "eaten_at"),
+        Index("pulse_meals_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    eaten_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    calories: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    protein_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    carbs_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    fat_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    proposal: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    warnings: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    stock_decrement_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    confirm_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirm_request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

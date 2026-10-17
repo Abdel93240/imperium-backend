@@ -829,9 +829,7 @@ Notes migration/ORM :
   cible documente est `health_entries`.
 
 Sous-domaines Health/Pulse futurs non codes :
-- `meals` / repas : FUTUR / NON CODE. Schema a definir au moment du chantier
-  repas, sans reprendre les exemples non autoritatifs des docs 40/34 comme
-  definition DB.
+- Repas : CODE, table `pulse_meals` (voir plus bas, migration 20261017_0056).
 - Hydratation : FUTUR / NON CODE. Schema a definir au moment du chantier
   hydratation.
 - Food stock / stock alimentaire : FUTUR / NON CODE. Schema a definir au moment
@@ -1450,6 +1448,13 @@ Scan du placard Pulse (CODE, migration 20261017_0055, doc 37 §5.4) :
 - `pulse_pantry_scans` : statut ready|failed|validated|cancelled, empreinte et taille de
   la photo (jamais la photo), qualite, confiance, resume, proposition (jsonb : lignes
   add|update avec version du stock), avertissements, resultat, Idempotency-Key unique.
+
+Repas Pulse (CODE, migration 20261017_0056, doc 40 §10) :
+- `pulse_meals` : statut draft|confirmed|cancelled, libelle, description, source
+  text|voice|photo|manual|chatbot, eaten_at, macros facultatives (>= 0), proposition de
+  decompte (jsonb), avertissements, stock_decrement_applied, resultat (lignes de stock
+  touchees), Idempotency-Key unique du brouillon + empreinte, cle et empreinte de la
+  validation.
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la

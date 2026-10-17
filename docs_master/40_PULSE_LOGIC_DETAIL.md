@@ -253,6 +253,25 @@ but no stock quantity changes until the user validates the lines.
 - repeated confirmation with different payload creates Conflict
 ```
 
+> CODÉ (2026-10-17, migration 20261017_0056, table `pulse_meals`) :
+> - `POST /api/imperium/pulse/meals/drafts` (Idempotency-Key ; même clé + contenu différent → 409) :
+>   description tapée ou dictée (source text|voice|manual|chatbot), heure, macros facultatives.
+>   Estimation automatique des macros (texte ou photo, doc 37 §5.3) : pas encore ; sans macros
+>   le brouillon porte l'avertissement « Macros non estimées automatiquement ».
+> - Proposition de décompte lue sans IA dans la description (« 200 g de riz avec 2 œufs »),
+>   comparée au stock actif : confiance `high` (même nom, quantité donnée, unité convertible)
+>   cochée ; sinon `low`, décochée. Produit absent du stock et stock insuffisant → avertissements.
+> - `POST /meals/{id}/confirm` (Idempotency-Key) : macros et libellé corrigés, lignes cochées
+>   `{stock_item_id, quantity, unit, finish}`. Conversion g/kg et ml/cl/l ; pièce non
+>   convertible → 422. Tout utiliser ou plus exige `finish` (ligne → consumed), sinon 409
+>   `STOCK_INSUFFICIENT` avec la ligne actuelle et rien n'est écrit. Le décompte étant
+>   relatif, il ne demande pas la version lue (la ligne est verrouillée, version + 1).
+>   `stock_decrement_applied` + clé et empreinte de la validation : rejouer ne décompte pas
+>   deux fois ; autre clé → 409.
+> - `POST /meals/{id}/cancel` (brouillon seulement) ; `GET /meals/{id}` ;
+>   `GET /meals?day=AAAA-MM-JJ` : repas validés du jour de Paris, totaux, nombre sans macros.
+> - Photo du repas, avertissement de jeûne (Path) : pas encore.
+
 ### 10.4 Recipe catalogue
 
 ```text
@@ -381,7 +400,7 @@ Cross-module links:
 > seulement). La validation (doc 72 §5) : `POST /food-stock/declarations` (Idempotency-Key,
 > 1 à 50 lignes corrigées) → lignes nouvelles source chatbot, `source_ref`
 > chat:{declaration_id}:{n}. Un achat n'est jamais fusionné avec une ligne existante.
-> Décompte après repas : pas encore (attend PUL-03).
+> Décompte après repas : CODÉ (2026-10-17, §10.3), écriture source meal dans l'événement.
 
 ### 11.2 Stock item fields (V1)
 
@@ -909,9 +928,9 @@ must be implemented in backend patches before UI relies on them.
 | Domain | Endpoint |
 |---|---|
 | Dashboard | `TBD GET /api/pulse/dashboard` |
-| Meals | `TBD POST /api/pulse/meals/estimate` |
-| Meals | `TBD POST /api/pulse/meals/{meal_draft_id}/confirm` |
-| Meals | `TBD GET /api/pulse/meals` |
+| Meals | `POST /api/imperium/pulse/meals/drafts` (CODÉ 2026-10-17, sans estimation automatique) |
+| Meals | `POST /api/imperium/pulse/meals/{meal_id}/confirm` (CODÉ 2026-10-17) |
+| Meals | `GET /api/imperium/pulse/meals?day=` et `GET …/meals/{meal_id}` (CODÉS 2026-10-17) |
 | Hydration | `TBD POST /api/pulse/hydration-logs` |
 | Workouts | `TBD GET /api/pulse/workouts` |
 | Workouts | `TBD POST /api/pulse/workouts` |
