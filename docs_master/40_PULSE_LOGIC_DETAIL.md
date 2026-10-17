@@ -364,10 +364,15 @@ Cross-module links:
 
 > CODÉ (2026-10-17, migration 20261017_0052) : table `food_stock_items` (champs §11.2 +
 > status active|consumed|removed, source manual|vault_receipt|pantry_scan|chatbot,
-> source_ref). Une ligne par achat (dates limites différentes). Source codée : passage
-> des tickets validés (doc 37 §3.4). Lecture : `GET /api/imperium/pulse/food-stock`
-> (actif, date limite la plus proche d'abord ; `include_inactive=true`). Ajout manuel,
-> scan du placard, chatbot, décompte après repas, alertes de date : pas encore.
+> source_ref, version). Une ligne par achat (dates limites différentes). Sources
+> codées : passage des tickets validés (doc 37 §3.4) et ajout manuel. Lecture :
+> `GET /api/imperium/pulse/food-stock` (actif, date limite la plus proche d'abord ;
+> `include_inactive=true`). Ajout : `POST` (Idempotency-Key, source manual). Modification :
+> `PATCH /food-stock/{id}` (Idempotency-Key + `version` lue ; version dépassée → 409
+> `STOCK_VERSION_CONFLICT` avec la ligne actuelle, pour le dialogue de conflit). La
+> quantité reste > 0 : ligne finie → status `consumed`, erreur de saisie → `removed`
+> (jamais supprimée physiquement). Migration 20261017_0053 pour `version`.
+> Scan du placard, chatbot, décompte après repas, alertes de date : pas encore.
 
 ### 11.2 Stock item fields (V1)
 
@@ -897,8 +902,8 @@ must be implemented in backend patches before UI relies on them.
 | Body | `TBD POST /api/pulse/body-snapshots` |
 | Pain | `TBD POST /api/pulse/pain-logs` |
 | Stock | `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
-| Stock | `TBD POST /api/pulse/food-stock` |
-| Stock | `TBD PATCH /api/pulse/food-stock/{stock_item_id}` |
+| Stock | `POST /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
+| Stock | `PATCH /api/imperium/pulse/food-stock/{stock_item_id}` (CODÉ 2026-10-17, avec `version`) |
 | Stock | `TBD POST /api/pulse/food-stock/scan` |
 | Stock | `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` |
 | Vault handoff | CODÉ autrement (2026-10-17) : `stock_lines` de `POST /api/imperium/vault/receipt-extractions/{id}/validate`, une seule validation pour les deux domaines (doc 37 §3.4). |
