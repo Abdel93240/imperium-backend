@@ -87,7 +87,11 @@ const T = {
     const F2 = await import("./flows.js"); F2.openTerminal({ ctx: { kind: "standard" }, initial: [] }); await wait(300); let m = top(); type($("textarea", m), "Test hors ligne"); $("button[aria-label='Envoyer']", m).click(); await wait(400);
     r["message marqué en attente"] = text(m).includes("en attente d'envoi"); modals.closeAll();
     const mis = (await svc.getDashboard()).mission; F2.openResult(mis, "done"); await wait(300); btnT("Valider", top()).click(); await wait(1200);
-    r["pas de faux succès (refus explicite)"] = text($("#toast")).includes("Hors ligne") && (await svc.getDashboard()).mission.id === mis.id; app.offline = false; svc.setScenario({ offline: false }); return check(r); },
+    r["pas de faux succès (en attente, mission inchangée)"] = text($("#toast")).includes("en attente d'envoi") && (await svc.getDashboard()).mission.id === mis.id;
+    await app.refresh(false); await wait(400); r["statut « en attente » visible"] = text().includes("Mission faite — en attente d'envoi") && text($(".offline-bar")).includes("1 en attente");
+    btnT("Replanifier la journée").disabled || (await (await import("./flows.js")).openReplan(), await wait(300)); modals.closeAll();
+    let refused = ""; try { await svc.requestReplan({ reason: "x" }); } catch (e) { refused = e.message; } r["action IA refusée hors ligne"] = refused.startsWith("Hors ligne");
+    app.offline = false; svc.setScenario({ offline: false }); const f = await svc.flushPending(); r["envoi au retour du réseau, confirmé par le serveur"] = f.sent === 1 && (await svc.getDashboard()).mission.id !== mis.id; return check(r); },
   async R21() { await go("dashboard", { error: true }); const r = { "Impossible de joindre Imperium": text().includes("Impossible de joindre Imperium"), "Réessayer": !!btnT("Réessayer"), "statut rouge": !!$("#main .dot.red") }; svc.setScenario({ error: false }); return check(r); },
   async R22() { await go("dashboard"); btnT("Commencer le Weekly Review").click(); await wait(3200); let m = top(); const r = { "terminal Weekly Review": !!m && text(m).includes("WEEKLY REVIEW"), "aucun bouton Suivant": !btnT("Suivant", m) && !btnT("Précédent", m) };
     await send($(".term", m), "J'ai tenu mon programme."); await send($(".term", m), "La fatigue du mercredi."); type($("textarea", m), "Oui, je valide."); $("button[aria-label='Envoyer']", m).click();

@@ -160,7 +160,8 @@ export function createDemoProvider() {
       return {
         day: { state: db.day.state, startedAt: db.day.startedAt },
         wr: db.wr.state, intervention: db.standby.length > 0,
-        mission: db.day.state === "active" ? clone(db.plan.find((p) => p.status === "active")) : null,
+        mission: db.day.state === "active" ? (() => { const m = clone(db.plan.find((p) => p.status === "active")); const q = m && api.pendingFor(m.id); if (q) m.pendingResult = q.label; return m; })() : null,
+        pendingFinish: db.pending.some((p) => p.status === "pending" && p.type === "finishDay"),
         plan: db.day.state === "active" ? clone(db.plan) : [],
         replan: { eligibleAt: db.replan.eligibleAt },
         finance: { balance: bal, pressure: db.finance.pressure.score, tx: clone(db.finance.tx.slice(0, 3)) },
@@ -240,7 +241,6 @@ export function createDemoProvider() {
     },
     async createTransaction(tx) {
       await io(700);
-      if (scen.offline) throw Object.assign(new Error("Hors ligne : une transaction n'est jamais rejouée automatiquement. Réessaie au retour du réseau."), { code: "OFFLINE" });
       const t = { id: id("tx"), ...tx }; db.finance.tx.unshift(t);
       const w = db.finance.wallets.find((x) => x.id === tx.wallet); if (w) w.value += tx.amount;
       return clone(t);
@@ -324,10 +324,30 @@ export function createDemoProvider() {
     async feedRetry(fid) { await sleep(1800); const f = db.feed.find((x) => x.id === fid); f.state = "to_validate"; f.error = null; f.conv = [["IMPERIUM", "J'ai pu lire le document cette fois. C'est un relevé bancaire d'octobre. Je l'enregistre comme contexte financier ?"]]; return clone(f); },
   };
 
-  // Hors ligne : les écritures sont refusées explicitement (pas de faux succès, pas de rejeu aveugle).
-  for (const k of ["finishDay", "startDay", "completeMission", "failMission", "saveNotes", "requestReplan", "acceptReplan", "saveProjects", "saveRoutine", "deleteRoutine", "saveSettings", "savePriorities", "saveModelRole", "saveThresholds", "replaceApiKey", "deleteApiKey", "feedImport", "feedSave", "feedDelete", "feedRetry", "resolveIntervention", "startWR", "completeTopProject"]) {
-    const f = api[k]; api[k] = async (...a) => { if (scen.offline) throw Object.assign(new Error("Hors ligne : action non envoyée. Réessaie au retour du réseau."), { code: "OFFLINE" }); return f(...a); };
+  // Hors ligne (doc 14) : les actions autorisées sont mises en file avec un statut « en attente »
+  // (jamais de faux succès) ; le backend confirme au retour du réseau. Les autres sont refusées.
+  const QUEUE = { finishDay: "Fin de journée", completeMission: "Mission faite", failMission: "Mission non faite", createTransaction: "Transaction", saveNotes: "Notes de mission" };
+  db.pending = []; const orig = {};
+  for (const k of ["finishDay", "startDay", "completeMission", "failMission", "saveNotes", "requestReplan", "acceptReplan", "saveProjects", "saveRoutine", "deleteRoutine", "saveSettings", "savePriorities", "saveModelRole", "saveThresholds", "replaceApiKey", "deleteApiKey", "feedImport", "feedSave", "feedDelete", "feedRetry", "resolveIntervention", "startWR", "completeTopProject", "createTransaction"]) {
+    const f = (orig[k] = api[k]);
+    api[k] = async (...a) => {
+      if (!scen.offline) return f(...a);
+      if (!QUEUE[k]) throw Object.assign(new Error("Hors ligne : cette action demande le serveur. Réessaie au retour du réseau."), { code: "OFFLINE" });
+      const item = { id: id("q"), type: k, label: QUEUE[k], detail: k === "createTransaction" ? `${a[0].label} ${a[0].amount} €` : "", args: clone(a), createdAt: now(), status: "pending", idempotencyKey: id("idem") };
+      db.pending.push(item); return { pending: true, item: clone(item) };
+    };
   }
+  api.listPending = async () => clone(db.pending.filter((p) => p.status !== "cancelled" && p.status !== "synced"));
+  api.cancelPending = async (qid) => { const p = db.pending.find((x) => x.id === qid); if (p && p.status === "pending") p.status = "cancelled"; return { ok: true }; };
+  api.flushPending = async () => {
+    let sent = 0;
+    for (const p of db.pending.filter((x) => x.status === "pending" || x.status === "failed")) {
+      p.status = "syncing";
+      try { await orig[p.type](...p.args); p.status = "synced"; sent++; } catch (e) { p.status = "failed"; p.error = e.message; }
+    }
+    return { sent, failed: db.pending.filter((x) => x.status === "failed").length };
+  };
+  api.pendingFor = (mid) => db.pending.find((p) => p.status === "pending" && (p.type === "completeMission" || p.type === "failMission") && p.args[0] === mid);
 
   function findProjectMission(mid) { for (const p of db.projects) { const m = p.missions.find((x) => x.id === mid); if (m) return { ...m, project: p.title }; } }
 

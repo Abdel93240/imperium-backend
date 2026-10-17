@@ -23,7 +23,8 @@ export const dashboard = {
           h("span", { class: "muted" }, "Écoulé"), liveTimer(() => fmtDur(clock.now() - vm.day.startedAt), "mono muted")) : h("div", { class: "muted small" }, "Démarre ta journée pour voir ta mission et ton programme.")),
       h("div", { class: "col", style: "margin-left:auto;align-items:flex-end;gap:8px" },
         h("img", { class: "calli", src: "assets/brand/calligraphie_compacte_retenue.png", alt: "إن الساعة آتية لا ريب فيها" }),
-        started ? (() => { const b = btn("Terminer la journée", { kind: "primary", onClick: () => busy(b, async () => { await svc.finishDay(); toast("Journée terminée. Les missions non faites retournent au backlog."); app.refresh(); }) }); return b; })()
+        started && vm.pendingFinish ? h("span", { class: "pill orange" }, "Fin de journée en attente d'envoi")
+        : started ? (() => { const b = btn("Terminer la journée", { kind: "primary", onClick: () => busy(b, async () => { const r = await svc.finishDay(); toast(r?.pending ? "Hors ligne : fin de journée en attente d'envoi. Le serveur clôturera la journée." : "Journée terminée. Les missions non faites retournent au backlog."); app.refresh(); }) }); return b; })()
           : (() => { const b = btn("Démarrer la journée", { kind: "primary", big: true, onClick: async () => { await withLoader("TA JOURNÉE", "Préparation de ta journée…", () => svc.startDay()); app.refresh(false); } }); return b; })())));
 
     // Bannières : 2 max ; ordre d'affichage WR puis Intervention (kit, règles finales).
@@ -61,6 +62,7 @@ export const dashboard = {
         h("div", { class: "row small", style: "margin-top:6px;gap:14px" }, h("span", { class: "muted" }, "Début prévu"), h("span", { class: "mono" }, fmtHM(m.plannedStart)), h("span", { class: "vsep" }), h("span", { class: "muted" }, "Durée prévue"), h("span", { class: "mono" }, fmtMin(m.durationMin))),
         m.annexes?.length ? h("div", { style: "margin-top:8px" }, h("div", { class: "row" }, h("span", { class: "h3" }, "Missions annexes"), h("span", { class: "tiny dim" }, "Facultatives")),
           h("ul", { class: "annexes" }, m.annexes.slice(0, 6).map((a) => h("li", null, h("span", { class: "ellipsis" }, a.title))))) : null,
+        m.pendingResult ? h("div", { class: "row", style: "justify-content:flex-end;margin-top:8px" }, h("span", { class: "pill orange" }, `${m.pendingResult} — en attente d'envoi`)) :
         h("div", { class: "row", style: "justify-content:flex-end;margin-top:8px;gap:12px" },
           btn("Fait", { kind: "success", icon: "check", iconVariant: "success", onClick: () => openResult(m, "done") }),
           btn("Pas fait", { kind: "danger", icon: "close", iconVariant: "danger", onClick: () => openResult(m, "fail") }))));

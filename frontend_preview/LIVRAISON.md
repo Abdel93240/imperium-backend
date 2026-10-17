@@ -24,7 +24,9 @@ Recette : servir sur 127.0.0.1:8770 puis `python3 frontend_preview/run_recette.p
 ## Structure
 - `js/services/demo.js` — fournisseur de démonstration (DEMO.json : horloge 07:24:18,
   journée 03:30, mission 07:00, délai de replan +3 min, pression 52, Imperium sans
-  estimation WR, VTC 35 %). Aucune requête réseau. Écritures refusées hors ligne.
+  estimation WR, VTC 35 %). Aucune requête réseau. Hors ligne (doc 14) : fin de journée,
+  résultat de mission, transaction et notes vont en file « en attente » (annulables,
+  envoyées au retour du réseau) ; les actions IA sont refusées.
 - `js/services/backend.js` — adaptateur réel, même interface ; carte opération → route
   du dépôt (existe / partiel / à confirmer / manquant). Aucune route inventée.
 - `js/services/index.js` — seul point d'accès des écrans (`svc`).

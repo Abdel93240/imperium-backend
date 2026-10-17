@@ -56,7 +56,23 @@ async function renderPage(name, silent) {
 }
 
 export function offlineBar() {
-  return app.offline ? h("div", { class: "offline-bar", role: "status" }, icon("wifi_off", "gold", 18), "Hors ligne — tes actions seront envoyées au retour du réseau. Affichage depuis le cache.") : "";
+  if (!app.offline) return "";
+  const count = h("span");
+  const bar = h("div", { class: "offline-bar", role: "status" }, icon("wifi_off", "gold", 18), h("span", { class: "grow" }, "Hors ligne — affichage depuis le cache. Les actions autorisées attendent le retour du réseau."), count);
+  svc.listPending?.().then((list) => { if (list.length) count.replaceChildren(h("button", { class: "link", onclick: () => openPending() }, `${list.length} en attente ›`)); });
+  return bar;
+}
+
+const ST = { pending: ["En attente", "orange"], syncing: ["Envoi…", "gold"], failed: ["Échec", "red"], conflict: ["Conflit", "red"] };
+export async function openPending() {
+  const { modals, modal } = await import("./core.js");
+  const list = await svc.listPending();
+  modals.open((close) => modal({ title: "Actions en attente", subtitle: "Elles seront envoyées au retour du réseau ; le serveur confirme ou signale un conflit.", close,
+    body: list.length ? list.map((p) => h("div", { class: "row", style: "min-height:56px;border-bottom:1px solid var(--sep-soft)" },
+      h("div", { class: "grow" }, h("div", null, p.label, p.detail ? h("span", { class: "muted" }, " · " + p.detail) : null), h("div", { class: "tiny dim mono" }, "créée à " + new Date(p.createdAt).toTimeString().slice(0, 5) + (p.error ? " · " + p.error : ""))),
+      h("span", { class: `pill ${ST[p.status][1]}` }, ST[p.status][0]),
+      p.status === "pending" ? btn("Annuler", { kind: "neutral", onClick: async () => { await svc.cancelPending(p.id); close(); app.refresh(); openPending(); } }) : null)) : h("div", { class: "muted" }, "Aucune action en attente."),
+    foot: [btn("Fermer", { kind: "neutral", onClick: close })] }));
 }
 
 function skeleton(kind = "dash") {

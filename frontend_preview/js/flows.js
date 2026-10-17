@@ -54,9 +54,10 @@ export function openResult(mission, mode) {
     ];
     save = btn(mode === "done" ? "Valider" : "Confirmer", { kind: mode === "done" ? "success" : "danger", onClick: () => busy(save, async () => {
       try {
-        if (mode === "done") await svc.completeMission(mission.id, { remark: draft.remark, overtimeReason: overtime ? reasonText.value : null, completedAnnexIds: [...draft.annexes] });
-        else await svc.failMission(mission.id, { reasonCode: draft.code, reason: reasonText.value.trim() || null });
-        close(); toast(mode === "done" ? "Mission validée." : "Mission enregistrée comme non faite."); app.refresh();
+        const res = mode === "done" ? await svc.completeMission(mission.id, { remark: draft.remark, overtimeReason: overtime ? reasonText.value : null, completedAnnexIds: [...draft.annexes] })
+          : await svc.failMission(mission.id, { reasonCode: draft.code, reason: reasonText.value.trim() || null });
+        close(); toast(res?.pending ? "Hors ligne : enregistré, en attente d'envoi. Le serveur confirmera." : mode === "done" ? "Mission validée." : "Mission enregistrée comme non faite."); app.refresh();
+        if (res?.pending) return;
         if (mode !== "done" && CHAT[draft.code]) openTerminal({ ctx: { kind: "standard", label: "MISSION NON FAITE" }, initial: [["IMPERIUM", CHAT[draft.code]]] });
       } catch (e) { toast(e.message || "Échec de l'enregistrement. Réessaie."); }
     }) });
@@ -121,7 +122,7 @@ export async function openNotes(missionId, { editable = true } = {}) {
   const n = await svc.getNotes(missionId);
   modals.open((close) => {
     const ta = h("textarea", { class: "textarea", style: "min-height:140px", readOnly: !editable }, n.notes);
-    const save = btn("Enregistrer", { kind: "primary", onClick: () => busy(save, async () => { await svc.saveNotes(missionId, ta.value); close(); toast("Notes enregistrées."); }) });
+    const save = btn("Enregistrer", { kind: "primary", onClick: () => busy(save, async () => { const res = await svc.saveNotes(missionId, ta.value); close(); toast(res?.pending ? "Hors ligne : notes en attente d'envoi." : "Notes enregistrées."); }) });
     return modal({ title: "Notes de la mission", close, size: "small",
       body: [h("div", null, h("div", { class: "small muted" }, n.context), h("div", { class: "h2", style: "margin-top:4px" }, n.title)),
         n.description ? h("div", { class: "muted" }, n.description) : null, h("hr", { class: "sep" }),
@@ -175,7 +176,7 @@ export async function openTransaction(draft) {
       if (!(n > 0)) { err.textContent = "Indique un montant."; return; }
       if (!draft.label.trim()) { err.textContent = "Indique un libellé."; return; }
       if (!draft.category) { err.textContent = "Choisis une catégorie."; return; }
-      try { await svc.createTransaction({ amount: draft.type === "in" ? n : -n, date: new Date(draft.date).getTime(), label: draft.label.trim(), wallet: draft.wallet, category: draft.category }); close(); toast("Transaction enregistrée."); app.refresh(); }
+      try { const res = await svc.createTransaction({ amount: draft.type === "in" ? n : -n, date: new Date(draft.date).getTime(), label: draft.label.trim(), wallet: draft.wallet, category: draft.category }); close(); toast(res?.pending ? "Hors ligne : transaction en attente d'envoi. Le serveur vérifiera les doublons." : "Transaction enregistrée."); app.refresh(); }
       catch (e) { err.textContent = e.message; }
     }) });
     return modal({ title: "Ajouter une transaction", close,

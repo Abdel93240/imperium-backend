@@ -34,7 +34,8 @@ if (isDemo) {
           opt("Chargement (skeleton)", sc.loading, () => { svc.setScenario({ loading: true }); setTimeout(() => { svc.setScenario({ loading: false }); }, 4000); }),
           opt("Vide — premier jour", sc.empty, () => svc.setScenario({ empty: !sc.empty })),
           opt("Erreur serveur", sc.error, () => svc.setScenario({ error: !sc.error })),
-          opt("Hors ligne", app.offline, () => { app.offline = !app.offline; svc.setScenario({ offline: app.offline }); }),
+          opt("Hors ligne", app.offline, async () => { app.offline = !app.offline; svc.setScenario({ offline: app.offline });
+            if (!app.offline) { const r = await svc.flushPending(); if (r.sent || r.failed) toast(`Réseau rétabli : ${r.sent} action(s) envoyée(s)${r.failed ? `, ${r.failed} en échec` : ""}.`); app.refresh(); } }),
           opt("Bulle : autorisation Android refusée", sc.overlayDenied, () => svc.setScenario({ overlayDenied: !sc.overlayDenied })),
           h("button", { onclick: async () => { close(); const r = await svc.completeTopProject(); toast(`« ${r.done} » terminé : « ${r.promoted} » devient actif.`); app.refresh(); } }, "Terminer le projet actif n° 1"),
           opt("Tout réinitialiser", false, () => { app.offline = false; svc.setScenario({ mission: "vtc", day: "active", loading: false, empty: false, error: false, offline: false, cooldown: true, long: false, longDay: false, overlayDenied: false }); })),
