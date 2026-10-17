@@ -137,6 +137,7 @@ def _line_items(lines: list[str], folded: list[str]) -> list[ReceiptLine]:
 
 
 def _fold(line: str) -> str:
+    line = line.replace("œ", "oe").replace("Œ", "OE").replace("æ", "ae").replace("Æ", "AE")  # NFKD ne les décompose pas
     return unicodedata.normalize("NFKD", line).encode("ascii", "ignore").decode("ascii").upper()
 
 

@@ -371,6 +371,25 @@ Output strict JSON only.
 
 ---
 
+### 5.4 Implémentation V1 du scan du placard (CODÉ le 2026-10-17, migration 20261017_0055)
+
+- Consigne §5.1 + §5.2 versionnée dans `backend/app/services/ai/prompts/ocr_kitchen_inventory.txt`
+  (§11), envoyée au service local par `POST /vision` (contrat dans `ops/gpu/OCR_SMOKE_CHECKLIST.md`).
+- Réponse validée strictement : éléments mal formés écartés, catégorie hors liste → other,
+  unité hors liste → piece, quantité absente → 1 proposée (`quantity_estimated = false`),
+  confiance bornée à 0..1 ; forme différente → analyse « illisible ».
+- Comparaison au stock actif : même nom normalisé, puis inclusion (« Oeufs » ↔ « Œufs plein
+  air ») → `update` avec la quantité et la version actuelles ; sinon `add`. Date visible →
+  DLC pour dairy/meat/fish, DDM sinon. Confiance < 0,6 → `low_confidence`. Aucun produit
+  ou confiance < 0,3 → « Aucun aliment détecté » ; qualité poor → « Photo trop floue ».
+- Un produit absent de la photo n'est jamais retiré (la photo ne montre qu'une partie).
+- **La photo n'est jamais conservée** (plus strict que les 7 jours de §9.3) : empreinte,
+  proposition et résultat seulement (`pulse_pantry_scans`).
+- Routes `/api/imperium/pulse/food-stock/scans` : `POST` (corps brut, X-Filename,
+  Idempotency-Key), `GET /{id}`, `POST /{id}/validate` (Idempotency-Key ; lignes gardées
+  seulement ; version de stock dépassée → 409 `STOCK_VERSION_CONFLICT`, rien n'est écrit),
+  `POST /{id}/cancel`.
+
 ## 6. General Document OCR
 
 Used for: `media.image_ocr` task when no specific extractor matches.

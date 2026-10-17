@@ -372,7 +372,8 @@ Cross-module links:
 > `STOCK_VERSION_CONFLICT` avec la ligne actuelle, pour le dialogue de conflit). La
 > quantité reste > 0 : ligne finie → status `consumed`, erreur de saisie → `removed`
 > (jamais supprimée physiquement). Migration 20261017_0053 pour `version`.
-> Scan du placard, chatbot, décompte après repas, alertes de date : pas encore.
+> Scan du placard : CODÉ (2026-10-17, doc 37 §5.4, routes `/food-stock/scans`, source
+> pantry_scan). Chatbot, décompte après repas : pas encore.
 
 ### 11.2 Stock item fields (V1)
 
@@ -914,8 +915,8 @@ must be implemented in backend patches before UI relies on them.
 | Stock | `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `POST /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `PATCH /api/imperium/pulse/food-stock/{stock_item_id}` (CODÉ 2026-10-17, avec `version`) |
-| Stock | `TBD POST /api/pulse/food-stock/scan` |
-| Stock | `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` |
+| Stock | `POST /api/imperium/pulse/food-stock/scans` (CODÉ 2026-10-17) |
+| Stock | `POST /api/imperium/pulse/food-stock/scans/{scan_id}/validate` (CODÉ 2026-10-17) |
 | Vault handoff | CODÉ autrement (2026-10-17) : `stock_lines` de `POST /api/imperium/vault/receipt-extractions/{id}/validate`, une seule validation pour les deux domaines (doc 37 §3.4). |
 | Medical | `TBD GET /api/pulse/medical-documents` |
 | Medical | `TBD POST /api/pulse/medical-documents` |

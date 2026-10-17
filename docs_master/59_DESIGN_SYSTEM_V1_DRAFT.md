@@ -1720,7 +1720,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Widgets :** image quality helper, inventory diff, confidence badge, low-confidence per-item warning.
 - **Assets :** Material Symbols `photo_camera`, `kitchen`, `add_box`, `warning`.
 - **Etats :** Loading=camera/OCR service scan pending ; Empty=0 item detected with retry/manual add CTA ; Error=camera permission/OCR service fail/invalid JSON ; Offline=camera can capture local photo but AI disabled banner ; Syncing=scan validate write line ; Synced=returns PUL-12 with stock update snackbar ; Conflict=scan already validated or stock version diff.
-- **Backend deps :** `TBD POST /api/pulse/food-stock/scan` with `Idempotency-Key`, `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` with `Idempotency-Key`, ai_task `pulse.kitchen_inventory_photo`.
+- **Backend deps :** `POST /api/imperium/pulse/food-stock/scans` (Idempotency-Key, corps brut), `GET …/scans/{id}`, `POST …/scans/{id}/validate` (Idempotency-Key ; 409 `STOCK_VERSION_CONFLICT`), `POST …/scans/{id}/cancel` (CODÉS 2026-10-17, doc 37 §5.4) ; tâche `pulse.kitchen_inventory_photo` par `POST /vision` du service local. La photo n'est pas conservée côté serveur : l'aperçu de la colonne gauche est la photo locale.
 - **Navigation :** from PUL-12; validation returns PUL-12; retry stays PUL-13.
 - **Tab S10 Ultra :** fullscreen camera/review route: preview left 50%, diff review right 50%, no second receipt validation.
 
@@ -1799,7 +1799,7 @@ Transitions conditionnelles canoniques V1 :
 | PUL-10 | none | `GET /api/pulse/meals`, `POST /api/pulse/recommendations` |
 | PUL-11 | none | `GET /api/pulse/workouts`, `GET /api/pulse/recovery-state`, `POST /api/pulse/recommendations` |
 | PUL-12 | `GET`, `POST`, `PATCH /{id}` sous `/api/imperium/pulse/food-stock` (codés 2026-10-17) | none |
-| PUL-13 | none | `POST /api/pulse/food-stock/scan`, `POST /api/pulse/food-stock/scans/{scan_id}/validate` |
+| PUL-13 | `POST /api/imperium/pulse/food-stock/scans`, `GET …/{id}`, `POST …/{id}/validate`, `POST …/{id}/cancel` (codés 2026-10-17) | none |
 | PUL-14 | none | `GET /api/pulse/medical-documents`, `POST /api/pulse/medical-documents`, `GET /api/pulse/medical-rules/active`, `POST /api/pulse/medical-rules/{rule_id}/activate` |
 
 All mutation endpoints require `Idempotency-Key`. Endpoint names are canonical UI contracts but remain `TBD` until backend patches implement them.

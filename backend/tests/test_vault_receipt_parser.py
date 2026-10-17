@@ -87,3 +87,9 @@ def test_line_item_quantity_forms() -> None:
 
 def test_fuel_receipt_has_no_food_lines() -> None:
     assert all(line.category_hint != "food" for line in parse_receipt_text(STATION).line_items)
+
+
+def test_ligatures_are_folded_before_keyword_matching() -> None:
+    from app.services.vault.receipt_parser import category_hint
+
+    assert category_hint("Œufs plein air x6") == "food"
