@@ -1,6 +1,6 @@
 """Santé sensible Pulse : consentement par domaine et relevé corporel (doc 40 §14, doc 05)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
@@ -120,3 +120,86 @@ class PainLogRead(BaseModel):
 
 class PainLogListResponse(BaseModel):
     items: list[PainLogRead]
+
+
+MedicalDocType = Literal[
+    "prescription", "blood_test", "imaging_report", "certificate", "physio_note", "allergy_note",
+    "consultation_summary", "vaccination", "other",
+]
+MedicalRuleType = Literal[
+    "workout_limit", "nutrition_constraint", "fasting_caution", "pain_watch", "medication_note", "general_context",
+]
+
+
+class MedicalDocumentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    doc_type: str
+    doc_date: date | None
+    original_name: str
+    mime_type: str
+    size_bytes: int
+    status: str
+    consent_version: str
+    consented_at: datetime
+    retention_delete_after: datetime
+    created_at: datetime
+    message: str | None = None
+
+
+class MedicalDocumentListResponse(BaseModel):
+    items: list[MedicalDocumentRead]
+
+
+class MedicalRuleCreate(BaseModel):
+    """Règle saisie par l'utilisateur (V1 : l'extraction automatique n'est pas encore active)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule_type: MedicalRuleType
+    rule_text: str = Field(min_length=1, max_length=1000)
+    severity: Literal["info", "warning", "critical"]
+    source_document_id: UUID | None = None
+    source_quote: str | None = Field(default=None, max_length=500)
+    expires_at: date | None = None
+
+    @model_validator(mode="after")
+    def text_not_blank(self) -> "MedicalRuleCreate":
+        if not self.rule_text.strip():
+            raise ValueError("rule_text is empty.")
+        return self
+
+
+class MedicalRuleActivateRequest(BaseModel):
+    """Doc 34 §10.1 : source relue, texte confirmé, règle encore valable — les trois sont obligatoires."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reviewed_source: Literal[True]
+    confirmed_text: Literal[True]
+    still_relevant: Literal[True]
+    acknowledge_critical: bool = False
+    supersedes_rule_id: UUID | None = None
+
+
+class MedicalRuleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    source_document_id: UUID | None
+    rule_type: str
+    rule_text: str
+    source_quote: str | None
+    severity: str
+    status: str
+    expires_at: date | None
+    validated_at: datetime | None
+    critical_acknowledged_at: datetime | None
+    deactivated_at: datetime | None
+    superseded_by: UUID | None
+    created_at: datetime
+
+
+class MedicalRuleListResponse(BaseModel):
+    items: list[MedicalRuleRead]

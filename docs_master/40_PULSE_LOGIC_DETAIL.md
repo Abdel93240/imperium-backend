@@ -206,8 +206,8 @@ the score card is hidden and an incomplete-data banner is shown.
 > en attente), eau bue (cible vide tant que le programme santé n'existe pas), dates limites
 > du stock, séances du jour (`workouts`), bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
 > `health_score_incomplete`. `health_score` reste vide (pas encore calculé) et la bannière
-> le dit. Douleurs en cours : bannière `pain_open`. Jeûne (Path) et règles médicales
-> actives : pas encore.
+> le dit. Douleurs en cours : bannière `pain_open` ; règles médicales actives : bannière
+> `medical_rules` (nombre seulement). Jeûne (Path) : pas encore.
 
 ---
 
@@ -1023,10 +1023,9 @@ must be implemented in backend patches before UI relies on them.
 | Stock | `POST /api/imperium/pulse/food-stock/scans` (CODÉ 2026-10-17) |
 | Stock | `POST /api/imperium/pulse/food-stock/scans/{scan_id}/validate` (CODÉ 2026-10-17) |
 | Vault handoff | CODÉ autrement (2026-10-17) : `stock_lines` de `POST /api/imperium/vault/receipt-extractions/{id}/validate`, une seule validation pour les deux domaines (doc 37 §3.4). |
-| Medical | `TBD GET /api/pulse/medical-documents` |
-| Medical | `TBD POST /api/pulse/medical-documents` |
-| Medical | `TBD GET /api/pulse/medical-rules/active` |
-| Medical | `TBD POST /api/pulse/medical-rules/{rule_id}/activate` |
+| Medical | `GET/POST /api/imperium/pulse/medical-documents` + `GET …/{id}/file`, `DELETE …/{id}` (CODÉS 2026-10-17, doc 34 §16-bis) |
+| Medical | `GET /api/imperium/pulse/medical-rules[/active]`, `POST …/medical-rules` (CODÉS 2026-10-17) |
+| Medical | `POST /api/imperium/pulse/medical-rules/{rule_id}/activate` et `/deactivate`, `DELETE …/{rule_id}` (CODÉS 2026-10-17) |
 | Recommendations | `TBD POST /api/pulse/recommendations` |
 
 ---

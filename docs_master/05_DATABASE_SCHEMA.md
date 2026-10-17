@@ -848,9 +848,9 @@ Sous-domaines Health/Pulse futurs non codes :
   20261017_0061), sous consentement « body ». Profils biologiques : FUTUR / NON CODE.
 - Health scores : FUTUR / NON CODE. Aucun score sante n'est calcule ou stocke
   par la V1 codee.
-- Medical documents et medical rules : FUTUR / NON CODE. Les docs 34/40
-  annoncent le besoin, mais le schema doit etre redessine ici au moment du
-  chantier avec consentement, retention, chiffrement et privacy gate.
+- Medical documents et medical rules : CODE, tables `pulse_medical_documents` et
+  `pulse_medical_rules` (voir plus bas, migration 20261017_0063), sous consentement
+  « medical ».
 - Recommandations : FUTUR / NON CODE. Schema a definir au moment du chantier
   recommandations ; aucune recommandation automatique n'est stockee en V1.
 
@@ -1489,6 +1489,18 @@ Journal des douleurs Pulse (CODE, migration 20261017_0062, doc 40 §16) :
 - `pulse_pain_logs` : zone (liste fermee), cote left|right|both, intensite 0..10, type,
   gene, impact sur la seance, seance liee (FK pulse_workouts, SET NULL), noted_at,
   resolved_at, Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
+
+Medical Pulse (CODE, migration 20261017_0063, doc 34 §16-bis) :
+- `pulse_medical_documents` : type (liste fermee), date, nom d'origine, type MIME, taille,
+  sha256, nom de stockage interne (fichier 0600 sous MEDICAL_DOCUMENTS_STORAGE_DIR),
+  statut uploaded|extracting|needs_validation|validated|failed, version et portee du
+  consentement de l'envoi, consented_at, retention_delete_after (90 jours),
+  Idempotency-Key unique + empreinte.
+- `pulse_medical_rules` : document source (FK SET NULL), type (liste du doc 34 §7), texte,
+  citation, severite info|warning|critical, statut proposed|active|inactive|expired|
+  superseded, echeance, validated_at, accuse de lecture critique, deactivated_at,
+  superseded_by (FK), Idempotency-Key unique + empreinte, cle et empreinte de l'activation.
+- Job `pulse.medical_retention` seme desactive.
 
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la

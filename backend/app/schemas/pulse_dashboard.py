@@ -24,7 +24,7 @@ class DashboardHydrationRead(BaseModel):
 
 
 class DashboardBannerRead(BaseModel):
-    kind: Literal["stock_expiry", "pain_open", "meal_drafts", "meals_without_macros", "health_score_incomplete"]
+    kind: Literal["stock_expiry", "pain_open", "medical_rules", "meal_drafts", "meals_without_macros", "health_score_incomplete"]
     level: Literal["info", "warning", "error"]
     message: str
 

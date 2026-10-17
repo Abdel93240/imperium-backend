@@ -1486,3 +1486,82 @@ class PulsePainLog(UUIDPrimaryKeyMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+MEDICAL_DOC_TYPES = (
+    "prescription", "blood_test", "imaging_report", "certificate", "physio_note", "allergy_note",
+    "consultation_summary", "vaccination", "other",
+)
+MEDICAL_RULE_TYPES = (
+    "workout_limit", "nutrition_constraint", "fasting_caution", "pain_watch", "medication_note", "general_context",
+)
+
+
+class PulseMedicalDocument(UUIDPrimaryKeyMixin, Base):
+    """Document médical (doc 34) sous double consentement ; fichier hors base, conservé 90 jours par défaut."""
+
+    __tablename__ = "pulse_medical_documents"
+    __table_args__ = (
+        CheckConstraint(f"doc_type IN ({', '.join(repr(t) for t in MEDICAL_DOC_TYPES)})", name="doc_type_check"),
+        CheckConstraint("status IN ('uploaded', 'extracting', 'needs_validation', 'validated', 'failed')", name="status_check"),
+        CheckConstraint("size_bytes > 0", name="size_positive"),
+        Index("pulse_medical_documents_user_created_idx", "user_id", "created_at"),
+        Index("pulse_medical_documents_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+        Index("pulse_medical_documents_retention_idx", "retention_delete_after"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    doc_type: Mapped[str] = mapped_column(Text, nullable=False)
+    doc_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    original_name: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    consent_version: Mapped[str] = mapped_column(Text, nullable=False)
+    consent_scope: Mapped[str] = mapped_column(Text, nullable=False)
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    retention_delete_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PulseMedicalRule(UUIDPrimaryKeyMixin, Base):
+    """Règle médicale (doc 34 §9–§10) : proposée, jamais active sans confirmation explicite de l'utilisateur."""
+
+    __tablename__ = "pulse_medical_rules"
+    __table_args__ = (
+        CheckConstraint(f"rule_type IN ({', '.join(repr(t) for t in MEDICAL_RULE_TYPES)})", name="rule_type_check"),
+        CheckConstraint("severity IN ('info', 'warning', 'critical')", name="severity_check"),
+        CheckConstraint("status IN ('proposed', 'active', 'inactive', 'expired', 'superseded')", name="status_check"),
+        CheckConstraint("length(btrim(rule_text)) > 0", name="rule_text_not_blank"),
+        Index("pulse_medical_rules_active_idx", "user_id", "rule_type", "status", postgresql_where=text("status = 'active'")),
+        Index("pulse_medical_rules_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_document_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_medical_documents.id", ondelete="SET NULL"), nullable=True
+    )
+    rule_type: Mapped[str] = mapped_column(Text, nullable=False)
+    rule_text: Mapped[str] = mapped_column(Text, nullable=False)
+    source_quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    severity: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="proposed")
+    expires_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    critical_acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    superseded_by: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_medical_rules.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    activation_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    activation_request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )

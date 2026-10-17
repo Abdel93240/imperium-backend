@@ -1,10 +1,15 @@
-"""Santé sensible Pulse : consentement par domaine, relevé corporel PUL-08 et douleurs PUL-09 (doc 40 §14, §16, doc 05)."""
+"""Santé sensible Pulse : consentement par domaine, relevé corporel PUL-08, douleurs PUL-09 et médical PUL-14
+(doc 40 §14, §16, doc 34, doc 05)."""
 
+import io
+from datetime import date
 from typing import Annotated
+from urllib.parse import quote, unquote
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Path, Response, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Header, HTTPException, Path, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.pulse_health import (
@@ -16,11 +21,18 @@ from app.schemas.pulse_health import (
     ConsentRead,
     DeletedCountRead,
     HealthDomain,
+    MedicalDocType,
+    MedicalDocumentListResponse,
+    MedicalDocumentRead,
+    MedicalRuleActivateRequest,
+    MedicalRuleCreate,
+    MedicalRuleListResponse,
+    MedicalRuleRead,
     PainLogCreate,
     PainLogListResponse,
     PainLogRead,
 )
-from app.services.pulse import body, health_consent, pain
+from app.services.pulse import body, health_consent, medical, pain
 
 router = APIRouter()
 
@@ -162,4 +174,160 @@ def delete_pain_log_route(pain_log_id: UUID, current_user: CurrentUserDep, db: S
         pain.delete_log(db, current_user=current_user, pain_log_id=pain_log_id)
     except pain.PainLogNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- médical (doc 34) ----------
+
+def _require_key(idempotency_key: str | None) -> str:
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    return idempotency_key
+
+
+def _medical_error(db: SessionDep, exc: Exception):
+    db.rollback()
+    if isinstance(exc, health_consent.ConsentRequiredError):
+        return consent_required_response(exc)
+    if isinstance(exc, medical.UploadConsentMissingError):
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc), "code": "UPLOAD_CONSENT_REQUIRED"})
+    if isinstance(exc, medical.MedicalNotFoundError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if isinstance(exc, medical.MedicalFileError):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+_MEDICAL_ERRORS = (
+    health_consent.ConsentRequiredError,
+    health_consent.ConsentVersionError,
+    medical.UploadConsentMissingError,
+    medical.MedicalNotFoundError,
+    medical.MedicalFileError,
+    medical.MedicalStateError,
+    medical.MedicalIdempotencyConflictError,
+)
+
+
+@router.get("/medical-documents", response_model=MedicalDocumentListResponse)
+def list_medical_documents_route(current_user: CurrentUserDep, db: SessionDep) -> MedicalDocumentListResponse:
+    return medical.list_documents(db, current_user=current_user)
+
+
+@router.post("/medical-documents", response_model=MedicalDocumentRead, status_code=status.HTTP_201_CREATED)
+async def upload_medical_document_route(
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    doc_type: MedicalDocType,
+    x_filename: Annotated[str, Header(alias="X-Filename")],
+    consent: bool = False,
+    consent_version: str | None = None,
+    doc_date: date | None = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    content_length: Annotated[int | None, Header(alias="Content-Length")] = None,
+):
+    """Corps brut ; consentement « medical » actif ET `consent=true` + `consent_version` pour cet envoi (doc 34 §5)."""
+    key = _require_key(idempotency_key)
+    if content_length is not None and content_length > medical.MAX_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Fichier refusé : 25 Mo maximum.")
+    buffer = bytearray()
+    async for chunk in request.stream():
+        buffer.extend(chunk)
+        if len(buffer) > medical.MAX_BYTES:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Fichier refusé : 25 Mo maximum.")
+    try:
+        read, duplicate = await run_in_threadpool(
+            medical.upload_document, db, current_user=current_user, filename=unquote(x_filename),
+            content_type=request.headers.get("content-type"), stream=io.BytesIO(bytes(buffer)), idempotency_key=key,
+            doc_type=doc_type, doc_date=doc_date, upload_consent=consent, consent_version=consent_version,
+        )
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.get("/medical-documents/{document_id}/file")
+def medical_document_file_route(document_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        path, mime_type, name = medical.document_file(db, current_user=current_user, document_id=document_id)
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+    return FileResponse(path, media_type=mime_type,
+                        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}", "Cache-Control": "no-store"})
+
+
+@router.delete("/medical-documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_medical_document_route(document_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """Suppression réelle du fichier, du document et des règles qui en sont tirées."""
+    try:
+        medical.delete_document(db, current_user=current_user, document_id=document_id)
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/medical-rules", response_model=MedicalRuleListResponse)
+def list_medical_rules_route(current_user: CurrentUserDep, db: SessionDep) -> MedicalRuleListResponse:
+    return medical.list_rules(db, current_user=current_user)
+
+
+@router.get("/medical-rules/active", response_model=MedicalRuleListResponse)
+def active_medical_rules_route(current_user: CurrentUserDep, db: SessionDep) -> MedicalRuleListResponse:
+    """Règles actives et non échues : celles que le planning et les suggestions peuvent lire."""
+    return medical.list_rules(db, current_user=current_user, active_only=True)
+
+
+@router.post("/medical-rules", response_model=MedicalRuleRead, status_code=status.HTTP_201_CREATED)
+def create_medical_rule_route(
+    payload: MedicalRuleCreate,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Règle saisie à la main : toujours « proposed », jamais active sans activation explicite."""
+    try:
+        read, duplicate = medical.create_rule(db, current_user=current_user, payload=payload, idempotency_key=_require_key(idempotency_key))
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.post("/medical-rules/{rule_id}/activate", response_model=MedicalRuleRead)
+def activate_medical_rule_route(
+    rule_id: UUID,
+    payload: MedicalRuleActivateRequest,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Trois confirmations obligatoires ; règle critique → `acknowledge_critical` ; `supersedes_rule_id` facultatif."""
+    try:
+        return medical.activate_rule(
+            db, current_user=current_user, rule_id=rule_id, payload=payload, idempotency_key=_require_key(idempotency_key)
+        )
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+
+
+@router.post("/medical-rules/{rule_id}/deactivate", response_model=MedicalRuleRead)
+def deactivate_medical_rule_route(rule_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        return medical.deactivate_rule(db, current_user=current_user, rule_id=rule_id)
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
+
+
+@router.delete("/medical-rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_medical_rule_route(rule_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        medical.delete_rule(db, current_user=current_user, rule_id=rule_id)
+    except _MEDICAL_ERRORS as exc:
+        return _medical_error(db, exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
