@@ -4,7 +4,7 @@ V1 : lecture du stock, ajout et modification manuels (PUL-12), et entrée des
 articles alimentaires d'un ticket validé (passage Vault → Pulse, doc 42 §15.2).
 Chaque achat est une ligne à part : deux paquets de riz achetés à des dates
 différentes n'ont pas la même date limite. Scan du placard : pantry_scan ; chatbot :
-stock_declaration ; décompte après repas : pas encore.
+stock_declaration ; décompte après repas : meals.
 
 Mutations (doc 40 §7–§8) : Idempotency-Key obligatoire (même clé + même contenu →
 même réponse ; contenu différent → conflit) ; une modification porte la version lue,
