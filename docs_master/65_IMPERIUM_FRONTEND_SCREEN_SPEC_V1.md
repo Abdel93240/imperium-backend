@@ -630,7 +630,7 @@ Ordre telephone :
 ### 8.5 Sections minimum
 
 > Backend : `GET|PATCH /api/imperium/settings` (codé le 2026-10-17, doc 43 §15) ; priorités : `GET|POST /api/imperium/decision-framework/priorities`.
-> État des services (fenêtre « Connexion à Imperium ») : `GET /api/health/services` (codé le 2026-10-17, authentifié) — API, base, mémoire vectorielle (pgvector + service d'embeddings), IA locale (Ollama), IA cloud ; états green|orange|red|grey ; un service non vérifiable est grey, jamais green (IA cloud : grey tant qu'aucun fournisseur n'est branché).
+> État des services (fenêtre « Connexion à Imperium ») : `GET /api/health/services` (codé le 2026-10-17, authentifié) — API, base, mémoire vectorielle (pgvector + service d'embeddings), IA locale (rôle local_executor), IA cloud ; états green|orange|red|grey ; un service non vérifiable est grey, jamais green (IA cloud : grey tant qu'aucun fournisseur n'est branché).
 
 | Section | Composant autorise | Contenu obligatoire |
 |---|---|---|
