@@ -206,7 +206,8 @@ the score card is hidden and an incomplete-data banner is shown.
 > en attente), eau bue (cible vide tant que le programme santé n'existe pas), dates limites
 > du stock, séances du jour (`workouts`), bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
 > `health_score_incomplete`. `health_score` reste vide (pas encore calculé) et la bannière
-> le dit. Jeûne (Path), règles médicales actives et douleurs : pas encore.
+> le dit. Douleurs en cours : bannière `pain_open`. Jeûne (Path) et règles médicales
+> actives : pas encore.
 
 ---
 
@@ -803,9 +804,23 @@ type if known, limitation notes, current workout impact. (No "voice note
 transcript" mechanism.)
 
 ```text
-TBD POST /api/pulse/pain-logs
+POST /api/imperium/pulse/pain-logs   (CODÉ 2026-10-17)
 Headers: Idempotency-Key
 ```
+
+> CODÉ (2026-10-17, migration 20261017_0062, table `pulse_pain_logs`), sous consentement
+> « pain » (doc 08 PULSE-004) :
+> - `POST` : zone (liste fermée : head, neck, shoulder, upper_back, lower_back, chest,
+>   abdomen, arm, elbow, wrist, hand, hip, thigh, knee, calf, ankle, foot, other), côté
+>   left|right|both, intensité 0..10, type, gêne, impact sur la séance, séance liée
+>   (doit appartenir à l'utilisateur), heure. Sans consentement → 403 `CONSENT_REQUIRED`.
+> - Intensité 8 à 10 (douleur en cours) → `suggest_replan` + « Douleur forte : veux-tu
+>   replanifier ta journée ? » ; l'écran propose, rien n'est déclenché seul.
+> - `GET ?include_resolved=` ; `POST /{id}/resolve` ; `DELETE /{id}` et
+>   `DELETE ?confirm=true` (suppression réelle, toujours permise).
+> - Événements `pulse.pain.logged|resolved|deleted` : identifiants et compte seulement.
+> - Tableau de bord : bannière `pain_open` (« 2 douleurs en cours, dont 1 forte. »).
+> - Interprétation par le modèle local et escalade (§13.3) : pas encore.
 
 ```text
 The pain log is DATA, an INPUT for the local model in workout adaptation (§13.3). The local model
@@ -1001,7 +1016,7 @@ must be implemented in backend patches before UI relies on them.
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/accept` |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/reject` |
 | Body | `GET/POST/DELETE /api/imperium/pulse/body-snapshots` + `/consents` (CODÉS 2026-10-17) |
-| Pain | `TBD POST /api/pulse/pain-logs` |
+| Pain | `GET/POST/DELETE /api/imperium/pulse/pain-logs` + `/{id}/resolve` (CODÉS 2026-10-17) |
 | Stock | `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `POST /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `PATCH /api/imperium/pulse/food-stock/{stock_item_id}` (CODÉ 2026-10-17, avec `version`) |

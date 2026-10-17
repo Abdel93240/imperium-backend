@@ -6,7 +6,7 @@ dates limites du stock, et des bannières courtes. Lecture seule.
 
 Le score santé n'est jamais affiché sans explication : tant qu'il n'est pas calculé,
 il reste vide et une bannière « données incomplètes » le dit. Jeûne (Path), règles
-médicales (doc 34) et douleurs : pas encore.
+médicales (doc 34) : pas encore. Douleurs : bannière sans détail.
 """
 
 from datetime import date, datetime, time, timedelta
@@ -23,7 +23,7 @@ from app.schemas.pulse_dashboard import (
     DashboardMealsRead,
     PulseDashboardRead,
 )
-from app.services.pulse import entries, expiry, hydration, meals, workouts
+from app.services.pulse import entries, expiry, hydration, meals, pain, workouts
 
 HEALTH_SCORE_INCOMPLETE = "Score santé masqué : pas encore assez de données pour l'expliquer."
 
@@ -46,6 +46,11 @@ def build_dashboard(db: Session, *, current_user: User, day: date) -> PulseDashb
     banners = []
     if report.message_fr:
         banners.append(DashboardBannerRead(kind="stock_expiry", level=report.level, message=report.message_fr))
+    open_pain, strong_pain = pain.open_summary(db, current_user=current_user)
+    if open_pain:
+        message = f"{open_pain} douleur{'s' if open_pain > 1 else ''} en cours"
+        message += f", dont {strong_pain} forte{'s' if strong_pain > 1 else ''}." if strong_pain else "."
+        banners.append(DashboardBannerRead(kind="pain_open", level="warning" if strong_pain else "info", message=message))
     if drafts:
         banners.append(DashboardBannerRead(
             kind="meal_drafts", level="info",
