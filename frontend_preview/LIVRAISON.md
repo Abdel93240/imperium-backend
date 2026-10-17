@@ -58,6 +58,8 @@ connexion (`/api/auth/login`).
 Codé le 2026-10-17 : missions annexes, `estimated_minutes`, `failure_reason_code`,
 `deadline_at`, statut `standby` et clôture de journée (doc 43 §5.4), replanification
 (demande, délai serveur, proposition IA, correction, acceptation/annulation).
+Runner `imperium.rolling_replan` codé (proposition déterministe + corrections par le modèle
+local), semé désactivé : à activer selon le doc 76.
 Manquant : notes de mission, projets/routines, catégorie suggérée,
 OCR, réglages, modèles/seuils/clés, logs IA, Nourrir l'IA (import/enregistrement),
 santé mémoire/IA. Carte complète : panneau Démo → « Carte des

@@ -1459,7 +1459,12 @@ class ReplanProposalAttachRequest(BaseModel):
     @classmethod
     def validate_blocks(cls, blocks: list[dict]) -> list[dict]:
         for block in blocks:
-            if not isinstance(block.get("title"), str) or not block["title"].strip():
+            if not isinstance(block, dict):
+                raise ValueError("Each proposal block must be an object.")
+            # Les blocs de contexte (priorités) n'ont pas de titre et ne bougent pas.
+            if block.get("block_type") != "priority_context" and (
+                not isinstance(block.get("title"), str) or not block["title"].strip()
+            ):
                 raise ValueError("Each proposal block needs a title.")
             if block.get("change", "unchanged") not in REPLAN_PROPOSAL_CHANGES:
                 raise ValueError("block change must be unchanged, moved, new or removed.")

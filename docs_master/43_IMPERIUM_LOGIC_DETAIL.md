@@ -135,6 +135,13 @@ CODE (2026-10-17, migration 20261017_0045, table planning_replan_events) :
   exclus), generated_from.replan_version +1, event planning.daily_plan.replanned ;
 - POST /api/imperium/day/replan/{id}/cancel → plan inchangé.
 Hooks : request_hook_replan() côté service ; ghusl_required et fasting_break passent le délai.
+Runner (CODE 2026-10-17, migration 20261017_0046) : job imperium.rolling_replan, abonné à
+planning.replan.requested et planning.replan.revision_requested, semé DÉSACTIVÉ (activation
+doc 76 + runner_enabled). Première proposition DÉTERMINISTE (§2) : new_event/other → suite
+décalée de 30 min ; fatigue → pause récupération 20 min + décalage ; wrong_estimation →
+mission en cours prolongée de 30 min ; priority_shift → rien ne bouge, question posée.
+Correction (revise) → local_executor, sortie validée ; sinon proposition conservée avec un
+message explicite. Échec → demande « failed » (ne compte pas dans le délai).
 
 ---
 

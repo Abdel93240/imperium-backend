@@ -194,6 +194,16 @@ def revise_replan(
     db.flush()
     row.ai_task_id = task.id
     row.status = "revising"
+    # Réveille le job runner imperium.rolling_replan (doc 43 §3.2).
+    db.add(
+        build_event(
+            db,
+            user_id=current_user.id,
+            event_type="planning.replan.revision_requested",
+            payload={"replan_event_id": str(row.id), "ai_task_id": str(task.id), "proposal_version": row.proposal_version},
+            idempotency_key=f"replan-revise:{task.id}",
+        )
+    )
     db.commit()
     db.refresh(row)
     return ReplanRead.model_validate(row)
