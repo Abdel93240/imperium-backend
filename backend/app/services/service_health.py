@@ -9,7 +9,7 @@ import logging
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
@@ -40,6 +40,7 @@ class Probes:
     vector_extension: Callable[[], bool]
     embedding_service: Callable[[], bool]
     local_model: Callable[[], bool]
+    ocr_service: Callable[[], bool] = field(default=lambda: False)
 
 
 def default_probes(db: Session, settings) -> Probes:
@@ -55,6 +56,7 @@ def default_probes(db: Session, settings) -> Probes:
         vector_extension=vector_extension,
         embedding_service=lambda: _http_ok(settings.embedding_base_url, "/health"),
         local_model=lambda: _http_ok(settings.qwen_base_url, "/api/tags"),
+        ocr_service=lambda: _http_ok(settings.ocr_base_url, "/health"),
     )
 
 
@@ -64,6 +66,7 @@ def check_services(*, settings, probes: Probes) -> ServiceHealthReport:
         _database(probes),
         _vector_memory(settings, probes),
         _local_ai(settings, probes),
+        _ocr(settings, probes),
         ServiceHealthRead(
             code="cloud_ai",
             label="IA cloud",
@@ -102,6 +105,17 @@ def _local_ai(settings, probes: Probes) -> ServiceHealthRead:
     if not _safe(probes.local_model):
         return ServiceHealthRead(**base, state="red", detail="Le modèle local ne répond pas.")
     return ServiceHealthRead(**base, state="green", detail="Le modèle local répond.")
+
+
+def _ocr(settings, probes: Probes) -> ServiceHealthRead:
+    base = {"code": "ocr", "label": "Lecture des images et PDF"}
+    if not getattr(settings, "ocr_enabled", False) or not getattr(settings, "ocr_base_url", None):
+        return ServiceHealthRead(**base, state="grey", detail="OCR désactivé : non vérifié.")
+    if not _safe(probes.ocr_service):
+        return ServiceHealthRead(
+            **base, state="orange", detail="Le service OCR ne répond pas : les images et PDF attendent."
+        )
+    return ServiceHealthRead(**base, state="green", detail="Le service OCR répond.")
 
 
 def _overall(services: list[ServiceHealthRead]) -> str:

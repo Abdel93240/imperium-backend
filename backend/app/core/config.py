@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     embedding_expected_dimensions: int = 1024
     embedding_batch_size: int = 32
 
+    # Service OCR (rôle ocr_service, Tower, Tailscale seulement). GET /health + POST /ocr.
+    ocr_enabled: bool = False
+    ocr_base_url: str | None = None
+    ocr_request_timeout_seconds: int = 60
+
     # Nourrir l'IA (doc 70) : sources toujours conservées, pointeur abstrait relatif à ce dossier.
     knowledge_inbox_storage_dir: str = "data/knowledge_inbox"
     # Clés des fournisseurs IA (doc 73) : un fichier 0600 par fournisseur, hors dépôt.

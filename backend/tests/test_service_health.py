@@ -6,14 +6,14 @@ from app.services import service_health as sh
 
 def _settings(**overrides):
     base = dict(embeddings_enabled=True, embedding_base_url="http://gpu:8000", qwen_enabled=True, qwen_dry_run=False,
-                qwen_base_url="http://tower:11434")
+                qwen_base_url="http://tower:11434", ocr_enabled=True, ocr_base_url="http://tower:8091")
     base.update(overrides)
     return SimpleNamespace(**base)
 
 
-def _probes(db=True, vector_ext=True, gpu=True, ollama=True):
+def _probes(db=True, vector_ext=True, gpu=True, ollama=True, ocr=True):
     return sh.Probes(database=lambda: db, vector_extension=lambda: vector_ext, embedding_service=lambda: gpu,
-                     local_model=lambda: ollama)
+                     local_model=lambda: ollama, ocr_service=lambda: ocr)
 
 
 def _states(report):
@@ -22,7 +22,8 @@ def _states(report):
 
 def test_all_up_is_green_except_cloud_which_is_never_verified() -> None:
     report = sh.check_services(settings=_settings(), probes=_probes())
-    assert _states(report) == {"api": "green", "database": "green", "vector_memory": "green", "local_ai": "green", "cloud_ai": "grey"}
+    assert _states(report) == {"api": "green", "database": "green", "vector_memory": "green", "local_ai": "green", "ocr": "green",
+                              "cloud_ai": "grey"}
     assert report.overall == "green"
 
 
@@ -36,15 +37,21 @@ def test_missing_pgvector_makes_memory_unavailable() -> None:
 
 
 def test_disabled_features_are_not_verified_never_green() -> None:
-    report = sh.check_services(settings=_settings(embeddings_enabled=False, qwen_dry_run=True), probes=_probes())
+    report = sh.check_services(settings=_settings(embeddings_enabled=False, qwen_dry_run=True, ocr_enabled=False),
+                               probes=_probes())
     states = _states(report)
-    assert states["vector_memory"] == "grey" and states["local_ai"] == "grey"
+    assert states["vector_memory"] == "grey" and states["local_ai"] == "grey" and states["ocr"] == "grey"
     assert report.overall == "green"  # rien de cassé : seulement non vérifié
 
 
 def test_local_model_down_is_red() -> None:
     report = sh.check_services(settings=_settings(), probes=_probes(ollama=False))
     assert _states(report)["local_ai"] == "red" and report.overall == "orange"
+
+
+def test_ocr_down_is_degraded_not_broken() -> None:
+    report = sh.check_services(settings=_settings(), probes=_probes(ocr=False))
+    assert _states(report)["ocr"] == "orange" and report.overall == "orange"
 
 
 def test_database_down_is_overall_red() -> None:
@@ -56,14 +63,16 @@ def test_probe_exceptions_count_as_unavailable() -> None:
     def boom():
         raise RuntimeError("x")
 
-    probes = sh.Probes(database=boom, vector_extension=boom, embedding_service=boom, local_model=boom)
+    probes = sh.Probes(database=boom, vector_extension=boom, embedding_service=boom, local_model=boom, ocr_service=boom)
     states = _states(sh.check_services(settings=_settings(), probes=probes))
     assert states["database"] == "red" and states["local_ai"] == "red"
+    assert states["ocr"] == "orange"
 
 
 def test_labels_are_french_and_every_service_has_a_detail() -> None:
     report = sh.check_services(settings=_settings(), probes=_probes())
-    assert [s.label for s in report.services] == ["API Imperium", "Base de données", "Mémoire vectorielle", "IA locale", "IA cloud"]
+    assert [s.label for s in report.services] == ["API Imperium", "Base de données", "Mémoire vectorielle", "IA locale",
+                                                 "Lecture des images et PDF", "IA cloud"]
     assert all(s.detail for s in report.services)
 
 
@@ -92,9 +101,11 @@ def test_real_probes_on_the_test_database() -> None:
 
     engine = create_engine(url, future=True)
     with Session(engine) as db:
-        settings = _settings(embedding_base_url="http://127.0.0.1:9", qwen_base_url="http://127.0.0.1:9")
+        settings = _settings(embedding_base_url="http://127.0.0.1:9", qwen_base_url="http://127.0.0.1:9",
+                             ocr_base_url="http://127.0.0.1:9")
         report = sh.check_services(settings=settings, probes=sh.default_probes(db, settings))
     engine.dispose()
     states = _states(report)
     # Base réelle + pgvector présents ; GPU et Ollama injoignables sur ce port fermé.
     assert states["database"] == "green" and states["vector_memory"] == "orange" and states["local_ai"] == "red"
+    assert states["ocr"] == "orange"

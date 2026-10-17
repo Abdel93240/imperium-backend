@@ -301,10 +301,18 @@ B10) : un ÉLÉMENT regroupe un texte de contexte et zéro, un ou plusieurs fich
   VPS en V1), storage_location vps_local|nas, source_retained_at, deleted_at.
 - Mémoire : `ai_memories` avec memory_type `user_knowledge`, source_domain `system`
   (provenance, pas un périmètre), source_table `knowledge_inbox_items`, source_id = élément.
-- Job runner `ai.knowledge_inbox` (semé désactivé) : analyse (fichiers texte lus ; PDF,
-  images, audio, vidéo listés « non lus » tant que l'OCR et la transcription ne sont pas
-  branchés ; modèle local si activé, sinon brouillon déterministe) puis vectorisation des
-  seuls éléments validés vers la mémoire (GPU injoignable → reste validé).
+- Job runner `ai.knowledge_inbox` (semé désactivé) : analyse (fichiers texte lus ; docx,
+  odt, xlsx lus localement sans OCR ; PDF et images lus par le service OCR de la Tower
+  quand `OCR_ENABLED=true`, sinon listés « non lus » ; audio et vidéo « non lus » tant que
+  la transcription n'est pas branchée ; modèle local si activé, sinon brouillon
+  déterministe) puis vectorisation des seuls éléments validés vers la mémoire (GPU
+  injoignable → reste validé).
+- OCR (CODÉ le 2026-10-17, `app/services/ai/ocr.py`, contrat dans
+  `ops/gpu/OCR_SMOKE_CHECKLIST.md`) : rôle `ocr_service`, local à la Tower (rien ne sort
+  vers le cloud). Service injoignable → l'élément repasse « À analyser » et est repris au
+  réveil suivant, jamais lu à moitié ; une seule tentative par réveil. Réponse illisible
+  → la source est « non lue ». Le brouillon liste `sources_ocr` (nom, confiance) pour que
+  l'utilisateur sache quel texte vient de l'OCR avant de valider.
 
 ## 11. Endpoints (V1, indicative — TBD)
 
