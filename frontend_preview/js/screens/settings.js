@@ -94,7 +94,7 @@ export async function openNotifications() {
     const row = (k, label, extra) => h("div", { class: "set-row" }, h("span", { class: "grow" }, label), toggle(s.notifs[k], async (v) => { s.notifs[k] = v; if (k === "red") warn.style.display = v ? "none" : ""; await svc.saveSettings({ notifs: s.notifs }); }, label), extra);
     return modal({ title: "Gérer les notifications", close, size: "small",
       body: [h("div", { class: "small muted" }, "Les notifications arrivent sur cette tablette (notifications Android)."),
-        row("checkin", "Check-in du matin"), row("wr", "Weekly Review"), row("reminders", "Rappels de mission"), row("red", "Alertes rouges"), warn],
+        row("wr", "Weekly Review"), row("reminders", "Rappels de mission"), row("red", "Alertes rouges"), warn],
       foot: [btn("Fermer", { kind: "neutral", onClick: close })] });
   });
 }

@@ -818,7 +818,9 @@ CORE:
     utilisateur 2026-10-17), une journée Imperium ne suit pas l'horloge (doc 12).
   - bubble_enabled (show/manage the Imperium floating bubble: current mission +
     complete / fail / full-day replan request; doc 63 §10, decision 2026-10-15)
-  - notifications_enabled (missions, routines, alerts + manage)
+  - notifications_enabled (missions, routines, alerts + manage) — pas de
+    notification de check-in du matin (décision 2026-10-17) : le check-in est le
+    popup du clic « Démarrer la journée » (§4).
     - channel: Android push ONLY (decision 2026-10-15, doc 76 Q24);
       the Telegram product channel stays in code, never activated.
     - red level: user-disableable (decision 2026-10-15, doc 76 Q24).

@@ -213,7 +213,6 @@ Fenêtre ouverte depuis Réglages → Notifications (doc 43 §15, doc 65 §8.5, 
 - Mention : « Les notifications arrivent sur cette tablette (notifications Android). »
   Pas de choix de canal.
 - Interrupteurs :
-  - Check-in du matin ;
   - Weekly Review ;
   - Rappels de mission ;
   - **Alertes rouges** (urgentes, ex. solde insuffisant pour une dépense à venir) —
