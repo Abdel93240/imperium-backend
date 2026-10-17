@@ -723,6 +723,66 @@ class ImperiumDailyPlan(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class PlanningReplanEvent(UUIDPrimaryKeyMixin, Base):
+    """Demande de replanification et cycle de sa proposition (doc 43 §3.2–§3.4, doc 59 §12.6)."""
+
+    __tablename__ = "planning_replan_events"
+    __table_args__ = (
+        CheckConstraint("trigger IN ('manual', 'hook')", name="trigger_check"),
+        CheckConstraint(
+            "status IN ('requested', 'proposed', 'revising', 'accepted', 'cancelled', 'failed')",
+            name="status_check",
+        ),
+        CheckConstraint(
+            "reason_category IS NULL OR reason_category IN "
+            "('new_event', 'wrong_estimation', 'fatigue', 'priority_shift', 'other')",
+            name="reason_category_check",
+        ),
+        CheckConstraint(
+            "trigger <> 'manual' OR (reason_category IS NOT NULL AND length(btrim(coalesce(reason_detail, ''))) >= 3)",
+            name="manual_reason_required",
+        ),
+        CheckConstraint(
+            "reason_category IS DISTINCT FROM 'other' OR length(btrim(coalesce(other_reason, ''))) > 0",
+            name="other_reason_required",
+        ),
+        CheckConstraint("trigger <> 'hook' OR hook_type IS NOT NULL", name="hook_type_required"),
+        CheckConstraint("proposal IS NULL OR jsonb_typeof(proposal) = 'array'", name="proposal_array"),
+        CheckConstraint("proposal_version >= 0", name="proposal_version_non_negative"),
+        UniqueConstraint("user_id", "idempotency_key", name="user_idempotency_unique"),
+        Index("planning_replan_events_user_requested_idx", "user_id", "requested_at"),
+        Index(
+            "planning_replan_events_one_open_per_user_idx",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('requested', 'proposed', 'revising')"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    planning_day_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("planning_days.id"), nullable=True)
+    daily_plan_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_daily_plans.id"), nullable=True
+    )
+    trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    hook_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason_category: Mapped[str | None] = mapped_column(Text, nullable=True)
+    other_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    ai_task_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("ai_tasks.id"), nullable=True)
+    proposal: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    proposal_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class ImperiumWeeklyReviewState(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_weekly_review_states"
     __table_args__ = (

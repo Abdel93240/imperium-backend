@@ -4,6 +4,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.schemas.imperium import ReplanProposalAttachRequest, ReplanRead
+from app.services.imperium.replan import ReplanNotFoundError, ReplanStateConflictError, attach_replan_proposal
 from app.api.deps import SessionDep
 from app.core.internal_webhooks import (
     InternalWebhookContext,
@@ -181,3 +183,21 @@ def mock_weekly_review_ai_summary_route(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return result
+
+
+@router.post("/replan/{replan_id}/attach-proposal", response_model=ReplanRead)
+def attach_replan_proposal_route(
+    replan_id: UUID,
+    payload: ReplanProposalAttachRequest,
+    context: Annotated[InternalWebhookContext, Depends(verify_internal_webhook)],
+    db: SessionDep,
+) -> ReplanRead:
+    """Le runner IA dépose la proposition de replanification (doc 43 §3.2)."""
+    try:
+        return attach_replan_proposal(db, request_id=replan_id, payload=payload, idempotency_key=context.idempotency_key)
+    except ReplanNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReplanStateConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

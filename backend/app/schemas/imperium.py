@@ -1404,3 +1404,103 @@ class WeeklyReportResponse(BaseModel):
     vault: WeeklyReportVault
     priorities: list[WeeklyReportPriority]
     signals: WeeklyReportSignals
+
+
+# ---------- Replanification (doc 43 §3.2–§3.4, doc 59 §12.6) ----------
+
+class ReplanReasonCategory(StrEnum):
+    """replan_reason_category (doc 01), décision utilisateur 2026-10-17."""
+
+    new_event = "new_event"
+    wrong_estimation = "wrong_estimation"
+    fatigue = "fatigue"
+    priority_shift = "priority_shift"
+    other = "other"
+
+
+REPLAN_PROPOSAL_CHANGES = {"unchanged", "moved", "new", "removed"}
+
+
+class ReplanRequestCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason_category: ReplanReasonCategory
+    reason_detail: str = Field(max_length=2000)
+    other_reason: str | None = Field(default=None, max_length=200)
+
+    @field_validator("reason_detail", "other_reason")
+    @classmethod
+    def strip_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def require_clear_reason(self) -> "ReplanRequestCreate":
+        # doc 74 §4 : pas de replanification sans un « pourquoi » clair.
+        if self.reason_detail is None or len(self.reason_detail) < 3:
+            raise ValueError("reason_detail is required (at least one short sentence).")
+        if self.reason_category == ReplanReasonCategory.other and not self.other_reason:
+            raise ValueError("other_reason is required when reason_category is other.")
+        return self
+
+
+class ReplanProposalAttachRequest(BaseModel):
+    """Proposition déposée par le runner IA (route interne)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    blocks: list[dict] = Field(max_length=100)
+    rationale: str | None = Field(default=None, max_length=4000)
+    ai_task_id: UUID | None = None
+
+    @field_validator("blocks")
+    @classmethod
+    def validate_blocks(cls, blocks: list[dict]) -> list[dict]:
+        for block in blocks:
+            if not isinstance(block.get("title"), str) or not block["title"].strip():
+                raise ValueError("Each proposal block needs a title.")
+            if block.get("change", "unchanged") not in REPLAN_PROPOSAL_CHANGES:
+                raise ValueError("block change must be unchanged, moved, new or removed.")
+        return blocks
+
+
+class ReplanReviseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(max_length=2000)
+
+    @field_validator("message")
+    @classmethod
+    def require_message(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("message cannot be empty.")
+        return stripped
+
+
+class ReplanRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    trigger: str
+    hook_type: str | None
+    status: str
+    reason_category: str | None
+    other_reason: str | None
+    reason_detail: str | None
+    ai_task_id: UUID | None
+    daily_plan_id: UUID | None
+    proposal: list[dict] | None
+    rationale: str | None
+    proposal_version: int
+    requested_at: datetime
+    resolved_at: datetime | None
+
+
+class ReplanStateResponse(BaseModel):
+    eligible_at: datetime | None
+    can_request: bool
+    debounce_minutes: int
+    open_request: ReplanRead | None

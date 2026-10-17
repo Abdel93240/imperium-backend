@@ -1428,8 +1428,11 @@ Invariants planning reintegres :
 Tables planning futures / non codees :
 - `planning_daily_plan_versions` : FUTUR / NON CODE. Versionnement du living
   plan D4 ; chaque replan cree une nouvelle version et conserve la raison.
-- `planning_replan_events` : FUTUR / NON CODE. Capture des triggers de replan,
-  debounce/batching, statut et lien futur vers tache IA / version de plan.
+- `planning_replan_events` : CODE (migration 20261017_0045, 2026-10-17). Demande
+  (trigger manual|hook, hook_type, reason_category + other_reason + reason_detail
+  obligatoires en manuel), statut requested|proposed|revising|accepted|cancelled|failed,
+  ai_task_id (imperium.rolling_replan), proposal JSONB + rationale + proposal_version,
+  une seule demande ouverte par utilisateur, debounce 5 min calcule sur requested_at.
 - Morning check-ins : FUTUR / NON CODE. La doc 43 annonce le check-in du matin
   comme premier replan de la journee ; aucune table canonique `planning_*` n'est
   encore definie ici.

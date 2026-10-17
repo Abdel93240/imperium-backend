@@ -11,6 +11,10 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    ReplanRead,
+    ReplanRequestCreate,
+    ReplanReviseRequest,
+    ReplanStateResponse,
     ResolveStandbyRequest,
     StandbyMissionListResponse,
     AttachAnnexesRequest,
@@ -151,6 +155,17 @@ from app.services.imperium.decision_framework import (
     get_user_priority_context,
     preview_decision_framework_score,
     replace_user_priorities,
+)
+from app.services.imperium.replan import (
+    ReplanCooldownError,
+    ReplanIdempotencyConflictError,
+    ReplanNotFoundError,
+    ReplanStateConflictError,
+    accept_replan,
+    cancel_replan,
+    get_replan_state,
+    request_replan,
+    revise_replan,
 )
 from app.services.imperium.missions import (
     list_standby_missions,
@@ -2436,3 +2451,80 @@ def cancel_weekly_review_route(
 def _require_idempotency_key(idempotency_key: str | None) -> None:
     if not idempotency_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+
+
+# ---------- Replanification (doc 43 §3.2–§3.4, doc 59 §12.6) ----------
+
+def _replan_http_error(db, exc: Exception) -> HTTPException:
+    db.rollback()
+    if isinstance(exc, ReplanNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if isinstance(exc, ReplanCooldownError):
+        return HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"code": "REPLAN_COOLDOWN", "message": str(exc), "eligible_at": exc.eligible_at.isoformat()},
+        )
+    return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+@router.get("/day/replan/state", response_model=ReplanStateResponse)
+def replan_state_route(current_user: CurrentUserDep, db: SessionDep) -> ReplanStateResponse:
+    """Délai restant (eligible_at, fourni par le serveur) et demande en cours."""
+    return get_replan_state(db, current_user=current_user)
+
+
+@router.post("/day/replan", response_model=ReplanRead, status_code=status.HTTP_202_ACCEPTED)
+def request_replan_route(
+    payload: ReplanRequestCreate,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> ReplanRead:
+    _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = request_replan(
+            db,
+            current_user=current_user,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except (ReplanCooldownError, ReplanStateConflictError, ReplanIdempotencyConflictError) as exc:
+        raise _replan_http_error(db, exc) from exc
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post("/day/replan/{replan_id}/revise", response_model=ReplanRead)
+def revise_replan_route(
+    replan_id: UUID,
+    payload: ReplanReviseRequest,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> ReplanRead:
+    _require_idempotency_key(idempotency_key)
+    try:
+        return revise_replan(db, current_user=current_user, replan_id=replan_id, payload=payload, idempotency_key=idempotency_key)
+    except (ReplanNotFoundError, ReplanStateConflictError) as exc:
+        raise _replan_http_error(db, exc) from exc
+
+
+@router.post("/day/replan/{replan_id}/accept", response_model=ReplanRead)
+def accept_replan_route(replan_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> ReplanRead:
+    try:
+        return accept_replan(db, current_user=current_user, replan_id=replan_id)
+    except (ReplanNotFoundError, ReplanStateConflictError) as exc:
+        raise _replan_http_error(db, exc) from exc
+
+
+@router.post("/day/replan/{replan_id}/cancel", response_model=ReplanRead)
+def cancel_replan_route(replan_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> ReplanRead:
+    try:
+        return cancel_replan(db, current_user=current_user, replan_id=replan_id)
+    except (ReplanNotFoundError, ReplanStateConflictError) as exc:
+        raise _replan_http_error(db, exc) from exc

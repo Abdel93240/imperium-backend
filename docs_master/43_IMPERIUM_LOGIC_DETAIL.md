@@ -123,6 +123,19 @@ distingue contrainte réelle et préférence pour l'entraînement de l'IA locale
 Les replans automatiques (hooks) portent leur propre raison système.
 ```
 
+CODE (2026-10-17, migration 20261017_0045, table planning_replan_events) :
+- GET  /api/imperium/day/replan/state  → eligible_at (serveur), can_request, demande ouverte ;
+- POST /api/imperium/day/replan        → 202, tâche IA imperium.rolling_replan en file ;
+  409 REPLAN_COOLDOWN + eligible_at pendant le délai ; une seule demande ouverte ;
+- POST /api/internal/replan/{id}/attach-proposal (runner IA) → proposition (blocs
+  unchanged|moved|new|removed + rationale), proposal_version +1 ;
+- POST /api/imperium/day/replan/{id}/revise → correction chatbot, nouvelle tâche IA,
+  sans nouveau délai ;
+- POST /api/imperium/day/replan/{id}/accept → plan du jour remplacé (blocs « removed »
+  exclus), generated_from.replan_version +1, event planning.daily_plan.replanned ;
+- POST /api/imperium/day/replan/{id}/cancel → plan inchangé.
+Hooks : request_hook_replan() côté service ; ghusl_required et fasting_break passent le délai.
+
 ---
 
 ## 4. The Morning Popup
