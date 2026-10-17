@@ -595,7 +595,7 @@ skipped`), planned_at/started_at/completed_at, duration_minutes, intensity_score
 > - `POST /{id}/skip` (Idempotency-Key) `{reason}` → skipped, `pulse.workout.skipped`.
 > - Une séance terminée ou sautée ne change plus (409). Même clé → même réponse.
 > - Programme du spécialiste santé (modes 1 et 3), adaptation PUL-07, fenêtre de
->   récupération, matériel possédé (§13-EQUIP) et parc (§13-PARK) : pas encore.
+>   récupération et parc (§13-PARK) : pas encore. Matériel possédé : §13-EQUIP.
 
 ### 13.3 Workout Adaptation (PUL-07)
 
@@ -662,6 +662,13 @@ attachable elastics, etc.). Owned equipment is considered ALWAYS available with
 the user (at home). It is a direct INPUT to program creation/revision.
 The health specialist exploits it creatively (one item → many exercises).
 ```
+
+> CODÉ (2026-10-17, migration 20261017_0060, table `pulse_owned_equipment`) :
+> `GET /api/imperium/pulse/equipment` (matériel actif, ordre alphabétique),
+> `POST` `{name, notes?}` (un même nom, sans accents ni casse, n'est actif qu'une fois :
+> le rajouter renvoie la ligne existante, 200), `DELETE /{id}` (statut removed, jamais
+> supprimé ; déjà retiré → même réponse). Événement `pulse.equipment.updated`. Utilisation
+> par le programme de séances (modes 1 et 3) : pas encore.
 
 ### 13-PARK. Park equipment & day-continuity routing
 

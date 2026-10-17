@@ -1380,3 +1380,25 @@ class PulseWorkout(UUIDPrimaryKeyMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class PulseOwnedEquipment(UUIDPrimaryKeyMixin, Base):
+    """Matériel possédé (doc 40 §13-EQUIP) : toujours disponible à la maison ; retrait sans suppression."""
+
+    __tablename__ = "pulse_owned_equipment"
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'removed')", name="status_check"),
+        CheckConstraint("length(btrim(name)) > 0", name="name_not_blank"),
+        Index(
+            "pulse_owned_equipment_user_active_name_idx", "user_id", "name_key", unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    name_key: Mapped[str] = mapped_column(Text, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

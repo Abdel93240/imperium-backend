@@ -1467,6 +1467,10 @@ Seances de sport Pulse (CODE, migration 20261017_0059, doc 40 §13) :
   started_at, completed_at, etat au depart, notes, raison du saut, version (>= 1),
   Idempotency-Key unique + empreinte, cle et empreinte de la cloture.
 
+Materiel possede Pulse (CODE, migration 20261017_0060, doc 40 §13-EQUIP) :
+- `pulse_owned_equipment` : nom, cle de nom (sans accents ni casse, unique par
+  utilisateur parmi les lignes actives), notes, statut active|removed, removed_at.
+
 Reglages Imperium (CODE, migration 20261017_0049, doc 43 §15) :
 - `imperium_user_settings` : une ligne par utilisateur (user_id unique), creee a la
   premiere lecture ; colonnes typees et contraintes (ai_mode, replan_on_failure_*,

@@ -156,3 +156,29 @@ class WorkoutRead(BaseModel):
 
 class WorkoutListResponse(BaseModel):
     items: list[WorkoutRead]
+
+
+class EquipmentCreate(BaseModel):
+    """Matériel possédé (doc 40 §13-EQUIP), ajouté depuis les réglages."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    notes: str | None = Field(default=None, max_length=300)
+
+    _strip_name = field_validator("name", mode="before")(_strip)
+
+
+class EquipmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    notes: str | None
+    status: str
+    removed_at: datetime | None
+    created_at: datetime
+
+
+class EquipmentListResponse(BaseModel):
+    items: list[EquipmentRead]
