@@ -200,6 +200,14 @@ Pulse dashboard combines today-only operational signals:
 **Health score must never render without explanation.** If factors are missing,
 the score card is hidden and an incomplete-data banner is shown.
 
+> CODÉ (2026-10-17) : `GET /api/imperium/pulse/dashboard?day=` (jour de Paris, aujourd'hui
+> par défaut), lecture seule, sans nouvelle table : saisie du jour (`entry` : sommeil,
+> énergie, fatigue, poids, séance), repas validés (nombre, totaux, sans macros, brouillons
+> en attente), eau bue (cible vide tant que le programme santé n'existe pas), dates limites
+> du stock, bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
+> `health_score_incomplete`. `health_score` reste vide (pas encore calculé) et la bannière
+> le dit. Jeûne (Path), règles médicales actives et douleurs : pas encore.
+
 ---
 
 ## 10. Meal Tracking
@@ -943,7 +951,7 @@ must be implemented in backend patches before UI relies on them.
 
 | Domain | Endpoint |
 |---|---|
-| Dashboard | `TBD GET /api/pulse/dashboard` |
+| Dashboard | `GET /api/imperium/pulse/dashboard` (CODÉ 2026-10-17, sans score santé) |
 | Meals | `POST /api/imperium/pulse/meals/drafts` (CODÉ 2026-10-17, texte, macros saisies) |
 | Meals | `POST /api/imperium/pulse/meals/photo-drafts` (CODÉ 2026-10-17, macros estimées depuis la photo) |
 | Meals | `POST /api/imperium/pulse/meals/{meal_id}/confirm` (CODÉ 2026-10-17) |
