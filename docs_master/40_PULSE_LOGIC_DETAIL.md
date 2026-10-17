@@ -460,11 +460,24 @@ PUL-04 supports quick buttons: `+250ml`, `+500ml`, `+1L`, plus chatbot input
 ("j'ai bu un litre").
 
 ```text
-TBD POST /api/pulse/hydration-logs
+POST /api/imperium/pulse/hydration-logs   (CODÉ 2026-10-17)
 Headers: Idempotency-Key
 ```
 
 Payload stores `amount_ml`, `logged_at`, `source`, and Path constraint context.
+
+> CODÉ (2026-10-17, migration 20261017_0058, table `pulse_hydration_logs`) :
+> - `POST` `{amount_ml 1..5000 (entier), logged_at?, source quick|manual|chatbot, decrement_stock = true}`
+>   → `{log, stock_items, warnings}`. Même clé + même contenu → même réponse ; contenu
+>   différent → 409 ; clés distinctes → les quantités s'additionnent.
+> - Décompte de l'eau : lignes actives dont le nom contient « eau », en ml/cl/l, date limite
+>   la plus proche d'abord ; une ligne vidée passe consumed. Stock insuffisant → l'eau bue
+>   est enregistrée, avertissement « Stock d'eau épuisé : N ml non décomptés ». Pas d'eau ou
+>   eau comptée en pièces → rien n'est décompté, avertissement.
+> - `GET /api/imperium/pulse/hydration-logs?day=` : total et appuis du jour de Paris ;
+>   `target` vide (« Objectif personnalisé pas encore calculé ») tant que le programme
+>   santé n'existe pas.
+> - Blocage pendant le jeûne (Path) : pas encore, aucune donnée de jeûne côté backend.
 
 ```text
 Hydration target is a PERSONALIZED RANGE computed by the health specialist from the user's data
@@ -935,7 +948,7 @@ must be implemented in backend patches before UI relies on them.
 | Meals | `POST /api/imperium/pulse/meals/photo-drafts` (CODÉ 2026-10-17, macros estimées depuis la photo) |
 | Meals | `POST /api/imperium/pulse/meals/{meal_id}/confirm` (CODÉ 2026-10-17) |
 | Meals | `GET /api/imperium/pulse/meals?day=` et `GET …/meals/{meal_id}` (CODÉS 2026-10-17) |
-| Hydration | `TBD POST /api/pulse/hydration-logs` |
+| Hydration | `POST` et `GET /api/imperium/pulse/hydration-logs` (CODÉS 2026-10-17) |
 | Workouts | `TBD GET /api/pulse/workouts` |
 | Workouts | `TBD POST /api/pulse/workouts` |
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/complete` |
