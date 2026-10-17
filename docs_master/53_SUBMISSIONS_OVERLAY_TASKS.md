@@ -79,6 +79,10 @@ V1 — CE QUI EST LIVRÉ
     annexes retournent au backlog.
     Contrat : POST /api/imperium/missions/{id}/complete accepte
     completed_annex_mission_ids: list[UUID] (vide par défaut).
+    CODE (2026-10-17, migration 20261017_0043) : accrochage par
+    POST /api/imperium/missions/{id}/annexes { mission_ids } (≤ 5, backlog,
+    estimated_minutes ≤ 15, pas déjà accrochée) ; GET /missions/active renvoie
+    mission.annexes.
 
 V3 — CE QUI RESTE (reste du document)
   is_carrier_mission / engagement_level / has_exploitable_pauses /

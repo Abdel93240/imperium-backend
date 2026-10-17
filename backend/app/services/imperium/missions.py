@@ -12,7 +12,10 @@ from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import (
-    ActiveMissionRead,
+    ActiveMissionWithAnnexesRead,
+    AttachAnnexesRequest,
+    AttachAnnexesResponse,
+    MissionAnnexRead,
     ActiveMissionResponse,
     BacklogDecisionCandidate,
     BacklogDecisionPreviewResponse,
@@ -57,6 +60,10 @@ class ActiveMissionExistsError(ValueError):
     pass
 
 
+class AnnexValidationError(ValueError):
+    """Règle des missions annexes V1 non respectée (doc 53 §3.1)."""
+
+
 class MissionNotFoundError(ValueError):
     pass
 
@@ -89,6 +96,9 @@ MISSION_COMPLETION_GUARDRAILS_CHECKED = [
 ]
 MISSION_COMPLETION_SAFE_EXPLANATION = "Mission completed using deterministic backend guardrails only."
 ACTIVE_MISSION_SAFE_EXPLANATION = "Current active mission for user."
+# doc 53 §3.1 : au plus 5 annexes, chacune de 15 min ou moins, prises dans le backlog.
+ANNEX_MAX_COUNT = 5
+ANNEX_MAX_MINUTES = 15
 ACTIVE_MISSION_NONE_SAFE_EXPLANATION = "No active mission found for current user."
 MISSION_HISTORY_SAFE_EXPLANATION = "Mission history for current user."
 MISSION_DETAIL_SAFE_EXPLANATION = "Mission detail for current user."
@@ -107,7 +117,7 @@ def start_mission(
     request_method: str,
     request_path: str,
 ) -> tuple[MissionWriteResponse, bool]:
-    request_hash = _hash_request("mission.started", payload.model_dump(mode="json"))
+    request_hash = _hash_request("mission.started", _stable_dump(payload, estimated_minutes=None))
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
         return _handle_existing_idempotency(existing_key, request_hash), True
@@ -127,6 +137,7 @@ def start_mission(
         status="active",
         planned_start_at=payload.planned_start_at,
         planned_end_at=payload.planned_end_at,
+        estimated_minutes=payload.estimated_minutes,
         started_at=now,
     )
     db.add(mission)
@@ -188,7 +199,7 @@ def create_backlog_mission(
     request_method: str,
     request_path: str,
 ) -> tuple[BacklogMissionCreateResponse, bool]:
-    request_hash = _hash_request("mission.backlog.created", payload.model_dump(mode="json"))
+    request_hash = _hash_request("mission.backlog.created", _stable_dump(payload, estimated_minutes=None))
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
         return _handle_existing_backlog_create_idempotency(existing_key, request_hash), True
@@ -202,6 +213,7 @@ def create_backlog_mission(
         priority_level=payload.priority_level,
         mission_type_category=payload.mission_type_category,
         status="backlog",
+        estimated_minutes=payload.estimated_minutes,
         started_at=now,
     )
     db.add(mission)
@@ -473,7 +485,10 @@ def complete_mission(
 ) -> tuple[MissionCompletionResponse, bool]:
     request_hash = _hash_request(
         "mission.completion_guardrails",
-        {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
+        {
+            "mission_id": str(mission_id),
+            "payload": _stable_dump(payload, failure_reason_code=None, completed_annex_mission_ids=[]),
+        },
     )
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
@@ -482,12 +497,20 @@ def complete_mission(
     mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
     _require_active_mission(mission)
 
+    annexes = _annexes_of(db, mission=mission)
+    completed_annex_ids = list(dict.fromkeys(payload.completed_annex_mission_ids))
+    unknown = set(completed_annex_ids) - {annex.id for annex in annexes}
+    if unknown:
+        raise AnnexValidationError("completed_annex_mission_ids must reference annexes of this mission.")
+
     outcome = payload.outcome.value
     event_id = f"evt_{uuid4().hex}"
     event_payload = {
         "mission_id": str(mission.id),
         "outcome": outcome,
         "reason": payload.reason,
+        "failure_reason_code": payload.failure_reason_code.value if payload.failure_reason_code else None,
+        "completed_annex_mission_ids": [str(annex_id) for annex_id in completed_annex_ids] or None,
     }
     start_event = (
         db.get(Event, mission.created_by_event_id)
@@ -506,21 +529,26 @@ def complete_mission(
     db.add(event)
     db.flush()
 
+    ended_at = datetime.now(UTC)
     mission.status = outcome
-    mission.ended_at = datetime.now(UTC)
+    mission.ended_at = ended_at
     if outcome == "completed":
         mission.completion_note = payload.reason
         mission.failure_reason = None
+        mission.failure_reason_code = None
     else:
         mission.completion_note = None
         mission.failure_reason = payload.reason
+        mission.failure_reason_code = payload.failure_reason_code.value if payload.failure_reason_code else None
     mission.ended_by_event_id = event.id
+    _settle_annexes(annexes, completed_ids=set(completed_annex_ids), ended_at=ended_at, event=event)
     db.flush()
 
     response = _completion_response(
         mission=mission,
         status_text=outcome,
     )
+    response.completed_annex_mission_ids = completed_annex_ids
     _store_idempotency(
         db,
         current_user=current_user,
@@ -547,7 +575,7 @@ def fail_mission(
 ) -> tuple[MissionWriteResponse, bool]:
     request_hash = _hash_request(
         "mission.failed",
-        {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
+        {"mission_id": str(mission_id), "payload": _stable_dump(payload, failure_reason_code=None)},
     )
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
@@ -557,10 +585,12 @@ def fail_mission(
     _require_active_mission(mission)
 
     event_id = f"evt_{uuid4().hex}"
+    annexes = _annexes_of(db, mission=mission)
     event_payload = {
         "mission_id": str(mission.id),
         "reason": payload.failure_reason,
         "failure_reason": payload.failure_reason,
+        "failure_reason_code": payload.failure_reason_code.value if payload.failure_reason_code else None,
         "user_reported_signals": payload.user_reported_signals,
         "ai_usable_reason": payload.ai_usable_reason,
     }
@@ -581,12 +611,16 @@ def fail_mission(
     db.add(event)
     db.flush()
 
+    ended_at = datetime.now(UTC)
     mission.status = "failed"
-    mission.ended_at = datetime.now(UTC)
+    mission.ended_at = ended_at
     mission.failure_reason = payload.failure_reason
+    mission.failure_reason_code = payload.failure_reason_code.value if payload.failure_reason_code else None
     mission.user_reported_signals = payload.user_reported_signals
     mission.ai_usable_reason = payload.ai_usable_reason
     mission.ended_by_event_id = event.id
+    # Pas fait sur la porteuse : toutes les annexes retournent au backlog, sans pénalité (doc 53 §8).
+    _settle_annexes(annexes, completed_ids=set(), ended_at=ended_at, event=event)
     db.flush()
 
     response = _write_response(
@@ -609,6 +643,124 @@ def fail_mission(
     return response, False
 
 
+def attach_annexes(
+    db: Session,
+    *,
+    current_user: User,
+    mission_id: UUID,
+    payload: AttachAnnexesRequest,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[AttachAnnexesResponse, bool]:
+    """Accroche jusqu'à 5 missions courtes du backlog à une mission porteuse (doc 53 §3.1)."""
+    request_hash = _hash_request(
+        "mission.annexes.attached",
+        {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
+    )
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        if existing_key.request_hash != request_hash:
+            raise IdempotencyConflictError("Idempotency key already used with different payload.")
+        if existing_key.response_body is None:
+            raise IdempotencyConflictError("Idempotency key is already processing.")
+        return AttachAnnexesResponse(**existing_key.response_body), True
+
+    carrier = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if carrier is None:
+        raise MissionNotFoundError("Mission not found.")
+    if carrier.status not in {"active", "backlog"} or carrier.annex_of_mission_id is not None:
+        raise AnnexValidationError("Carrier mission must be active or in backlog and not itself an annex.")
+
+    requested_ids = list(dict.fromkeys(payload.mission_ids))
+    if carrier.id in requested_ids:
+        raise AnnexValidationError("A mission cannot be its own annex.")
+    existing_annexes = _annexes_of(db, mission=carrier)
+    new_ids = [annex_id for annex_id in requested_ids if annex_id not in {annex.id for annex in existing_annexes}]
+    if len(existing_annexes) + len(new_ids) > ANNEX_MAX_COUNT:
+        raise AnnexValidationError(f"A carrier mission holds at most {ANNEX_MAX_COUNT} annexes.")
+
+    candidates = list(
+        db.scalars(
+            select(ImperiumMission).where(
+                ImperiumMission.user_id == current_user.id,
+                ImperiumMission.id.in_(new_ids),
+            )
+        )
+    )
+    if len(candidates) != len(new_ids):
+        raise AnnexValidationError("Annex missions must exist and belong to the current user.")
+    for candidate in candidates:
+        if candidate.status != "backlog":
+            raise AnnexValidationError("Only backlog missions can become annexes.")
+        if candidate.annex_of_mission_id is not None:
+            raise AnnexValidationError("Mission is already attached to another carrier.")
+        if candidate.estimated_minutes is None or candidate.estimated_minutes > ANNEX_MAX_MINUTES:
+            raise AnnexValidationError(f"Annex missions need estimated_minutes <= {ANNEX_MAX_MINUTES}.")
+
+    event_id = f"evt_{uuid4().hex}"
+    event = _build_event(
+        db,
+        current_user=current_user,
+        event_id=event_id,
+        event_type="planning.mission.annexes_attached",
+        idempotency_key=idempotency_key,
+        payload={"mission_id": str(carrier.id), "annex_mission_ids": [str(annex_id) for annex_id in new_ids]},
+    )
+    db.add(event)
+    for candidate in candidates:
+        candidate.annex_of_mission_id = carrier.id
+    db.flush()
+
+    response = AttachAnnexesResponse(
+        carrier_mission_id=carrier.id,
+        annexes=[MissionAnnexRead.model_validate(annex) for annex in _annexes_of(db, mission=carrier, refresh=True)],
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+    )
+    db.add(
+        IdempotencyKey(
+            user_id=current_user.id,
+            idempotency_key=idempotency_key,
+            request_method=request_method,
+            request_path=request_path,
+            request_hash=request_hash,
+            status=IdempotencyStatus.completed,
+            response_status_code=200,
+            response_body=response.model_dump(mode="json"),
+        )
+    )
+    db.commit()
+    return response, False
+
+
+def _annexes_of(db: Session, *, mission: ImperiumMission, refresh: bool = False) -> list[ImperiumMission]:
+    """Annexes encore en attente (backlog) accrochées à la mission porteuse.
+
+    Lues par la relation ORM : aucune requête pour un objet non persisté.
+    """
+    if refresh and mission in db:
+        db.expire(mission, ["pending_annexes"])
+    return list(mission.pending_annexes or [])
+
+
+def _settle_annexes(
+    annexes: list[ImperiumMission],
+    *,
+    completed_ids: set[UUID],
+    ended_at: datetime,
+    event: Event,
+) -> None:
+    """Annexes cochées → completed (lien conservé) ; les autres → backlog, lien effacé."""
+    for annex in annexes:
+        if annex.id in completed_ids:
+            annex.status = "completed"
+            annex.ended_at = ended_at
+            annex.ended_by_event_id = event.id
+        else:
+            annex.annex_of_mission_id = None
+
+
 def get_current_mission(db: Session, *, current_user: User) -> ImperiumMission | None:
     return _get_active_mission(db, current_user=current_user)
 
@@ -629,8 +781,10 @@ def get_current_active_mission(db: Session, *, current_user: User) -> ActiveMiss
         return ActiveMissionResponse(mission=None, safe_explanation=ACTIVE_MISSION_NONE_SAFE_EXPLANATION)
     if len(missions) > 1:
         raise MultipleActiveMissionsError("Multiple active missions found for current user.")
+    mission_read = ActiveMissionWithAnnexesRead.model_validate(missions[0])
+    mission_read.annexes = [MissionAnnexRead.model_validate(annex) for annex in _annexes_of(db, mission=missions[0])]
     return ActiveMissionResponse(
-        mission=ActiveMissionRead.model_validate(missions[0]),
+        mission=mission_read,
         safe_explanation=ACTIVE_MISSION_SAFE_EXPLANATION,
     )
 
@@ -1160,6 +1314,20 @@ def _completion_response(
             safe_explanation=MISSION_COMPLETION_SAFE_EXPLANATION,
         ),
     )
+
+
+def _stable_dump(payload, **new_field_defaults) -> dict:
+    """Dump JSON pour l'empreinte d'idempotence, stable pour les anciens clients.
+
+    Les champs ajoutés en 2026-10 (estimated_minutes, failure_reason_code,
+    completed_annex_mission_ids) sont omis quand ils gardent leur valeur par défaut,
+    pour que les clés déjà stockées en production se rejouent à l'identique.
+    """
+    dumped = payload.model_dump(mode="json")
+    for key, default in new_field_defaults.items():
+        if key in dumped and dumped[key] == default:
+            dumped.pop(key)
+    return dumped
 
 
 def _hash_request(action: str, payload: dict) -> str:

@@ -161,6 +161,7 @@ class StartMissionRequest(BaseModel):
     recurrence: int | str | None = None
     planned_start_at: datetime | None = None
     planned_end_at: datetime | None = None
+    estimated_minutes: int | None = Field(default=None, ge=1, le=1440)
 
     @field_validator("title", "category", "domain", "mission_type_category")
     @classmethod
@@ -235,6 +236,7 @@ class BacklogMissionCreateRequest(BaseModel):
     mission_type: int | str | None = None
     dependency: int | str | bool | None = None
     recurrence: int | str | None = None
+    estimated_minutes: int | None = Field(default=None, ge=1, le=1440)
 
     @field_validator("title", "category", "domain", "mission_type_category")
     @classmethod
@@ -296,6 +298,15 @@ class BacklogMissionCreateRequest(BaseModel):
         return self
 
 
+class FailureReasonCode(StrEnum):
+    """Raisons codées d'une mission non faite (doc 52 §10, décision 2026-10-17)."""
+
+    no_time = "no_time"
+    too_tired = "too_tired"
+    not_relevant = "not_relevant"
+    impediment = "impediment"
+
+
 class MissionCompletionOutcome(StrEnum):
     completed = "completed"
     failed = "failed"
@@ -307,6 +318,9 @@ class CompleteMissionRequest(BaseModel):
 
     outcome: MissionCompletionOutcome
     reason: str | None = None
+    failure_reason_code: FailureReasonCode | None = None
+    # doc 53 §3.1 : annexes cochées dans la fenêtre « Fait » ; les autres retournent au backlog.
+    completed_annex_mission_ids: list[UUID] = Field(default_factory=list, max_length=5)
 
     @field_validator("reason")
     @classmethod
@@ -318,15 +332,63 @@ class CompleteMissionRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_reason_for_non_completed_outcomes(self) -> "CompleteMissionRequest":
-        if self.outcome in {MissionCompletionOutcome.failed, MissionCompletionOutcome.abandoned} and self.reason is None:
+        if self.outcome == MissionCompletionOutcome.completed:
+            if self.failure_reason_code is not None:
+                raise ValueError("failure_reason_code is only allowed for failed outcomes.")
+            return self
+        if self.completed_annex_mission_ids:
+            raise ValueError("completed_annex_mission_ids is only allowed for completed outcomes.")
+        if self.failure_reason_code is not None and self.outcome != MissionCompletionOutcome.failed:
+            raise ValueError("failure_reason_code is only allowed for failed outcomes.")
+        if self.reason is None and self.failure_reason_code is None:
             raise ValueError("reason is required for failed or abandoned outcomes.")
         return self
 
 
 class FailMissionRequest(BaseModel):
-    failure_reason: str = Field(min_length=1)
+    failure_reason: str | None = None
+    failure_reason_code: FailureReasonCode | None = None
     user_reported_signals: dict | None = None
     ai_usable_reason: bool = True
+
+    @field_validator("failure_reason")
+    @classmethod
+    def strip_failure_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @model_validator(mode="after")
+    def require_code_or_details(self) -> "FailMissionRequest":
+        if self.failure_reason is None and self.failure_reason_code is None:
+            raise ValueError("failure_reason_code or failure_reason is required.")
+        return self
+
+
+class MissionAnnexRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    status: str
+    estimated_minutes: int | None
+
+
+class AttachAnnexesRequest(BaseModel):
+    """Accroche des missions annexes à une mission porteuse (doc 53 §3.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mission_ids: list[UUID] = Field(min_length=1, max_length=5)
+
+
+class AttachAnnexesResponse(BaseModel):
+    carrier_mission_id: UUID
+    annexes: list[MissionAnnexRead]
+    event_id: str
+    idempotency_key: str
+    status: Literal["attached"] = "attached"
 
 
 class MissionResponse(BaseModel):
@@ -341,10 +403,13 @@ class MissionResponse(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
     completion_note: str | None
     failure_reason: str | None
+    failure_reason_code: str | None = None
     user_reported_signals: dict | None
     ai_usable_reason: bool | None
     event_id: str | None = None
@@ -363,13 +428,19 @@ class ActiveMissionRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime
     created_at: datetime
     updated_at: datetime
 
 
+class ActiveMissionWithAnnexesRead(ActiveMissionRead):
+    annexes: list[MissionAnnexRead] = Field(default_factory=list)
+
+
 class ActiveMissionResponse(BaseModel):
-    mission: ActiveMissionRead | None
+    mission: ActiveMissionWithAnnexesRead | None
     safe_explanation: str
 
 
@@ -385,10 +456,13 @@ class MissionCompletionRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
     completion_note: str | None
     failure_reason: str | None
+    failure_reason_code: str | None = None
     user_reported_signals: dict | None
     ai_usable_reason: bool | None
 
@@ -402,6 +476,7 @@ class MissionCompletionSummary(BaseModel):
 class MissionCompletionResponse(BaseModel):
     mission: MissionCompletionRead
     completion_summary: MissionCompletionSummary
+    completed_annex_mission_ids: list[UUID] = Field(default_factory=list)
 
 
 class MissionHistoryRead(BaseModel):
@@ -416,6 +491,8 @@ class MissionHistoryRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime
     ended_at: datetime | None
     created_at: datetime
@@ -442,6 +519,8 @@ class MissionDetailRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
     created_at: datetime
@@ -475,6 +554,8 @@ class BacklogMissionRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
     decision_score: MissionDecisionScoreSummary | None = None
@@ -531,6 +612,8 @@ class PromotedBacklogMissionRead(BaseModel):
     mission_type_category: str | None
     planned_start_at: datetime | None
     planned_end_at: datetime | None
+    estimated_minutes: int | None = None
+    annex_of_mission_id: UUID | None = None
     started_at: datetime
     created_at: datetime
     updated_at: datetime

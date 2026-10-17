@@ -15,6 +15,7 @@ from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import BacklogMissionCreateRequest
 from app.services.imperium.missions import (
     _hash_request,
+    _stable_dump,
     create_backlog_mission,
     list_backlog_missions,
     promote_backlog_mission,
@@ -340,7 +341,7 @@ def test_idempotent_backlog_create_does_not_duplicate_mission() -> None:
         idempotency_key="backlog-create-replay",
         request_method="POST",
         request_path="/imperium/missions/backlog",
-        request_hash=_hash_request("mission.backlog.created", payload.model_dump(mode="json")),
+        request_hash=_hash_request("mission.backlog.created", _stable_dump(payload, estimated_minutes=None)),
         status=IdempotencyStatus.completed,
         response_status_code=201,
         response_body=cached_response,

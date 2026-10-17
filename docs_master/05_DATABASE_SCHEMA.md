@@ -1113,7 +1113,9 @@ started_at              TIMESTAMPTZ NOT NULL
 ended_at                TIMESTAMPTZ NULL
 completion_note         TEXT NULL
 failure_reason          TEXT NULL
-failure_reason_code     TEXT NULL   -- cible V1 (doc 52 §10, 2026-10-17) : no_time | too_tired | not_relevant | impediment ; NON CODE
+failure_reason_code     TEXT NULL   -- CODE (migration 20261017_0043) : no_time | too_tired | not_relevant | impediment (doc 52 §10)
+estimated_minutes       INTEGER NULL -- CODE (20261017_0043) : > 0 (doc 43 §5.2)
+annex_of_mission_id     UUID NULL FK imperium_missions.id ON DELETE SET NULL -- CODE (20261017_0043) : annexe V1 (doc 53 §3.1), <> id
 user_reported_signals   JSONB NULL
 ai_usable_reason        BOOLEAN NULL
 created_by_event_id     UUID NULL FK events.id
@@ -1403,12 +1405,10 @@ Invariants planning reintegres :
   actives doit etre detectee et exposee comme erreur, pas masquee.
 - Le mission lifecycle V1 code est volontairement simple : backlog -> active ->
   terminal (`completed`, `failed`, `abandoned`, `cancelled`). Les notions
-  `expired`, `stashed`, missions annexes et overlay restent hors schema code
-  actuel. Cible V1 (doc 53 §3.1, décision 2026-10-16) : une colonne
-  `annex_of_mission_id` nullable sur `imperium_missions` pour la version
-  allégée des missions annexes ; le reste de l'overlay reste V3. Cible V1
-  (doc 43 §5.2, decision 2026-10-16) : `estimated_minutes` INTEGER nullable
-  sur `imperium_missions` (duree estimee, proposee par l'IA, modifiable).
+  `expired`, `stashed` et l'overlay V3 (doc 53 hors §3.1) restent hors schema
+  code actuel. CODE (migration 20261017_0043, 2026-10-17) : colonnes
+  `annex_of_mission_id` (annexes V1 allegees, doc 53 §3.1), `estimated_minutes` (doc 43 §5.2)
+  et `failure_reason_code` (doc 52 §10) sur `imperium_missions` ; le reste de l'overlay reste V3.
   Cible V1 (doc 43 §5.4, decision 2026-10-16) : statut `standby` (echeance
   depassee constatee a la cloture de journee, attend une decision).
 - Les projets actifs et routines d'Operations sont la source future de missions,

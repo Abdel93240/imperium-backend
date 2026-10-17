@@ -301,9 +301,13 @@ def test_complete_replays_same_idempotency_key_without_second_transition() -> No
             "ended_at": ended_at.isoformat().replace("+00:00", "Z"),
             "completion_note": None,
             "failure_reason": None,
+            "failure_reason_code": None,
+            "estimated_minutes": None,
+            "annex_of_mission_id": None,
             "user_reported_signals": None,
             "ai_usable_reason": None,
         },
+        "completed_annex_mission_ids": [],
         "completion_summary": {
             "status": "completed",
             "guardrails_checked": [

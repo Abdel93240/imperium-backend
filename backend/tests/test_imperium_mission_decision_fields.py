@@ -10,7 +10,7 @@ from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumMissionScore, ImperiumUserPriority
 from app.schemas.imperium import MissionResponse, StartMissionRequest
 from app.services.imperium.decision_framework import get_domain_coefficient
-from app.services.imperium.missions import _hash_request, get_mission_decision_score, start_mission
+from app.services.imperium.missions import _hash_request, _stable_dump, get_mission_decision_score, start_mission
 
 
 class FakeDb:
@@ -398,7 +398,7 @@ def test_idempotent_start_mission_does_not_duplicate_mission_score() -> None:
         idempotency_key="mission-idempotent-score",
         request_method="POST",
         request_path="/api/imperium/missions/start",
-        request_hash=_hash_request("mission.started", payload.model_dump(mode="json")),
+        request_hash=_hash_request("mission.started", _stable_dump(payload, estimated_minutes=None)),
         status=IdempotencyStatus.completed,
         response_status_code=201,
         response_body=cached_response,

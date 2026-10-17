@@ -19,7 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base, UUIDPrimaryKeyMixin
@@ -190,6 +190,24 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
             "('cat_a', 'cat_b', 'cat_c', 'cat_d', 'cat_e', 'cat_f', 'cat_g', 'cat_h', 'cat_i')",
             name="imperium_missions_mission_type_category_check",
         ),
+        CheckConstraint(
+            "estimated_minutes IS NULL OR estimated_minutes > 0",
+            name="imperium_missions_estimated_minutes_positive",
+        ),
+        CheckConstraint(
+            "failure_reason_code IS NULL OR failure_reason_code IN "
+            "('no_time', 'too_tired', 'not_relevant', 'impediment')",
+            name="imperium_missions_failure_reason_code_check",
+        ),
+        CheckConstraint(
+            "annex_of_mission_id IS NULL OR annex_of_mission_id <> id",
+            name="imperium_missions_annex_not_self",
+        ),
+        Index(
+            "imperium_missions_annex_of_idx",
+            "annex_of_mission_id",
+            postgresql_where=text("annex_of_mission_id IS NOT NULL"),
+        ),
         Index(
             "imperium_missions_one_active_per_user_idx",
             "user_id",
@@ -222,8 +240,29 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completion_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # doc 52 §10 : raison codée d'une mission non faite ; failure_reason garde les détails.
+    failure_reason_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # doc 43 §5.2 : durée estimée (proposée par l'IA, modifiable).
+    estimated_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # doc 53 §3.1 : mission annexe accrochée à une mission porteuse.
+    annex_of_mission_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("imperium_missions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     user_reported_signals: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     ai_usable_reason: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # Annexes encore en attente (backlog) accrochées à cette mission porteuse.
+    pending_annexes: Mapped[list["ImperiumMission"]] = relationship(
+        "ImperiumMission",
+        primaryjoin=(
+            "and_(ImperiumMission.id == remote(foreign(ImperiumMission.annex_of_mission_id)), "
+            "remote(ImperiumMission.status) == 'backlog')"
+        ),
+        order_by="ImperiumMission.created_at",
+        viewonly=True,
+        lazy="select",
+    )
     created_by_event_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("events.id"),

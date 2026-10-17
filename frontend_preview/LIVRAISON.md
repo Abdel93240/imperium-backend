@@ -55,6 +55,7 @@ finances (`/api/imperium/vault/summary|transactions`, `/api/vault/pressure`),
 priorités (`/api/imperium/decision-framework/priorities`), Weekly Review
 (`/api/imperium/weekly-review/launch|…/approve`), santé (`/api/health`, `/api/health/db`),
 connexion (`/api/auth/login`).
+Codé le 2026-10-17 : missions annexes, `estimated_minutes`, `failure_reason_code`.
 Manquant : replanification, notes de mission, projets/routines, catégorie suggérée,
 OCR, réglages, modèles/seuils/clés, logs IA, Nourrir l'IA (import/enregistrement),
 standby/intervention, santé mémoire/IA. Carte complète : panneau Démo → « Carte des

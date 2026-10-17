@@ -14,6 +14,7 @@ from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.imperium import BacklogMissionCreateRequest
 from app.services.imperium.missions import (
     _hash_request,
+    _stable_dump,
     create_backlog_mission,
     get_backlog_decision_preview,
     get_mission_decision_score,
@@ -679,6 +680,8 @@ def test_backlog_public_response_does_not_expose_coefficient_or_weighted_score()
         "mission_type_category",
         "planned_start_at",
         "planned_end_at",
+        "estimated_minutes",
+        "annex_of_mission_id",
         "created_at",
         "updated_at",
         "decision_score",
@@ -736,7 +739,7 @@ def test_backlog_idempotent_create_replay_does_not_duplicate_score() -> None:
         idempotency_key="backlog-replay-score",
         request_method="POST",
         request_path="/imperium/missions/backlog",
-        request_hash=_hash_request("mission.backlog.created", payload.model_dump(mode="json")),
+        request_hash=_hash_request("mission.backlog.created", _stable_dump(payload, estimated_minutes=None)),
         status=IdempotencyStatus.completed,
         response_status_code=201,
         response_body=cached_response,

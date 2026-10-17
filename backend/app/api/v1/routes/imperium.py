@@ -11,6 +11,8 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.core.config import get_settings
 from app.models.imperium import ImperiumWeeklyReviewState
 from app.schemas.imperium import (
+    AttachAnnexesRequest,
+    AttachAnnexesResponse,
     ActiveMissionResponse,
     BacklogDecisionPreviewResponse,
     BacklogMissionCreateRequest,
@@ -149,6 +151,8 @@ from app.services.imperium.decision_framework import (
     replace_user_priorities,
 )
 from app.services.imperium.missions import (
+    AnnexValidationError,
+    attach_annexes,
     ActiveMissionExistsError,
     IdempotencyConflictError as MissionIdempotencyConflictError,
     MissionNotFoundError,
@@ -1153,6 +1157,9 @@ def complete_mission_route(
     except MissionNotFoundError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except AnnexValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except MissionStateConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -1200,6 +1207,9 @@ def fail_mission_route(
     except MissionNotFoundError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except AnnexValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except MissionStateConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -1217,6 +1227,47 @@ def fail_mission_route(
         response.status_code = status.HTTP_200_OK
     return result
 
+
+
+@router.post("/missions/{mission_id}/annexes", response_model=AttachAnnexesResponse)
+def attach_annexes_route(
+    mission_id: UUID,
+    payload: AttachAnnexesRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> AttachAnnexesResponse:
+    """Missions annexes V1 (doc 53 §3.1) : accroche jusqu'à 5 missions courtes du backlog."""
+    _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = attach_annexes(
+            db,
+            current_user=current_user,
+            mission_id=mission_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except AnnexValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except MissionIdempotencyConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mission or event conflicts with an existing record.",
+        ) from exc
+    response.status_code = status.HTTP_200_OK
+    return result
 
 @router.get("/missions/current", response_model=MissionResponse)
 def current_mission_route(current_user: CurrentUserDep, db: SessionDep) -> MissionResponse:
