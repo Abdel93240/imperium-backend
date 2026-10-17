@@ -108,6 +108,21 @@ To avoid plan thrashing:
     nouvelle replanification.
 ```
 
+### 3.4 Raison d'une replanification manuelle (décision utilisateur 2026-10-17)
+
+```text
+Fenêtre « Replanifier la journée » (maquette 02) :
+  Raison (menu, obligatoire) → replan_reason_category (doc 01) :
+    Nouvel imprévu (new_event) · Mauvaise estimation du temps (wrong_estimation) ·
+    Fatigue (fatigue) · Changement de priorité (priority_shift) · Autre (other)
+  « Autre » ajoute le champ « Autre raison » (obligatoire si Autre).
+  Détails (OBLIGATOIRE, au moins une phrase) → replan_reason_detail.
+  Le bouton Replanifier reste inactif tant que les détails sont vides.
+Raison : doc 74 §4 — on ne replanifie pas sans un « pourquoi » clair ; ce texte
+distingue contrainte réelle et préférence pour l'entraînement de l'IA locale.
+Les replans automatiques (hooks) portent leur propre raison système.
+```
+
 ---
 
 ## 4. The Morning Popup

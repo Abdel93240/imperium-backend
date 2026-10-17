@@ -14,7 +14,7 @@ export const OPERATIONS = {
   getNotes:           { route: null, etat: "manquant", note: "Notes de mission : FUTUR / NON CODÉ (doc 05)." },
   saveNotes:          { route: null, etat: "manquant" },
   getReplanState:     { route: null, etat: "manquant", note: "Délai : timestamp d'éligibilité à fournir par le backend (doc 43 §3.3)." },
-  requestReplan:      { route: null, etat: "manquant", note: "imperium.rolling_replan (doc 43 §3.2) sans route publique." },
+  requestReplan:      { route: null, etat: "manquant", note: "imperium.rolling_replan (doc 43 §3.2) sans route publique. Corps : replan_reason_category + replan_reason_detail (doc 43 §3.4)." },
   reviseReplan:       { route: null, etat: "manquant" },
   acceptReplan:       { route: "POST /api/imperium/day/plan/{plan_id}/activate", etat: "à confirmer", note: "Activation d'un plan existante ; lien avec une proposition de replan à définir." },
   cancelReplan:       { route: "POST /api/imperium/day/plan/{plan_id}/cancel", etat: "à confirmer" },

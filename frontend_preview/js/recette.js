@@ -40,11 +40,14 @@ const T = {
   async R08() { await go("dashboard", { longDay: true }); await wait(1100); const el = $$(".dash-day .mono").at(-1);
     return check({ "36:12 affiché": el.textContent.startsWith("36:12"), "pas de modulo 24": !el.textContent.startsWith("12:12") }); },
   async R09() { await go("dashboard"); btnT("Replanifier la journée").closest("div").querySelector("button"); const F2 = await import("./flows.js"); await F2.openReplan(); await wait(300);
-    const m = top(); const sel = $("select", m); type(sel, "Autre"); await wait(100);
+    const m = top(); const sel = $("select", m); type(sel, "other"); await wait(100);
     return check({ "champ Autre raison affiché": $$(".field", m).some((f) => f.textContent.includes("Autre raison") && f.style.display !== "none"), "Détails toujours là": text(m).includes("Détails de la raison"), "aucune durée d'imprévu": !text(m).match(/durée/i) }); },
   async R10() { await go("dashboard", { cooldown: true }); const dash = btnT("Replanifier la journée"); const F2 = await import("./flows.js"); await F2.openReplan(); await wait(300); const dlg = btnT("Replanifier", top());
     const r = { "bouton dashboard désactivé": dash.disabled, "« Disponible dans 3 min »": text().includes("Disponible dans 3 min"), "bouton fenêtre désactivé": dlg.disabled };
-    clock.offset += 3 * 60000 + 1000; await wait(1300); r["réactivation automatique (2 boutons)"] = !dash.disabled && !dlg.disabled; return check(r); },
+    type($("textarea", top()), "Le client a annulé, je libère l'après-midi."); clock.offset += 3 * 60000 + 1000; await wait(1300); r["réactivation automatique (2 boutons)"] = !dash.disabled && !dlg.disabled; return check(r); },
+  async R10b() { await go("dashboard", { cooldown: false }); const F2 = await import("./flows.js"); await F2.openReplan(); await wait(300); const m = top(), b = btnT("Replanifier", m);
+    const r = { "bloqué sans détails": b.disabled }; type($("textarea", m), "Le client a annulé."); await wait(100); r["actif avec détails"] = !b.disabled;
+    type($("select", m), "other"); await wait(100); r["Autre exige « Autre raison »"] = b.disabled; type($$("input", m)[0], "Panne de voiture"); await wait(100); r["actif avec Autre raison"] = !b.disabled; return check(r); },
   async R11() { await go("dashboard", { cooldown: false }); const before = (await svc.getDashboard()).plan.map((p) => p.title).join("|");
     const F2 = await import("./flows.js"); F2.openReplanValidate(await svc.requestReplan({ reason: "Fatigue — test" })); await wait(400); let m = top();
     const r = { "badges Déplacée/Nouvelle/Retirée": ["Déplacée", "Nouvelle", "Retirée"].every((b) => text(m).includes(b)) };

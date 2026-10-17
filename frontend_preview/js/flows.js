@@ -14,7 +14,7 @@ export function cooldownButton(label, eligibleAt, onClick, { kind = "", withHint
   const hint = h("div", { class: "tiny dim mono", style: "text-align:right;margin-top:4px;min-height:15px" });
   const tick = () => {
     const left = eligibleAt - clock.now();
-    b.disabled = left > 0;
+    b.disabled = left > 0 || b.dataset.invalid === "1";
     hint.textContent = left > 0 ? `Disponible dans ${Math.ceil(left / MIN)} min` : "";
     return left > 0;
   };
@@ -69,20 +69,27 @@ export function openResult(mission, mode) {
 export async function openReplan() {
   const st = await svc.getReplanState();
   modals.open((close) => {
-    const REASONS = ["Fatigue", "Imprévu", "Retard sur le programme", "Rendez-vous déplacé", "Autre"]; // valeurs de démonstration : liste réelle à confirmer dans le contrat
+    // Doc 43 §3.4 : 5 catégories (replan_reason_category) + détails obligatoires (doc 74 §4).
+    const REASONS = [{ value: "new_event", label: "Nouvel imprévu" }, { value: "wrong_estimation", label: "Mauvaise estimation du temps" }, { value: "fatigue", label: "Fatigue" }, { value: "priority_shift", label: "Changement de priorité" }, { value: "other", label: "Autre" }];
     const other = h("input", { class: "input", placeholder: "Indique le motif…" });
     const otherField = field("Autre raison", other); otherField.style.display = "none";
-    const sel = select(REASONS, REASONS[0], (v) => { otherField.style.display = v === "Autre" ? "" : "none"; });
-    const details = h("textarea", { class: "textarea", placeholder: "Décris la situation…", style: "min-height:130px" });
+    const details = h("textarea", { class: "textarea", placeholder: "Décris la situation en une phrase au moins…", style: "min-height:130px" });
+    const sel = select(REASONS, "new_event", (v) => { otherField.style.display = v === "other" ? "" : "none"; valid(); });
     const go = async () => {
-      const reason = `${sel.value === "Autre" ? other.value.trim() || "Autre" : sel.value} — ${details.value.trim()}`;
+      const label = sel.value === "other" ? other.value.trim() : REASONS.find((r) => r.value === sel.value).label;
+      const reason = `${label} — ${details.value.trim()}`;
       close();
-      try { const proposal = await withLoader("REPLANIFICATION", "Calcul de ta nouvelle journée…", () => svc.requestReplan({ reason }), "replan"); openReplanValidate(proposal); }
+      try { const proposal = await withLoader("REPLANIFICATION", "Calcul de ta nouvelle journée…", () => svc.requestReplan({ category: sel.value, detail: details.value.trim(), reason }), "replan"); openReplanValidate(proposal); }
       catch (e) { toast(e.code === "COOLDOWN" ? "Délai de replanification en cours." : "La replanification a échoué. Ton plan actuel est conservé."); app.refresh(); }
     };
+    const goBtn = cooldownButton("Replanifier", st.eligibleAt, go, { kind: "primary", withHint: false });
+    const need = h("div", { class: "tiny dim" }, "Les détails sont obligatoires : ils expliquent ta décision à l'IA.");
+    // Inactif tant que les détails (et « Autre raison ») sont vides ; le délai garde la main s'il est actif.
+    function valid() { const ok = details.value.trim().length >= 3 && (sel.value !== "other" || other.value.trim()); goBtn.dataset.invalid = ok ? "" : "1"; if (st.eligibleAt <= clock.now()) goBtn.disabled = !ok; }
+    details.addEventListener("input", valid); other.addEventListener("input", valid); queueMicrotask(valid);
     return modal({ title: "Replanifier la journée", close, size: "small",
-      body: [h("div", null, "Pourquoi souhaites-tu adapter ta journée ?"), field("Raison de la replanification", sel), otherField, field("Détails de la raison", details)],
-      foot: [btn("Annuler", { kind: "neutral", onClick: close }), cooldownButton("Replanifier", st.eligibleAt, go, { kind: "primary", withHint: false })] });
+      body: [h("div", null, "Pourquoi souhaites-tu adapter ta journée ?"), field("Raison de la replanification", sel), otherField, field("Détails de la raison", details), need],
+      foot: [btn("Annuler", { kind: "neutral", onClick: close }), goBtn] });
   });
 }
 

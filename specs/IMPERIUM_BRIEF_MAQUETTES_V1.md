@@ -116,6 +116,10 @@ manuel. Ajouter l'état grisé du bouton « Replanifier la journée » (maquette
 du bouton « Replanifier » (maquette 02), avec le texte « Disponible dans 3 min »
 (JetBrains Mono pour le nombre). Pas de fenêtre d'erreur : le bouton se réactive seul.
 
+Maquette 02, menu Raison (2026-10-17, doc 43 §3.4) : Nouvel imprévu, Mauvaise estimation
+du temps, Fatigue, Changement de priorité, Autre (remplace « Je suis trop fatigué »).
+« Détails de la raison » est obligatoire : « Replanifier » reste inactif tant qu'il est vide.
+
 ### A5. Maquettes 13 et 14 — Historique
 
 Remplacer le titre « Hall of Fame » par « Historique » ; la barre de navigation dit déjà
