@@ -113,6 +113,47 @@ class FoodStockLineIn(BaseModel):
         return stripped
 
 
+class FoodStockItemCreate(BaseModel):
+    """Ajout manuel (PUL-12, feuille d'ajout)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    quantity: Decimal = Field(gt=Decimal("0"), max_digits=10, decimal_places=3)
+    unit: StockUnit = "piece"
+    expiry_type: Literal["DLC", "DDM", "unknown"] = "unknown"
+    expiry_date: date | None = None
+    category: str | None = Field(default="food", max_length=40)
+
+    _strip_name = field_validator("name")(FoodStockLineIn.strip_name.__func__)
+
+
+class FoodStockItemUpdate(BaseModel):
+    """Modification d'une ligne : seule la version lue autorise l'écriture (doc 40 §8)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    quantity: Decimal | None = Field(default=None, gt=Decimal("0"), max_digits=10, decimal_places=3)
+    unit: StockUnit | None = None
+    expiry_type: Literal["DLC", "DDM", "unknown"] | None = None
+    expiry_date: date | None = None
+    category: str | None = Field(default=None, max_length=40)
+    status: Literal["active", "consumed", "removed"] | None = None
+
+    @model_validator(mode="after")
+    def require_a_change(self) -> "FoodStockItemUpdate":
+        if not (self.model_fields_set - {"version"}):
+            raise ValueError("Nothing to update.")
+        if "name" in self.model_fields_set and (self.name is None or not self.name.strip()):
+            raise ValueError("name cannot be empty.")
+        for required in ("quantity", "unit", "expiry_type", "status"):
+            if required in self.model_fields_set and getattr(self, required) is None:
+                raise ValueError(f"{required} cannot be null.")
+        return self
+
+
 class FoodStockItemRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -127,6 +168,7 @@ class FoodStockItemRead(BaseModel):
     source: str
     source_ref: str | None
     status: str
+    version: int
     created_at: datetime
 
 

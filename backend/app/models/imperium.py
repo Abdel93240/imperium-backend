@@ -1212,6 +1212,7 @@ class FoodStockItem(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("expiry_type IN ('DLC', 'DDM', 'unknown')", name="expiry_type_check"),
         CheckConstraint("source IN ('manual', 'vault_receipt', 'pantry_scan', 'chatbot')", name="source_check"),
         CheckConstraint("status IN ('active', 'consumed', 'removed')", name="status_check"),
+        CheckConstraint("version >= 1", name="version_positive"),
         Index("food_stock_items_user_status_idx", "user_id", "status"),
         Index("food_stock_items_user_source_ref_idx", "user_id", "source_ref", unique=True,
               postgresql_where=text("source_ref IS NOT NULL")),
@@ -1228,6 +1229,7 @@ class FoodStockItem(UUIDPrimaryKeyMixin, Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
