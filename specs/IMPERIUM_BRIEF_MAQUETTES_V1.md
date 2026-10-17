@@ -76,6 +76,7 @@ saisi ou lu par l'OCR : d'abord par la table des libellés connus, sinon par l'I
 (doc 42 §7.0). À côté, une étiquette non modifiable « Business » ou « Perso », déduite de
 la catégorie. Le champ reste modifiable avant « Enregistrer ». Montrer un état « catégorie
 proposée par l'IA » (petite icône IA commune) distinct d'un état « reconnu ».
+Type : Entrée / Sortie seulement, pas de « Transfert » en V1 (doc 42 §8.1, 2026-10-17).
 
 ### A6. Tutoiement (maquettes 15, 17, 19 et toutes les nouvelles)
 

@@ -264,6 +264,13 @@ User taps "Mettre à jour wallet" in Vault settings:
   → latest snapshot used for pressure calc
 ```
 
+**Transferts entre portefeuilles (décision utilisateur 2026-10-17) : pas de type
+« Transfert » en V1.** Un dépôt de cash en banque ne se saisit pas comme transaction
+(il fausserait revenus, dépenses et livres) : on ajuste les soldes avec ce formulaire.
+Un transfert ne change pas TOTAL_WALLET, donc ni la pression ni le plan. Le type
+« Transfert » pourra venir avec la synchronisation bancaire V2. Devise : EUR seul ;
+crypto saisie en contre-valeur EUR (pas de quantités).
+
 ### 8.2 Automatic adjustment after transactions
 
 ```text
