@@ -362,6 +362,13 @@ Cross-module links:
 | Chatbot | User declares stock in natural language ("j'ai acheté 2kg de riz"); backend updates stock. |
 | Meal decrement | PUL-03 confirmed stock lines decrement quantities. |
 
+> CODÉ (2026-10-17, migration 20261017_0052) : table `food_stock_items` (champs §11.2 +
+> status active|consumed|removed, source manual|vault_receipt|pantry_scan|chatbot,
+> source_ref). Une ligne par achat (dates limites différentes). Source codée : passage
+> des tickets validés (doc 37 §3.4). Lecture : `GET /api/imperium/pulse/food-stock`
+> (actif, date limite la plus proche d'abord ; `include_inactive=true`). Ajout manuel,
+> scan du placard, chatbot, décompte après repas, alertes de date : pas encore.
+
 ### 11.2 Stock item fields (V1)
 
 ```text
@@ -889,12 +896,12 @@ must be implemented in backend patches before UI relies on them.
 | Workouts | `TBD POST /api/pulse/workouts/{workout_id}/adaptation/reject` |
 | Body | `TBD POST /api/pulse/body-snapshots` |
 | Pain | `TBD POST /api/pulse/pain-logs` |
-| Stock | `TBD GET /api/pulse/food-stock` |
+| Stock | `GET /api/imperium/pulse/food-stock` (CODÉ 2026-10-17) |
 | Stock | `TBD POST /api/pulse/food-stock` |
 | Stock | `TBD PATCH /api/pulse/food-stock/{stock_item_id}` |
 | Stock | `TBD POST /api/pulse/food-stock/scan` |
 | Stock | `TBD POST /api/pulse/food-stock/scans/{scan_id}/validate` |
-| Vault handoff | `TBD POST /api/pulse/food-stock/drafts/confirm` |
+| Vault handoff | CODÉ autrement (2026-10-17) : `stock_lines` de `POST /api/imperium/vault/receipt-extractions/{id}/validate`, une seule validation pour les deux domaines (doc 37 §3.4). |
 | Medical | `TBD GET /api/pulse/medical-documents` |
 | Medical | `TBD POST /api/pulse/medical-documents` |
 | Medical | `TBD GET /api/pulse/medical-rules/active` |

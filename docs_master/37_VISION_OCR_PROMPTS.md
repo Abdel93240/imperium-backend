@@ -151,8 +151,15 @@ appelle directement le service OCR local (`app/services/ai/ocr.py`, contrat
   `external_ref = receipt:{id}`) et apprend la catégorie validée pour l'enseigne.
 - Image : effacée si la lecture échoue ou à l'annulation ; conservée comme
   justificatif après validation (fichier 0600 sous VAULT_RECEIPTS_STORAGE_DIR, hors dépôt).
-- PAS ENCORE : lignes d'articles, TVA, et le passage des articles alimentaires vers
-  le stock Pulse (§3.3 point 4) ; repli cloud de l'OCR (privacy gate à coder d'abord).
+- Lignes d'articles (CODÉ 2026-10-17, migration 20261017_0052) : libellé + montant en fin
+  de ligne, avant le premier total ; quantité « 2 x », « x2 », « 0,50 x 6 », « 6 x 0,50 »
+  ou poids (1kg, 500 g, 1,5 L). Indice de catégorie déterministe par mots-clés
+  (food|drink|household|fuel|other). Le brouillon coche `to_stock` sur les lignes food.
+- Passage Pulse (§3.3 point 4) : à la validation, `stock_lines` (lignes cochées et
+  éventuellement corrigées par l'utilisateur ; absent = lignes food du brouillon ; liste
+  vide = rien) entre dans `food_stock_items` (source vault_receipt, source_ref
+  receipt:{id}:{n}, rejoué → rien en double). Événement `pulse.food_stock.updated`.
+- PAS ENCORE : TVA ; repli cloud de l'OCR (privacy gate à coder d'abord).
 
 ---
 

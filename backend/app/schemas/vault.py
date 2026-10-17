@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.pulse import FoodStockItemRead, FoodStockLineIn
+
 
 class ImperiumVaultTransactionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -259,6 +261,16 @@ class VaultCategoryConfirmResponse(BaseModel):
     confirmations: int
 
 
+class VaultReceiptLineRead(BaseModel):
+    index: int
+    description: str
+    quantity: float
+    unit: str
+    total_cents: int
+    category_hint: str
+    to_stock: bool  # coché par défaut sur VAU-05 : les lignes alimentaires
+
+
 class VaultReceiptDraftRead(BaseModel):
     merchant: str | None = None
     purchase_date: date | None = None
@@ -269,6 +281,7 @@ class VaultReceiptDraftRead(BaseModel):
     category: str | None = None
     book: str | None = None
     category_source: str | None = None
+    line_items: list[VaultReceiptLineRead] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -300,6 +313,9 @@ class VaultReceiptValidateRequest(BaseModel):
     category: str | None = Field(default=None, max_length=80)
     wallet: str = Field(default="cash", min_length=1, max_length=80)
     note: str | None = Field(default=None, max_length=500)
+    # Lignes qui entrent au stock Pulse. Absent : les lignes alimentaires du brouillon ;
+    # liste vide : rien au stock.
+    stock_lines: list[FoodStockLineIn] | None = Field(default=None, max_length=100)
 
     @field_validator("occurred_at")
     @classmethod
@@ -312,3 +328,4 @@ class VaultReceiptValidateRequest(BaseModel):
 class VaultReceiptValidateResponse(BaseModel):
     extraction: VaultReceiptExtractionRead
     transaction: ImperiumVaultTransactionRead
+    stock_items: list[FoodStockItemRead] = Field(default_factory=list)

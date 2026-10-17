@@ -64,3 +64,26 @@ def test_unreadable_text_gives_empty_fields_and_warnings(raw) -> None:
 
 def test_invalid_dates_are_skipped() -> None:
     assert parse_receipt_text("MAGASIN\n31/02/2026\n05/03/2026\nTOTAL 3,00").purchase_date == date(2026, 3, 5)
+
+
+def test_line_items_stop_at_the_total_and_carry_quantities_and_hints() -> None:
+    lines = parse_receipt_text(SUPERMARCHE).line_items
+    assert [(line.description, line.quantity, line.unit, line.total_cents, line.category_hint) for line in lines] == [
+        ("Lait demi-écrémé", 1.0, "piece", 115, "food"),
+        ("Poulet fermier", 2.0, "piece", 980, "food"),
+    ]
+
+
+def test_line_item_quantity_forms() -> None:
+    raw = ("LIDL\n2 x Yaourt nature  1,98\nRiz basmati 1kg   2,49 B\nEau 6x1,5L 0,50 x 6 3,00\nOeufs 3 x 1,20 3,60\n"
+           "Lessive  7,90\nTOTAL 19,47\nCB 19,47\n")
+    lines = {line.description: line for line in parse_receipt_text(raw).line_items}
+    assert (lines["Yaourt nature"].quantity, lines["Yaourt nature"].category_hint) == (2.0, "food")
+    assert (lines["Riz basmati 1kg"].quantity, lines["Riz basmati 1kg"].unit) == (1.0, "kg")
+    assert (lines["Eau 6x1,5L"].quantity, lines["Eau 6x1,5L"].category_hint) == (6.0, "drink")
+    assert lines["Oeufs"].quantity == 3.0
+    assert lines["Lessive"].category_hint == "household" and "CB" not in " ".join(lines)
+
+
+def test_fuel_receipt_has_no_food_lines() -> None:
+    assert all(line.category_hint != "food" for line in parse_receipt_text(STATION).line_items)

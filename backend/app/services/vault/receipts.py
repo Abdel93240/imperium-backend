@@ -34,7 +34,9 @@ from app.schemas.vault import (
 )
 from app.services.ai import ocr
 from app.services.ai.knowledge_files import extension, safe_filename
+from app.schemas.pulse import FoodStockItemRead, FoodStockLineIn
 from app.services.events.emitter import build_event
+from app.services.pulse import food_stock
 from app.services.imperium.vault_transactions import create_vault_transaction
 from app.services.vault import categorization
 from app.services.vault.receipt_parser import parse_receipt_text
@@ -152,7 +154,8 @@ def validate_extraction(
     extraction = _get(db, current_user=current_user, extraction_id=extraction_id)
     if extraction.status == "validated":
         transaction = ImperiumVaultTransactionRead.model_validate(db.get(ImperiumVaultTransaction, extraction.transaction_id))
-        return VaultReceiptValidateResponse(extraction=_read(extraction), transaction=transaction)
+        return VaultReceiptValidateResponse(extraction=_read(extraction), transaction=transaction,
+                                            stock_items=_stock_read(db, current_user, extraction))
     if extraction.status != "ready":
         raise ReceiptStateError("Only a ready receipt can be validated.")
     merchant = (extraction.draft or {}).get("merchant")
@@ -178,11 +181,19 @@ def validate_extraction(
     extraction.status = "validated"
     extraction.transaction_id = transaction.id
     extraction.validated_at = datetime.now(UTC)
-    _emit(db, current_user, "finance.receipt.validated", extraction, {"transaction_id": str(transaction.id)})
+    # Deuxième écriture, dans le domaine Pulse (doc 42 §15.2) : jamais Vault ↔ Pulse en direct.
+    stock_lines = _default_stock_lines(extraction) if payload.stock_lines is None else payload.stock_lines
+    stocked = food_stock.add_from_receipt(
+        db, current_user=current_user, receipt_ref=_receipt_ref(extraction), lines=stock_lines,
+        confidence=extraction.ocr_confidence,
+    )
+    _emit(db, current_user, "finance.receipt.validated", extraction,
+          {"transaction_id": str(transaction.id), "stock_items": len(stocked)})
     db.commit()
     if merchant and category and category in categorization.get_referential(db):
         categorization.confirm_category(db, current_user=current_user, label=merchant, category=category)
-    return VaultReceiptValidateResponse(extraction=_read(extraction), transaction=transaction)
+    return VaultReceiptValidateResponse(extraction=_read(extraction), transaction=transaction,
+                                        stock_items=[FoodStockItemRead.model_validate(item) for item in stocked])
 
 
 def cancel_extraction(db: Session, *, current_user: User, extraction_id: UUID) -> VaultReceiptExtractionRead:
@@ -200,6 +211,24 @@ def cancel_extraction(db: Session, *, current_user: User, extraction_id: UUID) -
 
 
 # ---------- internes ----------
+
+def _receipt_ref(extraction: VaultReceiptExtraction) -> str:
+    return f"receipt:{extraction.id}"
+
+
+def _default_stock_lines(extraction: VaultReceiptExtraction) -> list[FoodStockLineIn]:
+    lines = []
+    for line in (extraction.draft or {}).get("line_items") or []:
+        if line.get("to_stock"):
+            lines.append(FoodStockLineIn(name=line["description"], quantity=Decimal(str(line["quantity"])), unit=line["unit"]))
+    return lines
+
+
+def _stock_read(db: Session, current_user: User, extraction: VaultReceiptExtraction) -> list[FoodStockItemRead]:
+    ref = _receipt_ref(extraction)
+    return [item for item in food_stock.list_stock(db, current_user=current_user, include_inactive=True).items
+            if item.source_ref and item.source_ref.startswith(f"{ref}:")]
+
 
 def _recognize(recognize: RecognizeFile | None, data: bytes, name: str, content_type: str | None):
     if recognize is None:
@@ -237,6 +266,11 @@ def _draft(db: Session, current_user: User, raw_text: str, confidence: Decimal |
         "category": suggestion.category if suggestion else None,
         "book": suggestion.book if suggestion else None,
         "category_source": suggestion.source if suggestion else None,
+        "line_items": [
+            {"index": index, "description": line.description, "quantity": line.quantity, "unit": line.unit,
+             "total_cents": line.total_cents, "category_hint": line.category_hint, "to_stock": line.category_hint == "food"}
+            for index, line in enumerate(parsed.line_items)
+        ],
         "warnings": warnings,
     }
 

@@ -20,7 +20,10 @@ from sqlalchemy.orm import Session  # noqa: E402
 
 from app.models.auth import User  # noqa: E402
 from app.models.event import Event  # noqa: E402
+from app.models.imperium import FoodStockItem  # noqa: E402
 from app.models.vault import ImperiumVaultTransaction, UserCategoryMemory  # noqa: E402
+from app.schemas.pulse import FoodStockLineIn  # noqa: E402
+from app.services.pulse import food_stock  # noqa: E402
 from app.schemas.vault import VaultReceiptValidateRequest  # noqa: E402
 from app.services.ai import ocr  # noqa: E402
 from app.services.vault import receipts  # noqa: E402
@@ -69,11 +72,11 @@ def _scan(db, user, *, recognize=None, name="ticket.jpg", data=b"JPEGDATA", key=
     )
 
 
-def _validate(db, user, extraction, *, category="carburant", key=None, amount=6540):
+def _validate(db, user, extraction, *, category="carburant", key=None, amount=6540, **extra):
     return receipts.validate_extraction(
         db, current_user=user, extraction_id=extraction.id,
         payload=VaultReceiptValidateRequest(amount_cents=amount, occurred_at=datetime(2026, 10, 16, 5, 55, tzinfo=UTC),
-                                            category=category, wallet="bank"),
+                                            category=category, wallet="bank", **extra),
         idempotency_key=key or f"v-{uuid4().hex}", request_method="POST", request_path="/api/imperium/vault/receipt-extractions",
     )
 
@@ -219,3 +222,94 @@ def test_http_flow(db, monkeypatch) -> None:
     assert image.status_code == 200 and image.content == b"JPG"
     assert validated.status_code == 200 and validated.json()["transaction"]["amount_cents"] == 6540
     assert cancel.status_code == 409
+
+
+COURSES = ("CARREFOUR MARKET\nLait demi-écrémé 1,15\n2 x Poulet fermier 9,80\nRiz basmati 1kg 2,49\nLessive 7,90\n"
+           "TOTAL TTC 21,34\nCB 21,34\n17/10/2026 18:42\n")
+
+
+def _stock(db, user):
+    return list(db.scalars(select(FoodStockItem).where(FoodStockItem.user_id == user.id).order_by(FoodStockItem.source_ref)))
+
+
+def test_draft_lists_lines_and_ticks_only_food(db) -> None:
+    user = _user(db)
+    extraction, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    ticked = {line.description: line.to_stock for line in extraction.draft.line_items}
+    assert ticked == {"Lait demi-écrémé": True, "Poulet fermier": True, "Riz basmati 1kg": True, "Lessive": False}
+
+
+def test_validation_without_stock_lines_sends_the_food_lines_to_pulse(db) -> None:
+    user = _user(db)
+    extraction, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    result = _validate(db, user, extraction, category="courses", amount=2134)
+    stock = _stock(db, user)
+    assert [(item.name, float(item.quantity), item.unit) for item in stock] == [
+        ("Lait demi-écrémé", 1.0, "piece"), ("Poulet fermier", 2.0, "piece"), ("Riz basmati 1kg", 1.0, "kg")]
+    assert all(item.source == "vault_receipt" and item.status == "active" for item in stock)
+    assert len(result.stock_items) == 3
+    events = list(db.scalars(select(Event).where(Event.user_id == user.id, Event.event_type == "pulse.food_stock.updated")))
+    assert len(events) == 1 and events[0].payload["items_added"] == 3
+
+
+def test_user_choice_of_lines_wins_and_empty_list_sends_nothing(db) -> None:
+    user = _user(db)
+    first, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    _validate(db, user, first, category="courses", amount=2134, stock_lines=[
+        FoodStockLineIn(name="Riz basmati", quantity=1, unit="kg", expiry_type="DDM", expiry_date="2027-06-01")])
+    stock = _stock(db, user)
+    assert [(item.name, item.expiry_type, str(item.expiry_date)) for item in stock] == [("Riz basmati", "DDM", "2027-06-01")]
+
+    second, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    result = _validate(db, user, second, category="courses", amount=2134, stock_lines=[])
+    assert result.stock_items == [] and len(_stock(db, user)) == 1
+
+
+def test_replayed_validation_does_not_double_the_stock(db) -> None:
+    user = _user(db)
+    extraction, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    _validate(db, user, extraction, category="courses", amount=2134, key="k")
+    again = _validate(db, user, extraction, category="courses", amount=2134, key="k")
+    assert len(_stock(db, user)) == 3 and len(again.stock_items) == 3
+
+
+def test_cancelled_receipt_sends_nothing_to_pulse(db) -> None:
+    user = _user(db)
+    extraction, _ = _scan(db, user, recognize=_reads(raw=COURSES))
+    receipts.cancel_extraction(db, current_user=user, extraction_id=extraction.id)
+    assert _stock(db, user) == []
+
+
+def test_stock_list_orders_by_expiry_and_hides_inactive(db) -> None:
+    user = _user(db)
+    food_stock.add_from_receipt(db, current_user=user, receipt_ref=f"receipt:{uuid4()}", confidence=None, lines=[
+        FoodStockLineIn(name="Yaourt", quantity=4, expiry_type="DLC", expiry_date="2026-10-20"),
+        FoodStockLineIn(name="Riz", quantity=1, unit="kg"),
+        FoodStockLineIn(name="Lait", quantity=1, expiry_type="DLC", expiry_date="2026-10-18"),
+    ])
+    db.commit()
+    names = [item.name for item in food_stock.list_stock(db, current_user=user).items]
+    assert names == ["Lait", "Yaourt", "Riz"]
+    db.execute(text("UPDATE food_stock_items SET status = 'consumed' WHERE user_id = :u AND name = 'Lait'"), {"u": str(user.id)})
+    db.commit()
+    assert [item.name for item in food_stock.list_stock(db, current_user=user).items] == ["Yaourt", "Riz"]
+
+
+def test_food_stock_route(db) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_current_user, get_db
+    from app.api.v1.routes import imperium_pulse_stock as routes
+
+    user = _user(db)
+    food_stock.add_from_receipt(db, current_user=user, receipt_ref=f"receipt:{uuid4()}", confidence=None,
+                                lines=[FoodStockLineIn(name="Dattes", quantity="0.5", unit="kg")])
+    db.commit()
+    app = FastAPI()
+    app.include_router(routes.router, prefix="/api/imperium/pulse")
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_db] = lambda: db
+    response = TestClient(app).get("/api/imperium/pulse/food-stock")
+    assert response.status_code == 200
+    assert [(i["name"], i["unit"], i["source"]) for i in response.json()["items"]] == [("Dattes", "kg", "vault_receipt")]
