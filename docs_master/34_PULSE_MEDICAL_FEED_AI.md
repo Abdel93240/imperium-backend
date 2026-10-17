@@ -600,6 +600,32 @@ Rule with expires_at set:
 
 ---
 
+## 16-bis. Implémentation V1 (CODÉ le 2026-10-17, migration 20261017_0063)
+
+Sans extraction automatique (le spécialiste santé n'est pas branché) :
+
+- Cadre : consentement « medical » du doc 08 PULSE-004 (`/api/imperium/pulse/consents`).
+- `POST /api/imperium/pulse/medical-documents?doc_type=&doc_date=&consent=true&consent_version=`
+  (corps brut, X-Filename, Idempotency-Key) : consentement du domaine actif (sinon 403
+  `CONSENT_REQUIRED`) ET accord de cet envoi (sinon 403 `UPLOAD_CONSENT_REQUIRED` ; texte
+  changé → 409). PDF ou photo, 25 Mo. Fichier sous `MEDICAL_DOCUMENTS_STORAGE_DIR/{user}/{uuid}.ext`
+  (droits 0600, nom interne), conservé 90 jours (`retention_delete_after`). Statut `uploaded`
+  + « Analyse automatique pas encore active : ajoute les règles à la main. »
+- `GET /medical-documents`, `GET /{id}/file` (no-store), `DELETE /{id}` : suppression réelle
+  du fichier, du document et des règles qui en sont tirées (§16.3).
+- Règles : `POST /medical-rules` (types du §7, sévérité info|warning|critical, document
+  source facultatif, citation, échéance) → toujours `proposed` ; `POST /{id}/activate`
+  avec `reviewed_source`, `confirmed_text`, `still_relevant` à true (§10.1), plus
+  `acknowledge_critical` pour une règle critique (§15.1) et `supersedes_rule_id` (§15.2) ;
+  `POST /{id}/deactivate` (toujours permis), `DELETE /{id}`, `GET /medical-rules`,
+  `GET /medical-rules/active` (actives et non échues).
+- Job `pulse.medical_retention` (3 h UTC, semé désactivé) : règles échues → `expired` ;
+  documents au terme → fichier et ligne supprimés, les règles validées restent (lien retiré).
+- Événements `pulse.medical_document.uploaded|deleted`, `pulse.medical_rule.activated|
+  deactivated|expired` : identifiants, type et sévérité seulement (privacy very_high).
+- Chiffrement au repos : celui du disque (§12.3, ops). Notification immédiate d'une règle
+  critique et notification d'échéance : pas encore (la règle est saisie par l'utilisateur).
+
 ## 17. Out Of Scope V1
 
 ```text

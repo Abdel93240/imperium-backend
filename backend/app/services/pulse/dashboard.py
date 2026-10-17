@@ -5,8 +5,8 @@ fatigue, poids, séance), repas validés et leurs totaux, eau bue, séances du j
 dates limites du stock, et des bannières courtes. Lecture seule.
 
 Le score santé n'est jamais affiché sans explication : tant qu'il n'est pas calculé,
-il reste vide et une bannière « données incomplètes » le dit. Jeûne (Path), règles
-médicales (doc 34) : pas encore. Douleurs : bannière sans détail.
+il reste vide et une bannière « données incomplètes » le dit. Règles médicales actives :
+bannière sans contenu. Jeûne (Path) : pas encore. Douleurs : bannière sans détail.
 """
 
 from datetime import date, datetime, time, timedelta
@@ -23,7 +23,7 @@ from app.schemas.pulse_dashboard import (
     DashboardMealsRead,
     PulseDashboardRead,
 )
-from app.services.pulse import entries, expiry, hydration, meals, pain, workouts
+from app.services.pulse import entries, expiry, hydration, meals, medical, pain, workouts
 
 HEALTH_SCORE_INCOMPLETE = "Score santé masqué : pas encore assez de données pour l'expliquer."
 
@@ -51,6 +51,10 @@ def build_dashboard(db: Session, *, current_user: User, day: date) -> PulseDashb
         message = f"{open_pain} douleur{'s' if open_pain > 1 else ''} en cours"
         message += f", dont {strong_pain} forte{'s' if strong_pain > 1 else ''}." if strong_pain else "."
         banners.append(DashboardBannerRead(kind="pain_open", level="warning" if strong_pain else "info", message=message))
+    rules = medical.active_count(db, current_user=current_user)
+    if rules:
+        plural = "s" if rules > 1 else ""
+        banners.append(DashboardBannerRead(kind="medical_rules", level="info", message=f"{rules} règle{plural} médicale{plural} active{plural}."))
     if drafts:
         banners.append(DashboardBannerRead(
             kind="meal_drafts", level="info",

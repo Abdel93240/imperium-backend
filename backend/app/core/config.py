@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     knowledge_inbox_storage_dir: str = "data/knowledge_inbox"
     # Justificatifs du Vault (doc 37 §3) : images des tickets validés, hors dépôt en production.
     vault_receipts_storage_dir: str = "data/vault_receipts"
+    medical_documents_storage_dir: str = "data/medical_documents"  # hors dépôt en production, disque chiffré
     # Clés des fournisseurs IA (doc 73) : un fichier 0600 par fournisseur, hors dépôt.
     provider_keys_dir: str = "data/provider_keys"
 

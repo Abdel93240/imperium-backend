@@ -51,7 +51,10 @@ filesystem (doc 70 / Knowledge Inbox, PATCH 05): uploaded PDFs, The Path audio,
 OCR markdown, etc. These are referenced from the database via
 `knowledge_inbox_documents.storage_pointer` but are NOT inside a `pg_dump`.
 Same for the Vault receipts kept as proof after validation
-(`vault_receipt_extractions.storage_pointer`, VAULT_RECEIPTS_STORAGE_DIR, doc 37 §3.4).
+(`vault_receipt_extractions.storage_pointer`, VAULT_RECEIPTS_STORAGE_DIR, doc 37 §3.4),
+and the medical documents (`pulse_medical_documents.storage_name`,
+MEDICAL_DOCUMENTS_STORAGE_DIR, doc 34 §16-bis; encrypted disk, 90-day retention, so a
+restore may bring back documents already purged: rerun `pulse.medical_retention` after it).
 
 Rule: the source file store is part of the backup perimeter. A database restore
 without its source files yields dead pointers - base and files must be backed up
