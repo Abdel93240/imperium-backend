@@ -7,8 +7,15 @@ from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.pulse import FoodStockItemCreate, FoodStockItemRead, FoodStockItemUpdate, FoodStockListResponse
-from app.services.pulse import food_stock
+from app.schemas.pulse import (
+    FoodStockExpiryAlertRead,
+    FoodStockExpiryRead,
+    FoodStockItemCreate,
+    FoodStockItemRead,
+    FoodStockItemUpdate,
+    FoodStockListResponse,
+)
+from app.services.pulse import expiry, food_stock
 
 router = APIRouter()
 
@@ -25,6 +32,16 @@ def list_food_stock_route(
 ) -> FoodStockListResponse:
     """Stock actif, date limite la plus proche en premier."""
     return food_stock.list_stock(db, current_user=current_user, include_inactive=include_inactive)
+
+
+@router.get("/food-stock/alerts", response_model=FoodStockExpiryRead)
+def food_stock_alerts_route(current_user: CurrentUserDep, db: SessionDep) -> FoodStockExpiryRead:
+    """Dates limites proches ou dépassées, calculées en direct (jour de Paris)."""
+    report = expiry.compute_alerts(db, current_user=current_user)
+    return FoodStockExpiryRead(
+        today=report.today, level=report.level, to_consume=report.to_consume, message_fr=report.message_fr,
+        alerts=[FoodStockExpiryAlertRead(**alert.__dict__) for alert in report.alerts],
+    )
 
 
 @router.post("/food-stock", response_model=FoodStockItemRead, status_code=status.HTTP_201_CREATED)

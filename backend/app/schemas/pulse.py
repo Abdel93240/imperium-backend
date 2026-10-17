@@ -172,5 +172,24 @@ class FoodStockItemRead(BaseModel):
     created_at: datetime
 
 
+class FoodStockExpiryAlertRead(BaseModel):
+    item_id: UUID
+    name: str
+    expiry_type: str
+    expiry_date: date
+    days_left: int
+    level: str
+
+
+class FoodStockExpiryRead(BaseModel):
+    """Bannière Pulse : « N items à consommer rapidement » (doc 40 §11.3)."""
+
+    today: date
+    level: str  # none | info | warning | error
+    to_consume: int
+    message_fr: str | None
+    alerts: list[FoodStockExpiryAlertRead]
+
+
 class FoodStockListResponse(BaseModel):
     items: list[FoodStockItemRead]
