@@ -131,6 +131,29 @@ After the OCR service returns, the backend:
 
 The user always validates before any canonical write.
 
+### 3.4 Implémentation V1 (CODÉ le 2026-10-17, migration 20261017_0051)
+
+Écart assumé avec §3.3 et doc 45 §9 : pas de n8n ni de tâche asynchrone. Le backend
+appelle directement le service OCR local (`app/services/ai/ocr.py`, contrat
+`ops/gpu/OCR_SMOKE_CHECKLIST.md`), pendant l'écran de chargement standard.
+- Routes `/api/imperium/vault/receipt-extractions` (module séparé du registre, qui
+  reste sans IA) : `POST` (corps brut, X-Filename, Idempotency-Key, `entry_app`
+  vault|imperium), `GET /{id}`, `GET /{id}/image`, `POST /{id}/validate`
+  (Idempotency-Key), `POST /{id}/cancel`.
+- Le texte OCR est lu par des règles déterministes (`receipt_parser.py`) : enseigne,
+  date, heure, total TTC (NET À PAYER > TOTAL TTC > TOTAL ; jamais SOUS-TOTAL, HT, TVA),
+  moyen de paiement (carte → portefeuille bank, espèces → cash). La catégorie vient
+  de la catégorie suggérée (doc 42 §7.0) sur l'enseigne. Champ non lu → vide +
+  avertissement ; confiance OCR < 0,6 → avertissement global.
+- Table `vault_receipt_extractions` (statut ready|failed|validated|cancelled, texte
+  OCR brut, confiance, brouillon, pointeur d'image). Rien n'est écrit au registre
+  avant `validate`, qui passe par le service canonique (`source = scan_ticket`,
+  `external_ref = receipt:{id}`) et apprend la catégorie validée pour l'enseigne.
+- Image : effacée si la lecture échoue ou à l'annulation ; conservée comme
+  justificatif après validation (fichier 0600 sous VAULT_RECEIPTS_STORAGE_DIR, hors dépôt).
+- PAS ENCORE : lignes d'articles, TVA, et le passage des articles alimentaires vers
+  le stock Pulse (§3.3 point 4) ; repli cloud de l'OCR (privacy gate à coder d'abord).
+
 ---
 
 ## 4. Bolt Screenshot Extraction (Vector V2)

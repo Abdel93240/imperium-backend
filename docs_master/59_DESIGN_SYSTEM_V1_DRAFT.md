@@ -1073,7 +1073,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Widgets :** viewfinder frame, image quality helper.
 - **Assets :** Vault receipt scan asset, Material Symbols `photo_camera`, `flash_on`, `close`.
 - **Etats :** Loading=camera initializing ; Empty=permission not requested with CTA ; Error=camera unavailable/OCR upload failure with retry/manual entry ; Offline=camera can capture local draft but OCR disabled banner ; Syncing=photo upload/OCR service task creation line ; Synced=route to VAU-05 when draft ready ; Conflict=duplicate pending receipt task dialog.
-- **Backend deps :** `TBD POST /api/vault/receipt-extractions`, ai_task `vault.receipt_extract`, ocr_service prompt doc 37 §3.
+- **Backend deps :** `POST /api/imperium/vault/receipt-extractions` (CODÉ 2026-10-17, synchrone, doc 37 §3.4), ocr_service.
 - **Navigation :** opened from VAU-01 `Scan ticket`; VAU-04 --> VAU-05 after OCR draft; camera denied/manual exits to VAU-03.
 - **Tab S10 Ultra :** fullscreen route, preview centered max 1280dp, right 320dp panel for capture guidance.
 
@@ -1086,7 +1086,7 @@ Top-level Vault V1 : Dashboard (`VAU-01`), Transactions (`VAU-07`), Categories (
 - **Widgets :** OCR confidence badge, total comparator, Pulse handoff summary.
 - **Assets :** receipt thumbnail image, Material Symbols `receipt_long`, `inventory_2`, `warning`.
 - **Etats :** Loading=OCR pending skeleton and polling banner ; Empty=no line detected with manual entry CTA ; Error=OCR service fail/invalid JSON with retry or re-capture ; Offline=read cached draft only, validation disabled ; Syncing=validation write in progress ; Synced=snackbar "Transactions enregistrées" plus Pulse handoff toast ; Conflict=draft already validated or modified dialog.
-- **Backend deps :** `TBD GET /api/vault/receipt-extractions/{receipt_task_id}`, `TBD POST /api/vault/receipt-extractions/{receipt_task_id}/validate`, `POST /api/vault/transactions`, `TBD POST /api/pulse/food-stock/drafts/confirm`.
+- **Backend deps :** `GET /api/imperium/vault/receipt-extractions/{id}` (+ `/image`), `POST …/{id}/validate`, `POST …/{id}/cancel` (CODÉS 2026-10-17, doc 37 §3.4) ; `TBD POST /api/pulse/food-stock/drafts/confirm`. Lignes d'articles et passage Pulse : pas encore.
 - **Navigation :** from VAU-04; VAU-05 --> VAU-01 on validation; VAU-05 --> PULSE_HANDOFF as backend event only, no second screen V1; re-scan returns VAU-04.
 - **Tab S10 Ultra :** two-column: receipt preview left 40%, draft cards right 60%, sticky validation bar bottom.
 
@@ -1224,7 +1224,7 @@ Transitions conditionnelles canoniques V1 :
 |---|---|---|
 | VAU-01 | `GET /api/imperium/vault/summary`, `GET /api/imperium/vault/summary/monthly` | `GET /api/vault/pressure/current` |
 | VAU-02/03 | `POST /api/vault/transactions`, `POST /api/imperium/vault/transactions` | none |
-| VAU-04/05 | none | `POST /api/vault/receipt-extractions`, `GET /api/vault/receipt-extractions/{receipt_task_id}`, `POST /api/vault/receipt-extractions/{receipt_task_id}/validate` |
+| VAU-04/05 | `POST /api/imperium/vault/receipt-extractions`, `GET …/{id}`, `GET …/{id}/image`, `POST …/{id}/validate`, `POST …/{id}/cancel` (codés 2026-10-17, doc 37 §3.4) | Pulse handoff des articles alimentaires |
 | VAU-06 | none | `GET /api/vault/pressure/current`, `POST /api/vault/advice/detail` |
 | VAU-07 | `GET /api/imperium/vault/transactions`, `GET /api/vault/transactions/recent` | none |
 | VAU-08 | `GET /api/imperium/vault/transactions/{transaction_id}`, `POST /api/imperium/vault/transactions/{transaction_id}/reverse` | `PATCH /api/imperium/vault/transactions/{transaction_id}` |

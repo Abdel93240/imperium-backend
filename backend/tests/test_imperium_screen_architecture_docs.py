@@ -975,7 +975,7 @@ def test_design_system_instantiates_vault_screen_contracts_and_high_risk_decisio
         "Money Input",
         "/api/imperium/vault/summary",
         "/api/imperium/vault/transactions/{transaction_id}/reverse",
-        "TBD POST /api/vault/receipt-extractions",
+        "POST /api/imperium/vault/receipt-extractions",
         "VAU-04 --> VAU-05",
         "VAU-05 --> PULSE_HANDOFF",
         "VAU-12 --> PATH_SETTINGS",

@@ -3,6 +3,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -182,6 +183,41 @@ class UserCategoryMemory(UUIDPrimaryKeyMixin, Base):
     category: Mapped[str] = mapped_column(Text, nullable=False)
     confirmations: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     last_confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class VaultReceiptExtraction(UUIDPrimaryKeyMixin, Base):
+    """Justificatif lu par l'OCR : brouillon de dépense en attente de validation (doc 37 §3)."""
+
+    __tablename__ = "vault_receipt_extractions"
+    __table_args__ = (
+        CheckConstraint("entry_app IN ('vault', 'imperium')", name="entry_app_check"),
+        CheckConstraint("status IN ('ready', 'failed', 'validated', 'cancelled')", name="status_check"),
+        CheckConstraint("size_bytes >= 0", name="size_non_negative"),
+        CheckConstraint("status <> 'validated' OR transaction_id IS NOT NULL", name="validated_has_transaction"),
+        Index("vault_receipt_extractions_user_created_idx", "user_id", "created_at"),
+        Index("vault_receipt_extractions_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    entry_app: Mapped[str] = mapped_column(Text, nullable=False, default="vault", server_default=text("'vault'"))
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_pointer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    draft: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Sans clé étrangère vers le registre (voir la migration 0051) ; lien inverse : external_ref.
+    transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
