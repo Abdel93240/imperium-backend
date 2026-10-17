@@ -1707,7 +1707,7 @@ Top-level Pulse V1 : Dashboard (`PUL-01`), Meals (`PUL-10`), Workouts (`PUL-11`)
 - **Widgets :** category stats, expiring soon banner, handoff badge, stock item detail pane.
 - **Assets :** empty-state illustration, Material Symbols `inventory_2`, `kitchen`, `event`, `warning`, `photo_camera`.
 - **Etats :** Loading=stock skeleton rows ; Empty=no stock with add/scan CTA, distinct from filter empty ; Error=stock fetch/update failure ; Offline=cached stock read-only plus queued local edits ; Syncing=pending row indicators ; Synced=snackbar after update ; Conflict=stock quantity/version diff dialog.
-- **Backend deps :** `GET`, `POST` (Idempotency-Key) et `PATCH /{id}` (Idempotency-Key + `version` ; 409 `STOCK_VERSION_CONFLICT` porte la ligne actuelle) sous `/api/imperium/pulse/food-stock` (CODÉS 2026-10-17, doc 40 §11) ; « fini » = status consumed, « erreur » = removed ; passage Vault par la validation du ticket (doc 37 §3.4).
+- **Backend deps :** `GET`, `POST` (Idempotency-Key) et `PATCH /{id}` (Idempotency-Key + `version` ; 409 `STOCK_VERSION_CONFLICT` porte la ligne actuelle) sous `/api/imperium/pulse/food-stock` (CODÉS 2026-10-17, doc 40 §11) ; « fini » = status consumed, « erreur » = removed ; Expiring Soon Banner : `GET /api/imperium/pulse/food-stock/alerts` (codé 2026-10-17, doc 40 §11.3) ; passage Vault par la validation du ticket (doc 37 §3.4).
 - **Navigation :** top-level Pulse tab; PUL-12 --> PUL-13 via scan CTA; item opens detail/edit pane; Vault VAU-05 may deep link to PUL-12 with handoff badge.
 - **Tab S10 Ultra :** list/detail split: stock list max 880dp, right 320dp selected item/expiring soon/handoff summary.
 

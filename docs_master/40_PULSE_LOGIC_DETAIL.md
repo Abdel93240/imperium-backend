@@ -392,6 +392,16 @@ Daily cron at 09:00 Europe/Paris (deterministic, no AI):
   → Surface in Pulse banner: "N items à consommer rapidement"
 ```
 
+> CODÉ (2026-10-17, `app/services/pulse/expiry.py`, migration 20261017_0054) :
+> - Règles : DLC dépassée → error ; DLC à 0–2 jours → warning ; DDM à 0–7 jours → info
+>   (une DDM dépassée reste info : le produit reste consommable). Lignes actives seulement.
+> - Bannière en direct : `GET /api/imperium/pulse/food-stock/alerts` → `level`
+>   none|info|warning|error, `to_consume` (warning + error), `message_fr`
+>   (« Stock : 1 produit dépassé, 2 à consommer rapidement, … »), alertes triées par urgence.
+> - Job `pulse.food_stock_expiry` (semé désactivé) : planifié `0 7,8 * * *` UTC, n'agit qu'à
+>   9 h heure de Paris (été comme hiver) ; une seule notification par jour (domaine pulse,
+>   sévérité red si dépassé, normal si à consommer vite, info sinon), rien si aucun produit.
+
 ### 11.4 Anti-waste meal suggestions
 
 When stock contains items expiring soon:
