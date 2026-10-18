@@ -799,6 +799,10 @@ Backend:
      lower of objective and subjective energy, and their gap is recorded for
      calibration.
 
+  Code (2026-10-18) : l'étape 2 est GET /api/imperium/day/freshness (status fresh |
+  review + raisons) ; les étapes 3–4 (énergie objective) et le repli local ne sont
+  pas encore codés.
+
 DECISION TREE:
 
   IF selection is fresh, feasible and conflict-free:
