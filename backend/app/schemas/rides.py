@@ -118,3 +118,43 @@ class SessionListResponse(BaseModel):
 class SessionEntryResult(BaseModel):
     transaction_id: UUID
     session: SessionRead
+
+
+class RecommendationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_zone: str | None = Field(default=None, max_length=120)
+
+
+class ZoneStatRead(BaseModel):
+    zone: str
+    rides: int
+    sessions: int
+    average_ride_cents: int
+
+
+class RecommendationRead(BaseModel):
+    id: UUID
+    session_id: UUID | None
+    requested_at: datetime
+    current_zone: str | None
+    recommendation: Literal["stay_here", "move_to_zone", "abstain"]
+    zone: str | None
+    reason: str
+    confidence: Decimal
+    hourly_rate_estimate_cents: int | None  # pas encore : le temps passé par zone n'est pas mesuré
+    slot: str  # ex. « semaine, 18 h–20 h »
+    zones: list[ZoneStatRead]  # zones comparées, meilleure d'abord
+    missing_context: list[str]  # signaux non pris en compte (événements, trains, aéroports, trafic)
+    feedback_useful: bool | None
+    ride_user_action: Literal["accepted", "refused", "missed", "ignored"] | None
+    feedback_reason: str | None
+    feedback_at: datetime | None
+
+
+class RecommendationFeedback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    useful: bool
+    ride_user_action: Literal["accepted", "refused", "missed", "ignored"] | None = None
+    reason: str | None = Field(default=None, max_length=500)

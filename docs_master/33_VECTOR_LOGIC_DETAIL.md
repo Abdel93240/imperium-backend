@@ -138,6 +138,17 @@ Example:
 }
 ```
 
+> CODÉ (2026-10-18, migration 0070, sans IA) : `POST /api/imperium/vector/recommendations`
+> `{current_zone?}`, `GET …/recommendations/latest`, `GET …/{id}`, `POST …/{id}/feedback`.
+> Base : revenus saisis en session avec leur zone (`rides_revenue_entries`), 90 jours, même
+> créneau (heure ± 1, semaine ou week-end, Paris), transactions annulées au Vault exclues ;
+> une zone n'est comparée qu'avec 5 courses sur 2 sessions au moins. Décision : aucune zone
+> comparable → `abstain` (« Haute incertitude, à toi de juger. », §4.1) ; meilleure zone =
+> zone actuelle ou gain < 15 % → `stay_here` ; sinon `move_to_zone`. Confiance plafonnée à
+> 0,6 ; la raison dit que événements, trains, aéroports et trafic ne sont pas lus
+> (`missing_context`). Pas de taux horaire (temps par zone non mesuré). Retour : utile ou
+> non, action (accepted|refused|missed|ignored), un seul par recommandation.
+
 ## 6. The local model Role in Vector
 
 The split is strict:
