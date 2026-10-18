@@ -218,7 +218,7 @@ def test_imperium_frontend_api_mapping_v1_locks_missing_backend_contracts_and_no
         "FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}",
         "FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal",
         "FUTURE TBD POST /api/imperium/voice/transcriptions",
-        "FUTURE TBD GET /api/imperium/history/events",
+        "`GET /api/imperium/history/events[/{event_id}]` | Codé 2026-10-18",  # codé depuis
         "FUTURE TBD PATCH /api/imperium/settings",
     ):
         assert required in missing

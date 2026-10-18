@@ -21,7 +21,7 @@ class NextPrayerRead(BaseModel):
 
 class QiblaRead(BaseModel):
     direction_degrees: float  # depuis le nord géographique, sens horaire
-    location_source: Literal["reference_mosque", "default_city"]
+    location_source: Literal["reference_mosque", "settings_city", "default_city"]
 
 
 class PathBannerRead(BaseModel):

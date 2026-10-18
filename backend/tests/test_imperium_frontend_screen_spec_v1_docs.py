@@ -287,7 +287,7 @@ def test_imperium_frontend_screen_spec_v1_history_screen_is_fully_specified() ->
         '"source"',
         '"linked_route"',
         "GET /api/imperium/missions/history",
-        "TBD GET /api/imperium/history/events",
+        "GET /api/imperium/history/events/{event_id}` (codé 2026-10-18",
         "DoD",
     ):
         assert required in history
