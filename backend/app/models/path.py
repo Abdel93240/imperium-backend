@@ -1,8 +1,8 @@
 """Path prayer-time tables (socle scope: doc 41 §20, minimal prayer engine).
 
 Socle: mosques + MAWAQIT cache + calculated fallback times. Path pass: prayer
-marks (PAT-02), fasts (PAT-05) and sadaqa (settings, donations, closed weeks).
-Ghusl addresses, adhkar and quran are still to come.
+marks (PAT-02), fasts (PAT-05), sadaqa (settings, donations, closed weeks) and
+ghusl (state + addresses). Adhkar and quran are still to come.
 """
 
 from datetime import date, datetime, time
@@ -257,5 +257,77 @@ class PathSadaqaWeek(Base):
     donated_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     remaining_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     closed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+GHUSL_ADDRESS_TYPES = ("home", "mosque", "gym", "work", "other")
+
+
+class PathGhuslAddress(UUIDPrimaryKeyMixin, Base):
+    """Adresse où faire le ghusl (PAT-10, doc 41 §10.4) ; lue par la replanification Imperium."""
+
+    __tablename__ = "path_ghusl_addresses"
+    __table_args__ = (
+        CheckConstraint("length(btrim(label)) BETWEEN 1 AND 100", name="label_length"),
+        CheckConstraint(f"address_type IN ({', '.join(repr(name) for name in GHUSL_ADDRESS_TYPES)})", name="address_type_check"),
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="coordinates_pair"),
+        CheckConstraint("latitude IS NULL OR latitude BETWEEN -90 AND 90", name="latitude_range"),
+        CheckConstraint("longitude IS NULL OR longitude BETWEEN -180 AND 180", name="longitude_range"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("path_ghusl_addresses_one_default_idx", "user_id", unique=True, postgresql_where=text("is_default")),
+        Index("path_ghusl_addresses_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    address_type: Mapped[str] = mapped_column(Text, nullable=False)
+    address_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathGhuslState(UUIDPrimaryKeyMixin, Base):
+    """Ghusl requis (PAT-04, doc 41 §10) : une ligne par activation, toujours posée et levée par l'utilisateur."""
+
+    __tablename__ = "path_ghusl_states"
+    __table_args__ = (
+        CheckConstraint("status IN ('required', 'completed')", name="status_check"),
+        CheckConstraint("status <> 'completed' OR completed_at IS NOT NULL", name="completed_has_time"),
+        CheckConstraint(
+            "replan_status IN ('pending', 'requested', 'no_open_day', 'replan_in_progress', 'failed')",
+            name="replan_status_check",
+        ),
+        Index("path_ghusl_states_one_required_idx", "user_id", unique=True, postgresql_where=text("status = 'required'")),
+        Index("path_ghusl_states_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    required_since: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_prayer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mission_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id", ondelete="SET NULL"), nullable=True
+    )
+    replan_event_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    replan_status: Mapped[str] = mapped_column(Text, nullable=False, default="pending", server_default="pending")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

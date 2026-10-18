@@ -646,6 +646,25 @@ TBD POST /api/path/ghusl/complete
 Headers for mutations: Idempotency-Key
 ```
 
+> CODÉ (2026-10-18, migration 0066, tables `path_ghusl_states` et `path_ghusl_addresses`) :
+> - `GET /api/imperium/path/ghusl` : requis ou non, activation en cours (prochaine prière,
+>   mission, replanification), message.
+> - `POST …/ghusl/activate` (Idempotency-Key) : état enregistré d'abord (événement
+>   `path.ghusl.required`), puis mission Imperium « Faire le ghusl avant {prière} » (backlog,
+>   domaine religious, priorité 9, 30 min) et demande de replanification `ghusl_required`,
+>   hors délai (doc 43 §3.3). `replan_status` : requested, no_open_day (aucune journée ouverte),
+>   replan_in_progress (une demande est déjà ouverte), failed (mission non créée). Déjà requis →
+>   409 `GHUSL_STATE_CONFLICT` avec l'activation en cours.
+> - `POST …/ghusl/complete` `{state_id}` : « Ghusl fait » ; la mission encore ouverte (backlog,
+>   active, standby) passe completed (événement `planning.mission.completed`), aucune
+>   replanification. Activation déjà terminée → 409 `GHUSL_STATE_CONFLICT`.
+> - `GET/POST …/ghusl-addresses`, `PATCH …/{id}` (version lue, sinon 409
+>   `GHUSL_ADDRESS_VERSION_CONFLICT`), `DELETE …/{id}`. Une seule adresse par défaut ;
+>   coordonnées seulement par paire, saisies explicitement.
+> - Événements : identifiants seulement (privacy very_high), jamais de libellé ni d'adresse.
+> - Pas encore : la proposition de replanification ne lit pas les adresses ghusl (la tâche IA
+>   ne reçoit pas de données very_high sans porte de confidentialité) ; bannière PAT-01.
+
 Offline conflict:
 
 - Activation followed by completion syncs in order.
