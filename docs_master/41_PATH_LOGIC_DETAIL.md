@@ -212,6 +212,13 @@ Privacy rules:
 > par défaut est la référence des horaires de CET utilisateur (cache MAWAQIT, sinon calcul à ses
 > coordonnées) et de la qibla ; `prayer_times` reçoit désormais l'utilisateur. Recherche et
 > synchronisation MAWAQIT (réseau) : pas encore. Événement `path.mosque.updated` sans nom ni adresse.
+>
+> CODÉ (2026-10-18) — PAT-08 : `GET /api/imperium/path/mosques/{id}?day=` renvoie les horaires
+> MAWAQIT en cache avec leur qualité (`fresh` ≤ 24 h, `stale` ≤ 48 h avec avertissement, `expired`
+> au-delà, `missing`), les horaires calculés aux coordonnées de la mosquée (sinon au lieu des
+> réglages) et la qibla. La règle des 48 h s'applique aussi aux horaires affichés partout :
+> au-delà, le calcul local redevient la source. La qibla du tableau de bord suit le lieu du
+> calcul (mosquée, ville des réglages, Paris).
 
 ### 6.4 Fallback calculation engine
 

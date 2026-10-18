@@ -1,7 +1,8 @@
 """Mosquées enregistrées (PAT-09, doc 41 §6.3) : la mosquée par défaut sert de référence aux horaires."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -55,3 +56,19 @@ class MosqueRead(BaseModel):
 class MosqueListResponse(BaseModel):
     items: list[MosqueRead]
     times_source: str  # mawaqit (cache de la mosquée par défaut) ou calculated
+
+
+class MosqueDetailRead(BaseModel):
+    """PAT-08 : horaires d'un jour pour une mosquée (cache MAWAQIT + calcul local) et qibla."""
+
+    mosque: MosqueRead
+    day: date
+    times: dict[str, str]  # HH:MM, source principale
+    times_source: Literal["mawaqit", "calculated"]
+    mawaqit_times: dict[str, str] | None
+    mawaqit_data_quality: Literal["fresh", "stale", "expired", "missing"]
+    mawaqit_fetched_at: datetime | None
+    calculated_times: dict[str, str]
+    calculation_location: Literal["mosque", "city", "default"]
+    qibla_direction_degrees: float | None  # sans coordonnées : pas de qibla propre à la mosquée
+    message: str | None

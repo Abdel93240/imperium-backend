@@ -6,7 +6,9 @@ local à ses coordonnées (Paris sans coordonnées). La recherche et la synchron
 passent par le réseau : pas dans ce lot. Événements sans nom ni adresse.
 """
 
+from datetime import UTC, date, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -14,10 +16,19 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.path import PathRegisteredMosque
-from app.schemas.path_mosques import MosqueCreate, MosqueListResponse, MosqueRead, MosqueUpdate
+from app.schemas.path_mosques import MosqueCreate, MosqueDetailRead, MosqueListResponse, MosqueRead, MosqueUpdate
 from app.services.events.emitter import build_event
 from app.services.path.fasting import paris_today
-from app.services.path.prayer import prayer_times
+from app.services.path.dashboard import qibla_from
+from app.services.path.prayer import (
+    DEFAULT_TZ,
+    calculation_config,
+    cached_mawaqit_row,
+    compute_prayer_times_utc,
+    mawaqit_quality,
+    parse_mawaqit_times,
+    prayer_times,
+)
 from app.services.pulse import food_stock
 
 
@@ -46,6 +57,59 @@ def list_mosques(db: Session, *, current_user: User) -> MosqueListResponse:
     )
     _, source = prayer_times(db, paris_today(), user_id=current_user.id)
     return MosqueListResponse(items=[MosqueRead.model_validate(row) for row in rows], times_source=source)
+
+
+QUALITY_MESSAGES = {
+    "stale": "Horaires MAWAQIT de plus de 24 h : à vérifier.",
+    "expired": "Horaires MAWAQIT de plus de 48 h : horaires calculés affichés.",
+    "missing": "Pas d'horaires MAWAQIT en cache pour ce jour : horaires calculés affichés.",
+}
+
+
+def mosque_detail(
+    db: Session, *, current_user: User, mosque_id: UUID, day: date | None = None, now: datetime | None = None
+) -> MosqueDetailRead:
+    """PAT-08 (doc 59 §16.8) : cache MAWAQIT avec sa qualité, calcul local aux coordonnées, qibla.
+
+    Lecture seule ; la synchronisation MAWAQIT passe par le réseau (pas encore).
+    """
+    row = db.scalar(
+        select(PathRegisteredMosque).where(PathRegisteredMosque.id == mosque_id, PathRegisteredMosque.user_id == current_user.id)
+    )
+    if row is None:
+        raise MosqueNotFoundError("Mosquée introuvable.")
+    now = now or datetime.now(UTC)
+    day = day or paris_today()
+    zone = ZoneInfo(DEFAULT_TZ)
+    config = calculation_config(db, current_user.id)
+    if row.latitude is not None:
+        origin, location = (float(row.latitude), float(row.longitude)), "mosque"
+    else:
+        origin, location = (config.latitude, config.longitude), config.location_source
+    calculated = {
+        prayer: _hhmm(moment.astimezone(zone))
+        for prayer, moment in compute_prayer_times_utc(day, *origin, method=config.method, madhhab=config.madhhab).items()
+    }
+    cache = cached_mawaqit_row(db, row, day)
+    quality = mawaqit_quality(cache.fetched_at, now) if cache is not None else "missing"
+    mawaqit = (
+        {prayer: _hhmm(moment) for prayer, moment in parse_mawaqit_times(cache.prayer_times, day, zone).items()}
+        if cache is not None
+        else None
+    )
+    primary = mawaqit is not None and quality != "expired"
+    return MosqueDetailRead(
+        mosque=MosqueRead.model_validate(row), day=day, times=mawaqit if primary else calculated,
+        times_source="mawaqit" if primary else "calculated", mawaqit_times=mawaqit, mawaqit_data_quality=quality,
+        mawaqit_fetched_at=cache.fetched_at if cache is not None else None, calculated_times=calculated,
+        calculation_location=location,
+        qibla_direction_degrees=qibla_from(origin) if row.latitude is not None else None,
+        message=QUALITY_MESSAGES.get(quality),
+    )
+
+
+def _hhmm(moment: datetime) -> str:
+    return moment.strftime("%H:%M")
 
 
 def create_mosque(db: Session, *, current_user: User, payload: MosqueCreate, idempotency_key: str) -> tuple[MosqueRead, bool]:

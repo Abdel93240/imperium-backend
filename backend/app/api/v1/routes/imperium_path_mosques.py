@@ -1,5 +1,6 @@
 """Path : mosquées enregistrées (PAT-09, doc 41 §6.3)."""
 
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -8,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.path_mosques import MosqueCreate, MosqueListResponse, MosqueRead, MosqueUpdate
+from app.schemas.path_mosques import MosqueCreate, MosqueDetailRead, MosqueListResponse, MosqueRead, MosqueUpdate
 from app.services.path import mosques
 from app.services.pulse import food_stock
 
@@ -66,6 +67,15 @@ def create_mosque_route(
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return read
+
+
+@router.get("/mosques/{mosque_id}", response_model=MosqueDetailRead)
+def mosque_detail_route(mosque_id: UUID, current_user: CurrentUserDep, db: SessionDep, day: date | None = None):
+    """PAT-08 : horaires du jour (MAWAQIT en cache et qualité, sinon calcul local), qibla."""
+    try:
+        return mosques.mosque_detail(db, current_user=current_user, mosque_id=mosque_id, day=day)
+    except _ERRORS as exc:
+        return _error(db, exc)
 
 
 @router.patch("/mosques/{mosque_id}", response_model=MosqueRead)

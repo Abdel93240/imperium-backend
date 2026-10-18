@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.schemas.path_dashboard import NextPrayerRead, PathBannerRead, PathDashboardRead, QiblaRead
 from app.services.path import adhkar, fasting, ghusl, hijri, prayer_marks, quran, sadaqa
-from app.services.path.prayer import DEFAULT_LOCATION, PRAYERS, _reference_mosque, prayer_times
+from app.services.path.prayer import PRAYERS, calculation_config, prayer_times
 
 KAABA = (21.422487, 39.826206)
 
@@ -70,13 +70,14 @@ def next_prayer(db: Session, now: datetime, user_id: UUID | None = None) -> Next
 
 
 def qibla(db: Session, user_id: UUID | None = None) -> QiblaRead:
-    """Cap initial (grand cercle) vers la Kaaba depuis la mosquée de référence, sinon Paris."""
-    mosque = _reference_mosque(db, user_id)
-    if mosque is not None and mosque.latitude is not None and mosque.longitude is not None:
-        origin, source = (float(mosque.latitude), float(mosque.longitude)), "reference_mosque"
-    else:
-        origin, source = DEFAULT_LOCATION, "default_city"
-    return QiblaRead(direction_degrees=round(bearing(origin, KAABA), 1), location_source=source)
+    """Cap initial (grand cercle) vers la Kaaba depuis le lieu du calcul : mosquée, ville des réglages, sinon Paris."""
+    config = calculation_config(db, user_id)
+    source = {"mosque": "reference_mosque", "city": "settings_city", "default": "default_city"}[config.location_source]
+    return QiblaRead(direction_degrees=qibla_from((config.latitude, config.longitude)), location_source=source)
+
+
+def qibla_from(origin: tuple[float, float]) -> float:
+    return round(bearing(origin, KAABA), 1)
 
 
 def bearing(origin: tuple[float, float], target: tuple[float, float]) -> float:

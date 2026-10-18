@@ -45,6 +45,10 @@ ASR_SHADOW = {"Hanafi": 2.0}
 
 DEFAULT_LOCATION = (48.8566, 2.3522)  # Paris, sans ville ni mosquée à coordonnées (doc 41 §6.4)
 DEFAULT_TZ = "Europe/Paris"
+# Doc 41 §6.3 : cache rafraîchi chaque jour ; affiché jusqu'à 48 h avec un avertissement,
+# au-delà le calcul local redevient la source principale.
+MAWAQIT_FRESH_HOURS = 24
+MAWAQIT_MAX_STALE_HOURS = 48
 
 
 @dataclass(frozen=True)
@@ -227,12 +231,34 @@ def _reference_mosque(db: Session, user_id: UUID | None = None) -> PathRegistere
 
 
 def cached_mawaqit_times(db: Session, mosque: PathRegisteredMosque, d: date) -> dict | None:
-    row = db.scalar(
+    row = cached_mawaqit_row(db, mosque, d)
+    return row.prayer_times if row is not None else None
+
+
+def cached_mawaqit_row(db: Session, mosque: PathRegisteredMosque, d: date) -> PathMawaqitCache | None:
+    return db.scalar(
         select(PathMawaqitCache).where(
             PathMawaqitCache.mosque_id == mosque.id, PathMawaqitCache.date == d
         )
     )
-    return row.prayer_times if row is not None else None
+
+
+def mawaqit_quality(fetched_at: datetime, now: datetime | None = None) -> str:
+    """fresh (≤ 24 h), stale (≤ 48 h, avertissement) ou expired (calcul local prioritaire)."""
+    age = (now or datetime.now(UTC)) - fetched_at
+    if age <= timedelta(hours=MAWAQIT_FRESH_HOURS):
+        return "fresh"
+    if age <= timedelta(hours=MAWAQIT_MAX_STALE_HOURS):
+        return "stale"
+    return "expired"
+
+
+def parse_mawaqit_times(cached: dict, d: date, zone: ZoneInfo) -> dict[str, datetime]:
+    adhans = {}
+    for prayer in PRAYERS:
+        hour, minute = map(int, str(cached[prayer]).split(":")[:2])
+        adhans[prayer] = datetime.combine(d, time(hour, minute), tzinfo=zone)
+    return adhans
 
 
 def refresh_mawaqit_cache(db: Session, *, days: int = 30, today: date | None = None) -> int:
@@ -302,13 +328,9 @@ def prayer_times(
     zone = ZoneInfo(tz)
     mosque = _reference_mosque(db, user_id)
     if mosque is not None:
-        cached = cached_mawaqit_times(db, mosque, d)
-        if cached is not None:
-            adhans = {}
-            for prayer in PRAYERS:
-                hour, minute = map(int, str(cached[prayer]).split(":")[:2])
-                adhans[prayer] = datetime.combine(d, time(hour, minute), tzinfo=zone)
-            return adhans, "mawaqit"
+        row = cached_mawaqit_row(db, mosque, d)
+        if row is not None and mawaqit_quality(row.fetched_at) != "expired":
+            return parse_mawaqit_times(row.prayer_times, d, zone), "mawaqit"
     return _calculated_times(db, d, zone, user_id), "calculated"
 
 
