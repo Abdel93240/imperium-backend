@@ -1502,6 +1502,15 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) :
+- `rides_sessions` : statut active|completed (une seule active, index partiel), started_at,
+  ended_at, CA cible (centimes), direction strategique, mission_id (FK imperium_missions,
+  SET NULL), CA et depenses figes a la cloture, note de revue, version, Idempotency-Key.
+- `rides_drop_zones` : depose confirmee (zone, latitude/longitude par paire, confiance GPS,
+  duree reelle), FK rides_sessions (CASCADE), Idempotency-Key unique + empreinte.
+- Revenus et depenses : `imperium_vault_transactions` (source vector_manual, external_ref
+  `rides:{session}:{cle}`), jamais une table Vector.
+
 Calendrier hegirien Path (CODE, migration 20261018_0068, doc 41 14-V3) :
 - `path_hijri_month_starts` : debut de mois confirme par l'utilisateur (annee 1300..1700,
   mois 1..12, first_day), unique (user_id, annee, mois).
