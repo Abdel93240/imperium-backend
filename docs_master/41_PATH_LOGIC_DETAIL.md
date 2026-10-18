@@ -515,6 +515,29 @@ TBD PATCH /api/path/settings/sadaqa
 Headers for mutations: Idempotency-Key
 ```
 
+> CODÉ (2026-10-18, migration 0065, tables `path_sadaqa_settings`, `path_sadaqa_donations`,
+> `path_sadaqa_weeks`) :
+> - `GET /api/imperium/path/sadaqa/settings` et `PATCH …/sadaqa/settings`
+>   `{percentage?, safety_margin?, base_version, apply_to_current_week?, confirm_second_change?}` :
+>   le changement vaut à partir de lundi prochain (le premier de la semaine peut valoir tout de
+>   suite) ; un deuxième changement dans la même semaine → 409 `SADAQA_SECOND_CHANGE` tant
+>   qu'il n'est pas confirmé, et ne vaut jamais pour la semaine en cours ; version lue périmée
+>   → 409 `SADAQA_SETTINGS_CONFLICT`.
+> - `GET …/sadaqa/summary?week_start=` : bénéfice pro (`weekly_finance_summaries`, sinon
+>   registre Vault lu directement), pourcentage, marge, base, montant reporté, cible, dons,
+>   reste, message « Montant reporté : X € » si le report est positif, dons en attente Vault.
+> - `POST …/sadaqa/donations` `{amount_cents, destination?, note?, donated_at?, record_in_vault?,
+>   wallet?}` : don enregistré côté Path, puis dépense Vault (doc 42 §15.1) ; échec Vault →
+>   `vault_status: pending` + avertissement, `POST …/donations/{id}/vault-retry` pour réessayer.
+>   Répartition calculée : d'abord le montant reporté, puis l'objectif de la semaine, puis
+>   au-delà. Un don daté dans une semaine déjà close compte pour la semaine en cours.
+> - `GET …/sadaqa/donations`, `DELETE …/sadaqa/donations/{id}` (suppression réelle ; la dépense
+>   Vault est annulée par une écriture inverse).
+> - Job `path.sadaqa_week_close` (lundi 01:00 UTC, après `vault.weekly_profit`, semé désactivé) :
+>   fige les semaines terminées ; une semaine close n'est plus jamais recalculée.
+> - Le suivi commence à la semaine du premier réglage ou du premier don (pas de rattrapage sur
+>   l'historique Vault antérieur), 104 semaines au plus.
+
 ### 9.5 Safety margin (per user wish)
 
 A safety margin (default 12.5%, range 10-15%) is applied on top of the computed
@@ -537,6 +560,10 @@ Final target with margin:
 ```text
 effective_target_with_margin = effective_weekly_target × (1 + safety_margin)
 ```
+
+> CODÉ (2026-10-18), écart assumé : la marge s'applique à la base de la semaine
+> (`profit × pourcentage × (1 + marge)`), puis le montant reporté s'ajoute. Appliquée après
+> le report, elle se cumulerait d'une semaine à l'autre sur le même montant non donné.
 
 This applies to the §9.2 computation: the margin multiplies the effective weekly
 target after carry. It is a Path setting, configurable independently of any V2

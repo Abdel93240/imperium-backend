@@ -1502,6 +1502,19 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Sadaqa Path (CODE, migration 20261018_0065, doc 41 §9) :
+- `path_sadaqa_settings` : une ligne par changement ; percentage 0.01..0.20, safety_margin
+  0.10..0.15, effective_from (lundi). Defauts 5 % et 12,5 % tant qu'aucune ligne.
+- `path_sadaqa_donations` : amount_cents (1..10 000 000), destination, note, donated_at,
+  related_week_start (lundi), allocation JSONB (carry|week_target|beyond_target),
+  record_in_vault, wallet, vault_status not_requested|pending|recorded,
+  vault_transaction_id (sans FK : le registre Vault garde son garde-fou en ajout seul),
+  Idempotency-Key unique + empreinte. Suppression reelle.
+- `path_sadaqa_weeks` : semaine close (PK user_id + week_start) : benefice, source,
+  pourcentage, marge, base, report entrant, cible, dons, reste >= 0 (figes).
+- Job `path.sadaqa_week_close` seme desactive (lundi 01:00 UTC).
+- Remplacent `sadaqa_records` et `path_weekly_sadaqa_state` du doc 41 §20.
+
 Medical Pulse (CODE, migration 20261017_0063, doc 34 §16-bis) :
 - `pulse_medical_documents` : type (liste fermee), date, nom d'origine, type MIME, taille,
   sha256, nom de stockage interne (fichier 0600 sous MEDICAL_DOCUMENTS_STORAGE_DIR),
