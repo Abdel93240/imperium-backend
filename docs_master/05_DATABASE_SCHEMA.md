@@ -1502,6 +1502,15 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Ghusl Path (CODE, migration 20261018_0066, doc 41 §10) :
+- `path_ghusl_states` : une ligne par activation ; statut required|completed (un seul
+  required par utilisateur, index partiel), required_since, completed_at, next_prayer,
+  mission_id (FK imperium_missions, SET NULL), replan_event_id, replan_status
+  pending|requested|no_open_day|replan_in_progress|failed, Idempotency-Key unique + empreinte.
+- `path_ghusl_addresses` : libelle, type home|mosque|gym|work|other, adresse, latitude et
+  longitude (par paire), is_default (une seule, index partiel), version,
+  Idempotency-Key unique + empreinte. Remplace `registered_ghusl_addresses` du doc 41 §20.
+
 Sadaqa Path (CODE, migration 20261018_0065, doc 41 §9) :
 - `path_sadaqa_settings` : une ligne par changement ; percentage 0.01..0.20, safety_margin
   0.10..0.15, effective_from (lundi). Defauts 5 % et 12,5 % tant qu'aucune ligne.
