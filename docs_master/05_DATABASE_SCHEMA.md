@@ -1502,6 +1502,19 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Adhkar et Coran Path (CODE, migration 20261018_0067, doc 41 §11-§12) :
+- `path_adhkar_routines` : libelle, type (liste du doc 41 §11), cible 1..10000, frequence
+  daily|weekly|per_prayer, active (8 au plus, cote service), version, Idempotency-Key.
+- `path_adhkar_counts` : compteur par routine et periode (`YYYY-MM-DD`, `week:<lundi>`,
+  `YYYY-MM-DD:<priere>`), unique (routine_id, period_key), target_reached_at, reset_at.
+- `path_adhkar_increments` : appuis (1..1000, tap|voice), cle unique par utilisateur,
+  reponse gardee pour le rejeu.
+- `path_quran_progress` : une ligne par utilisateur, derniere page validee 1..604, objectif
+  quotidien, nombre de khatm, version.
+- `path_quran_plans` : daily_pages|finish_in_days|juz_based, pages par jour, date de fin,
+  page de depart, un seul actif (index partiel).
+- Remplacent `adhkar_routines`, `adhkar_completions` et `quran_progression` du doc 41 §20.
+
 Ghusl Path (CODE, migration 20261018_0066, doc 41 §10) :
 - `path_ghusl_states` : une ligne par activation ; statut required|completed (un seul
   required par utilisateur, index partiel), required_since, completed_at, next_prayer,
