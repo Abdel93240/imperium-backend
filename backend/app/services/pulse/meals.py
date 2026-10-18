@@ -33,6 +33,7 @@ from app.schemas.pulse_meals import (
     MealTotalsRead,
 )
 from app.services.events.emitter import build_event
+from app.services.path import fasting
 from app.services.pulse import food_stock
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.pantry_scan import match_stock, normalize_name
@@ -91,9 +92,12 @@ def create_draft(
     lines, warnings = propose(db, current_user, [(line, False) for line in _declared(payload.description)])
     if all(value is None for value in macros.values()):
         warnings.insert(0, NO_MACROS)
+    eaten_at = payload.eaten_at or datetime.now(UTC)
+    if fasting_warning := fasting.meal_warning(db, current_user, eaten_at):
+        warnings.insert(0, fasting_warning)
     meal = PulseMeal(
         user_id=current_user.id, status="draft", label=payload.label or payload.description[:120],
-        description=payload.description, source=payload.source, eaten_at=payload.eaten_at or datetime.now(UTC),
+        description=payload.description, source=payload.source, eaten_at=eaten_at,
         **macros, proposal=[line.model_dump(mode="json") for line in lines], warnings=warnings[:20],
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )

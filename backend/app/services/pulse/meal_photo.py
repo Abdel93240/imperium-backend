@@ -23,6 +23,7 @@ from app.models.imperium import PulseMeal
 from app.schemas.pulse_meals import MealRead
 from app.services.ai import ocr
 from app.services.ai.knowledge_files import extension, safe_filename
+from app.services.path import fasting
 from app.services.pulse import meals
 from app.services.pulse.pantry_scan import ACCEPTED_EXTENSIONS, MAX_BYTES, _unit_interval
 from app.services.pulse.stock_declaration import DeclaredLine
@@ -107,10 +108,13 @@ def create_photo_draft(
         head.append("Photo trop floue. Reprendre une photo ?")
     if confidence is not None and confidence < LOW_CONFIDENCE:
         head.append("Estimation peu sûre : vérifie les portions.")
+    eaten_at = eaten_at or datetime.now(UTC)
+    if fasting_warning := fasting.meal_warning(db, current_user, eaten_at):
+        head.insert(0, fasting_warning)
     description = summary or "Repas en photo"
     meal = PulseMeal(
         user_id=current_user.id, status="draft", label=description[:120], description=description, source="photo",
-        eaten_at=eaten_at or datetime.now(UTC),
+        eaten_at=eaten_at,
         **{macro: Decimal(str(round(value, 1))) if value is not None else None for macro, value in macros.items()},
         macros_estimated=estimated, confidence=Decimal(str(confidence)) if confidence is not None else None,
         photo_sha256=sha256, proposal=[line.model_dump(mode="json") for line in lines],

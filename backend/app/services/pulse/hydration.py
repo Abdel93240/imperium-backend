@@ -7,7 +7,8 @@ est quand même enregistrée, avec un avertissement (jamais de blocage).
 
 Même Idempotency-Key + même contenu → même réponse ; contenu différent → conflit ;
 clés distinctes → les quantités s'additionnent (fusion hors ligne, doc 40 §8).
-Cible personnalisée (programme santé) et blocage pendant le jeûne (Path) : pas encore.
+Jeûne (Path) : un appui daté dans la fenêtre suhoor → iftar est refusé, sauf si l'eau
+est permise de jour pour ce jeûne. Cible personnalisée (programme santé) : pas encore.
 """
 
 from datetime import UTC, date, datetime, time, timedelta
@@ -22,6 +23,7 @@ from app.models.imperium import FoodStockItem, PulseHydrationLog
 from app.schemas.pulse import FoodStockItemRead
 from app.schemas.pulse_hydration import HydrationDayRead, HydrationLogCreate, HydrationLogRead, HydrationLogResult
 from app.services.events.emitter import build_event
+from app.services.path import fasting
 from app.services.pulse import food_stock
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.meals import convert
@@ -32,6 +34,10 @@ NO_TARGET = "Objectif personnalisé pas encore calculé."
 
 
 class HydrationIdempotencyConflictError(ValueError):
+    pass
+
+
+class HydrationFastingError(ValueError):
     pass
 
 
@@ -48,8 +54,11 @@ def log_hydration(
         if existing.request_hash != fingerprint:
             raise HydrationIdempotencyConflictError("Idempotency key already used with a different hydration log.")
         return HydrationLogResult.model_validate(existing.result), True
+    logged_at = payload.logged_at or datetime.now(UTC)
+    if blocked := fasting.hydration_blocked(db, current_user, logged_at):
+        raise HydrationFastingError(blocked)
     log = PulseHydrationLog(
-        user_id=current_user.id, amount_ml=payload.amount_ml, logged_at=payload.logged_at or datetime.now(UTC),
+        user_id=current_user.id, amount_ml=payload.amount_ml, logged_at=logged_at,
         source=payload.source, idempotency_key=idempotency_key, request_hash=fingerprint,
     )
     touched, warnings = _decrement_water(db, current_user, payload.amount_ml) if payload.decrement_stock else ([], [])

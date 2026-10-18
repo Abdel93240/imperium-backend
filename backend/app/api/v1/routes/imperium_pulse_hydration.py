@@ -4,6 +4,7 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.pulse_hydration import HydrationDayRead, HydrationLogCreate, HydrationLogResult
@@ -26,14 +27,20 @@ def log_hydration_route(
     current_user: CurrentUserDep,
     db: SessionDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> HydrationLogResult:
-    """Enregistre l'eau bue et la décompte du stock d'eau ; stock insuffisant → avertissement, jamais de blocage."""
+):
+    """Enregistre l'eau bue et la décompte du stock d'eau ; stock insuffisant → avertissement, jamais de blocage.
+
+    Heure dans la fenêtre d'un jeûne (Path) sans eau permise de jour → 409 FASTING_HYDRATION_BLOCKED.
+    """
     if not idempotency_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
     try:
         result, duplicate = hydration.log_hydration(
             db, current_user=current_user, payload=payload, idempotency_key=idempotency_key
         )
+    except hydration.HydrationFastingError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": "FASTING_HYDRATION_BLOCKED"})
     except hydration.HydrationIdempotencyConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

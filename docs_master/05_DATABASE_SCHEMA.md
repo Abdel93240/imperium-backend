@@ -1490,6 +1490,18 @@ Journal des douleurs Pulse (CODE, migration 20261017_0062, doc 40 §16) :
   gene, impact sur la seance, seance liee (FK pulse_workouts, SET NULL), noted_at,
   resolved_at, Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
 
+Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
+- `path_prayer_logs` : prayer_date, prayer_name fajr|dhuhr|asr|maghrib|isha, statut
+  accomplished|not_marked_as_accomplished, prayed_at (accomplie seulement), note, version ;
+  unique (user_id, prayer_date, prayer_name). Effacer le statut supprime la ligne.
+  Idempotence par la table idempotency_keys.
+- `path_fasts` : fasting_date (unique par utilisateur), type
+  monday_thursday|white_days|ramadan|custom|temporary, statut active|ended|broken (un seul
+  active par utilisateur, index partiel), started_at, suhoor_at < iftar_at (figes au
+  demarrage), times_source mawaqit|calculated, hydration_daytime_allowed, ended_at,
+  broken_at, break_reason, version, Idempotency-Key unique + empreinte.
+- Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
+
 Medical Pulse (CODE, migration 20261017_0063, doc 34 §16-bis) :
 - `pulse_medical_documents` : type (liste fermee), date, nom d'origine, type MIME, taille,
   sha256, nom de stockage interne (fichier 0600 sous MEDICAL_DOCUMENTS_STORAGE_DIR),
