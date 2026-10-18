@@ -91,6 +91,9 @@ def _seed(db, user) -> dict:
         "cancelled": _event(db, user, "mission.abandoned", {"mission_id": str(cancelled.id), "reason": "cancelled",
                                                             "cancellation_reason": "Plus utile"}, 30),
         "active": _event(db, user, "mission.started", {"mission_id": str(active.id)}, 40),
+        "deleted": _event(db, user, "mission.abandoned", {"mission_id": str(cancelled.id), "reason": "deleted_by_user"}, 41),
+        "coded": _event(db, user, "mission.failed", {"mission_id": str(failed.id), "reason": "too_tired",
+                                                     "failure_reason_code": "too_tired"}, 42),
         "priorities": _event(db, user, "priority.rules.updated", {"priorities": []}, 50),
         "project": _event(db, user, "planning.project.created", {"project_id": str(project.id), "source": "manual", "rank": 1}, 60),
         "finished": _event(db, user, "day.finished", {"planning_day_id": str(uuid4()), "missions_returned_to_backlog": 1}, 70),
@@ -124,6 +127,8 @@ def test_timeline_projects_imperium_facts_newest_first(db) -> None:
         ("day_finished", "Journée terminée", "finished", "day"),
         ("project_created", "Camping-car", "created", "project"),
         ("priorities_updated", "Priorités modifiées", "updated", "decision"),
+        ("mission_failed", "Séance de sport", "failed", "mission"),
+        ("mission_cancelled", "Appeler le garage", "cancelled", "mission"),
         ("mission_started", "Préparer le devis", "active", "mission"),
         ("mission_cancelled", "Appeler le garage", "cancelled", "mission"),
         ("mission_failed", "Séance de sport", "failed", "mission"),
@@ -134,7 +139,8 @@ def test_timeline_projects_imperium_facts_newest_first(db) -> None:
     assert (by_id[ids["active"]]["linked_route"], by_id[ids["active"]]["linked_mission_id"]) == ("IMP.MISSION.ACTIVE", ids["active_mission"])
     assert (by_id[ids["failed"]]["reason"], by_id[ids["cancelled"]]["reason"]) == ("Fatigue après VTC", "Plus utile")
     assert (by_id[ids["weekly"]]["linked_route"], by_id[ids["day"]]["linked_route"]) == ("IMP.WR.READ_ONLY", "IMP.PLAN.HISTORY")
-    assert (body["count"], body["has_more"], body["filter"]) == (9, False, "all")
+    assert (by_id[ids["deleted"]]["reason"], by_id[ids["coded"]]["reason"]) == ("Supprimée par l'utilisateur", "too_tired")
+    assert (body["count"], body["has_more"], body["filter"]) == (11, False, "all")
 
 
 def test_filters_search_and_pages(db) -> None:
@@ -145,11 +151,11 @@ def test_filters_search_and_pages(db) -> None:
     def types(**params):
         return [i["type"] for i in client.get(BASE, params=params).json()["items"]]
 
-    assert types(filter="failed") == ["mission_failed"]
+    assert types(filter="failed") == ["mission_failed", "mission_failed"]
     assert types(filter="weekly") == ["weekly_review"]
     assert types(filter="decisions") == ["project_created", "priorities_updated"]
-    assert len(types(filter="missions")) == 4
-    assert types(query="garage") == ["mission_cancelled"]
+    assert len(types(filter="missions")) == 6
+    assert types(query="garage") == ["mission_cancelled", "mission_cancelled"]
     page = client.get(BASE, params={"limit": 2, "offset": 2}).json()
     assert ([i["type"] for i in page["items"]], page["has_more"]) == (["project_created", "priorities_updated"], True)
     assert client.get(BASE, params={"filter": "other"}).status_code == 422

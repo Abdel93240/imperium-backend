@@ -84,7 +84,7 @@ def test_cancel_the_active_mission_with_a_reason(db) -> None:
     assert (body["status"], body["mission"]["status"]) == ("cancelled", "cancelled")
     db.expire_all()
     row = db.get(ImperiumMission, carrier.id)
-    assert (row.failure_reason, row.failure_reason_code, row.ended_at is not None) == ("Examen reporté", None, True)
+    assert (row.completion_note, row.failure_reason, row.ended_at is not None) == ("Examen reporté", None, True)
     assert (db.get(ImperiumMission, annex.id).status, db.get(ImperiumMission, annex.id).annex_of_mission_id) == ("backlog", None)
     event = db.scalar(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.mission.aborted"))
     assert (event.payload["reason"], event.payload["previous_status"], event.payload["cancellation_reason"]) == (

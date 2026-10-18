@@ -800,7 +800,8 @@ def cancel_mission(
 ) -> tuple[MissionWriteResponse, bool]:
     """Annulée (doc 43 §5) : mission en cours ou au backlog, définitive, raison obligatoire.
 
-    La raison est gardée dans failure_reason (pas de code : ce n'est pas un échec du doc 52 §10).
+    La raison est gardée dans completion_note, comme pour une suppression depuis Operations
+    (doc 71) : failure_reason reste réservé aux échecs (doc 52 §10).
     Les annexes en attente d'une porteuse annulée retournent au backlog, sans pénalité (doc 53 §8).
     """
     request_hash = _hash_request(
@@ -839,8 +840,7 @@ def cancel_mission(
 
     mission.status = "cancelled"
     mission.ended_at = now
-    mission.failure_reason = payload.reason
-    mission.failure_reason_code = None
+    mission.completion_note = payload.reason
     mission.planned_start_at = None
     mission.planned_end_at = None
     mission.annex_of_mission_id = None
