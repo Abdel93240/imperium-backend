@@ -45,6 +45,7 @@ EVENT_TYPES: dict[str, tuple[str, str, str, str]] = {
     "planning.project.deleted": ("project_deleted", "project", "deleted", "Projet supprimé"),
     "planning.project.reordered": ("projects_reordered", "decision", "updated", "Projets réordonnés"),
 }
+CANCEL_REASONS = {"deleted_by_user": "Supprimée par l'utilisateur", "standby_cancelled": "Annulée depuis le standby"}
 FILTER_SOURCES = {
     "missions": {"mission"},
     "decisions": {"decision", "project"},
@@ -162,11 +163,14 @@ def _project(rows: list[Event], db: Session, user: User) -> list[HistoryEventRea
         payload = row.payload or {}
         reason = None
         if canonical == "planning.mission.aborted":
-            if payload.get("reason") == "cancelled" or payload.get("decision") == "cancelled":
-                kind, status, title = "mission_cancelled", "cancelled", "Mission annulée"
-                reason = payload.get("cancellation_reason") or payload.get("note")
-            else:
+            # Un échec porte toujours failure_reason ou failure_reason_code (FailMissionRequest) ;
+            # tout autre abandon est une annulation : bouton Annulée, suppression, standby annulé.
+            if row.event_type == "mission.failed" or "failure_reason" in payload or "failure_reason_code" in payload:
                 reason = payload.get("failure_reason") or payload.get("failure_reason_code") or payload.get("reason")
+            else:
+                kind, status, title = "mission_cancelled", "cancelled", "Mission annulée"
+                reason = (payload.get("cancellation_reason") or payload.get("note")
+                          or CANCEL_REASONS.get(payload.get("reason")))
         mission = missions.get(_uuid(payload.get("mission_id")))
         project = projects.get(_uuid(payload.get("project_id")))
         if mission is not None:
