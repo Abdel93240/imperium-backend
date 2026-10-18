@@ -31,7 +31,9 @@ from app.schemas.pulse_health import (
     PainLogCreate,
     PainLogListResponse,
     PainLogRead,
+    PainReplanResponse,
 )
+from app.services.imperium import replan
 from app.services.pulse import body, health_consent, medical, pain
 
 router = APIRouter()
@@ -158,6 +160,33 @@ def resolve_pain_log_route(pain_log_id: UUID, current_user: CurrentUserDep, db: 
         return consent_required_response(exc)
     except pain.PainLogNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/pain-logs/{pain_log_id}/replan", response_model=PainReplanResponse, status_code=status.HTTP_201_CREATED)
+def replan_from_pain_route(pain_log_id: UUID, response: Response, current_user: CurrentUserDep, db: SessionDep):
+    """Après accord de l'utilisateur : replan de la journée (hook « pain ») ; demande ouverte → 200."""
+    try:
+        result, created = pain.request_replan(db, current_user=current_user, pain_log_id=pain_log_id)
+    except health_consent.ConsentRequiredError as exc:
+        db.rollback()
+        return consent_required_response(exc)
+    except pain.PainLogNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except pain.PainResolvedError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": "PAIN_RESOLVED"})
+    except replan.ReplanCooldownError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "REPLAN_COOLDOWN", "eligible_at": exc.eligible_at.isoformat(),
+        })
+    except replan.ReplanStateConflictError as exc:
+        db.rollback()
+        code = "DAY_NOT_STARTED" if "No operational day" in str(exc) else "REPLAN_ALREADY_OPEN"
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": code})
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return result
 
 
 @router.delete("/pain-logs", response_model=DeletedCountRead)

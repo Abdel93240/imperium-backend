@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
+from app.schemas.imperium import ReplanRead
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 HealthDomain = Literal["body", "pain", "medical"]
@@ -116,6 +117,12 @@ class PainLogRead(BaseModel):
     created_at: datetime
     suggest_replan: bool = False  # douleur forte : l'écran propose de replanifier, rien n'est fait seul
     replan_message: str | None = None
+    replan_event_id: UUID | None = None  # replan demandé depuis cette douleur
+
+
+class PainReplanResponse(BaseModel):
+    pain_log: PainLogRead
+    replan: ReplanRead
 
 
 class PainLogListResponse(BaseModel):

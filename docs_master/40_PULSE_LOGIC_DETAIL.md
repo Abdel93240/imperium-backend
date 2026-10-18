@@ -824,6 +824,10 @@ Headers: Idempotency-Key
 >   (doit appartenir à l'utilisateur), heure. Sans consentement → 403 `CONSENT_REQUIRED`.
 > - Intensité 8 à 10 (douleur en cours) → `suggest_replan` + « Douleur forte : veux-tu
 >   replanifier ta journée ? » ; l'écran propose, rien n'est déclenché seul.
+> - CODÉ (2026-10-18, migration 0077) : `POST /pain-logs/{id}/replan` après accord de
+>   l'utilisateur (toute douleur en cours) → replan de la journée, hook `pain`, délai respecté ;
+>   `replan_event_id` gardé sur la douleur, relance pendant la demande ouverte → 200. Refus 409 :
+>   `REPLAN_COOLDOWN` (+ `eligible_at`), `REPLAN_ALREADY_OPEN`, `DAY_NOT_STARTED`, `PAIN_RESOLVED`.
 > - `GET ?include_resolved=` ; `POST /{id}/resolve` ; `DELETE /{id}` et
 >   `DELETE ?confirm=true` (suppression réelle, toujours permise).
 > - Événements `pulse.pain.logged|resolved|deleted` : identifiants et compte seulement.

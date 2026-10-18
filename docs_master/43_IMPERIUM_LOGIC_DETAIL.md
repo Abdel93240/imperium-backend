@@ -140,7 +140,9 @@ _other (§15). Urgente = échéance dans les 24 h (choix à valider : le code ne
 niveau urgente/importante/secondaire du §5.2). `replan` → hook `mission_failed` (avec le délai) ;
 `ask` → l'écran propose. Réponse `replan` : action, urgent, status requested | suggested |
 cooldown | already_open | no_open_day. L'échec reste enregistré même si le replan est refusé.
-« Annulée » et les autres hooks de §3.1 (Pulse, Vault, Vector) : pas encore raccordés.
+Pulse « pain logged » : CODÉ (2026-10-18), seulement après accord de l'utilisateur
+(`POST /api/imperium/pulse/pain-logs/{id}/replan`, hook `pain`). « Annulée », séance
+annulée, Vault et Vector : pas encore raccordés.
 CODÉ (2026-10-18) : `POST /api/imperium/path/ghusl/activate` appelle le hook ghusl_required et crée
 la mission « Faire le ghusl avant {prière} » ; `…/ghusl/complete` la passe completed (doc 41 §10).
 Runner (CODE 2026-10-17, migration 20261017_0046) : job imperium.rolling_replan, abonné à
