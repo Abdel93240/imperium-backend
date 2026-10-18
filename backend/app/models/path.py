@@ -565,3 +565,68 @@ class PathSettings(UUIDPrimaryKeyMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+INVOCATION_SITUATIONS = ("quotidien", "voyage", "protection", "difficulte", "maladie", "peur_anxiete")
+INVOCATION_PERIODS = ("morning", "evening")
+
+
+class PathInvocation(UUIDPrimaryKeyMixin, Base):
+    """Invocation à lire (doc 41 §11-bis) : texte saisi et validé par l'utilisateur, source obligatoire.
+
+    Distincte des compteurs de dhikr (§11). daily_period la place dans la liste du matin ou du soir.
+    """
+
+    __tablename__ = "path_invocations"
+    __table_args__ = (
+        CheckConstraint(
+            f"situation IN ({', '.join(repr(name) for name in INVOCATION_SITUATIONS)})", name="situation_check"
+        ),
+        CheckConstraint(
+            f"daily_period IS NULL OR daily_period IN ({', '.join(repr(name) for name in INVOCATION_PERIODS)})",
+            name="daily_period_check",
+        ),
+        CheckConstraint("(daily_period IS NULL) = (daily_order IS NULL)", name="daily_order_pair"),
+        CheckConstraint("length(btrim(arabic_text)) > 0 AND length(btrim(translation_fr)) > 0", name="texts_present"),
+        CheckConstraint("length(btrim(source)) > 0", name="source_present"),
+        CheckConstraint("audio_url IS NULL OR audio_url LIKE 'https://%'", name="audio_url_https"),
+        Index("path_invocations_user_situation_idx", "user_id", "situation"),
+        Index("path_invocations_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    situation: Mapped[str] = mapped_column(Text, nullable=False)
+    arabic_text: Mapped[str] = mapped_column(Text, nullable=False)
+    translation_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    daily_period: Mapped[str | None] = mapped_column(Text, nullable=True)
+    daily_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathInvocationCheck(UUIDPrimaryKeyMixin, Base):
+    """Coche du jour d'une invocation du matin ou du soir (doc 41 §11-bis.3) ; jour de Paris."""
+
+    __tablename__ = "path_invocation_checks"
+    __table_args__ = (UniqueConstraint("invocation_id", "day", name="path_invocation_checks_invocation_day_unique"),)
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    invocation_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("path_invocations.id", ondelete="CASCADE"), nullable=False
+    )
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

@@ -813,6 +813,16 @@ TBD POST /api/path/invocations     (via Feed IA validation)
 TBD PATCH /api/path/invocations/{invocation_id}/favorite
 ```
 
+> CODÉ (2026-10-18, migration 0078, tables `path_invocations`, `path_invocation_checks`) :
+> `GET/POST /api/imperium/path/invocations` (situation fixe, texte arabe, traduction et source
+> obligatoires, lien audio https facultatif jamais téléchargé ; `Idempotency-Key`),
+> `PATCH …/{id}` (version), `PATCH …/{id}/favorite`, `DELETE …/{id}` (suppression réelle).
+> Saisie validée par l'utilisateur ; la proposition de classement par « Nourrir l'IA » n'est
+> pas encore raccordée. Matin et soir (§11-bis.3) : `daily_period` + `daily_order` sur
+> l'invocation, `GET …/invocations/daily?day=` (progression X/Y), `POST …/{id}/check`
+> `{day?, checked}` (jour de Paris, pas de jour à venir). Événement `path.invocation.updated`
+> sans texte.
+
 ### 11-bis.2 Daily reminder banner
 
 Every Path screen (Accueil, Worship, Jeûne, Aumône, Réglages) displays a top
