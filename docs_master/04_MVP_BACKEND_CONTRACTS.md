@@ -415,6 +415,9 @@ reversal transaction is a new transaction linked to the original
 one reversal per original
 forbidden for the append-only ledger
 legacy direct edit route
+correction VAU-08 (2026-10-18) : post /api/imperium/vault/transactions/{transaction_id}/correct
+reversal of the original + corrected transaction appended in one write, linked by `corrects_transaction_id`
+the original transaction is still never updated or deleted ; still no put/patch/delete endpoints
 patch 9h
 append-only
 immutable after insert

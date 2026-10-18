@@ -384,3 +384,31 @@ class UpcomingExpensePayResult(BaseModel):
     expense: UpcomingExpenseRead
     transaction: ImperiumVaultTransactionRead
     next_occurrence: UpcomingExpenseRead | None
+
+
+class ImperiumVaultTransactionCorrectRequest(BaseModel):
+    """Correction (VAU-08) : seuls les champs donnés changent ; la raison est obligatoire."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=3, max_length=500)
+    transaction_type: Literal["income", "expense"] | None = None
+    amount_cents: int | None = Field(default=None, gt=0)
+    wallet: str | None = Field(default=None, min_length=1, max_length=80)
+    occurred_at: datetime | None = None
+    category: str | None = Field(default=None, max_length=80)
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("occurred_at")
+    @classmethod
+    def aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("occurred_at must include timezone information.")
+        return value
+
+
+class ImperiumVaultTransactionCorrectResponse(BaseModel):
+    original_transaction_id: UUID
+    reversal: ImperiumVaultTransactionRead
+    corrected: ImperiumVaultTransactionRead
+    safe_explanation: str = "Original reversed and corrected transaction appended, in one write."

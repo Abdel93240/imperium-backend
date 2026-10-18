@@ -12,6 +12,8 @@ from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.vault import (
+    ImperiumVaultTransactionCorrectRequest,
+    ImperiumVaultTransactionCorrectResponse,
     ImperiumVaultTransactionCreate,
     ImperiumVaultTransactionListResponse,
     ImperiumVaultTransactionRead,
@@ -20,6 +22,7 @@ from app.schemas.vault import (
     ImperiumVaultTransactionReverseResponse,
 )
 from app.services.events.emitter import build_event
+from app.services.vault.managed_sources import CORRECTION_BLOCKED_SOURCES
 
 VAULT_TRANSACTIONS_SAFE_EXPLANATION = "Vault transactions for current user."
 
@@ -198,6 +201,104 @@ def reverse_vault_transaction(
             status=IdempotencyStatus.completed,
             response_status_code=201,
             response_body=response.model_dump(mode="json"),
+        )
+    )
+    db.commit()
+    return response, False
+
+
+def correct_vault_transaction(
+    db: Session,
+    *,
+    current_user: User,
+    transaction_id: UUID,
+    payload: ImperiumVaultTransactionCorrectRequest,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+) -> tuple[ImperiumVaultTransactionCorrectResponse, bool]:
+    """VAU-08 : écriture inverse de l'originale + transaction corrigée, dans la même écriture."""
+    request_hash = _hash_request(
+        "imperium.vault.transaction.corrected",
+        {"transaction_id": str(transaction_id), "payload": payload.model_dump(mode="json", exclude_unset=True)},
+    )
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        if existing_key.request_path != request_path or existing_key.request_hash != request_hash:
+            raise VaultTransactionIdempotencyConflictError("Idempotency key already used with different payload.")
+        return ImperiumVaultTransactionCorrectResponse.model_validate(existing_key.response_body), True
+
+    original = db.scalar(
+        select(ImperiumVaultTransaction).where(
+            ImperiumVaultTransaction.id == transaction_id, ImperiumVaultTransaction.user_id == current_user.id
+        ).with_for_update()
+    )
+    if original is None:
+        raise VaultTransactionNotFoundError("Vault transaction not found.")
+    if original.is_reversal:
+        raise VaultTransactionReversalConflictError("Vault reversal transactions cannot be corrected.")
+    if original.source in CORRECTION_BLOCKED_SOURCES:
+        raise VaultTransactionReversalConflictError(CORRECTION_BLOCKED_SOURCES[original.source])
+    if db.scalar(
+        select(ImperiumVaultTransaction.id).where(ImperiumVaultTransaction.reversal_of_transaction_id == original.id)
+    ) is not None:
+        raise VaultTransactionReversalConflictError("Vault transaction is already reversed or corrected.")
+    changes = payload.model_dump(exclude_unset=True, exclude={"reason"})
+    corrected_values = {
+        "transaction_type": changes.get("transaction_type") or original.transaction_type,
+        "amount_cents": changes.get("amount_cents") or original.amount_cents,
+        "wallet": (changes.get("wallet") or original.wallet).strip(),
+        "occurred_at": changes.get("occurred_at") or original.occurred_at,
+        "category": (changes["category"] or "").strip().lower() or None if "category" in changes else original.category,
+        "note": (changes["note"] or "").strip() or None if "note" in changes else original.note,
+    }
+    if all(corrected_values[field] == getattr(original, field) for field in corrected_values):
+        raise VaultTransactionReversalConflictError("Nothing to correct: every field is unchanged.")
+
+    now = datetime.now(UTC)
+    reversal_timezone = _user_timezone_name(current_user)
+    reversal = ImperiumVaultTransaction(
+        user_id=current_user.id, transaction_type=_opposite_transaction_type(original.transaction_type),
+        amount_cents=original.amount_cents, currency=original.currency, wallet=original.wallet, occurred_at=now,
+        local_date=_local_date_in_timezone(now, reversal_timezone), timezone=reversal_timezone, category=original.category,
+        source="reversal", note=f"Correction of transaction {original.id}", external_ref=None, is_reversal=True,
+        reversal_of_transaction_id=original.id, reversal_reason=payload.reason.strip(),
+    )
+    corrected = ImperiumVaultTransaction(
+        user_id=current_user.id, currency=original.currency,
+        local_date=original.local_date if corrected_values["occurred_at"] == original.occurred_at
+        else _payload_local_date(corrected_values["occurred_at"], original.timezone),
+        timezone=original.timezone, source=original.source, external_ref=original.external_ref, is_reversal=False,
+        corrects_transaction_id=original.id, **corrected_values,
+    )
+    db.add_all([reversal, corrected])
+    db.flush()
+    db.add(
+        build_event(
+            db, user_id=current_user.id, event_type="finance.transaction.reversed",
+            payload={**_transaction_event_payload(reversal), "original_transaction_id": str(original.id),
+                     "reversal_reason": payload.reason.strip(), "correction_transaction_id": str(corrected.id)},
+            idempotency_key=f"finance.transaction.reversed.{reversal.id}", source_app=SourceApp.vault,
+            privacy_level=PrivacyLevel.high,
+        )
+    )
+    db.add(
+        build_event(
+            db, user_id=current_user.id, event_type="finance.transaction.created",
+            payload={**_transaction_event_payload(corrected), "corrects_transaction_id": str(original.id)},
+            idempotency_key=f"finance.transaction.created.{corrected.id}", source_app=SourceApp.vault,
+            privacy_level=PrivacyLevel.high,
+        )
+    )
+    response = ImperiumVaultTransactionCorrectResponse(
+        original_transaction_id=original.id, reversal=ImperiumVaultTransactionRead.model_validate(reversal),
+        corrected=ImperiumVaultTransactionRead.model_validate(corrected),
+    )
+    db.add(
+        IdempotencyKey(
+            user_id=current_user.id, idempotency_key=idempotency_key, request_method=request_method,
+            request_path=request_path, request_hash=request_hash, status=IdempotencyStatus.completed,
+            response_status_code=201, response_body=response.model_dump(mode="json"),
         )
     )
     db.commit()

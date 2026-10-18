@@ -69,6 +69,12 @@ class ImperiumVaultTransaction(UUIDPrimaryKeyMixin, Base):
             unique=True,
             postgresql_where=text("is_reversal = true"),
         ),
+        Index(
+            "imperium_vault_transactions_one_correction_idx",
+            "corrects_transaction_id",
+            unique=True,
+            postgresql_where=text("corrects_transaction_id IS NOT NULL"),
+        ),
     )
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -90,6 +96,10 @@ class ImperiumVaultTransaction(UUIDPrimaryKeyMixin, Base):
         nullable=True,
     )
     reversal_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Correction (VAU-08) : la transaction corrigée pointe vers l'originale, annulée par écriture inverse.
+    corrects_transaction_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_vault_transactions.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
