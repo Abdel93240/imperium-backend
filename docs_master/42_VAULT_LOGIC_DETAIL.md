@@ -604,6 +604,12 @@ Phase E drops the orphaned `vault_transactions` table after archiving
 
 ## 17. UI Surface (V1)
 
+> CODÉ (2026-10-18) — VAU-12 : `GET /api/vault/settings`, synthèse en lecture seule (doc 59 §13.12) :
+> pourcentage et marge sadaqa lus dans Path (Path gagne), nombre de catégories, date du dernier
+> relevé de soldes, échéances actives, derniers bénéfice hebdomadaire et pression calculés,
+> lignes vers VAU-09 / VAU-10 / VAU-11 / PAT-11d et complétion sur 4. Aucun réglage propre au
+> Vault n'est défini : pas de `PATCH`.
+
 ```text
 Vault Dashboard:
   ├─ Wallet total: X €

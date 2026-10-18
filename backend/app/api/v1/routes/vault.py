@@ -12,6 +12,7 @@ from app.schemas.vault import (
     UpcomingExpensePayResult,
     UpcomingExpenseRead,
     UpcomingExpenseUpdate,
+    VaultSettingsRead,
     VaultPressureExplainResponse,
     VaultPressureHistoryItem,
     VaultPressureResponse,
@@ -26,6 +27,7 @@ from app.services.vault.pressure import (
     pressure_history,
 )
 from app.services.imperium.vault_transactions import VaultTransactionIdempotencyConflictError
+from app.services.vault import settings as vault_settings_service
 from app.services.vault import upcoming, wallet
 from app.services.vault.upcoming import (
     create_upcoming_expense,
@@ -135,6 +137,12 @@ def mark_upcoming_expense_paid_route(
     except (upcoming.UpcomingExpenseStateError, VaultTransactionIdempotencyConflictError) as exc:
         db.rollback()
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+@router.get("/settings", response_model=VaultSettingsRead)
+def vault_settings_route(current_user: CurrentUserDep, db: SessionDep) -> VaultSettingsRead:
+    """VAU-12 : synthèse en lecture seule (sadaqa lue dans Path, catégories, soldes, échéances, synchro)."""
+    return vault_settings_service.vault_settings(db, current_user=current_user)
 
 
 @router.get("/wallet", response_model=WalletStateRead)
