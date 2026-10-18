@@ -249,10 +249,11 @@ acceptation de course / importance / zone doit être testé assez tôt.
 
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
 |---|---|---|---|---|
-| `rides.session.started` | Futur/non codé. | Non détaillé dans les sources. | Futur | Vector conseille, analyse et optimise ; il n'automatise pas d'action Bolt illégale ou contraire aux plateformes. |
-| `rides.session.ended` | Futur/non codé. | Non détaillé dans les sources. | Futur | Session VTC terminée. |
+| `rides.session.started` | CODE (2026-10-18) : `POST /api/imperium/vector/sessions`. | `{ session_id, target_ca_cents, mission_id }` (privacy high). | V1 | Vector conseille, analyse et optimise ; il n'automatise pas d'action Bolt illégale ou contraire aux plateformes. |
+| `rides.session.ended` | CODE (2026-10-18) : `POST …/vector/sessions/{id}/complete`. | `{ session_id, revenue_cents, expense_cents, objective_reached, elapsed_minutes }` (privacy high). | V1 | Session VTC terminée. |
 | `rides.ride.accepted` | Futur/non codé. | Non détaillé dans les sources. | Futur | Fait d'acceptation, pas automatisation. |
 | `rides.ride.refused` | Futur/non codé. | Non détaillé dans les sources. | Futur | Fait de refus, utile au scoring et à l'analyse. |
+| `rides.drop_zone.recorded` | CODE (2026-10-18) : `POST …/vector/sessions/{id}/drop-zone`. | `{ session_id, drop_zone_id, zone, real_duration_minutes }` (privacy high). | V1 | Dépose confirmée par l'utilisateur (VEC-10) ; les revenus et dépenses restent `finance.transaction.created` (external_ref `rides:…`). |
 | `rides.zone.repositioned` | Futur/non codé. | Non détaillé dans les sources. | Futur | Déplacement de zone. |
 
 ### VEHICLE
