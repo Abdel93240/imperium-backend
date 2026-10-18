@@ -247,6 +247,15 @@ a calculation, neighboring mosques, etc.?). Do NOT assume a second calculation
 API is needed until MAWAQIT's real capabilities are checked. The Maliki
 calculation engine (§6.4) is the assumed fallback only pending this check.
 
+> CODÉ (2026-10-18, migration 0076, table `path_settings`) — PAT-11b/c/f :
+> `GET/PATCH /api/imperium/path/settings` (version lue, 0 avant le premier enregistrement ;
+> `Idempotency-Key`). Méthodes MuslimWorldLeague, Karachi, Egypt, ISNA (Jafari et Custom :
+> pas encore dans le moteur) ; madhhab Hanafi (ombre ×2 pour Asr), Maliki, Shafii, Hanbali,
+> Jafari. Ville saisie avec ses coordonnées (pas de géocodage), `city: null` revient à Paris ;
+> fuseau Europe/Paris. Lieu du calcul : mosquée de référence à coordonnées, sinon ville, sinon
+> Paris. Le cache MAWAQIT reste prioritaire. Défaut madhhab : Maliki (doc 59 dit Shafi ; même
+> heure d'Asr). Calcul encore refait à la demande, pas lu depuis `path_calculated_prayer_times`.
+
 If GPS is denied and no city is configured, PAT-01 shows an Empty/Warning state
 asking the user to configure city or mosque. **It must not invent times.**
 

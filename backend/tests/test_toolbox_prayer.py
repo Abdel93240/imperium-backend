@@ -125,7 +125,7 @@ def test_prayer_windows_uses_mawaqit_cache_first_then_parameters(engine) -> None
         )
         db.flush()
 
-        windows = prayer_windows(db, target)
+        windows = prayer_windows(db, target, user_id=user_id)
         by_prayer = {window.prayer: window for window in windows}
         assert [window.prayer for window in windows] == list(PRAYERS)
         assert by_prayer["asr"].adhan_ts.astimezone(TZ).strftime("%H:%M") == "18:18"
@@ -139,7 +139,7 @@ def test_prayer_windows_uses_mawaqit_cache_first_then_parameters(engine) -> None
 def test_prayer_windows_falls_back_to_calculation_without_mawaqit(engine) -> None:
     target = date(2026, 10, 1)
     with Session(engine) as db:
-        windows = prayer_windows(db, target)
+        windows = prayer_windows(db, target, user_id=uuid4())  # aucun réglage ni mosquée : Paris
         by_prayer = {window.prayer: window for window in windows}
         # Fallback = local engine (±2 min vs official 19:30 maghrib).
         maghrib_local = by_prayer["maghrib"].adhan_ts.astimezone(TZ)

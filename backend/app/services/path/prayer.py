@@ -26,7 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.path import PathCalculatedPrayerTime, PathMawaqitCache, PathRegisteredMosque
+from app.models.path import PathCalculatedPrayerTime, PathMawaqitCache, PathRegisteredMosque, PathSettings
 from app.services.params import get_parameter
 
 logger = logging.getLogger(__name__)
@@ -43,8 +43,38 @@ METHOD_ANGLES = {
 # Asr shadow factor: standard (Maliki/Shafii/Hanbali/Jafari) = 1, Hanafi = 2.
 ASR_SHADOW = {"Hanafi": 2.0}
 
-DEFAULT_LOCATION = (48.8566, 2.3522)  # Paris; parameterized via path.city_* later
+DEFAULT_LOCATION = (48.8566, 2.3522)  # Paris, sans ville ni mosquée à coordonnées (doc 41 §6.4)
 DEFAULT_TZ = "Europe/Paris"
+
+
+@dataclass(frozen=True)
+class CalculationConfig:
+    method: str
+    madhhab: str
+    latitude: float
+    longitude: float
+    location_source: str  # mosque | city | default
+
+
+def calculation_config(db: Session, user_id: UUID | None = None) -> CalculationConfig:
+    """Réglages du calcul local : ceux de l'utilisateur (PAT-11), sinon les paramètres globaux.
+
+    Lieu : mosquée de référence à coordonnées, sinon ville des réglages, sinon Paris.
+    """
+    settings = (
+        db.scalar(select(PathSettings).where(PathSettings.user_id == user_id)) if user_id is not None else None
+    )
+    if settings is not None:
+        method, madhhab = settings.calculation_method, settings.madhhab
+    else:
+        method = str(get_parameter(db, "path.calc_method", default="MuslimWorldLeague"))
+        madhhab = str(get_parameter(db, "path.madhhab", default="Maliki"))
+    mosque = _reference_mosque(db, user_id)
+    if mosque is not None and mosque.latitude is not None and mosque.longitude is not None:
+        return CalculationConfig(method, madhhab, float(mosque.latitude), float(mosque.longitude), "mosque")
+    if settings is not None and settings.latitude is not None:
+        return CalculationConfig(method, madhhab, float(settings.latitude), float(settings.longitude), "city")
+    return CalculationConfig(method, madhhab, *DEFAULT_LOCATION, "default")
 
 
 @dataclass(frozen=True)
@@ -238,7 +268,9 @@ def refresh_mawaqit_cache(db: Session, *, days: int = 30, today: date | None = N
 # --- The graved contract: prayer_windows(date) (Daily G4 will consume it) ---
 
 
-def prayer_windows(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> list[PrayerWindow]:
+def prayer_windows(
+    db: Session, d: date, *, tz: str = DEFAULT_TZ, user_id: UUID | None = None
+) -> list[PrayerWindow]:
     """[{prayer, adhan_ts, window_start, window_end}] — windows from parameters.
 
     Source order doc 41 §6.2: MAWAQIT cache of the reference mosque, then the
@@ -247,7 +279,7 @@ def prayer_windows(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> list[Prayer
     """
     before_min = int(get_parameter(db, "path.window_before_min", default=0))
     after_min = int(get_parameter(db, "path.window_after_min", default=30))
-    adhans, _ = prayer_times(db, d, tz=tz)
+    adhans, _ = prayer_times(db, d, tz=tz, user_id=user_id)
 
     windows = []
     for prayer in PRAYERS:
@@ -282,19 +314,14 @@ def prayer_times(
 
 def _calculated_times(db: Session, d: date, zone: ZoneInfo, user_id: UUID | None = None) -> dict[str, datetime]:
     """Local engine, persisted in path_calculated_prayer_times (no per-request recompute)."""
-    method = str(get_parameter(db, "path.calc_method", default="MuslimWorldLeague"))
-    madhhab = str(get_parameter(db, "path.madhhab", default="Maliki"))
-    lat, lng = DEFAULT_LOCATION
-
-    utc_times = compute_prayer_times_utc(d, lat, lng, method=method, madhhab=madhhab)
+    config = calculation_config(db, user_id)
+    utc_times = compute_prayer_times_utc(
+        d, config.latitude, config.longitude, method=config.method, madhhab=config.madhhab
+    )
     local = {prayer: ts.astimezone(zone) for prayer, ts in utc_times.items()}
 
-    mosque = _reference_mosque(db, user_id)
-    if mosque is not None and mosque.latitude is not None and mosque.longitude is not None:
-        utc_times = compute_prayer_times_utc(
-            d, float(mosque.latitude), float(mosque.longitude), method=method, madhhab=madhhab
-        )
-        local = {prayer: ts.astimezone(zone) for prayer, ts in utc_times.items()}
+    mosque = _reference_mosque(db, user_id) if config.location_source == "mosque" else None
+    if mosque is not None:
         # Calibration: log the MAWAQIT↔calculation gap when both exist.
         cached = cached_mawaqit_times(db, mosque, d)
         if cached is not None:
@@ -309,9 +336,9 @@ def _calculated_times(db: Session, d: date, zone: ZoneInfo, user_id: UUID | None
 
 def store_calculated_times(db: Session, *, user_id: UUID, d: date, tz: str = DEFAULT_TZ) -> None:
     zone = ZoneInfo(tz)
-    local = _calculated_times(db, d, zone)
-    method = str(get_parameter(db, "path.calc_method", default="MuslimWorldLeague"))
-    madhhab = str(get_parameter(db, "path.madhhab", default="Maliki"))
+    local = _calculated_times(db, d, zone, user_id)
+    config = calculation_config(db, user_id)
+    method, madhhab = config.method, config.madhhab
     row = db.scalar(
         select(PathCalculatedPrayerTime).where(
             PathCalculatedPrayerTime.user_id == user_id, PathCalculatedPrayerTime.date == d
