@@ -1512,6 +1512,11 @@ Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) 
   `rides:{session}:{cle}`), jamais une table Vector.
 - `rides_revenue_entries` (migration 20261018_0070) : contexte VTC d'un revenu de session
   (zone, cle de zone sans accents ni casse, montant, heure), transaction_id unique sans FK.
+- `rides_offers` (migration 20261018_0071) : course proposee pendant une session (prix,
+  distances, durees, zones, majoration, paiement, type, plateforme, source manual|ocr),
+  variables calculees (JSONB), decision accepted|refused|missed + note, resultat reel
+  (gain, minutes mobilisees, EUR/h en centimes, detail), revenue_transaction_id (sans FK),
+  version, Idempotency-Key unique + empreinte.
 - `rides_recommendations` (migration 20261018_0070) : « Ou aller ? » ; stay_here|move_to_zone|
   abstain, zone, raison, confiance 0..1, entrees (creneau, zones comparees, contexte
   manquant), retour utilisateur (utile, action accepted|refused|missed|ignored, raison).

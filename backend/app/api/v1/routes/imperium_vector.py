@@ -17,17 +17,23 @@ from app.schemas.rides import (
     RecommendationFeedback,
     RecommendationRead,
     RecommendationRequest,
+    RideDecisionRequest,
+    RideOfferCreate,
+    RideOfferListResponse,
+    RideOfferRead,
+    RideOutcomeRequest,
     SessionComplete,
     SessionEntryResult,
     SessionListResponse,
     SessionRead,
     SessionStart,
     SessionUpdate,
+    TrainingSummaryRead,
 )
 from app.services.imperium import vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import recommendations, sessions
+from app.services.vector import offers, recommendations, sessions
 
 router = APIRouter()
 
@@ -270,3 +276,96 @@ def _reco_error(db: SessionDep, exc: Exception) -> JSONResponse:
             "detail": str(exc), "code": "RIDES_FEEDBACK_CONFLICT", "current": exc.current.model_dump(mode="json"),
         })
     return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+# ---------- courses proposées ----------
+
+_OFFER_ERRORS = (
+    offers.OfferNotFoundError,
+    offers.OfferInputError,
+    offers.OfferStateError,
+    offers.OfferIdempotencyConflictError,
+    offers.OfferVersionConflictError,
+    sessions.RidesNotFoundError,
+    sessions.RidesStateError,
+    sessions.RidesIdempotencyConflictError,
+    vault_transactions.VaultTransactionIdempotencyConflictError,
+)
+
+
+def _offer_error(db: SessionDep, exc: Exception) -> JSONResponse:
+    if isinstance(exc, offers.OfferVersionConflictError):
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "RIDES_OFFER_VERSION_CONFLICT", "current": exc.current.model_dump(mode="json"),
+        })
+    if isinstance(exc, offers.OfferNotFoundError):
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    if isinstance(exc, offers.OfferInputError):
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(exc)})
+    return _error(db, exc)
+
+
+@router.get("/training-summary", response_model=TrainingSummaryRead)
+def training_summary_route(current_user: CurrentUserDep, db: SessionDep) -> TrainingSummaryRead:
+    """Courses enregistrées, résultats réels disponibles, médiane €/h, phase d'apprentissage (doc 57 §3)."""
+    return offers.training_summary(db, current_user=current_user)
+
+
+@router.post("/sessions/{session_id}/offers", response_model=RideOfferRead, status_code=status.HTTP_201_CREATED)
+def record_offer_route(
+    session_id: UUID,
+    payload: RideOfferCreate,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Course proposée (saisie) ; variables calculées, aucun verdict tant que le modèle n'est pas entraîné."""
+    try:
+        read, duplicate = offers.record_offer(db, current_user=current_user, session_id=session_id, payload=payload,
+                                              idempotency_key=_require_key(idempotency_key))
+    except _OFFER_ERRORS as exc:
+        return _offer_error(db, exc)
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.get("/sessions/{session_id}/offers", response_model=RideOfferListResponse)
+def list_offers_route(session_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        return offers.list_offers(db, current_user=current_user, session_id=session_id)
+    except _OFFER_ERRORS as exc:
+        return _offer_error(db, exc)
+
+
+@router.get("/offers/{offer_id}", response_model=RideOfferRead)
+def get_offer_route(offer_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        return offers.get_offer(db, current_user=current_user, offer_id=offer_id)
+    except _OFFER_ERRORS as exc:
+        return _offer_error(db, exc)
+
+
+@router.post("/offers/{offer_id}/decision", response_model=RideOfferRead)
+def decide_offer_route(offer_id: UUID, payload: RideDecisionRequest, current_user: CurrentUserDep, db: SessionDep):
+    """Acceptée, refusée ou manquée : donnée de comportement, jamais cible d'apprentissage (doc 33 §8)."""
+    try:
+        return offers.decide(db, current_user=current_user, offer_id=offer_id, payload=payload)
+    except _OFFER_ERRORS as exc:
+        return _offer_error(db, exc)
+
+
+@router.post("/offers/{offer_id}/outcome", response_model=RideOfferRead)
+def offer_outcome_route(
+    offer_id: UUID, payload: RideOutcomeRequest, request: Request, current_user: CurrentUserDep, db: SessionDep
+):
+    """Résultat réel d'une course acceptée : gain ÷ temps mobilisé ; revenu écrit au Vault par défaut."""
+    try:
+        return offers.record_outcome(db, current_user=current_user, offer_id=offer_id, payload=payload,
+                                     request_path=request.url.path)
+    except _OFFER_ERRORS as exc:
+        return _offer_error(db, exc)
