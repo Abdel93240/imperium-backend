@@ -33,6 +33,10 @@ from app.db.base import Base, UUIDPrimaryKeyMixin
 
 class PathRegisteredMosque(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "path_registered_mosques"
+    __table_args__ = (
+        Index("path_registered_mosques_one_default_idx", "user_id", unique=True, postgresql_where=text("is_default")),
+        CheckConstraint("(latitude IS NULL) = (longitude IS NULL)", name="coordinates_pair"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -48,6 +52,9 @@ class PathRegisteredMosque(UUIDPrimaryKeyMixin, Base):
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class PathMawaqitCache(UUIDPrimaryKeyMixin, Base):

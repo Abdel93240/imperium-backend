@@ -42,7 +42,7 @@ class PrayerStatusConflictError(ValueError):
 
 
 def day_view(db: Session, *, current_user: User, day: date) -> PrayerDayRead:
-    adhans, source = prayer_times(db, day)
+    adhans, source = prayer_times(db, day, user_id=current_user.id)
     logs = {
         log.prayer_name: log
         for log in db.scalars(
@@ -71,7 +71,7 @@ def mark_prayer(
     if previous is not None:
         return previous, True
     now = now or datetime.now(UTC)
-    adhans, _ = prayer_times(db, payload.prayer_date)
+    adhans, _ = prayer_times(db, payload.prayer_date, user_id=current_user.id)
     adhan_at = adhans[prayer_name]
     if payload.prayer_date > now.astimezone(PARIS).date():
         raise PrayerInputError("Ce jour n'est pas encore arrivé.")
@@ -135,7 +135,7 @@ def clear_prayer(
     previous = food_stock.replay(db, current_user, idempotency_key, fingerprint, request_path, PrayerRead)
     if previous is not None:
         return previous, True
-    adhans, _ = prayer_times(db, payload.prayer_date)
+    adhans, _ = prayer_times(db, payload.prayer_date, user_id=current_user.id)
     log = _get(db, current_user, payload.prayer_date, prayer_name)
     if log is None:
         raise PrayerNotFoundError("Aucun statut posé pour cette prière.")
