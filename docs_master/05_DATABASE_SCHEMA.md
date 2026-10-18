@@ -1502,6 +1502,12 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Reglages Path (CODE, migration 20261018_0076, PAT-11) :
+- `path_settings` : une ligne par utilisateur (creee au premier changement) ; calculation_method
+  MuslimWorldLeague|Karachi|Egypt|ISNA, madhhab Hanafi|Maliki|Shafii|Hanbali|Jafari, ville
+  (city_name + latitude + longitude, tous ou aucun), version. Sans ligne : parametres globaux
+  path.calc_method / path.madhhab et Paris.
+
 Mosquees Path (CODE, migration 20261018_0075, PAT-09) :
 - `path_registered_mosques` recoit `version`, `idempotency_key`, `request_hash`, une mosquee
   par defaut au plus par utilisateur (index partiel) et la paire latitude/longitude.

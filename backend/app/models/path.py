@@ -530,3 +530,38 @@ class PathCalendarEvent(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+CALCULATION_METHODS = ("MuslimWorldLeague", "Karachi", "Egypt", "ISNA")
+MADHHABS = ("Hanafi", "Maliki", "Shafii", "Hanbali", "Jafari")
+
+
+class PathSettings(UUIDPrimaryKeyMixin, Base):
+    """Réglages Path par utilisateur (PAT-11, doc 41 §6.4) : calcul local des horaires."""
+
+    __tablename__ = "path_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="path_settings_user_unique"),
+        CheckConstraint(
+            f"calculation_method IN ({', '.join(repr(name) for name in CALCULATION_METHODS)})",
+            name="calculation_method_check",
+        ),
+        CheckConstraint(f"madhhab IN ({', '.join(repr(name) for name in MADHHABS)})", name="madhhab_check"),
+        CheckConstraint(
+            "(latitude IS NULL) = (longitude IS NULL) AND (latitude IS NULL) = (city_name IS NULL)",
+            name="city_complete",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    calculation_method: Mapped[str] = mapped_column(Text, nullable=False)
+    madhhab: Mapped[str] = mapped_column(Text, nullable=False)
+    city_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
