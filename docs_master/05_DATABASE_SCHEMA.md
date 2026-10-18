@@ -1517,6 +1517,10 @@ Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) 
   variables calculees (JSONB), decision accepted|refused|missed + note, resultat reel
   (gain, minutes mobilisees, EUR/h en centimes, detail), revenue_transaction_id (sans FK),
   version, Idempotency-Key unique + empreinte.
+- `rides_business_rules` et `rides_rule_revisions` (migration 20261018_0072) : regles metier
+  par utilisateur (code unique, conditions JSONB, action red|green, active, ferme, compteur,
+  version) et leurs revisions (type, raison, avant/apres, proposee par, validee) ;
+  `rides_offers` recoit les codes postaux, `signal` green|red, source, raison, regles declenchees.
 - `rides_recommendations` (migration 20261018_0070) : « Ou aller ? » ; stay_here|move_to_zone|
   abstain, zone, raison, confiance 0..1, entrees (creneau, zones comparees, contexte
   manquant), retour utilisateur (utile, action accepted|refused|missed|ignored, raison).

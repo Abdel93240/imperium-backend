@@ -8,7 +8,7 @@ l'utilisateur. Les revenus et dépenses d'une session sont des transactions Vaul
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, Text, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -154,6 +154,7 @@ class RidesOffer(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("actual_hourly_rate_cents IS NULL OR decision = 'accepted'", name="outcome_only_accepted"),
         CheckConstraint("mobilized_minutes IS NULL OR mobilized_minutes > 0", name="mobilized_positive"),
         CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint("signal IS NULL OR signal IN ('green', 'red')", name="signal_check"),
         Index("rides_offers_session_idx", "session_id", "offered_at"),
         Index("rides_offers_user_offered_idx", "user_id", "offered_at"),
         Index("rides_offers_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
@@ -185,6 +186,59 @@ class RidesOffer(UUIDPrimaryKeyMixin, Base):
     actual_hourly_rate_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     outcome: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     revenue_transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    pickup_zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    destination_zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signal: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signal_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    triggered_rules: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RidesBusinessRule(UUIDPrimaryKeyMixin, Base):
+    """Règle métier de l'utilisateur (doc 57 §4) : point de départ, révisable, jamais un verdict définitif."""
+
+    __tablename__ = "rides_business_rules"
+    __table_args__ = (
+        UniqueConstraint("user_id", "rule_code", name="rides_business_rules_user_code_unique"),
+        CheckConstraint("action IN ('red', 'green')", name="action_check"),
+        CheckConstraint("version >= 1", name="version_positive"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rule_code: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    conditions: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    is_hard_rule: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    times_applied: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    revision_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_revised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RidesRuleRevision(UUIDPrimaryKeyMixin, Base):
+    """Révision d'une règle (doc 57 §4.12, §10) : avant / après, raison, validée par l'utilisateur."""
+
+    __tablename__ = "rides_rule_revisions"
+    __table_args__ = (
+        CheckConstraint("revision_type IN ('disabled', 'enabled', 'modified', 'hardened', 'softened')", name="revision_type_check"),
+        CheckConstraint("proposed_by IN ('user_manual', 'weekly_review', 'auto_threshold')", name="proposed_by_check"),
+        Index("rides_rule_revisions_rule_idx", "rule_id", "revised_at"),
+    )
+
+    rule_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("rides_business_rules.id", ondelete="CASCADE"), nullable=False
+    )
+    revised_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revision_type: Mapped[str] = mapped_column(Text, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    previous: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    new: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    proposed_by: Mapped[str] = mapped_column(Text, nullable=False)
+    user_validated: Mapped[bool] = mapped_column(Boolean, nullable=False)

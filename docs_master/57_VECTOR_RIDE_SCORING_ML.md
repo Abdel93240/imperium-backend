@@ -325,6 +325,17 @@ CREATE TABLE vector_rule_revisions (
 );
 ```
 
+> CODÉ (2026-10-18, migration 0072, `services/vector/rules.py`) : tables `rides_business_rules`
+> (par utilisateur, créées à la première lecture) et `rides_rule_revisions` (avant / après,
+> raison, `user_manual`, validée). Règles codées sur codes postaux, créneau et type de course :
+> R1 (75008 départ ou arrivée → rouge), R2 (75018/75019 départ en journée → rouge), R7 (arrivée
+> 75… la nuit → vert), R8 (programmée la nuit → vert). Signal « règles seules » (§3.1) sur chaque
+> course proposée : rouge si une règle rouge, sinon vert si une verte, sinon aucun signal
+> (« Haute incertitude, à toi de juger. ») ; une règle sans sa donnée ne se déclenche pas ;
+> variables `rule_Rx_triggered` (§5.7). `GET /api/imperium/vector/rules`, `PATCH …/rules/{code}`
+> (activer, rendre ferme, conditions ; raison et version obligatoires). Pas encore : R3, R5, R6,
+> R10 (géographie, flux externes) ; R4, R9, R11 ne notent pas une course.
+
 ---
 
 ## 5. Complete Feature List
