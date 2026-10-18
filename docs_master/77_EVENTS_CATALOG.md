@@ -102,7 +102,7 @@ Le domaine `finance` remplace les noms d'application de type `vault.*`.
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
 |---|---|---|---|---|
 | `finance.transaction.created` | Existe ; émis par le service canonique `/api/imperium/vault/transactions`. | `transaction_id`, `transaction_type`, `amount_cents`, `currency`, `wallet`, `occurred_at`, `local_date`, `timezone`, `category`, `source`, `external_ref`, `is_reversal`, `reversal_of_transaction_id`. | V1 | Domaine `finance` canonique. Privacy `high`. |
-| `finance.transaction.reversed` | Existe ; émis par le service canonique de reversal. | Payload transaction canonique + `original_transaction_id`, `reversal_reason`. | V1 | Le ledger financier reste factuel. La décision financière ne vient pas de Vault seul. |
+| `finance.transaction.reversed` | Existe ; émis par le service canonique de reversal (et par la correction VAU-08, avec `correction_transaction_id`). | Payload transaction canonique + `original_transaction_id`, `reversal_reason`. | V1 | Le ledger financier reste factuel. La décision financière ne vient pas de Vault seul. |
 | `finance.pressure.updated` | Existe ; émis après écriture d'un snapshot déterministe. | `snapshot_id`, `score`, `label`. | V1 | Le score reste calculé/signal déterministe `vault.pressure`; l'event journalise qu'un nouveau snapshot existe. |
 | `finance.weekly_summary.created` | Existe ; émis par le job/calcul weekly profit. | `week_start`, `weekly_business_profit`. | V1 | The Path lit `weekly_finance_summaries` comme source de valeur ; l'event sert au réveil/chaînage. |
 

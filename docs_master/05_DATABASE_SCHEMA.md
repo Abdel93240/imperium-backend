@@ -1502,6 +1502,10 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Correction Vault (CODE, migration 20261018_0074, VAU-08) :
+- `imperium_vault_transactions.corrects_transaction_id` (FK vers la meme table, unique quand
+  renseigne) : la transaction corrigee pointe vers l'originale, annulee par ecriture inverse.
+
 Soldes reels Vault (CODE, migration 20261018_0073, doc 42 §8) :
 - `vault_wallet_snapshots` : cash (>= 0), banque (decouvert possible), crypto (>= 0) en
   centimes EUR, recorded_at, source manual|sync, note, Idempotency-Key unique + empreinte.

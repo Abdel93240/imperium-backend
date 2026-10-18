@@ -13,6 +13,8 @@ from app.schemas.imperium import (
     ImperiumVaultTransactionDetailResponse,
 )
 from app.schemas.vault import (
+    ImperiumVaultTransactionCorrectRequest,
+    ImperiumVaultTransactionCorrectResponse,
     ImperiumVaultTransactionCreate,
     ImperiumVaultTransactionListResponse,
     ImperiumVaultTransactionRead,
@@ -23,6 +25,7 @@ from app.services.imperium.vault_transactions import (
     VaultTransactionIdempotencyConflictError,
     VaultTransactionNotFoundError,
     VaultTransactionReversalConflictError,
+    correct_vault_transaction,
     create_vault_transaction,
     list_vault_transactions,
     reverse_vault_transaction,
@@ -228,6 +231,42 @@ def reverse_imperium_vault_transaction_route(
             detail="Vault transaction reversal conflicts with an existing record.",
         ) from exc
 
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post(
+    "/transactions/{transaction_id}/correct",
+    response_model=ImperiumVaultTransactionCorrectResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def correct_imperium_vault_transaction_route(
+    transaction_id: UUID,
+    payload: ImperiumVaultTransactionCorrectRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> ImperiumVaultTransactionCorrectResponse:
+    """VAU-08 « Enregistrer correction » : écriture inverse + transaction corrigée (registre en ajout seul)."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        result, duplicate = correct_vault_transaction(
+            db, current_user=current_user, transaction_id=transaction_id, payload=payload,
+            idempotency_key=idempotency_key, request_method=request.method, request_path=request.url.path,
+        )
+    except VaultTransactionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (VaultTransactionIdempotencyConflictError, VaultTransactionReversalConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Vault transaction correction conflicts.") from exc
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return result

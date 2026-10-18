@@ -89,6 +89,7 @@ def test_imperium_vault_routes_are_registered_in_a_safe_order() -> None:
         ("/transactions/{transaction_id}", ("GET",)),
         ("/transactions", ("POST",)),
         ("/transactions/{transaction_id}/reverse", ("POST",)),
+        ("/transactions/{transaction_id}/correct", ("POST",)),
     ]
 
 

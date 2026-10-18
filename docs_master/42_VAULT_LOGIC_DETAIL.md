@@ -368,6 +368,13 @@ Used for:
 
 User adds these manually. V2 may auto-detect from email parsing.
 
+> CODÉ (2026-10-18, migration 0074) — correction d'une transaction (VAU-08) :
+> `POST /api/imperium/vault/transactions/{id}/correct` (Idempotency-Key ; raison obligatoire,
+> montant, type, portefeuille, date, catégorie, note facultatifs). Le registre reste en ajout
+> seul : écriture inverse de l'originale + transaction corrigée (même source, même
+> `external_ref`, `corrects_transaction_id`) dans la même écriture. Déjà annulée ou corrigée,
+> écriture inverse, aucun changement → 409. Un don de sadaqa se corrige depuis Path.
+
 > CODÉ (2026-10-18) : `POST /api/vault/upcoming-expenses/{id}/mark-paid` (Idempotency-Key ;
 > montant, date et portefeuille facultatifs) écrit la dépense au Vault (source
 > `upcoming_expense`, catégorie de l'échéance), clôt l'échéance (`paid_at`,
