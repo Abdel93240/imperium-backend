@@ -8,6 +8,11 @@ par `external_ref = rides:{session}:{clé}`. Une transaction annulée au Vault n
 
 À la clôture, le CA et les dépenses sont figés dans la session. Vector ne lit ni fatigue ni
 pression financière (doc 13 §5) : l'objectif atteint compare seulement le CA à la cible.
+
+Relais Imperium (VEC-11, doc 43 §3.1) : après la clôture, l'utilisateur peut demander un
+replan de la journée (hook `vector_session_ended`). Jamais automatique : le runner de replan
+reste désactivé tant que le doc 76 ne l'active pas, et une demande ouverte bloquerait
+« Replanifier ».
 """
 
 from datetime import UTC, date, datetime, time, timedelta
@@ -21,9 +26,10 @@ from sqlalchemy.orm import Session, aliased
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
-from app.models.imperium import ImperiumMission
+from app.models.imperium import ImperiumMission, PlanningReplanEvent
 from app.models.rides import RidesDropZone, RidesRevenueEntry, RidesSession
 from app.models.vault import ImperiumVaultTransaction
+from app.schemas.imperium import ReplanRead
 from app.schemas.rides import (
     CurrentSessionRead,
     DropZoneCreate,
@@ -35,6 +41,7 @@ from app.schemas.rides import (
     SessionKpis,
     SessionListResponse,
     SessionRead,
+    SessionReplanResponse,
     SessionStart,
     SessionUpdate,
 )
@@ -196,6 +203,32 @@ def complete_session(
     return read
 
 
+def request_replan(
+    db: Session, *, current_user: User, session_id: UUID, now: datetime | None = None
+) -> tuple[SessionReplanResponse, bool]:
+    """Replan de la journée demandé après la clôture ; (réponse, créé).
+
+    Relancer pendant que la demande est ouverte renvoie la même. Délai entre deux replans,
+    demande déjà ouverte ou journée non démarrée : erreurs du service de replan.
+    """
+    from app.services.imperium import replan as replan_service
+
+    session = _get(db, current_user, session_id)
+    if session.status != "completed":
+        raise RidesStateError("Termine la session avant de replanifier.", _read(db, session))
+    if session.replan_event_id is not None:
+        previous = db.get(PlanningReplanEvent, session.replan_event_id)
+        if previous is not None and previous.status in replan_service.OPEN_STATUSES:
+            return SessionReplanResponse(session=_read(db, session), replan=ReplanRead.model_validate(previous)), False
+    replan = replan_service.request_hook_replan(db, current_user=current_user, hook_type="vector_session_ended", now=now)
+    session = _get(db, current_user, session_id)
+    session.replan_event_id = replan.id
+    db.flush()
+    response = SessionReplanResponse(session=_read(db, session), replan=replan)
+    db.commit()
+    return response, True
+
+
 # ---------- saisies ----------
 
 def add_revenue(
@@ -339,6 +372,7 @@ def _read(db: Session, session: RidesSession, now: datetime | None = None) -> Se
         id=session.id, status=session.status, started_at=session.started_at, ended_at=session.ended_at,
         target_ca_cents=session.target_ca_cents, strategic_direction=session.strategic_direction, mission_id=session.mission_id,
         review_note=session.review_note, version=session.version, kpis=_kpis(db, session, now),
+        replan_event_id=session.replan_event_id,
     )
 
 

@@ -41,6 +41,8 @@ class RidesSession(UUIDPrimaryKeyMixin, Base):
     final_revenue_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     final_expense_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Replan Imperium demandé par l'utilisateur après la clôture (VEC-11) ; sans clé étrangère.
+    replan_event_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)

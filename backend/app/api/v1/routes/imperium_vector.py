@@ -29,11 +29,12 @@ from app.schemas.rides import (
     SessionEntryResult,
     SessionListResponse,
     SessionRead,
+    SessionReplanResponse,
     SessionStart,
     SessionUpdate,
     TrainingSummaryRead,
 )
-from app.services.imperium import vault_transactions
+from app.services.imperium import replan, vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
 from app.services.vector import offers, recommendations, rules, sessions
@@ -213,6 +214,27 @@ def complete_session_route(
                                          idempotency_key=_require_key(idempotency_key), request_path=request.url.path)
     except _ERRORS as exc:
         return _error(db, exc)
+
+
+@router.post("/sessions/{session_id}/replan", response_model=SessionReplanResponse, status_code=status.HTTP_201_CREATED)
+def replan_after_session_route(session_id: UUID, response: Response, current_user: CurrentUserDep, db: SessionDep):
+    """VEC-11 → Imperium : replan de la journée après la clôture, à la demande ; demande ouverte → 200."""
+    try:
+        result, created = sessions.request_replan(db, current_user=current_user, session_id=session_id)
+    except _ERRORS as exc:
+        return _error(db, exc)
+    except replan.ReplanCooldownError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "REPLAN_COOLDOWN", "eligible_at": exc.eligible_at.isoformat(),
+        })
+    except replan.ReplanStateConflictError as exc:
+        db.rollback()
+        code = "DAY_NOT_STARTED" if "No operational day" in str(exc) else "REPLAN_ALREADY_OPEN"
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": code})
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return result
 
 
 # ---------- « Où aller ? » ----------
