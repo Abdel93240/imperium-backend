@@ -11,6 +11,8 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.path_worship import (
     FastBreakRequest,
+    FastCancelRequest,
+    FastCancelResult,
     FastEndRequest,
     FastingStateRead,
     FastListResponse,
@@ -189,6 +191,26 @@ def break_fast_route(
     """Rupture confirmée (`confirm: true`) avant l'iftar ; raison facultative, jamais dans les événements."""
     try:
         read, _ = fasting.break_fast(
+            db, current_user=current_user, fast_id=fast_id, payload=payload,
+            idempotency_key=_require_key(idempotency_key), request_path=request.url.path,
+        )
+    except _ERRORS as exc:
+        return _error(db, exc)
+    return read
+
+
+@router.post("/fasts/{fast_id}/cancel", response_model=FastCancelResult)
+def cancel_fast_route(
+    fast_id: UUID,
+    payload: FastCancelRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Annule un jeûne démarré par erreur (`confirm: true`), tant qu'il est en cours ; la ligne est supprimée."""
+    try:
+        read, _ = fasting.cancel_fast(
             db, current_user=current_user, fast_id=fast_id, payload=payload,
             idempotency_key=_require_key(idempotency_key), request_path=request.url.path,
         )

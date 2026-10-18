@@ -405,7 +405,10 @@ Headers: Idempotency-Key
 >   cours, `hydration_limits.daytime`, message. `GET …/fasts?from_day=&to_day=`.
 > - Pulse (doc 40 §15.2) : hydratation refusée dans la fenêtre (409 `FASTING_HYDRATION_BLOCKED`)
 >   sauf `hydration_daytime_allowed`, repas accepté avec avertissement, une bannière jeûne.
-> - Pas encore : abandon (`abandon`), rappels Ramadan / jours blancs (calendrier hégirien),
+> - `POST …/fasts/{id}/cancel` `{confirm: true}` (CODÉ 2026-10-18, action `abandon`) : un jeûne en
+>   cours démarré par erreur est supprimé (événement `path.fasting.cancelled`) ; il ne bloque
+>   plus l'hydratation et un nouveau jeûne peut être démarré le jour même.
+> - Pas encore : rappels Ramadan / jours blancs (calendrier hégirien),
 >   proposition de replanification Imperium sur rupture, intensité des séances.
 
 Offline conflict:
@@ -1103,6 +1106,14 @@ PAT-11f City / Location Selector
 ```
 
 These sub-surfaces are drawers, dialogs, side panes, or inline states.
+
+> CODÉ (2026-10-18) — PAT-01 : `GET /api/imperium/path/dashboard?day=` en lecture seule : les cinq
+> prières (heure, source, statut posé, sans reproche pour une prière sans statut), prochaine
+> prière et compte à rebours (aujourd'hui seulement, fajr du lendemain après isha), état du
+> jeûne, sadaqa de la semaine, ghusl, routines d'adhkar actives et compteurs du jour, point de
+> reprise du Coran, qibla (cap vers la Kaaba depuis la mosquée de référence, sinon Paris),
+> bannières `ghusl_required`, `fasting`, `sadaqa_carry`, `sadaqa_vault_pending`. Pas encore :
+> date hégirienne et jours blancs, score Path (§13).
 
 Settings (PAT-11) covers: calculation method, madhhab, large city (Paris default),
 sadaqa percentage, registered mosques (MAWAQIT), registered ghusl addresses, and
