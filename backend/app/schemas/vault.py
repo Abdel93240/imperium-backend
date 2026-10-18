@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.pulse import FoodStockItemRead, FoodStockLineIn
 
@@ -435,3 +435,50 @@ class VaultSettingsRead(BaseModel):
     last_pressure_at: datetime | None
     rows: list[VaultSettingsRow]
     completion: int  # lignes complètes sur 4
+
+
+class PressureCorrectionCreate(BaseModel):
+    """doc 11 « Manual Correction » : reportée (nouvelle date), déjà réglée, semaine exceptionnelle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["postponed", "handled", "exceptional_week"]
+    upcoming_expense_id: UUID | None = None
+    postponed_until: date | None = None
+    week_start: date | None = None
+    reason: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def check(self):
+        self.reason = self.reason.strip()
+        if not self.reason:
+            raise ValueError("reason is required.")
+        if self.kind == "exceptional_week":
+            if self.week_start is None or self.upcoming_expense_id is not None or self.postponed_until is not None:
+                raise ValueError("exceptional_week takes week_start only.")
+            if self.week_start.weekday() != 0:
+                raise ValueError("week_start must be a Monday.")
+        else:
+            if self.upcoming_expense_id is None or self.week_start is not None:
+                raise ValueError(f"{self.kind} takes upcoming_expense_id.")
+            if (self.kind == "postponed") != (self.postponed_until is not None):
+                raise ValueError("postponed_until goes with postponed only.")
+        return self
+
+
+class PressureCorrectionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    kind: str
+    upcoming_expense_id: UUID | None
+    postponed_until: date | None
+    week_start: date | None
+    reason: str
+    revoked_at: datetime | None
+    created_at: datetime
+
+
+class PressureCorrectionResult(BaseModel):
+    correction: PressureCorrectionRead
+    pressure: VaultPressureResponse

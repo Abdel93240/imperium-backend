@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
@@ -12,7 +12,7 @@ from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.toolbox import SignalValue
-from app.models.vault import ImperiumVaultTransaction, PressureSnapshot, UpcomingExpense
+from app.models.vault import ImperiumVaultTransaction, PressureSnapshot, UpcomingExpense, VaultPressureCorrection
 from app.services.vault import wallet
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
@@ -59,6 +59,8 @@ class PressureInputs:
     minimum_survival_threshold: Decimal = Decimal("150.00")
     number_of_remaining_work_days: int = 1
     realistic_daily_capacity: Decimal = Decimal("220.00")
+    # Corrections manuelles appliquées (doc 11), visibles dans l'explication.
+    applied_corrections: list = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,7 @@ def compute_pressure(inputs: PressureInputs) -> PressureResult:
         label=label,
     )
     factors = {
+        "manual_corrections": inputs.applied_corrections,
         "required_money_this_week": required_money,
         "remaining_required_money": remaining_required,
         "remaining_realistic_earning_capacity": remaining_capacity,
@@ -215,16 +218,33 @@ def load_pressure_inputs(
     conditional = ZERO
     exceptional = ZERO
     urgent = ZERO
+    # Corrections manuelles (doc 11), lues après les données de base.
+    corrections = list(
+        db.scalars(
+            select(VaultPressureCorrection)
+            .where(VaultPressureCorrection.user_id == current_user.id, VaultPressureCorrection.revoked_at.is_(None))
+            .order_by(VaultPressureCorrection.created_at, VaultPressureCorrection.id)
+        )
+    )
+    handled = {c.upcoming_expense_id for c in corrections if c.kind == "handled"}
+    postponed = {c.upcoming_expense_id: c.postponed_until for c in corrections if c.kind == "postponed"}
+    exceptional_weeks = {c.week_start for c in corrections if c.kind == "exceptional_week"}
+    if exceptional_weeks:
+        realistic_daily_capacity = _recent_daily_capacity(
+            db, current_user=current_user, today=today, excluded_weeks=exceptional_weeks
+        )
+    labels = {expense.id: expense.label_fr for expense in active_expenses}
     for expense in active_expenses:
-        if not expense.mandatory:
+        if not expense.mandatory or expense.id in handled:
             continue
-        if expense.due_date > week_end:
+        due = max(expense.due_date, postponed.get(expense.id) or expense.due_date)
+        if due > week_end:
             continue
         amount = _money(Decimal(expense.amount))
-        if expense.due_date < today:
+        if due < today:
             overdue += amount
             continue
-        if expense.due_date <= today + timedelta(days=3):
+        if due <= today + timedelta(days=3):
             urgent += amount
 
         category = _normalize_category(expense.category)
@@ -253,6 +273,16 @@ def load_pressure_inputs(
         minimum_survival_threshold=_money(minimum_survival),
         number_of_remaining_work_days=work_days,
         realistic_daily_capacity=realistic_daily_capacity,
+        applied_corrections=[
+            {
+                "correction_id": str(c.id), "kind": c.kind, "reason": c.reason,
+                "upcoming_expense_id": str(c.upcoming_expense_id) if c.upcoming_expense_id else None,
+                "label": labels.get(c.upcoming_expense_id),
+                "postponed_until": c.postponed_until.isoformat() if c.postponed_until else None,
+                "week_start": c.week_start.isoformat() if c.week_start else None,
+            }
+            for c in corrections
+        ],
     )
 
 
@@ -372,7 +402,10 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _recent_daily_capacity(db: Session, *, current_user: User, today: date) -> Decimal:
+def _recent_daily_capacity(
+    db: Session, *, current_user: User, today: date, excluded_weeks: set[date] | frozenset = frozenset()
+) -> Decimal:
+    """Moyenne des gains par jour travaillé sur 14 jours, hors semaines marquées exceptionnelles (doc 11)."""
     since = today - timedelta(days=14)
     transactions = list(
         db.scalars(
@@ -385,6 +418,11 @@ def _recent_daily_capacity(db: Session, *, current_user: User, today: date) -> D
             )
         )
     )
+    if not transactions:
+        return Decimal("220.00")
+    transactions = [
+        t for t in transactions if (t.local_date - timedelta(days=t.local_date.weekday())) not in excluded_weeks
+    ]
     if not transactions:
         return Decimal("220.00")
     totals: dict[date, Decimal] = {}
