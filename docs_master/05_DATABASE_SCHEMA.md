@@ -1510,6 +1510,11 @@ Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) 
   duree reelle), FK rides_sessions (CASCADE), Idempotency-Key unique + empreinte.
 - Revenus et depenses : `imperium_vault_transactions` (source vector_manual, external_ref
   `rides:{session}:{cle}`), jamais une table Vector.
+- `rides_revenue_entries` (migration 20261018_0070) : contexte VTC d'un revenu de session
+  (zone, cle de zone sans accents ni casse, montant, heure), transaction_id unique sans FK.
+- `rides_recommendations` (migration 20261018_0070) : « Ou aller ? » ; stay_here|move_to_zone|
+  abstain, zone, raison, confiance 0..1, entrees (creneau, zones comparees, contexte
+  manquant), retour utilisateur (utile, action accepted|refused|missed|ignored, raison).
 
 Calendrier hegirien Path (CODE, migration 20261018_0068, doc 41 14-V3) :
 - `path_hijri_month_starts` : debut de mois confirme par l'utilisateur (annee 1300..1700,

@@ -22,7 +22,7 @@ from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission
-from app.models.rides import RidesDropZone, RidesSession
+from app.models.rides import RidesDropZone, RidesRevenueEntry, RidesSession
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.rides import (
     CurrentSessionRead,
@@ -42,6 +42,7 @@ from app.schemas.vault import ImperiumVaultTransactionCreate
 from app.services.events.emitter import build_event
 from app.services.imperium import vault_transactions
 from app.services.pulse import food_stock
+from app.services.vector.zones import zone_key
 
 PARIS = ZoneInfo("Europe/Paris")
 CLOCK_SKEW = timedelta(minutes=5)
@@ -203,8 +204,17 @@ def add_revenue(
 ) -> SessionEntryResult:
     zone = (payload.zone or "").strip()
     note = " · ".join(part for part in (f"Zone : {zone}" if zone else "", (payload.note or "").strip()) if part) or None
-    return _vault_entry(db, current_user, session_id, "income", payload.amount_cents, REVENUE_CATEGORY, payload.wallet,
-                        payload.occurred_at, note, idempotency_key, request_path, now)
+    result = _vault_entry(db, current_user, session_id, "income", payload.amount_cents, REVENUE_CATEGORY, payload.wallet,
+                          payload.occurred_at, note, idempotency_key, request_path, now)
+    # Contexte VTC du revenu (zone) dans le domaine rides, pour la recommandation de zone.
+    if db.scalar(select(RidesRevenueEntry.id).where(RidesRevenueEntry.transaction_id == result.transaction_id)) is None:
+        transaction = db.get(ImperiumVaultTransaction, result.transaction_id)
+        db.add(RidesRevenueEntry(
+            user_id=current_user.id, session_id=session_id, transaction_id=transaction.id, zone=zone or None,
+            zone_key=zone_key(zone), amount_cents=transaction.amount_cents, occurred_at=transaction.occurred_at,
+        ))
+        db.commit()
+    return result
 
 
 def add_expense(

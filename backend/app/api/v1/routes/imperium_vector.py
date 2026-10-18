@@ -1,4 +1,4 @@
-"""Vector : sessions VTC (doc 59 §14 ; doc 13) — conseil et mesure, jamais d'action sur l'appli VTC."""
+"""Vector : sessions VTC et « Où aller ? » (doc 59 §14 ; doc 13, doc 33 §5) — conseil et mesure, jamais d'action sur l'appli VTC."""
 
 from datetime import date, timedelta
 from typing import Annotated
@@ -14,6 +14,9 @@ from app.schemas.rides import (
     DropZoneRead,
     ManualExpenseCreate,
     ManualRevenueCreate,
+    RecommendationFeedback,
+    RecommendationRead,
+    RecommendationRequest,
     SessionComplete,
     SessionEntryResult,
     SessionListResponse,
@@ -24,7 +27,7 @@ from app.schemas.rides import (
 from app.services.imperium import vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import sessions
+from app.services.vector import recommendations, sessions
 
 router = APIRouter()
 
@@ -201,3 +204,69 @@ def complete_session_route(
                                          idempotency_key=_require_key(idempotency_key), request_path=request.url.path)
     except _ERRORS as exc:
         return _error(db, exc)
+
+
+# ---------- « Où aller ? » ----------
+
+@router.post("/recommendations", response_model=RecommendationRead, status_code=status.HTTP_201_CREATED)
+def recommend_route(
+    payload: RecommendationRequest,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """VEC-07 : zone conseillée sur l'historique du créneau, ou abstention ; toujours un conseil, jamais une action."""
+    try:
+        read, duplicate = recommendations.recommend(db, current_user=current_user, payload=payload,
+                                                    idempotency_key=_require_key(idempotency_key))
+    except _RECO_ERRORS as exc:
+        return _reco_error(db, exc)
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.get("/recommendations/latest", response_model=RecommendationRead | None)
+def latest_recommendation_route(current_user: CurrentUserDep, db: SessionDep):
+    """Dernière recommandation (carte en cache de VEC-01), ou null."""
+    return recommendations.latest(db, current_user=current_user)
+
+
+@router.get("/recommendations/{recommendation_id}", response_model=RecommendationRead)
+def get_recommendation_route(recommendation_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """VEC-08 : détail, zones comparées et signaux non pris en compte."""
+    try:
+        return recommendations.get(db, current_user=current_user, recommendation_id=recommendation_id)
+    except _RECO_ERRORS as exc:
+        return _reco_error(db, exc)
+
+
+@router.post("/recommendations/{recommendation_id}/feedback", response_model=RecommendationRead)
+def recommendation_feedback_route(
+    recommendation_id: UUID, payload: RecommendationFeedback, current_user: CurrentUserDep, db: SessionDep
+):
+    """VEC-09 : utile ou non, et ce que l'utilisateur a fait ; un seul retour par recommandation."""
+    try:
+        return recommendations.record_feedback(db, current_user=current_user, recommendation_id=recommendation_id,
+                                               payload=payload)
+    except _RECO_ERRORS as exc:
+        return _reco_error(db, exc)
+
+
+_RECO_ERRORS = (
+    recommendations.RecommendationNotFoundError,
+    recommendations.RecommendationIdempotencyConflictError,
+    recommendations.RecommendationFeedbackConflictError,
+)
+
+
+def _reco_error(db: SessionDep, exc: Exception) -> JSONResponse:
+    db.rollback()
+    if isinstance(exc, recommendations.RecommendationNotFoundError):
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    if isinstance(exc, recommendations.RecommendationFeedbackConflictError):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "RIDES_FEEDBACK_CONFLICT", "current": exc.current.model_dump(mode="json"),
+        })
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
