@@ -1186,6 +1186,26 @@ class CreateDailyPlanRequest(BaseModel):
         return stripped
 
 
+class DailyPlanVersionRead(BaseModel):
+    """Version du plan vivant (doc 43 §20) : 0 = plan d'origine, N = N-ième replan accepté."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    version: int
+    plan_blocks: list[dict]
+    reason: str | None
+    trigger: str | None
+    source_replan_event_id: UUID | None
+    created_at: datetime
+    is_current: bool = False
+
+
+class DailyPlanVersionListResponse(BaseModel):
+    plan_id: UUID
+    current_version: int
+    items: list[DailyPlanVersionRead]  # de la plus récente à la plus ancienne
+
+
 class DailyPlanResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

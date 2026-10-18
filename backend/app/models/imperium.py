@@ -798,6 +798,34 @@ class PlanningReplanEvent(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class PlanningDailyPlanVersion(UUIDPrimaryKeyMixin, Base):
+    """Version du plan vivant (doc 43 §20, doc 05 D4) : on versionne, on n'écrase pas.
+
+    Version 0 = plan d'origine (archivé au premier replan accepté) ; version N = N-ième replan
+    accepté, avec sa raison et la demande source. La version courante est la plus haute.
+    """
+
+    __tablename__ = "planning_daily_plan_versions"
+    __table_args__ = (
+        UniqueConstraint("daily_plan_id", "version", name="planning_daily_plan_versions_plan_version_unique"),
+        CheckConstraint("version >= 0", name="version_non_negative"),
+        CheckConstraint("jsonb_typeof(plan_blocks) = 'array'", name="plan_blocks_array"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    daily_plan_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_daily_plans.id", ondelete="CASCADE"), nullable=False
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    plan_blocks: Mapped[list] = mapped_column(JSONB, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)  # catégorie de replan ou hook
+    trigger: Mapped[str | None] = mapped_column(Text, nullable=True)  # manual | hook ; NULL pour le plan d'origine
+    source_replan_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("planning_replan_events.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class ImperiumProject(UUIDPrimaryKeyMixin, Base):
     """Projet d'Opérations (doc 71 §3) : les 2 premiers du classement sont actifs."""
 
