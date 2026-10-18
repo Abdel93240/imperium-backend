@@ -134,7 +134,7 @@ Le mapping suit strictement cette chaine :
 | Timeline | `events[].id`, `events[].type`, `events[].title`, `events[].status`, `events[].occurred_at` | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
 | Search | `filters.query`, query count, result narrowing only | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
 | Filters | `filters.active` and filter chips | `history_mock_v1` | `GET /api/imperium/missions/history` | None | GET | `Ready state` | No branch now |
-| History Detail Card | selected event details, `events[].source`, `events[].linked_route`, linked mission if present | `history_mock_v1` | `FUTURE TBD GET /api/imperium/history/events` | `FUTURE TBD GET /api/imperium/history/events` | GET | `Ready state` | No branch now |
+| History Detail Card | selected event details, `events[].source`, `events[].linked_route`, linked mission if present | `history_mock_v1` | `GET /api/imperium/history/events/{event_id}` (codé 2026-10-18) | `GET /api/imperium/history/events/{event_id}` | GET | `Ready state` | No branch now |
 
 ### 3.6 Settings
 
@@ -211,7 +211,7 @@ Ils restent marques `FUTURE` et ne doivent pas etre branches maintenant.
 | Inbox | `FUTURE TBD GET /api/imperium/inbox/conversations/{conversation_id}` | Missing | GET |
 | Inbox | `FUTURE TBD POST /api/imperium/inbox/items/{item_id}/convert-to-mission-proposal` | Missing | POST |
 | Inbox | `FUTURE TBD POST /api/imperium/voice/transcriptions` | Missing | POST |
-| History | `FUTURE TBD GET /api/imperium/history/events` | Missing | GET |
+| History | `GET /api/imperium/history/events[/{event_id}]` | Codé 2026-10-18 | GET |
 | Settings | `FUTURE TBD PATCH /api/imperium/settings` | Missing | PATCH |
 
 ## 6. Wiring Preconditions

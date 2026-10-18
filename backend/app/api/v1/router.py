@@ -13,6 +13,7 @@ from app.api.v1.routes import (
     imperium_contracts,
     imperium_home,
     imperium_operations,
+    imperium_history,
     imperium_settings,
     imperium,
     imperium_dashboard,
@@ -76,6 +77,7 @@ api_router.include_router(imperium_pulse_health.router, prefix="/imperium/pulse"
 api_router.include_router(imperium.router, prefix="/imperium", tags=["imperium"])
 api_router.include_router(imperium_operations.router, prefix="/imperium", tags=["imperium-operations"])
 api_router.include_router(imperium_settings.router, prefix="/imperium", tags=["imperium-settings"])
+api_router.include_router(imperium_history.router, prefix="/imperium", tags=["imperium-history"])
 api_router.include_router(imperium_vault.router, prefix="/imperium/vault", tags=["imperium-vault"])
 api_router.include_router(imperium_vector.router, prefix="/imperium/vector", tags=["imperium-vector"])
 api_router.include_router(imperium_vault_categories.router, prefix="/imperium/vault", tags=["imperium-vault-categories"])
