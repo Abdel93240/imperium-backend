@@ -10,7 +10,7 @@ from app.models.auth import User
 from app.models.enums import IdempotencyStatus
 from app.models.event import Event
 from app.models.idempotency import IdempotencyKey
-from app.models.imperium import ImperiumMission, ImperiumMissionScore
+from app.models.imperium import ImperiumMission, ImperiumMissionScore, PlanningReplanEvent
 from app.schemas.imperium import (
     ResolveStandbyRequest,
     StandbyMissionListResponse,
@@ -42,10 +42,12 @@ from app.schemas.imperium import (
     MissionDecisionScoreRead,
     MissionDecisionScorePublicSummary,
     MissionDecisionScoreSummary,
+    MissionReplanResponse,
     MissionResponse,
     MissionWriteResponse,
     PromotedBacklogMissionRead,
     PromoteBacklogMissionResponse,
+    ReplanRead,
     StartMissionRequest,
 )
 from app.services.events.emitter import build_event
@@ -686,8 +688,43 @@ def _replan_after_failure(db: Session, *, current_user: User, mission: ImperiumM
         message = ("Journée non démarrée : pas de replan." if status == "no_open_day"
                    else "Une replanification est déjà en cours.")
         return FailureReplanRead(action="replan", urgent=urgent, status=status, message=message)
+    mission.replan_event_id = row.id
     return FailureReplanRead(action="replan", urgent=urgent, status="requested", replan_id=row.id,
                              message="Replanification de la journée demandée.")
+
+
+REPLAN_HOOKS = {"failed": "mission_failed", "cancelled": "mission_cancelled"}
+
+
+def request_mission_replan(
+    db: Session, *, current_user: User, mission_id: UUID, now: datetime | None = None
+) -> tuple[MissionReplanResponse, bool]:
+    """Replan accepté par l'utilisateur après « Ratée » ou « Annulée » (doc 43 §3.1) ; (réponse, créé).
+
+    Relancer pendant que la demande est ouverte renvoie la même, y compris celle demandée
+    automatiquement à l'échec. Délai entre deux replans, demande déjà ouverte ou journée non
+    démarrée : erreurs du service de replan.
+    """
+    from app.services.imperium import replan as replan_service
+
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission is None:
+        raise MissionNotFoundError("Mission not found.")
+    if mission.status not in REPLAN_HOOKS:
+        raise MissionStateConflictError("Only a failed or cancelled mission can trigger a replan.")
+    if mission.replan_event_id is not None:
+        previous = db.get(PlanningReplanEvent, mission.replan_event_id)
+        if previous is not None and previous.status in replan_service.OPEN_STATUSES:
+            return MissionReplanResponse(mission=MissionResponse.model_validate(mission),
+                                         replan=ReplanRead.model_validate(previous)), False
+    hook_type = REPLAN_HOOKS[mission.status]
+    replan = replan_service.request_hook_replan(db, current_user=current_user, hook_type=hook_type, now=now)
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    mission.replan_event_id = replan.id
+    db.flush()
+    response = MissionReplanResponse(mission=MissionResponse.model_validate(mission), replan=replan)
+    db.commit()
+    return response, True
 
 
 def attach_annexes(
@@ -895,6 +932,10 @@ def cancel_mission(
         idempotency_key=idempotency_key,
         status_text="cancelled",
     )
+    if previous_status == "active":
+        # La journée perd sa mission en cours : on propose, l'utilisateur décide (jamais automatique).
+        response.replan = FailureReplanRead(action="ask", urgent=False, status="suggested",
+                                            message="Mission annulée : veux-tu replanifier ta journée ?")
     _store_idempotency(
         db,
         current_user=current_user,
