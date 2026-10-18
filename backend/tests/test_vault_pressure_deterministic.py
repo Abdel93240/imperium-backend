@@ -22,6 +22,10 @@ class FakeDb:
             return self.scalars_results.pop(0)
         return []
 
+    def scalar(self, query):
+        self.queries.append(query)
+        return None  # aucun relevé de soldes : liquidité calculée sur les transactions
+
 
 GOLDENS = [
     (

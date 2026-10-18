@@ -1502,6 +1502,12 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Soldes reels Vault (CODE, migration 20261018_0073, doc 42 §8) :
+- `vault_wallet_snapshots` : cash (>= 0), banque (decouvert possible), crypto (>= 0) en
+  centimes EUR, recorded_at, source manual|sync, note, Idempotency-Key unique + empreinte.
+- `upcoming_expenses` recoit `paid_at` et `paid_transaction_id` (sans FK) : echeance payee
+  via `POST /api/vault/upcoming-expenses/{id}/mark-paid`.
+
 Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) :
 - `rides_sessions` : statut active|completed (une seule active, index partiel), started_at,
   ended_at, CA cible (centimes), direction strategique, mission_id (FK imperium_missions,

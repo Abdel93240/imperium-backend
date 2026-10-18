@@ -202,6 +202,8 @@ class UpcomingExpenseRead(BaseModel):
     wallet: str | None
     mandatory: bool
     active: bool
+    paid_at: datetime | None = None
+    paid_transaction_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -329,3 +331,56 @@ class VaultReceiptValidateResponse(BaseModel):
     extraction: VaultReceiptExtractionRead
     transaction: ImperiumVaultTransactionRead
     stock_items: list[FoodStockItemRead] = Field(default_factory=list)
+
+
+class WalletSnapshotCreate(BaseModel):
+    """Soldes réels (doc 42 §8.1) : EUR seul, crypto en contre-valeur ; la banque peut être à découvert."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cash_cents: int = Field(ge=0, le=100_000_000, strict=True)
+    bank_cents: int = Field(ge=-100_000_000, le=1_000_000_000, strict=True)
+    crypto_cents: int = Field(default=0, ge=0, le=1_000_000_000, strict=True)
+    recorded_at: datetime | None = None
+    note: str | None = Field(default=None, max_length=300)
+
+
+class WalletSnapshotRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    cash_cents: int
+    bank_cents: int
+    crypto_cents: int
+    total_cents: int
+    recorded_at: datetime
+    source: str
+    note: str | None
+
+
+class WalletStateRead(BaseModel):
+    """Dernier relevé (réel) et solde prévu = relevé + transactions passées depuis (doc 42 §8.2)."""
+
+    snapshot: WalletSnapshotRead | None
+    predicted_cash_cents: int | None
+    predicted_bank_cents: int | None
+    predicted_crypto_cents: int | None
+    predicted_total_cents: int | None
+    transactions_since: int
+    other_wallets_cents: dict[str, int]  # transactions sur un autre portefeuille (ex. plateforme), hors total
+    check_suggested: bool  # écart prévu / réel > 5 % : « Vérifier ton solde réel ? »
+    message: str | None
+
+
+class UpcomingExpensePay(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    amount_cents: int | None = Field(default=None, gt=0, le=100_000_000, strict=True)  # absent : le montant prévu
+    paid_at: datetime | None = None
+    wallet: str | None = Field(default=None, min_length=1, max_length=80)  # absent : celui de la dépense, sinon cash
+
+
+class UpcomingExpensePayResult(BaseModel):
+    expense: UpcomingExpenseRead
+    transaction: ImperiumVaultTransactionRead
+    next_occurrence: UpcomingExpenseRead | None

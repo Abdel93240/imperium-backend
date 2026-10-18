@@ -295,6 +295,14 @@ When difference > 5%:
   → not blocking
 ```
 
+> CODÉ (2026-10-18, migration 0073, table `vault_wallet_snapshots`) : `POST /api/vault/wallet/snapshots`
+> (Idempotency-Key ; cash ≥ 0, banque éventuellement négative, crypto en contre-valeur EUR),
+> `GET /api/vault/wallet` (dernier relevé, solde prévu par portefeuille = relevé + transactions
+> passées depuis, autres portefeuilles à part et hors total, `check_suggested` au-delà de 5 %
+> d'écart), `GET /api/vault/wallet/snapshots`. La pression (doc 11) lit la liquidité sur le
+> dernier relevé cash + banque plus les mouvements depuis ; sans relevé, sur les transactions
+> comme avant. Événement `finance.wallet.updated` sans montants.
+
 ---
 
 ## 9. Pressure Score
@@ -359,6 +367,11 @@ Used for:
 - Vault UI surfacing
 
 User adds these manually. V2 may auto-detect from email parsing.
+
+> CODÉ (2026-10-18) : `POST /api/vault/upcoming-expenses/{id}/mark-paid` (Idempotency-Key ;
+> montant, date et portefeuille facultatifs) écrit la dépense au Vault (source
+> `upcoming_expense`, catégorie de l'échéance), clôt l'échéance (`paid_at`,
+> `paid_transaction_id`, inactive) et crée la suivante si elle se répète. Déjà payée → 409.
 
 ---
 

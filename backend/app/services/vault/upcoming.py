@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,6 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.models.vault import ImperiumVaultTransaction, UpcomingExpense
+from app.schemas.vault import (
+    ImperiumVaultTransactionCreate,
+    ImperiumVaultTransactionRead,
+    UpcomingExpensePayResult,
+    UpcomingExpenseRead,
+)
+from app.services.imperium.vault_transactions import create_vault_transaction
 from app.services.notifications import notify
 
 
@@ -61,6 +68,75 @@ def deactivate_upcoming_expense(db: Session, *, current_user: User, expense_id: 
     db.commit()
     db.refresh(expense)
     return expense
+
+
+class UpcomingExpenseNotFoundError(ValueError):
+    pass
+
+
+class UpcomingExpenseStateError(ValueError):
+    pass
+
+
+def mark_paid(
+    db: Session, *, current_user: User, expense_id: UUID, payload, idempotency_key: str, request_path: str,
+):
+    """VAU-11 : écrit la dépense au Vault, clôt l'échéance, crée la suivante si elle se répète."""
+    expense = db.scalar(
+        select(UpcomingExpense).where(UpcomingExpense.id == expense_id, UpcomingExpense.user_id == current_user.id)
+        .with_for_update()
+    )
+    if expense is None:
+        raise UpcomingExpenseNotFoundError("Upcoming expense not found.")
+    if expense.paid_transaction_id is not None:
+        transaction = db.get(ImperiumVaultTransaction, expense.paid_transaction_id)
+        if transaction is not None and transaction.external_ref == f"upcoming:{expense.id}:{idempotency_key[:80]}":
+            return _pay_result(db, expense, transaction)
+        raise UpcomingExpenseStateError("Cette échéance est déjà payée.")
+    if not expense.active:
+        raise UpcomingExpenseStateError("Cette échéance n'est plus active.")
+    paid_at = payload.paid_at or datetime.now(UTC)
+    amount_cents = payload.amount_cents or int((Decimal(expense.amount) * 100).to_integral_value())
+    transaction, _ = create_vault_transaction(
+        db, current_user=current_user,
+        payload=ImperiumVaultTransactionCreate(
+            transaction_type="expense", amount_cents=amount_cents, wallet=payload.wallet or expense.wallet or "cash",
+            occurred_at=paid_at, timezone="Europe/Paris", category=expense.category, source="upcoming_expense",
+            note=expense.label_fr[:500], external_ref=f"upcoming:{expense.id}:{idempotency_key[:80]}",
+        ),
+        idempotency_key=idempotency_key, request_method="POST", request_path=request_path,
+    )
+    expense = db.get(UpcomingExpense, expense_id)
+    expense.paid_at, expense.paid_transaction_id, expense.active = paid_at, transaction.id, False
+    ensure_next_occurrence(db, expense=_still_active(expense))
+    db.commit()
+    db.refresh(expense)
+    return _pay_result(db, expense, db.get(ImperiumVaultTransaction, transaction.id))
+
+
+def _still_active(expense: UpcomingExpense) -> UpcomingExpense:
+    """Modèle non enregistré : la prochaine échéance naît active, même si celle-ci vient d'être close."""
+    return UpcomingExpense(
+        user_id=expense.user_id, label_fr=expense.label_fr, amount=expense.amount, due_date=expense.due_date,
+        recurrence=expense.recurrence, category=expense.category, wallet=expense.wallet, mandatory=expense.mandatory,
+        active=True,
+    )
+
+
+def _pay_result(db: Session, expense: UpcomingExpense, transaction: ImperiumVaultTransaction) -> UpcomingExpensePayResult:
+    following = None
+    next_date = next_due_date(expense.due_date, expense.recurrence)
+    if next_date is not None:
+        following = db.scalar(
+            select(UpcomingExpense).where(
+                UpcomingExpense.user_id == expense.user_id, UpcomingExpense.label_fr == expense.label_fr,
+                UpcomingExpense.due_date == next_date, UpcomingExpense.category == expense.category,
+            )
+        )
+    return UpcomingExpensePayResult(
+        expense=UpcomingExpenseRead.model_validate(expense), transaction=ImperiumVaultTransactionRead.model_validate(transaction),
+        next_occurrence=UpcomingExpenseRead.model_validate(following) if following else None,
+    )
 
 
 def next_due_date(due_date: date, recurrence: str | None) -> date | None:
