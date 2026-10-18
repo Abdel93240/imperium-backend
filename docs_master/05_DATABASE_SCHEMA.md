@@ -1502,6 +1502,12 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Calendrier hegirien Path (CODE, migration 20261018_0068, doc 41 14-V3) :
+- `path_hijri_month_starts` : debut de mois confirme par l'utilisateur (annee 1300..1700,
+  mois 1..12, first_day), unique (user_id, annee, mois).
+- `path_calendar_events` : evenement religieux personnel (libelle, note, annee facultative =
+  chaque annee, mois, jour 1..30), Idempotency-Key unique + empreinte.
+
 Adhkar et Coran Path (CODE, migration 20261018_0067, doc 41 §11-§12) :
 - `path_adhkar_routines` : libelle, type (liste du doc 41 §11), cible 1..10000, frequence
   daily|weekly|per_prayer, active (8 au plus, cote service), version, Idempotency-Key.

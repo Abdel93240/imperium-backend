@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.schemas.path_adhkar import AdhkarRoutineWithCountRead
+from app.schemas.path_calendar import HijriDayRead
 from app.schemas.path_ghusl import GhuslCurrentRead
 from app.schemas.path_quran import QuranContinuationRead
 from app.schemas.path_sadaqa import SadaqaWeekRead
@@ -24,13 +25,14 @@ class QiblaRead(BaseModel):
 
 
 class PathBannerRead(BaseModel):
-    kind: Literal["ghusl_required", "fasting", "sadaqa_carry", "sadaqa_vault_pending"]
+    kind: Literal["ghusl_required", "fasting", "white_days", "ramadan", "sadaqa_carry", "sadaqa_vault_pending"]
     level: Literal["info", "warning"]
     message: str
 
 
 class PathDashboardRead(BaseModel):
     day: date
+    hijri: HijriDayRead
     prayers: PrayerDayRead
     next_prayer: NextPrayerRead | None  # None pour un autre jour qu'aujourd'hui
     fasting: FastingStateRead

@@ -3,8 +3,9 @@
 Assemble ce que Path sait déjà pour un jour de Paris : les cinq prières (heure, source,
 statut posé), la prochaine prière et son compte à rebours, l'état du jeûne, l'objectif
 sadaqa de la semaine, le ghusl, les compteurs d'adhkar, le point de reprise du Coran,
-la direction de la qibla, et des bannières courtes. Aucun texte de reproche : une
-prière sans statut reste sans statut. Score Path (doc 41 §13) et date hégirienne : pas encore.
+la date hégirienne, la direction de la qibla, et des bannières courtes. Aucun texte de reproche : une
+prière sans statut reste sans statut. Jours blancs : une suggestion, jamais un jeûne
+automatique. Score Path (doc 41 §13) : pas encore.
 """
 
 import math
@@ -14,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.schemas.path_dashboard import NextPrayerRead, PathBannerRead, PathDashboardRead, QiblaRead
-from app.services.path import adhkar, fasting, ghusl, prayer_marks, quran, sadaqa
+from app.services.path import adhkar, fasting, ghusl, hijri, prayer_marks, quran, sadaqa
 from app.services.path.prayer import DEFAULT_LOCATION, PRAYERS, _reference_mosque, prayer_times
 
 KAABA = (21.422487, 39.826206)
@@ -33,6 +34,14 @@ def build_dashboard(db: Session, *, current_user: User, day: date, now: datetime
         banners.append(PathBannerRead(kind="ghusl_required", level="warning", message=ghusl_state.message))
     if message := fasting.day_message(db, current_user, day, now):
         banners.append(PathBannerRead(kind="fasting", level="info", message=message))
+    hijri_day = hijri.hijri_day(db, current_user=current_user, day=day)
+    if hijri_day.ramadan:
+        banners.append(PathBannerRead(kind="ramadan", level="info", message=f"Ramadan, jour {hijri_day.hijri_day}."))
+    elif hijri_day.white_day:
+        banners.append(PathBannerRead(
+            kind="white_days", level="info",
+            message=f"Jour blanc ({hijri_day.hijri_day} {hijri_day.month_name}) : un jeûne est possible si tu le souhaites.",
+        ))
     if week.carry_message:
         banners.append(PathBannerRead(kind="sadaqa_carry", level="info", message=week.carry_message))
     if week.vault_pending:
@@ -41,7 +50,7 @@ def build_dashboard(db: Session, *, current_user: User, day: date, now: datetime
             message=f"{week.vault_pending} don(s) en attente d'écriture au Vault.",
         ))
     return PathDashboardRead(
-        day=day, prayers=prayers, next_prayer=next_prayer(db, now) if day == today else None, fasting=fast_state,
+        day=day, hijri=hijri_day, prayers=prayers, next_prayer=next_prayer(db, now) if day == today else None, fasting=fast_state,
         sadaqa=week, ghusl=ghusl_state, adhkar=routines, quran=quran.continuation(db, current_user=current_user, today=today),
         qibla=qibla(db), banners=banners,
     )

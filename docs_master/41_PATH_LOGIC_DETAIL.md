@@ -1112,8 +1112,8 @@ These sub-surfaces are drawers, dialogs, side panes, or inline states.
 > prière et compte à rebours (aujourd'hui seulement, fajr du lendemain après isha), état du
 > jeûne, sadaqa de la semaine, ghusl, routines d'adhkar actives et compteurs du jour, point de
 > reprise du Coran, qibla (cap vers la Kaaba depuis la mosquée de référence, sinon Paris),
-> bannières `ghusl_required`, `fasting`, `sadaqa_carry`, `sadaqa_vault_pending`. Pas encore :
-> date hégirienne et jours blancs, score Path (§13).
+> bannières `ghusl_required`, `fasting`, `ramadan`, `white_days`, `sadaqa_carry`,
+> `sadaqa_vault_pending`, date hégirienne. Pas encore : score Path (§13).
 
 Settings (PAT-11) covers: calculation method, madhhab, large city (Paris default),
 sadaqa percentage, registered mosques (MAWAQIT), registered ghusl addresses, and
@@ -1336,6 +1336,27 @@ TBD POST /api/path/calendar/confirm-date   (manual lunar-observation confirmatio
 ```
 Date records carry a status: `predicted` (duplicated J / J+1) → `confirmed`
 (single true date) after manual confirmation.
+
+> CODÉ (2026-10-18, migration 0068, tables `path_hijri_month_starts` et `path_calendar_events`) :
+> - Moteur : calendrier tabulaire (cycle de 30 ans), vérifié sur les débuts de ramadan
+>   1445–1447. Début d'un mois : confirmé par l'utilisateur, sinon début confirmé du mois
+>   précédent + 29 jours (J) / + 30 (J+1), sinon calcul décalé de l'écart du dernier mois
+>   confirmé (12 mois au plus), sinon calcul seul.
+> - `GET /api/imperium/path/calendar/hijri?day=` : date hégirienne, nom du mois, statut
+>   (predicted|confirmed), source, jour blanc, mois sacré, ramadan.
+> - `GET …/calendar/events?from_day=&to_day=` (14 jours par défaut = fenêtre d'affichage,
+>   400 jours au plus pour la planification) : nouvel an, Achoura, Mawlid, début du ramadan,
+>   Aïd al-Fitr, Arafat, Aïd al-Adha, jours blancs (13–15) et événements personnels ; une date
+>   prédite porte deux jours (J, J+1), une date confirmée un seul.
+> - `POST …/calendar/confirm-date` `{hijri_year, hijri_month, first_day}` : à un jour près de la
+>   prévision (sinon 422), au plus la veille ; une confirmation peut être corrigée. Événement
+>   `path.calendar.date_confirmed`.
+> - `GET/POST …/calendar/personal-events`, `DELETE …/{id}` : une année précise ou chaque année ;
+>   événement `path.calendar.event_added` sans libellé.
+> - Tableau de bord PAT-01 : date hégirienne, bannière « Ramadan, jour N. » ou « Jour blanc :
+>   un jeûne est possible si tu le souhaites. » (jamais de jeûne automatique).
+> - Pas encore : `path.calendar.date_predicted` (aucun job ne l'émet ; Imperium lit
+>   `/calendar/events`), source externe de calendrier.
 
 ---
 

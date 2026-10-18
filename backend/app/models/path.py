@@ -3,7 +3,7 @@
 Socle: mosques + MAWAQIT cache + calculated fallback times. Path pass: prayer
 marks (PAT-02), fasts (PAT-05), sadaqa (settings, donations, closed weeks) and
 ghusl (state + addresses), adhkar (routines, counts, increments) and quran
-(progress, plans).
+(progress, plans), hijri calendar (confirmed month starts, personal events).
 """
 
 from datetime import date, datetime, time
@@ -472,6 +472,52 @@ class PathQuranPlan(UUIDPrimaryKeyMixin, Base):
     started_on: Mapped[date] = mapped_column(Date, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PathHijriMonthStart(UUIDPrimaryKeyMixin, Base):
+    """Début de mois hégirien confirmé par l'utilisateur après l'observation (doc 41 14-V3)."""
+
+    __tablename__ = "path_hijri_month_starts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "hijri_year", "hijri_month", name="path_hijri_month_starts_user_month_unique"),
+        CheckConstraint("hijri_month BETWEEN 1 AND 12", name="month_range"),
+        CheckConstraint("hijri_year BETWEEN 1300 AND 1700", name="year_range"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    hijri_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    hijri_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    first_day: Mapped[date] = mapped_column(Date, nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PathCalendarEvent(UUIDPrimaryKeyMixin, Base):
+    """Événement religieux personnel (dars, rappel, observance) daté dans le calendrier hégirien."""
+
+    __tablename__ = "path_calendar_events"
+    __table_args__ = (
+        CheckConstraint("length(btrim(label)) BETWEEN 1 AND 120", name="label_length"),
+        CheckConstraint("hijri_month BETWEEN 1 AND 12", name="month_range"),
+        CheckConstraint("hijri_day BETWEEN 1 AND 30", name="day_range"),
+        CheckConstraint("hijri_year IS NULL OR hijri_year BETWEEN 1300 AND 1700", name="year_range"),
+        Index("path_calendar_events_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hijri_year: Mapped[int | None] = mapped_column(Integer, nullable=True)  # vide : chaque année
+    hijri_month: Mapped[int] = mapped_column(Integer, nullable=False)
+    hijri_day: Mapped[int] = mapped_column(Integer, nullable=False)
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
