@@ -1538,6 +1538,7 @@ Sessions VTC Vector (CODE, migration 20261018_0069, domaine rides, doc 59 §14) 
 - `rides_sessions` : statut active|completed (une seule active, index partiel), started_at,
   ended_at, CA cible (centimes), direction strategique, mission_id (FK imperium_missions,
   SET NULL), CA et depenses figes a la cloture, note de revue, version, Idempotency-Key.
+  `replan_event_id` (migration 20261018_0081, sans FK) : replan Imperium demande apres la cloture.
 - `rides_drop_zones` : depose confirmee (zone, latitude/longitude par paire, confiance GPS,
   duree reelle), FK rides_sessions (CASCADE), Idempotency-Key unique + empreinte.
 - Revenus et depenses : `imperium_vault_transactions` (source vector_manual, external_ref

@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.schemas.imperium import ReplanRead
+
 ExpenseCategory = Literal["carburant", "peage", "parking", "entretien", "plateformes", "autre"]
 
 
@@ -105,6 +107,12 @@ class SessionRead(BaseModel):
     review_note: str | None
     version: int
     kpis: SessionKpis
+    replan_event_id: UUID | None = None  # replan Imperium demandé après la clôture (VEC-11)
+
+
+class SessionReplanResponse(BaseModel):
+    session: SessionRead
+    replan: ReplanRead
 
 
 class CurrentSessionRead(BaseModel):
