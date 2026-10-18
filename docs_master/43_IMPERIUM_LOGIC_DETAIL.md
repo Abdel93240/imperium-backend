@@ -223,6 +223,12 @@ stashed    - user deferred indefinitely (V3, doc 54)
 
 No "proposed", "paused", "scheduled" intermediate states. Simple and binary.
 
+Code (2026-10-18) : « annulée » = `POST /api/imperium/missions/{id}/cancel`
+{ reason } (obligatoire), pour une mission `active` ou `backlog` ; statut `cancelled`,
+définitif, raison gardée dans `failure_reason` sans `failure_reason_code` (ce n'est
+pas un « pas fait » du doc 52 §10). Les annexes en attente retournent au backlog.
+Événement `planning.mission.aborted` avec `reason: cancelled`.
+
 ### 5.1 Why this simplicity
 
 ```text

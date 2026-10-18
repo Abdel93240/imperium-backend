@@ -371,6 +371,22 @@ class FailMissionRequest(BaseModel):
         return self
 
 
+class CancelMissionRequest(BaseModel):
+    """Annulation d'une mission (doc 43 §5) : définitive, raison obligatoire."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("reason")
+    @classmethod
+    def strip_reason(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("reason is required to cancel a mission.")
+        return stripped
+
+
 class StandbyDecision(StrEnum):
     """Sortie du standby (doc 43 §5.4) : nouvelle échéance, faite ou annulée."""
 

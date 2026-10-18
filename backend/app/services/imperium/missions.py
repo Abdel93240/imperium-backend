@@ -29,6 +29,7 @@ from app.schemas.imperium import (
     BacklogMissionListResponse,
     BacklogMissionRead,
     CompleteMissionRequest,
+    CancelMissionRequest,
     FailMissionRequest,
     MissionHistoryRead,
     MissionHistoryResponse,
@@ -784,6 +785,87 @@ def list_standby_missions(db: Session, *, current_user: User) -> StandbyMissionL
         missions=[StandbyMissionRead.model_validate(mission) for mission in missions],
         intervention_required=bool(missions),
     )
+
+
+def cancel_mission(
+    db: Session,
+    *,
+    current_user: User,
+    mission_id: UUID,
+    payload: CancelMissionRequest,
+    idempotency_key: str,
+    request_method: str,
+    request_path: str,
+    now: datetime | None = None,
+) -> tuple[MissionWriteResponse, bool]:
+    """Annulée (doc 43 §5) : mission en cours ou au backlog, définitive, raison obligatoire.
+
+    La raison est gardée dans failure_reason (pas de code : ce n'est pas un échec du doc 52 §10).
+    Les annexes en attente d'une porteuse annulée retournent au backlog, sans pénalité (doc 53 §8).
+    """
+    request_hash = _hash_request(
+        "mission.cancelled",
+        {"mission_id": str(mission_id), "payload": payload.model_dump(mode="json")},
+    )
+    existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if existing_key is not None:
+        return _handle_existing_idempotency(existing_key, request_hash), True
+
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission is None:
+        raise MissionNotFoundError("Mission not found.")
+    if mission.status not in {"active", "backlog"}:
+        raise MissionStateConflictError("Only an active or backlog mission can be cancelled.")
+    previous_status = mission.status
+    now = now or datetime.now(UTC)
+
+    event_id = f"evt_{uuid4().hex}"
+    annexes = _annexes_of(db, mission=mission)
+    event = _build_event(
+        db,
+        current_user=current_user,
+        event_id=event_id,
+        event_type="mission.abandoned",
+        idempotency_key=idempotency_key,
+        payload={
+            "mission_id": str(mission.id),
+            "reason": "cancelled",
+            "cancellation_reason": payload.reason,
+            "previous_status": previous_status,
+        },
+    )
+    db.add(event)
+    db.flush()
+
+    mission.status = "cancelled"
+    mission.ended_at = now
+    mission.failure_reason = payload.reason
+    mission.failure_reason_code = None
+    mission.planned_start_at = None
+    mission.planned_end_at = None
+    mission.annex_of_mission_id = None
+    mission.ended_by_event_id = event.id
+    _settle_annexes(annexes, completed_ids=set(), ended_at=now, event=event)
+    db.flush()
+
+    response = _write_response(
+        mission=mission,
+        event_id=event_id,
+        idempotency_key=idempotency_key,
+        status_text="cancelled",
+    )
+    _store_idempotency(
+        db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+        request_method=request_method,
+        request_path=request_path,
+        request_hash=request_hash,
+        response_status_code=200,
+        response=response,
+    )
+    db.commit()
+    return response, False
 
 
 def resolve_standby_mission(

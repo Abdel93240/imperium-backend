@@ -39,6 +39,7 @@ from app.schemas.imperium import (
     DecisionFrameworkSchemaResponse,
     DecisionFrameworkScorePreviewRequest,
     DecisionFrameworkScorePreviewResponse,
+    CancelMissionRequest,
     FailMissionRequest,
     FinishDayRequest,
     FinishDayResponse,
@@ -181,6 +182,7 @@ from app.services.imperium.missions import (
     MultipleActiveMissionsError,
     complete_mission,
     create_backlog_mission,
+    cancel_mission,
     fail_mission,
     get_backlog_decision_preview,
     get_current_active_mission,
@@ -1259,6 +1261,45 @@ def fail_mission_route(
         response.status_code = status.HTTP_200_OK
     return result
 
+
+@router.post("/missions/{mission_id}/cancel", response_model=MissionWriteResponse)
+def cancel_mission_route(
+    mission_id: UUID,
+    payload: CancelMissionRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> MissionWriteResponse:
+    """Annulée : définitive, raison obligatoire (doc 43 §5) ; mission en cours ou au backlog."""
+    _require_idempotency_key(idempotency_key)
+    try:
+        result, duplicate = cancel_mission(
+            db,
+            current_user=current_user,
+            mission_id=mission_id,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            request_method=request.method,
+            request_path=request.url.path,
+        )
+    except MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (MissionStateConflictError, MissionIdempotencyConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mission or event conflicts with an existing record.",
+        ) from exc
+
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
 
 
 @router.post("/missions/{mission_id}/annexes", response_model=AttachAnnexesResponse)
