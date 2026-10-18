@@ -183,15 +183,17 @@ def fetch_mawaqit_times(mosque: PathRegisteredMosque, d: date) -> dict[str, str]
     return {prayer: payload[prayer] for prayer in PRAYERS}
 
 
-def _reference_mosque(db: Session) -> PathRegisteredMosque | None:
+def _reference_mosque(db: Session, user_id: UUID | None = None) -> PathRegisteredMosque | None:
+    """Paramètre path.reference_mosque_id d'abord, puis la mosquée par défaut (de l'utilisateur si connu)."""
     mosque_id = get_parameter(db, "path.reference_mosque_id", default=None)
     if mosque_id:
         mosque = db.get(PathRegisteredMosque, UUID(str(mosque_id)))
-        if mosque is not None:
+        if mosque is not None and (user_id is None or mosque.user_id == user_id):
             return mosque
-    return db.scalar(
-        select(PathRegisteredMosque).where(PathRegisteredMosque.is_default.is_(True)).limit(1)
-    )
+    query = select(PathRegisteredMosque).where(PathRegisteredMosque.is_default.is_(True))
+    if user_id is not None:
+        query = query.where(PathRegisteredMosque.user_id == user_id)
+    return db.scalar(query.limit(1))
 
 
 def cached_mawaqit_times(db: Session, mosque: PathRegisteredMosque, d: date) -> dict | None:
@@ -261,10 +263,12 @@ def prayer_windows(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> list[Prayer
     return windows
 
 
-def prayer_times(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> tuple[dict[str, datetime], str]:
+def prayer_times(
+    db: Session, d: date, *, tz: str = DEFAULT_TZ, user_id: UUID | None = None
+) -> tuple[dict[str, datetime], str]:
     """Five adhan times (aware, local) and their source: 'mawaqit' or 'calculated' (doc 41 §6.2)."""
     zone = ZoneInfo(tz)
-    mosque = _reference_mosque(db)
+    mosque = _reference_mosque(db, user_id)
     if mosque is not None:
         cached = cached_mawaqit_times(db, mosque, d)
         if cached is not None:
@@ -273,10 +277,10 @@ def prayer_times(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> tuple[dict[st
                 hour, minute = map(int, str(cached[prayer]).split(":")[:2])
                 adhans[prayer] = datetime.combine(d, time(hour, minute), tzinfo=zone)
             return adhans, "mawaqit"
-    return _calculated_times(db, d, zone), "calculated"
+    return _calculated_times(db, d, zone, user_id), "calculated"
 
 
-def _calculated_times(db: Session, d: date, zone: ZoneInfo) -> dict[str, datetime]:
+def _calculated_times(db: Session, d: date, zone: ZoneInfo, user_id: UUID | None = None) -> dict[str, datetime]:
     """Local engine, persisted in path_calculated_prayer_times (no per-request recompute)."""
     method = str(get_parameter(db, "path.calc_method", default="MuslimWorldLeague"))
     madhhab = str(get_parameter(db, "path.madhhab", default="Maliki"))
@@ -285,7 +289,7 @@ def _calculated_times(db: Session, d: date, zone: ZoneInfo) -> dict[str, datetim
     utc_times = compute_prayer_times_utc(d, lat, lng, method=method, madhhab=madhhab)
     local = {prayer: ts.astimezone(zone) for prayer, ts in utc_times.items()}
 
-    mosque = _reference_mosque(db)
+    mosque = _reference_mosque(db, user_id)
     if mosque is not None and mosque.latitude is not None and mosque.longitude is not None:
         utc_times = compute_prayer_times_utc(
             d, float(mosque.latitude), float(mosque.longitude), method=method, madhhab=madhhab

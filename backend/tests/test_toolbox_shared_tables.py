@@ -110,7 +110,8 @@ def test_v_ai_training_pairs_exposes_disagreements_only(engine) -> None:
 
 def test_signal_tables_exist_shared_with_domain_column(engine) -> None:
     # DBL-2 killed: ONE shared table with a domain column; the 32 Pulse signals
-    # will be seeded BY the Pulse pass, so the socle table is empty.
+    # will be seeded BY the Pulse pass. The socle seeds nothing; the only row
+    # today is vault.pressure, seeded by the Vault Phase E migration (0040).
     with engine.connect() as conn:
         columns = {
             row.column_name
@@ -122,8 +123,8 @@ def test_signal_tables_exist_shared_with_domain_column(engine) -> None:
             )
         }
         assert {"domain", "code", "active", "bands", "baseline_window_days"} <= columns
-        count = conn.execute(text("SELECT count(*) FROM signal_definitions")).scalar()
-        assert count == 0
+        codes = set(conn.execute(text("SELECT code FROM signal_definitions")).scalars())
+        assert codes == {"vault.pressure"}
         forbidden = conn.execute(
             text(
                 "SELECT count(*) FROM information_schema.tables WHERE table_name IN "

@@ -206,6 +206,13 @@ Privacy rules:
 - External model calls receive no mosque names, addresses, or GPS unless a
   privacy gate explicitly allows a summarized use case.
 
+> CODÉ (2026-10-18, migration 0075) — PAT-09 : `GET/POST /api/imperium/path/mosques`,
+> `PATCH/DELETE …/{id}` : saisie manuelle (nom, adresse, coordonnées par paire, identifiant
+> MAWAQIT facultatif), une mosquée par défaut au plus par utilisateur, version lue. La mosquée
+> par défaut est la référence des horaires de CET utilisateur (cache MAWAQIT, sinon calcul à ses
+> coordonnées) et de la qibla ; `prayer_times` reçoit désormais l'utilisateur. Recherche et
+> synchronisation MAWAQIT (réseau) : pas encore. Événement `path.mosque.updated` sans nom ni adresse.
+
 ### 6.4 Fallback calculation engine
 
 If MAWAQIT is unavailable, Path uses a backend calculation engine equivalent to

@@ -101,7 +101,7 @@ def activate(
     )
     if active is not None:
         raise GhuslStateError("Le ghusl est déjà marqué comme requis.", GhuslStateRead.model_validate(active))
-    prayer = next_prayer(db, now)
+    prayer = next_prayer(db, now, current_user.id)
     state = PathGhuslState(
         user_id=current_user.id, status="required", required_since=now, next_prayer=prayer, replan_status="pending",
         idempotency_key=idempotency_key, request_hash=fingerprint,
@@ -152,10 +152,10 @@ def complete(
     return read, False
 
 
-def next_prayer(db: Session, now: datetime) -> str:
+def next_prayer(db: Session, now: datetime, user_id: UUID | None = None) -> str:
     """Prochaine prière à partir de maintenant (fajr du lendemain après isha)."""
     today = now.astimezone(PARIS).date()
-    adhans, _ = prayer_times(db, today)
+    adhans, _ = prayer_times(db, today, user_id=user_id)
     for name in PRAYERS:
         if adhans[name] > now:
             return name

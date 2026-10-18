@@ -85,7 +85,7 @@ def start_fast(
     same_day = db.scalar(select(PathFast).where(PathFast.user_id == current_user.id, PathFast.fasting_date == day))
     if same_day is not None:
         raise FastStateError("Un jeûne est déjà enregistré pour ce jour.", FastRead.model_validate(same_day))
-    adhans, source = prayer_times(db, day)
+    adhans, source = prayer_times(db, day, user_id=current_user.id)
     offset = int(get_parameter(db, "path.suhoor_offset_min", default=DEFAULT_SUHOOR_OFFSET_MIN))
     fast = PathFast(
         user_id=current_user.id, fasting_date=day, fasting_type=payload.fasting_type, status="active", started_at=now,

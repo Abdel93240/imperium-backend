@@ -10,6 +10,7 @@ automatique. Score Path (doc 41 §13) : pas encore.
 
 import math
 from datetime import UTC, date, datetime, timedelta
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -50,16 +51,16 @@ def build_dashboard(db: Session, *, current_user: User, day: date, now: datetime
             message=f"{week.vault_pending} don(s) en attente d'écriture au Vault.",
         ))
     return PathDashboardRead(
-        day=day, hijri=hijri_day, prayers=prayers, next_prayer=next_prayer(db, now) if day == today else None, fasting=fast_state,
+        day=day, hijri=hijri_day, prayers=prayers, next_prayer=next_prayer(db, now, current_user.id) if day == today else None, fasting=fast_state,
         sadaqa=week, ghusl=ghusl_state, adhkar=routines, quran=quran.continuation(db, current_user=current_user, today=today),
-        qibla=qibla(db), banners=banners,
+        qibla=qibla(db, current_user.id), banners=banners,
     )
 
 
-def next_prayer(db: Session, now: datetime) -> NextPrayerRead:
+def next_prayer(db: Session, now: datetime, user_id: UUID | None = None) -> NextPrayerRead:
     today = now.astimezone(fasting.PARIS).date()
     for day in (today, today + timedelta(days=1)):
-        adhans, _ = prayer_times(db, day)
+        adhans, _ = prayer_times(db, day, user_id=user_id)
         for name in PRAYERS:
             if adhans[name] > now:
                 return NextPrayerRead(
@@ -68,9 +69,9 @@ def next_prayer(db: Session, now: datetime) -> NextPrayerRead:
     raise RuntimeError("No prayer within two days.")  # impossible : fajr existe chaque jour
 
 
-def qibla(db: Session) -> QiblaRead:
+def qibla(db: Session, user_id: UUID | None = None) -> QiblaRead:
     """Cap initial (grand cercle) vers la Kaaba depuis la mosquée de référence, sinon Paris."""
-    mosque = _reference_mosque(db)
+    mosque = _reference_mosque(db, user_id)
     if mosque is not None and mosque.latitude is not None and mosque.longitude is not None:
         origin, source = (float(mosque.latitude), float(mosque.longitude)), "reference_mosque"
     else:
