@@ -5,7 +5,14 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.history import HistoryEventDetailResponse, HistoryEventListResponse, HistoryFilter
+from app.schemas.history import (
+    HistoryDayListResponse,
+    HistoryEventDetailResponse,
+    HistoryEventListResponse,
+    HistoryFilter,
+    HistoryFinancesResponse,
+    HistoryPeriod,
+)
 from app.services.imperium import history
 
 router = APIRouter()
@@ -32,3 +39,22 @@ def history_event_route(event_id: str, current_user: CurrentUserDep, db: Session
         return history.get_history_event(db, current_user=current_user, event_id=event_id)
     except history.HistoryEventNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/history/days", response_model=HistoryDayListResponse)
+def history_days_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 30,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> HistoryDayListResponse:
+    """Historique des journées : démarrage, clôture, ressenti, missions faites / ratées / annulées."""
+    return history.list_history_days(db, current_user=current_user, limit=limit, offset=offset)
+
+
+@router.get("/history/finances", response_model=HistoryFinancesResponse)
+def history_finances_route(
+    current_user: CurrentUserDep, db: SessionDep, period: HistoryPeriod = "3months"
+) -> HistoryFinancesResponse:
+    """Bloc Finances : résultat net par jour sur la période, écart avec la précédente, solde du jour."""
+    return history.history_finances(db, current_user=current_user, period=period)

@@ -2,7 +2,7 @@
 
 Projection du registre d'événements (table events, en ajout seul) restreinte aux faits
 Imperium : missions, journées opérationnelles, plans du jour, décisions (priorités, demandes
-de replan) et projets ; plus les Weekly Reviews approuvées (rapports finaux). Les autres
+de replan) et projets ; plus bas, les blocs « Historique des journées » et « Finances » ; plus les Weekly Reviews approuvées (rapports finaux). Les autres
 domaines (Vault, Pulse, Path, Vector) n'y entrent pas : leurs données sont plus sensibles et
 ont leurs propres écrans.
 
@@ -12,15 +12,25 @@ avec les nouveaux (expand_for_read). Au plus HISTORY_SCAN_LIMIT événements ré
 par requête.
 """
 
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.models.event import Event
-from app.models.imperium import ImperiumMission, ImperiumProject, ImperiumWeeklyReviewFinalReport
-from app.schemas.history import HistoryEventDetailResponse, HistoryEventListResponse, HistoryEventRead
+from app.models.imperium import ImperiumMission, ImperiumProject, ImperiumWeeklyReviewFinalReport, PlanningDay
+from app.models.vault import ImperiumVaultTransaction
+from app.schemas.history import (
+    FinancePointRead,
+    HistoryDayListResponse,
+    HistoryDayRead,
+    HistoryEventDetailResponse,
+    HistoryEventListResponse,
+    HistoryEventRead,
+    HistoryFinancesResponse,
+)
 from app.services.events.nomenclature import canonical_event_type, expand_for_read
 
 HISTORY_SCAN_LIMIT = 5000
@@ -202,3 +212,108 @@ def _uuid(value) -> UUID | None:  # noqa: ANN001 - valeur de payload JSON
         return UUID(str(value)) if value else None
     except ValueError:
         return None
+
+
+# ---------- Historique des journées et Finances (doc 65 §7.5) ----------
+
+PERIOD_DAYS = {"week": 7, "month": 30, "3months": 90, "year": 365}
+
+
+def list_history_days(db: Session, *, current_user: User, limit: int = 30, offset: int = 0,
+                      now: datetime | None = None) -> HistoryDayListResponse:
+    """Journées opérationnelles, de la plus récente à la plus ancienne, avec leurs missions.
+
+    Une mission compte pour la journée où elle s'est terminée (faite, ratée, annulée) ;
+    les missions annexes faites sont comptées à part (bonus, doc 53 §8).
+    """
+    now = now or datetime.now(UTC)
+    rows = list(
+        db.scalars(
+            select(PlanningDay)
+            .where(PlanningDay.user_id == current_user.id)
+            .order_by(PlanningDay.started_at.desc(), PlanningDay.id)
+            .offset(offset)
+            .limit(limit + 1)
+        )
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    missions = []
+    if rows:
+        start = min(row.started_at for row in rows)
+        end = max(row.finished_at or now for row in rows)
+        missions = list(
+            db.scalars(
+                select(ImperiumMission).where(
+                    ImperiumMission.user_id == current_user.id,
+                    ImperiumMission.status.in_(("completed", "failed", "cancelled")),
+                    ImperiumMission.ended_at >= start,
+                    ImperiumMission.ended_at <= end,
+                )
+            )
+        )
+    items = []
+    for row in rows:
+        end = row.finished_at or now
+        inside = [m for m in missions if row.started_at <= m.ended_at <= end]
+        principal = [m for m in inside if m.annex_of_mission_id is None]
+        items.append(
+            HistoryDayRead(
+                planning_day_id=row.id, start_local_date=row.start_local_date, started_at=row.started_at,
+                finished_at=row.finished_at, status="finished" if row.finished_at else "open",
+                duration_minutes=int((end - row.started_at).total_seconds() // 60), felt_energy=row.felt_energy,
+                missions_completed=sum(m.status == "completed" for m in principal),
+                missions_failed=sum(m.status == "failed" for m in principal),
+                missions_cancelled=sum(m.status == "cancelled" for m in principal),
+                annexes_completed=sum(m.status == "completed" and m.annex_of_mission_id is not None for m in inside),
+                day_review_id=row.day_review_id,
+            )
+        )
+    return HistoryDayListResponse(items=items, count=len(items), limit=limit, offset=offset, has_more=has_more)
+
+
+def history_finances(db: Session, *, current_user: User, period: str = "3months",
+                     today: date | None = None) -> HistoryFinancesResponse:
+    """Résultat net (gains − dépenses, EUR) par jour de Paris ; les écritures inverses s'annulent d'elles-mêmes.
+
+    Périodes glissantes finissant aujourd'hui : 7, 30, 90 ou 365 jours ; « Tout » part de la
+    première transaction, sans période précédente (écart = net depuis le début).
+    """
+    from app.services.path.fasting import paris_today
+    from app.services.vault.wallet import wallet_state
+
+    today = today or paris_today()
+    daily = {
+        day: int(net)
+        for day, net in db.execute(
+            select(
+                ImperiumVaultTransaction.local_date,
+                func.sum(
+                    case((ImperiumVaultTransaction.transaction_type == "income", ImperiumVaultTransaction.amount_cents),
+                         else_=-ImperiumVaultTransaction.amount_cents)
+                ),
+            )
+            .where(ImperiumVaultTransaction.user_id == current_user.id, ImperiumVaultTransaction.currency == "EUR",
+                   ImperiumVaultTransaction.local_date <= today)
+            .group_by(ImperiumVaultTransaction.local_date)
+        )
+    }
+    if period == "all":
+        from_day = min(daily) if daily else None
+        previous = None
+    else:
+        from_day = today - timedelta(days=PERIOD_DAYS[period] - 1)
+        previous_start = from_day - timedelta(days=PERIOD_DAYS[period])
+        previous = sum(net for day, net in daily.items() if previous_start <= day < from_day)
+    points = []
+    if from_day is not None:
+        day = from_day
+        while day <= today:
+            points.append(FinancePointRead(day=day, net_cents=daily.get(day, 0)))
+            day += timedelta(days=1)
+    period_net = sum(point.net_cents for point in points)
+    return HistoryFinancesResponse(
+        period=period, from_day=from_day, to_day=today, currency="EUR", points=points, period_net_cents=period_net,
+        previous_period_net_cents=previous, delta_cents=period_net - (previous or 0),
+        balance_cents=wallet_state(db, current_user=current_user).predicted_total_cents,
+    )
