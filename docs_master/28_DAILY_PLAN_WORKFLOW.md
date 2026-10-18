@@ -43,6 +43,12 @@ AI call. The operational flow is nevertheless fixed:
   (up to roughly 36 hours). `local_date` remains a snapshot/display attribute;
   it must not be used to infer that an operational day has ended.
 
+Code (2026-10-18) : `GET /api/imperium/day/freshness` renvoie la vérification de
+fraîcheur de la journée ouverte (calendrier modifié depuis la dernière mise à jour du
+plan, ou depuis la clôture précédente sans plan ; missions ratées, en standby ou
+remises au backlog la veille ; mission restée active ; ghusl, jeûne, replan ouvert,
+standby). Lecture seule, aucun appel de modèle.
+
 Energy is deliberately two-dimensional: objective energy is estimated
 deterministically from wearable sleep, Pulse declarations (nutrition, caffeine,
 hydration), and prior-day load; subjective energy is the check-in feeling. The

@@ -1610,9 +1610,10 @@ Tables planning futures / non codees :
   obligatoires en manuel), statut requested|proposed|revising|accepted|cancelled|failed,
   ai_task_id (imperium.rolling_replan), proposal JSONB + rationale + proposal_version,
   une seule demande ouverte par utilisateur, debounce 5 min calcule sur requested_at.
-- Morning check-ins : FUTUR / NON CODE. La doc 43 annonce le check-in du matin
-  comme premier replan de la journee ; aucune table canonique `planning_*` n'est
-  encore definie ici.
+- Morning check-ins : pas de table dediee. Le check-in du matin est le ressenti
+  `planning_days.felt_energy` (1-5) saisi par `POST /api/imperium/day/start`
+  (DECISION_demarrage_journee) ; la verification de fraicheur
+  (`GET /api/imperium/day/freshness`) lit les tables existantes sans rien ecrire.
 - Projets Operations : CODE (migration 20261017_0047, 2026-10-17). Nom canonique
   `imperium_projects` (rank_order, status open|completed|deleted, source manual|chatbot,
   progress_percent 0-100 + progress_why + progress_at deposes par la WR, completed_at,

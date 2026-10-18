@@ -192,6 +192,12 @@ cause a proposed replan after user agreement.
 → ALL AI calls from this flow logged in ai_call_logs (§17)
 ```
 
+Code (2026-10-18) : le ressenti est `felt_energy` (1–5) de `POST /api/imperium/day/start`,
+stocké dans `planning_days` ; la table `imperium_morning_checkins` du §20 reste un
+héritage non créé. La vérification de fraîcheur est `GET /api/imperium/day/freshness`
+(lecture seule, sans IA) ; l'énergie objective et l'arbitrage local ne sont pas encore
+codés.
+
 The morning check-in is not a replan by default. It is the single subjective
 input collected by the explicit start action. The day is operational from start
 to closure and may cross midnight (up to roughly 36 hours), so it must not be

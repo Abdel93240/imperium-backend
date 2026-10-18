@@ -139,6 +139,8 @@ from app.services.imperium.daily_plans import (
     get_daily_plan_for_date,
     get_today_daily_plan,
 )
+from app.schemas.day_freshness import DayFreshnessResponse
+from app.services.imperium.day_freshness import DayNotStartedError, check_freshness
 from app.services.imperium.planning_days import (
     PlanningDayAlreadyOpenError,
     PlanningDayIdempotencyConflictError,
@@ -563,6 +565,17 @@ def current_planning_day_route(
     if planning_day is None:
         return None
     return PlanningDayResponse.model_validate(planning_day)
+
+
+@router.get("/day/freshness", response_model=DayFreshnessResponse)
+def day_freshness_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> DayFreshnessResponse:
+    try:
+        return check_freshness(db, current_user=current_user)
+    except DayNotStartedError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.post("/day/finish", response_model=FinishDayResponse, status_code=status.HTTP_201_CREATED)
