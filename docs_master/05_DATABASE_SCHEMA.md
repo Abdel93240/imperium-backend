@@ -1489,6 +1489,7 @@ Journal des douleurs Pulse (CODE, migration 20261017_0062, doc 40 §16) :
 - `pulse_pain_logs` : zone (liste fermee), cote left|right|both, intensite 0..10, type,
   gene, impact sur la seance, seance liee (FK pulse_workouts, SET NULL), noted_at,
   resolved_at, Idempotency-Key unique + empreinte. Suppression reelle (DELETE).
+  Migration 20261018_0077 : `replan_event_id` (sans FK) = replan demande depuis la douleur.
 
 Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
 - `path_prayer_logs` : prayer_date, prayer_name fajr|dhuhr|asr|maghrib|isha, statut

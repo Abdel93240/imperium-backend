@@ -2,7 +2,8 @@
 
 La douleur est une donnée d'entrée pour l'adaptation des séances (§13.3), jamais
 un diagnostic. Une douleur forte (8 à 10) fait proposer à l'écran de replanifier
-la journée ; rien n'est déclenché seul. Interprétation par le modèle local et
+la journée ; rien n'est déclenché seul. Si l'utilisateur accepte (pour toute douleur
+en cours, DECISION_demarrage_journee), POST /{id}/replan demande le replan (hook « pain »). Interprétation par le modèle local et
 escalade : pas encore.
 
 Même cadre que le relevé corporel (doc 08 PULSE-004) : écriture sous consentement,
@@ -17,8 +18,9 @@ from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
-from app.models.imperium import PulsePainLog, PulseWorkout
-from app.schemas.pulse_health import PainLogCreate, PainLogListResponse, PainLogRead
+from app.models.imperium import PlanningReplanEvent, PulsePainLog, PulseWorkout
+from app.schemas.imperium import ReplanRead
+from app.schemas.pulse_health import PainLogCreate, PainLogListResponse, PainLogRead, PainReplanResponse
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock, health_consent
 
@@ -32,6 +34,10 @@ class PainLogNotFoundError(ValueError):
 
 
 class PainIdempotencyConflictError(ValueError):
+    pass
+
+
+class PainResolvedError(ValueError):
     pass
 
 
@@ -92,6 +98,33 @@ def resolve_log(db: Session, *, current_user: User, pain_log_id: UUID) -> PainLo
     return read
 
 
+def request_replan(
+    db: Session, *, current_user: User, pain_log_id: UUID, now: datetime | None = None
+) -> tuple[PainReplanResponse, bool]:
+    """Replan accepté par l'utilisateur depuis une douleur en cours ; (réponse, créé).
+
+    Relancer pendant que la demande est ouverte renvoie la même. Délai entre deux replans,
+    demande déjà ouverte ou journée non démarrée : erreurs du service de replan.
+    """
+    from app.services.imperium import replan as replan_service
+
+    log = _get(db, current_user, pain_log_id)
+    health_consent.require(db, current_user, "pain")
+    if log.resolved_at is not None:
+        raise PainResolvedError("Cette douleur est résolue.")
+    if log.replan_event_id is not None:
+        previous = db.get(PlanningReplanEvent, log.replan_event_id)
+        if previous is not None and previous.status in replan_service.OPEN_STATUSES:
+            return PainReplanResponse(pain_log=_read(log), replan=ReplanRead.model_validate(previous)), False
+    replan = replan_service.request_hook_replan(db, current_user=current_user, hook_type="pain", now=now)
+    log = _get(db, current_user, pain_log_id)
+    log.replan_event_id = replan.id
+    db.flush()
+    response = PainReplanResponse(pain_log=_read(log), replan=replan)
+    db.commit()
+    return response, True
+
+
 def delete_log(db: Session, *, current_user: User, pain_log_id: UUID) -> None:
     db.delete(_get(db, current_user, pain_log_id))
     _emit(db, current_user, "pulse.pain.deleted", {"deleted": 1, "scope": "one"}, str(pain_log_id))
@@ -114,7 +147,7 @@ def _get(db: Session, current_user: User, pain_log_id: UUID) -> PulsePainLog:
 
 
 def _read(log: PulsePainLog) -> PainLogRead:
-    strong = log.severity >= STRONG and log.resolved_at is None
+    strong = log.severity >= STRONG and log.resolved_at is None and log.replan_event_id is None
     return PainLogRead.model_validate(log).model_copy(
         update={"suggest_replan": strong, "replan_message": REPLAN_MESSAGE if strong else None}
     )
