@@ -1,8 +1,8 @@
 """Path prayer-time tables (socle scope: doc 41 §20, minimal prayer engine).
 
 Socle: mosques + MAWAQIT cache + calculated fallback times. Path pass: prayer
-marks (PAT-02) and fasts (PAT-05). Ghusl addresses, adhkar, quran and sadaqa
-state are still to come.
+marks (PAT-02), fasts (PAT-05) and sadaqa (settings, donations, closed weeks).
+Ghusl addresses, adhkar and quran are still to come.
 """
 
 from datetime import date, datetime, time
@@ -171,4 +171,91 @@ class PathFast(UUIDPrimaryKeyMixin, Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathSadaqaSetting(UUIDPrimaryKeyMixin, Base):
+    """Réglage sadaqa (PAT-11d, doc 41 §9.2, §9.5) : une ligne par changement, valable à partir d'un lundi.
+
+    Le calcul d'une semaine prend la dernière ligne dont `effective_from` est passé ;
+    un changement vaut pour les semaines suivantes par défaut (jamais de recalcul du passé).
+    """
+
+    __tablename__ = "path_sadaqa_settings"
+    __table_args__ = (
+        CheckConstraint("percentage BETWEEN 0.01 AND 0.20", name="percentage_range"),
+        CheckConstraint("safety_margin BETWEEN 0.10 AND 0.15", name="safety_margin_range"),
+        CheckConstraint("extract(isodow from effective_from) = 1", name="effective_from_monday"),
+        Index("path_sadaqa_settings_user_effective_idx", "user_id", "effective_from", "created_at"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    percentage: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    safety_margin: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    effective_from: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PathSadaqaDonation(UUIDPrimaryKeyMixin, Base):
+    """Don déclaré par l'utilisateur (PAT-03, doc 41 §9.4) ; dépense « sadaqa » écrite au Vault ensuite."""
+
+    __tablename__ = "path_sadaqa_donations"
+    __table_args__ = (
+        CheckConstraint("amount_cents > 0 AND amount_cents <= 10000000", name="amount_range"),
+        CheckConstraint("extract(isodow from related_week_start) = 1", name="related_week_monday"),
+        CheckConstraint("vault_status IN ('not_requested', 'pending', 'recorded')", name="vault_status_check"),
+        CheckConstraint("vault_status <> 'recorded' OR vault_transaction_id IS NOT NULL", name="recorded_has_transaction"),
+        Index("path_sadaqa_donations_user_week_idx", "user_id", "related_week_start"),
+        Index("path_sadaqa_donations_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    destination: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    donated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    related_week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    allocation: Mapped[list] = mapped_column(JSONB, nullable=False)
+    record_in_vault: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    wallet: Mapped[str] = mapped_column(Text, nullable=False)
+    vault_status: Mapped[str] = mapped_column(Text, nullable=False)
+    # Lien sans clé étrangère : le registre Vault garde son garde-fou en ajout seul (TRUNCATE refusé).
+    vault_transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PathSadaqaWeek(Base):
+    """Semaine close (doc 41 §9.3) : cible, dons et reste figés, base du report suivant."""
+
+    __tablename__ = "path_sadaqa_weeks"
+    __table_args__ = (
+        CheckConstraint("extract(isodow from week_start) = 1", name="week_start_monday"),
+        CheckConstraint("remaining_cents >= 0", name="remaining_not_negative"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    business_profit_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    profit_source: Mapped[str] = mapped_column(Text, nullable=False)
+    percentage: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    safety_margin: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    base_target_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    carried_in_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    target_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    donated_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    remaining_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    closed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

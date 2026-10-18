@@ -460,6 +460,11 @@ sadaqa basis from common memory (read-only).
 When a sadaqa donation is confirmed (Path side), the BACKEND writes the
 corresponding expense into the Vault domain (category Sadaqa). There is no
 direct Path→Vault transfer; it is a backend rule writing the owner's table.
+CODÉ (2026-10-18) : le don Path est enregistré d'abord, puis le service Vault écrit
+la dépense (catégorie `sadaqa`, source `path_sadaqa`, note « Sadaqa », sans
+destination, external_ref `sadaqa:{id}`). En cas d'échec, le don reste `pending`
+jusqu'à `POST /api/imperium/path/sadaqa/donations/{id}/vault-retry` (même clé, jamais
+de doublon). Supprimer le don annule la dépense par une écriture inverse.
 ```
 
 ### 15.2 With Pulse
