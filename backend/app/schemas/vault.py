@@ -412,3 +412,26 @@ class ImperiumVaultTransactionCorrectResponse(BaseModel):
     reversal: ImperiumVaultTransactionRead
     corrected: ImperiumVaultTransactionRead
     safe_explanation: str = "Original reversed and corrected transaction appended, in one write."
+
+
+class VaultSettingsRow(BaseModel):
+    key: Literal["sadaqa", "categories", "wallet", "upcoming"]
+    label: str
+    value: str | None
+    complete: bool
+    target: str  # écran ouvert par la ligne (VAU-09, VAU-10, VAU-11, PAT-11d)
+
+
+class VaultSettingsRead(BaseModel):
+    """VAU-12 (doc 59 §13.12) : synthèse en lecture seule ; la sadaqa reste réglée dans Path."""
+
+    sadaqa_percentage: Decimal
+    sadaqa_safety_margin: Decimal
+    sadaqa_source: Literal["path"]
+    categories_count: int
+    last_wallet_snapshot_at: datetime | None
+    active_upcoming_expenses: int
+    last_weekly_summary_at: datetime | None
+    last_pressure_at: datetime | None
+    rows: list[VaultSettingsRow]
+    completion: int  # lignes complètes sur 4
