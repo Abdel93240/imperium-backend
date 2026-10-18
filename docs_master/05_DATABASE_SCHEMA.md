@@ -1519,6 +1519,12 @@ Mosquees Path (CODE, migration 20261018_0075, PAT-09) :
 - `path_registered_mosques` recoit `version`, `idempotency_key`, `request_hash`, une mosquee
   par defaut au plus par utilisateur (index partiel) et la paire latitude/longitude.
 
+Corrections de pression (CODE, migration 20261018_0079, doc 11 « Manual Correction ») :
+- `vault_pressure_corrections` (ajout seul, revoked_at) : kind postponed (postponed_until) |
+  handled | exceptional_week (week_start, lundi), echeance cible (FK upcoming_expenses, SET NULL),
+  raison obligatoire, Idempotency-Key + empreinte ; une correction active au plus par echeance
+  et par semaine (index partiels). L'echeance d'origine n'est jamais modifiee.
+
 Correction Vault (CODE, migration 20261018_0074, VAU-08) :
 - `imperium_vault_transactions.corrects_transaction_id` (FK vers la meme table, unique quand
   renseigne) : la transaction corrigee pointe vers l'originale, annulee par ecriture inverse.

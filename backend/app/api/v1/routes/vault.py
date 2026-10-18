@@ -7,6 +7,9 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.vault import (
+    PressureCorrectionCreate,
+    PressureCorrectionRead,
+    PressureCorrectionResult,
     UpcomingExpenseCreate,
     UpcomingExpensePay,
     UpcomingExpensePayResult,
@@ -28,7 +31,7 @@ from app.services.vault.pressure import (
 )
 from app.services.imperium.vault_transactions import VaultTransactionIdempotencyConflictError
 from app.services.vault import settings as vault_settings_service
-from app.services.vault import upcoming, wallet
+from app.services.vault import corrections, upcoming, wallet
 from app.services.vault.upcoming import (
     create_upcoming_expense,
     deactivate_upcoming_expense,
@@ -59,6 +62,49 @@ def pressure_explain_route(current_user: CurrentUserDep, db: SessionDep) -> Vaul
         inputs_snapshot=snapshot.inputs_snapshot,
         computed_at=snapshot.computed_at,
     )
+
+
+@router.get("/pressure/corrections", response_model=list[PressureCorrectionRead])
+def list_pressure_corrections_route(
+    current_user: CurrentUserDep, db: SessionDep, include_revoked: bool = False
+) -> list[PressureCorrectionRead]:
+    """Corrections manuelles actives (révoquées avec `include_revoked=true`)."""
+    return corrections.list_corrections(db, current_user=current_user, include_revoked=include_revoked)
+
+
+@router.post("/pressure/corrections", response_model=PressureCorrectionResult, status_code=status.HTTP_201_CREATED)
+def create_pressure_correction_route(
+    payload: PressureCorrectionCreate,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """doc 11 : échéance reportée ou déjà réglée, semaine exceptionnelle ; la pression est recalculée."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        result, duplicate = corrections.create_correction(db, current_user=current_user, payload=payload,
+                                                          idempotency_key=idempotency_key)
+    except corrections.CorrectionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (corrections.CorrectionStateError, corrections.CorrectionIdempotencyConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post("/pressure/corrections/{correction_id}/revoke", response_model=PressureCorrectionResult)
+def revoke_pressure_correction_route(correction_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """Annule l'effet d'une correction (elle reste au journal) ; la pression est recalculée."""
+    try:
+        return corrections.revoke_correction(db, current_user=current_user, correction_id=correction_id)
+    except corrections.CorrectionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/pressure/history", response_model=list[VaultPressureHistoryItem])

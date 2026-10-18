@@ -459,6 +459,14 @@ Manual corrections must:
 - be visible in explanation
 - not silently erase the original obligation history
 
+> CODÉ (2026-10-18, migration 0079) : `GET/POST /api/vault/pressure/corrections`
+> `{kind: postponed|handled|exceptional_week, upcoming_expense_id | week_start, postponed_until?,
+> reason}` (Idempotency-Key) et `POST …/{id}/revoke`. Reportée : l'échéance compte à sa nouvelle
+> date (après l'échéance d'origine) ; réglée : elle sort du calcul ; semaine exceptionnelle : ses
+> jours sortent de la capacité réaliste (moyenne 14 jours) — lecture retenue de « changes realistic
+> capacity context ». Chaque correction : événement `finance.pressure.corrected`, nouvel
+> instantané, détail dans `factors.manual_corrections` de l'explication. Rien n'est effacé.
+
 ## Non-Negotiables
 
 The system must never:

@@ -258,3 +258,49 @@ class VaultWalletSnapshot(UUIDPrimaryKeyMixin, Base):
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+CORRECTION_KINDS = ("postponed", "handled", "exceptional_week")
+
+
+class VaultPressureCorrection(UUIDPrimaryKeyMixin, Base):
+    """Correction manuelle de la pression (doc 11 « Manual Correction »), en ajout seul.
+
+    postponed : l'échéance compte à postponed_until ; handled : la dépense sort du calcul ;
+    exceptional_week : les jours de la semaine sortent de la capacité réaliste. Une correction
+    se révoque (revoked_at), elle ne s'efface jamais ; l'échéance d'origine reste intacte.
+    """
+
+    __tablename__ = "vault_pressure_corrections"
+    __table_args__ = (
+        CheckConstraint(f"kind IN ({', '.join(repr(kind) for kind in CORRECTION_KINDS)})", name="kind_check"),
+        CheckConstraint(
+            "(kind = 'exceptional_week') = (week_start IS NOT NULL AND upcoming_expense_id IS NULL)",
+            name="target_check",
+        ),
+        CheckConstraint("(kind = 'postponed') = (postponed_until IS NOT NULL)", name="postponed_until_check"),
+        CheckConstraint("week_start IS NULL OR extract(isodow from week_start) = 1", name="week_start_monday"),
+        CheckConstraint("length(btrim(reason)) > 0", name="reason_present"),
+        Index("vault_pressure_corrections_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+        Index(
+            "vault_pressure_corrections_one_active_expense_idx", "upcoming_expense_id", unique=True,
+            postgresql_where=text("revoked_at IS NULL AND upcoming_expense_id IS NOT NULL"),
+        ),
+        Index(
+            "vault_pressure_corrections_one_active_week_idx", "user_id", "week_start", unique=True,
+            postgresql_where=text("revoked_at IS NULL AND week_start IS NOT NULL"),
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    upcoming_expense_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("upcoming_expenses.id", ondelete="SET NULL"), nullable=True
+    )
+    postponed_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    week_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
