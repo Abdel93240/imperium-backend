@@ -573,8 +573,14 @@ Fixture locale canonique : `history_mock_v1`.
 - `GET /api/imperium/missions/history`
 - `GET /api/imperium/daily-plan`
 - `GET /api/imperium/day/plan`
-- `TBD GET /api/imperium/history/events`
-- `TBD GET /api/imperium/history/events/{event_id}`
+- `GET /api/imperium/history/events?filter=all|missions|decisions|weekly|failed&query=&limit=&offset=` (codé 2026-10-18)
+- `GET /api/imperium/history/events/{event_id}` (codé 2026-10-18 : élément + `details`)
+
+Code (2026-10-18) : projection en lecture seule du registre d'événements, limitée aux faits
+Imperium (missions, journées, plans, priorités, demandes de replan, projets) et aux Weekly
+Reviews approuvées ; Vault, Pulse, Path et Vector n'y entrent pas. Titres en français, du plus
+récent au plus ancien ; `failed` = missions ratées (les annulées ont le statut `cancelled`).
+La carte de détail n'expose qu'une liste fermée de champs (raison, décision, ressenti…).
 
 ### 7.10 DoD
 
