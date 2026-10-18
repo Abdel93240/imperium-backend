@@ -715,6 +715,20 @@ TBD POST /api/path/adhkar/routines/{routine_id}/reset
 Headers for mutations: Idempotency-Key
 ```
 
+> CODÉ (2026-10-18, migration 0067) sous `/api/imperium/path/adhkar/*` :
+> - `GET …/suggestions` : 7 routines proposées (matin, soir, istighfar 100, salawat 100,
+>   tasbih 33, tahmid 33, takbir 34 par prière) ; rien n'est créé sans action.
+> - `GET/POST …/routines`, `PATCH/DELETE …/routines/{id}` : 8 actives au plus (409), version lue
+>   obligatoire (409 `ADHKAR_VERSION_CONFLICT`), pause par `active: false`, suppression réelle.
+> - `POST …/routines/{id}/increment` `{amount, prayer?, day?, source, confidence?, validated?}` :
+>   compteur par période (jour de Paris, semaine ISO, prière du jour) ; clés distinctes =
+>   sommes, même clé = rejeu. Voix : confiance obligatoire, sous 0,8 il faut `validated: true`.
+>   Routine en pause : 409. Jour futur : 422.
+> - `POST …/routines/{id}/reset` `{expected_count}` : le compte affiché doit être le compte
+>   serveur, sinon 409 `ADHKAR_RESET_CONFLICT` (appuis encore en file).
+> - Pas encore : textes arabes, translittération, comptage à la voix côté transcription,
+>   suggestion après une prière marquée.
+
 Offline conflict: distinct increment keys use merge sum; same key dedupes; routine
 edits use version conflict; reset conflicts with queued increments open a review
 sheet.
@@ -871,6 +885,17 @@ TBD POST /api/path/quran/plans
 TBD PATCH /api/path/quran/plans/{plan_id}
 Headers for mutations: Idempotency-Key
 ```
+
+> CODÉ (2026-10-18, migration 0067) sous `/api/imperium/path/quran/*` :
+> - `GET …/continuation` : dernier point validé (page, juz, sourate), page suivante, objectif,
+>   nombre de khatm, plan actif et sa page visée du jour (repère, aucun rattrapage).
+> - `POST …/progress` `{page | surah | juz, base_version, confirm_regression?}` : sourate et juz
+>   ramenés à leur page de début (mushaf de Médine, `services/path/quran_index.py`) ; page
+>   plus basse → 409 `QURAN_REGRESSION` tant qu'elle n'est pas confirmée.
+> - `PATCH …/objective`, `POST …/khatm` (`confirm: true`, page 604 validée).
+> - `POST …/plans` (daily_pages, finish_in_days, juz_based = 20 pages par juz) remplace le plan
+>   actif, à partir de la page suivant le point de reprise ; `POST …/plans/{id}/stop`.
+> - Pas encore : hizb (bornes à vérifier sur une source), sélecteur PAT-07b côté écran.
 
 Offline conflict: same key dedupes; higher server point plus lower local point
 opens regression confirmation; higher local point can update after backend

@@ -2,7 +2,8 @@
 
 Socle: mosques + MAWAQIT cache + calculated fallback times. Path pass: prayer
 marks (PAT-02), fasts (PAT-05), sadaqa (settings, donations, closed weeks) and
-ghusl (state + addresses). Adhkar and quran are still to come.
+ghusl (state + addresses), adhkar (routines, counts, increments) and quran
+(progress, plans).
 """
 
 from datetime import date, datetime, time
@@ -326,6 +327,151 @@ class PathGhuslState(UUIDPrimaryKeyMixin, Base):
     )
     replan_event_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     replan_status: Mapped[str] = mapped_column(Text, nullable=False, default="pending", server_default="pending")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+ADHKAR_TYPES = ("morning", "evening", "istighfar", "salawat", "tasbih", "tahmid", "takbir", "personal")
+ADHKAR_FREQUENCIES = ("daily", "weekly", "per_prayer")
+QURAN_PLAN_TYPES = ("daily_pages", "finish_in_days", "juz_based")
+
+
+class PathAdhkarRoutine(UUIDPrimaryKeyMixin, Base):
+    """Routine de dhikr (PAT-06, doc 41 §11) : 8 actives au plus, activée par l'utilisateur."""
+
+    __tablename__ = "path_adhkar_routines"
+    __table_args__ = (
+        CheckConstraint("length(btrim(label)) BETWEEN 1 AND 64", name="label_length"),
+        CheckConstraint(f"adhkar_type IN ({', '.join(repr(name) for name in ADHKAR_TYPES)})", name="adhkar_type_check"),
+        CheckConstraint(f"frequency IN ({', '.join(repr(name) for name in ADHKAR_FREQUENCIES)})", name="frequency_check"),
+        CheckConstraint("target_count BETWEEN 1 AND 10000", name="target_range"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("path_adhkar_routines_user_active_idx", "user_id", "active"),
+        Index("path_adhkar_routines_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    adhkar_type: Mapped[str] = mapped_column(Text, nullable=False)
+    target_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    frequency: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathAdhkarCount(UUIDPrimaryKeyMixin, Base):
+    """Compteur d'une routine sur sa période (jour, semaine ISO ou prière du jour)."""
+
+    __tablename__ = "path_adhkar_counts"
+    __table_args__ = (
+        UniqueConstraint("routine_id", "period_key", name="path_adhkar_counts_routine_period_unique"),
+        CheckConstraint("count >= 0", name="count_not_negative"),
+        Index("path_adhkar_counts_user_period_idx", "user_id", "period_key"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    routine_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("path_adhkar_routines.id", ondelete="CASCADE"), nullable=False
+    )
+    period_key: Mapped[str] = mapped_column(Text, nullable=False)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    target_reached_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathAdhkarIncrement(UUIDPrimaryKeyMixin, Base):
+    """Un appui (ou un lot d'appuis) validé ; clés distinctes = sommes, même clé = rejeu."""
+
+    __tablename__ = "path_adhkar_increments"
+    __table_args__ = (
+        CheckConstraint("amount BETWEEN 1 AND 1000", name="amount_range"),
+        CheckConstraint("source IN ('tap', 'voice')", name="source_check"),
+        Index("path_adhkar_increments_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    routine_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("path_adhkar_routines.id", ondelete="CASCADE"), nullable=False
+    )
+    period_key: Mapped[str] = mapped_column(Text, nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    result: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PathQuranProgress(UUIDPrimaryKeyMixin, Base):
+    """Point de reprise validé (PAT-07, doc 41 §12) : une ligne par utilisateur."""
+
+    __tablename__ = "path_quran_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="path_quran_progress_user_unique"),
+        CheckConstraint("last_validated_page BETWEEN 1 AND 604", name="page_range"),
+        CheckConstraint("daily_objective_pages IS NULL OR daily_objective_pages BETWEEN 1 AND 604", name="objective_range"),
+        CheckConstraint("khatm_count >= 0", name="khatm_not_negative"),
+        CheckConstraint("version >= 1", name="version_positive"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    last_validated_page: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_validated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    daily_objective_pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    khatm_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PathQuranPlan(UUIDPrimaryKeyMixin, Base):
+    """Plan de lecture choisi (doc 41 §12) : un seul actif ; jamais de rattrapage imposé."""
+
+    __tablename__ = "path_quran_plans"
+    __table_args__ = (
+        CheckConstraint(f"plan_type IN ({', '.join(repr(name) for name in QURAN_PLAN_TYPES)})", name="plan_type_check"),
+        CheckConstraint("pages_per_day BETWEEN 1 AND 604", name="pages_per_day_range"),
+        CheckConstraint("start_page BETWEEN 1 AND 604", name="start_page_range"),
+        CheckConstraint("plan_type <> 'finish_in_days' OR end_date IS NOT NULL", name="finish_has_end_date"),
+        Index("path_quran_plans_one_active_idx", "user_id", unique=True, postgresql_where=text("active")),
+        Index("path_quran_plans_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    plan_type: Mapped[str] = mapped_column(Text, nullable=False)
+    pages_per_day: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    start_page: Mapped[int] = mapped_column(Integer, nullable=False)
+    started_on: Mapped[date] = mapped_column(Date, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
