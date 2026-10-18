@@ -710,6 +710,17 @@ class PromoteBacklogMissionResponse(BaseModel):
     decision_score: MissionDecisionScoreSummary | None = None
 
 
+class FailureReplanRead(BaseModel):
+    """Suite d'une mission ratée (doc 43 §3.1, §15 replan_on_failure_urgent / _other)."""
+
+    action: Literal["replan", "ask"]
+    urgent: bool  # échéance dans les 24 h
+    status: Literal["requested", "suggested", "cooldown", "already_open", "no_open_day"]
+    replan_id: UUID | None = None
+    eligible_at: datetime | None = None
+    message: str
+
+
 class MissionWriteResponse(BaseModel):
     mission: MissionResponse
     event_id: str
@@ -717,6 +728,7 @@ class MissionWriteResponse(BaseModel):
     status: str
     score_created: bool = False
     decision_score: MissionDecisionScoreSummary | None = None
+    replan: FailureReplanRead | None = None  # seulement après « Ratée »
 
 
 class PriorityRuleInput(BaseModel):

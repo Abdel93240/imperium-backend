@@ -39,6 +39,12 @@ def replan_debounce_minutes(db: Session, *, current_user: User) -> int:
     return value or DEFAULT_REPLAN_DEBOUNCE_MINUTES
 
 
+def failure_replan_actions(db: Session, *, current_user: User) -> tuple[str, str]:
+    """(urgente, autre) pour une mission ratée ; sans réglage : replan / ask (doc 43 §15)."""
+    row = db.scalar(select(ImperiumUserSettings).where(ImperiumUserSettings.user_id == current_user.id))
+    return (row.replan_on_failure_urgent, row.replan_on_failure_other) if row is not None else ("replan", "ask")
+
+
 def _get_or_create(db: Session, *, current_user: User) -> ImperiumUserSettings:
     row = db.scalar(select(ImperiumUserSettings).where(ImperiumUserSettings.user_id == current_user.id))
     if row is not None:

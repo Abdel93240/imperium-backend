@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -31,6 +31,7 @@ from app.schemas.imperium import (
     CompleteMissionRequest,
     CancelMissionRequest,
     FailMissionRequest,
+    FailureReplanRead,
     MissionHistoryRead,
     MissionHistoryResponse,
     MissionHistoryStatus,
@@ -646,7 +647,47 @@ def fail_mission(
         response=response,
     )
     db.commit()
+    # Après le commit : un replan refusé (délai, demande ouverte) ne défait pas l'échec.
+    response.replan = _replan_after_failure(db, current_user=current_user, mission=mission, now=ended_at)
+    stored = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
+    if stored is not None:
+        stored.response_body = response.model_dump(mode="json")
+        db.commit()
     return response, False
+
+
+URGENT_DEADLINE_WINDOW = timedelta(hours=24)
+
+
+def _replan_after_failure(db: Session, *, current_user: User, mission: ImperiumMission, now: datetime) -> FailureReplanRead:
+    """Réglage replan_on_failure_urgent / _other (doc 43 §15) : replan aussitôt, ou proposer.
+
+    Urgente = échéance dans les 24 h (le code ne porte pas le niveau urgente/importante/
+    secondaire du doc 43 §5.2). Le replan passe par le hook mission_failed, avec le délai.
+    """
+    from app.services.imperium import replan as replan_service
+    from app.services.imperium.settings import failure_replan_actions
+
+    urgent_action, other_action = failure_replan_actions(db, current_user=current_user)
+    urgent = mission.deadline_at is not None and mission.deadline_at <= now + URGENT_DEADLINE_WINDOW
+    action = urgent_action if urgent else other_action
+    if action == "ask":
+        return FailureReplanRead(action="ask", urgent=urgent, status="suggested",
+                                 message="Mission ratée : veux-tu replanifier ta journée ?")
+    try:
+        row = replan_service.request_hook_replan(db, current_user=current_user, hook_type="mission_failed", now=now)
+    except replan_service.ReplanCooldownError as exc:
+        db.rollback()
+        return FailureReplanRead(action="replan", urgent=urgent, status="cooldown", eligible_at=exc.eligible_at,
+                                 message="Replanification possible après le délai entre deux replans.")
+    except replan_service.ReplanStateConflictError as exc:
+        db.rollback()
+        status = "no_open_day" if "No operational day" in str(exc) else "already_open"
+        message = ("Journée non démarrée : pas de replan." if status == "no_open_day"
+                   else "Une replanification est déjà en cours.")
+        return FailureReplanRead(action="replan", urgent=urgent, status=status, message=message)
+    return FailureReplanRead(action="replan", urgent=urgent, status="requested", replan_id=row.id,
+                             message="Replanification de la journée demandée.")
 
 
 def attach_annexes(
