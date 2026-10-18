@@ -16,6 +16,12 @@ les specs le font déjà via leurs seeds. Pas de document séparé.
 > E2 + NOTIFY (F1-10), config rôle→modèle `ai_role_models` (F2-17), lecteurs
 > legacy migrés (C-1, F2-08). La LIMITE 1 est caduque (base rapatriée sur Tower).
 > État d'activation : doc 76 ; détail d'exécution : `SOCLE_MAPPING.md` (racine repo).
+>
+> **Resynchronisation 2026-10-18** (vérifiée contre `backend/app` et les migrations) : F1-16
+> (prières : Hijri, Qibla, mosquées et réglages livrés), F1-17 (pression codée depuis la phase E
+> Vault, 2026-07-16), F2-12 (versions du plan quotidien Imperium, partiel), F2-15 et F2-16
+> (tables présentes) mises à jour ; compteurs recalculés. Les autres fiches gardent l'état du
+> 2026-07-16.
 
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
@@ -25,12 +31,13 @@ n8n sur disque (`ops/n8n/workflows/`).
 
 ## RÉPONSE CHIFFRÉE
 
-**Le système compte 55 outils : 25 en F1 (dont 12 codés — 7 livrés éteints par la passe 0 —,
-12 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 12 codées,
-3 spécifiées, 2 manquantes), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
+**Le système compte 55 outils : 25 en F1 (dont 13 codés — 7 livrés éteints par la passe 0 —,
+11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 14 codées,
+3 spécifiées, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
 plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
 Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
-D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
+D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), puis le 2026-10-18
+(F1-17, F2-15, F2-16 passés codés).
 
 ## LIMITES DE L'AUDIT (à lire avant les fiches)
 
@@ -214,21 +221,29 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - description : temps de prière (MAWAQIT prioritaire + cache 30 j + fallback moteur type Adhan MuslimWorldLeague/Maliki), calendrier Hijri lunaire (observation + confirmation manuelle + duplicate-date V3), Qibla. Catégorie « déterministe qui doit être EXACT » (gap_analysis_v1/00_INDEX).
 - famille : F1
 - vit_aujourd_hui : minimal CODÉ (passe 0, éteint) — `app/services/path/prayer.py` : MAWAQIT prioritaire + cache 30 j + fallback lib adhan (calcul local) ; tables doc 41 §20 créées (0038 : `path_registered_mosques`, `path_mawaqit_cache`, `path_calculated_prayer_times`) ; mosquée de référence via paramètre `path.reference_mosque_id` ; contrat `prayer_windows(date)` pour la porte G4 (Q6 arbitrée : prières = engagements fixes). Hijri/duplicate-date (Patch 41-A, 14-V3) et Qibla restent à livrer (doc 41 §6, §14).
-- consommateurs_actuels : aucun (service livré éteint).
+  **Mise à jour 2026-10-18 :** Hijri avec double date J / J+1 jusqu'à confirmation
+  (`services/path/hijri.py`), Qibla (`services/path/dashboard.py`), mosquées enregistrées
+  (0075 : la mosquée par défaut de l'utilisateur remplace le paramètre de référence), réglages de
+  calcul par utilisateur (0076 : méthode, madhhab, ville ; `calculation_config`), cache MAWAQIT
+  frais 24 h et toléré jusqu'à 48 h (au-delà : calcul local). L'adaptateur HTTP MAWAQIT
+  existe (URL fournie par la configuration, job `path.mawaqit_refresh` semé désactivé) ; son
+  activation attend la décision utilisateur sur les appels réseau sortants.
+- consommateurs_actuels (2026-10-18) : Path (prières marquées, jeûne, ghusl, tableau de bord,
+  détail mosquée).
 - consommateurs_prevus_par_specs : aucune des 4 specs (angle mort confirmé).
 - consommateurs_probables_non_documentés (sourcés docs) : The Path (affichage PAT-01/02) ; **Imperium planning** (awareness zones de prière créées PAR le daily planning, doc 41 §7-bis → le futur Daily Orchestrator devrait traiter les prières comme engagements, cf. QUESTION Q6) ; **Vector HUD** doc 55 §9.5 (overlay mosquées, couleur = urgence prochaine prière) ; Pulse (fenêtres suhoor/iftar lues via l'état de jeûne Path, doc 40 §15.2/41 §8) ; doc 52 §8.2 CATEGORY 8 (« Daily prayers » en engagements récurrents).
 - seconde_regle_consommateur : PASSE (Path + planning + HUD).
-- statut : existe_codé (minimal éteint ; Hijri V3 et Qibla à venir — hors des 4 passes, voir FINDINGS).
+- statut : existe_codé (Hijri, Qibla, mosquées et réglages livrés le 2026-10-18 ; job MAWAQIT désactivé, en attente de décision).
 
 ### F1-17 `toolbox.pressure` — moteur de pression financière
 - description : score déterministe 0-100 + label + facteurs explicables + objectifs journaliers min/comfortable/optimal (formule doc 11 complète).
 - famille : F1 (tables F2-15/16 associées)
-- vit_aujourd_hui : MANQUANT (grep `pressure` : seul un asset SVG `vault_pressure` dans `frontend.py:627`). Formule canonique : doc 11 ; doc 42 §9 (résumé, ⚠ échelle 0-10 divergente, voir FINDINGS DV-4).
-- consommateurs_actuels : aucun.
+- vit_aujourd_hui : CODÉ (phase E Vault, migrations 0040/0041, 2026-07-16) — `app/services/vault/pressure.py` : score 0-100, label (safe … critical), facteurs, objectifs journaliers ; entrées : registre canonique, échéances (F2-15), soldes réels (`vault_wallet_snapshots`, 0073), corrections manuelles (0079) ; instantanés `pressure_snapshots`, signal `vault.pressure` écrit dans `signal_values` (F2-13). Routes `GET /api/vault/pressure`, `/explain`, `/history`, `/corrections`. Formule canonique : doc 11 ; doc 42 §9 (résumé, ⚠ échelle 0-10 divergente, voir FINDINGS DV-4). (Fiche « MANQUANT » du 2026-07-10, antérieure à la phase E.)
+- consommateurs_actuels : Vault (jauge, « Voir pourquoi », historique, corrections).
 - consommateurs_prevus_par_specs : WR W1 (« rollups finance (flux, pression) », spec WR §4).
 - consommateurs_probables_non_documentés (sourcés docs) : Vault (affichage + « Voir pourquoi », doc 42 §14) ; Imperium (sizing objectif quotidien, doc 42 §15.4, doc 52 §8.2 CATEGORY 2) ; Vector (urgence via le plan, PAS en direct — doc 42 §9 correction) ; Daily Orchestrator (candidat via plan, non sourcé dans la spec → QUESTION Q7).
 - seconde_regle_consommateur : PASSE (Vault + Imperium + WR).
-- statut : spécifié (docs) non codé — déterministe codable maintenant (GAP_vault gap n°4).
+- statut : existe_codé (consommateurs Imperium et WR W1 encore à brancher).
 
 ### F1-18 `toolbox.dialogue` — moteur de dialogue partagé
 - description : conducteur local unique, contexte de session détenu par le backend, spécialistes consultés en coulisse, escalade par tour, un seul interlocuteur.
@@ -357,7 +372,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : spécifié. Table partagée de fait → canoniser en F2 dès création (R3).
 
 ### F2-12 `plan_versions` + `plan_deltas` + vue `v_plan_current`
-- vit : spécifiées (spec WR §3.5). MANQUANTES. Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 (imperium_daily_plan_versions annoncée, jamais codée) — voir FINDINGS DV-5.
+- vit : spécifiées (spec WR §3.5). MANQUANTES. Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 — voir FINDINGS DV-5. Partiel (2026-10-18) : `planning_daily_plan_versions` (0080) versionne le plan QUOTIDIEN Imperium à chaque replan accepté (doc 43 §20) ; ni `plan_deltas` ni `v_plan_current` ni plan hebdo/mensuel.
 - consommateurs prévus : WR (deltas hebdo, régénérations), Daily (G1 périmètre « plan courant », §0.5), le local_executor terrain (« le lit ENTIER »).
 - statut : spécifié.
 
@@ -371,14 +386,14 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle).
 - statut : spécifié.
 
 ### F2-15 `upcoming_expenses` / liste de dépenses récurrentes
-- vit : MANQUANTE (docs 42 §10, 11 §Recurring-Expenses — « source of truth » utilisateur).
-- consommateurs prévus : pression (F1-17), Imperium plan awareness, Vault UI, doc 52 §8.2 CATEGORY 2.
-- statut : manquant (GAP_vault n°3).
+- vit : CODÉE (0040/0041, phase E Vault) — `upcoming_expenses`, `app/services/vault/upcoming.py` ; `GET/POST/PATCH/DELETE /api/vault/upcoming-expenses`, `POST …/{id}/mark-paid` (2026-10-18). Docs 42 §10, 11 §Recurring-Expenses.
+- consommateurs actuels : pression (F1-17), Vault UI, corrections de pression. Prévus : Imperium plan awareness, doc 52 §8.2 CATEGORY 2.
+- statut : existe_codé.
 
 ### F2-16 `weekly_finance_summaries` / vue profit hebdo
-- vit : MANQUANTE — doc 42 §16 la dit « Existing (per doc 05) », le code ne l'a pas (INVENTAIRE §3, revérifié : aucune migration).
-- consommateurs prévus : Path (§16.2 lit `weekly_business_profit` « from common memory » pour la sadaqa), WR W1, doc 52 §8.2.
-- statut : manquant (divergence docs↔code DV-3 ; QUESTION Q9).
+- vit : CODÉE (0040/0041, phase E Vault) — `weekly_finance_summaries`, `app/services/vault/weekly.py` ; `GET /api/vault/weekly-summaries`. (Fiche « MANQUANTE » du 2026-07-10, antérieure à la phase E.)
+- consommateurs actuels : Path (sadaqa : `weekly_business_profit`, repli sur le registre si la semaine n'est pas résumée). Prévus : WR W1, doc 52 §8.2.
+- statut : existe_codé (DV-3 et Q9 refermées par le code).
 
 ### F2-17 config role→model éditable (doc 73 PART B)
 - vit : CRÉÉE au socle — table `ai_role_models` (0038, identifier-not-call) + seed historique 0039 (`local_executor` → `qwen3-32b`, Fable 5 restauré au rôle `sustained_long_context` à cette date). Ces identifiants décrivent la migration passée, pas le mapping actuel du doc 30 §3 ; aucune ligne ni migration n’est modifiée par cette passe.
@@ -449,10 +464,10 @@ Colonne « Système » = usine WR, orchestrateur de build, routage, runner.
 - The Path consomme ou devrait consommer : trajets/geo (Q2 — mosquées §7-bis, ghusl), prayer engine
   (S-doc), notifications (Q3 — rappels/bannières), events (émet déjà `path.item.*` ; renommage
   `worship.*` doc 77), params (réglages sadaqa/marge), runner (refresh MAWAQIT), profit hebdo
-  (F2-16 — la sadaqa dépend d'une table qui N'EXISTE PAS), mémoire (résumés only, doc 09),
+  (F2-16 — codée depuis la phase E, lue par la sadaqa), mémoire (résumés only, doc 09),
   ingestion (invocations), privacy gate (very_high). Il ne consomme PAS : embeddings (religieux non
   vectorisé), LLM local (98 % déterministe, 41 §15).
-- Vault consomme ou devrait consommer : pression (F1-17, moteur à créer), signals (jauge),
+- Vault consomme ou devrait consommer : pression (F1-17, codée), signals (jauge),
   OCR (reçus), notifications (alertes échéances), events (`finance.*` cible), params (seuils doc 11),
   runner (profit hebdo lundi 00:30 — aujourd'hui prévu n8n doc 42 §11), LLM local (catégorisation
   42 §7), docket (Q10 : anomalies financières W4 → docket, non documenté), profit hebdo (F2-16).
