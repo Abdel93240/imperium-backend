@@ -4,7 +4,8 @@ Un jeûne ne démarre que sur confirmation de l'utilisateur, le jour même ; jam
 d'intention déduite du calendrier. La fenêtre est figée au démarrage : suhoor = fajr
 − `path.suhoor_offset_min` (30 min par défaut), iftar = maghrib, depuis la source
 d'horaires choisie (MAWAQIT puis calcul). La fin à l'iftar et la rupture demandent
-toujours une action de l'utilisateur ; aucun job ne clôt un jeûne tout seul.
+toujours une action de l'utilisateur ; aucun job ne clôt un jeûne tout seul. Un jeûne
+démarré par erreur peut être annulé tant qu'il est en cours : la ligne est supprimée.
 
 Pulse lit `window_fast` : hydratation bloquée pendant la fenêtre (sauf choix contraire
 au démarrage), repas notés pendant la fenêtre acceptés avec un avertissement.
@@ -23,6 +24,8 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.path import PathFast
 from app.schemas.path_worship import (
     FastBreakRequest,
+    FastCancelRequest,
+    FastCancelResult,
     FastEndRequest,
     FastingStateRead,
     FastListResponse,
@@ -145,6 +148,24 @@ def break_fast(
     return _finish(db, current_user, fast, "path.fasting.broken",
                    {"broken_at": fast.broken_at.isoformat(), "replan_prompt": True},
                    idempotency_key, request_path, fingerprint)
+
+
+def cancel_fast(
+    db: Session, *, current_user: User, fast_id: UUID, payload: FastCancelRequest, idempotency_key: str, request_path: str,
+) -> tuple[FastCancelResult, bool]:
+    """Démarrage par erreur : le jeûne en cours est supprimé (un nouveau peut être démarré le jour même)."""
+    fingerprint = food_stock.request_hash("path.fasting.cancel", {"fast_id": str(fast_id), **payload.model_dump(mode="json")})
+    previous = food_stock.replay(db, current_user, idempotency_key, fingerprint, request_path, FastCancelResult)
+    if previous is not None:
+        return previous, True
+    fast = _active(db, current_user, fast_id)
+    _event(db, current_user, fast, "path.fasting.cancelled", {})
+    db.delete(fast)
+    db.flush()
+    read = FastCancelResult(cancelled=True, fast_id=fast_id)
+    food_stock.remember(db, current_user, idempotency_key, "POST", request_path, fingerprint, 200, read)
+    db.commit()
+    return read, False
 
 
 def list_fasts(db: Session, *, current_user: User, from_day: date, to_day: date) -> FastListResponse:

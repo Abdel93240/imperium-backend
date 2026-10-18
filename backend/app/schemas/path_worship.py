@@ -67,6 +67,17 @@ class FastBreakRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class FastCancelRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirm: Literal[True]
+
+
+class FastCancelResult(BaseModel):
+    cancelled: bool
+    fast_id: UUID
+
+
 class FastRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
