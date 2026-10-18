@@ -1278,6 +1278,16 @@ ORDER BY 2 DESC, 1;
 
 ---
 
+> CODÉ (2026-10-18, migration 0071, sans modèle) — base d'apprentissage : table `rides_offers`
+> (domaine `rides`, doc 77 ; remplace `vector_ride_score_log` pour la partie données).
+> `POST /api/imperium/vector/sessions/{id}/offers` (saisie manuelle ; l'OCR remplira les mêmes
+> champs), variables §5.1, §5.2 (sans culte ni santé : doc 13 §5 les exclut) et §5.4 figées au
+> moment de l'offre ; `POST …/offers/{id}/decision` (accepted|refused|missed, version lue) ;
+> `POST …/offers/{id}/outcome` (gain réel ÷ temps mobilisé à la minute = cible §6, revenu écrit
+> au Vault par défaut) ; `GET …/training-summary` (phase §3 par nombre de résultats réels,
+> médiane €/h). Aucun verdict (`signal: null`) tant que le modèle n'est pas entraîné. Pas encore :
+> règles R1–R11 (§4.12), variables externes §5.5–§5.6, entraînement et inférence.
+
 ## 12. Implementation Order
 
 ```text

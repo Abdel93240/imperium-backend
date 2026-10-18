@@ -131,3 +131,60 @@ class RidesRecommendation(UUIDPrimaryKeyMixin, Base):
     feedback_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+RIDE_DECISIONS = ("accepted", "refused", "missed")
+
+
+class RidesOffer(UUIDPrimaryKeyMixin, Base):
+    """Course proposée pendant une session (doc 57 §5, §11) : variables, décision de l'utilisateur, résultat réel.
+
+    La décision est gardée comme donnée de comportement, jamais comme cible d'apprentissage
+    (doc 33 §8) ; la cible est le gain réel ÷ temps mobilisé, à la minute.
+    """
+
+    __tablename__ = "rides_offers"
+    __table_args__ = (
+        CheckConstraint("price_cents BETWEEN 1 AND 1000000", name="price_range"),
+        CheckConstraint("platform IN ('bolt', 'uber', 'heetch', 'other')", name="platform_check"),
+        CheckConstraint("ride_type IN ('immediate', 'scheduled')", name="ride_type_check"),
+        CheckConstraint("source IN ('manual', 'ocr')", name="source_check"),
+        CheckConstraint(f"decision IS NULL OR decision IN ({', '.join(repr(d) for d in RIDE_DECISIONS)})", name="decision_check"),
+        CheckConstraint("(decision IS NULL) = (decided_at IS NULL)", name="decision_has_time"),
+        CheckConstraint("actual_hourly_rate_cents IS NULL OR decision = 'accepted'", name="outcome_only_accepted"),
+        CheckConstraint("mobilized_minutes IS NULL OR mobilized_minutes > 0", name="mobilized_positive"),
+        CheckConstraint("version >= 1", name="version_positive"),
+        Index("rides_offers_session_idx", "session_id", "offered_at"),
+        Index("rides_offers_user_offered_idx", "user_id", "offered_at"),
+        Index("rides_offers_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("rides_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    offered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    platform: Mapped[str] = mapped_column(Text, nullable=False)
+    price_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    distance_km: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
+    estimated_duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approach_distance_km: Mapped[float | None] = mapped_column(Numeric(7, 2), nullable=True)
+    approach_duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    surge_multiplier: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    pickup_zone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    destination_zone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payment_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ride_type: Mapped[str] = mapped_column(Text, nullable=False)
+    features: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    decision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actual_earning_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    mobilized_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_hourly_rate_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    revenue_transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)

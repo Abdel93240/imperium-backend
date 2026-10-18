@@ -189,6 +189,10 @@ Routine VTC micro-decisions should stay local and cheap.
 - **Refusals ARE recorded** — they are valuable BEHAVIORAL data for the brain (not for CatBoost training). Example: in the Weekly Review the brain can flag "Vector judged these rides profitable, yet you refused many — why?", and cross it with other signals (missed missions, etc.) as a **mental-load / burnout indicator**.
 - **WR refinement loop (supervised):** the binary verdict is intentionally imprecise at cold start; the user does not blindly follow it. The Weekly Review analyzes the **gap between CatBoost verdicts and the user's actual decisions** and produces refinement data CatBoost can use to sharpen its business logic. So: CatBoost learns directly on hourly revenue, AND the brain (via WR) prepares supervised corrections from the verdict-vs-decision gap. Raw refusals are never learned directly.
 
+> CODÉ (2026-10-18) : `rides_offers` garde la décision (acceptée, refusée, manquée) comme donnée
+> de comportement et le résultat réel des courses acceptées (gain ÷ temps mobilisé à la minute)
+> comme cible ; les refus ne servent jamais de cible (doc 57 §6).
+
 ## 9. Compliance
 
 Vector never auto-clicks Bolt.

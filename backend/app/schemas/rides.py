@@ -158,3 +158,91 @@ class RecommendationFeedback(BaseModel):
     useful: bool
     ride_user_action: Literal["accepted", "refused", "missed", "ignored"] | None = None
     reason: str | None = Field(default=None, max_length=500)
+
+
+class RideOfferCreate(BaseModel):
+    """Course proposée, saisie à la main (l'OCR des captures viendra remplir les mêmes champs)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    price_cents: int = Field(ge=1, le=1_000_000, strict=True)
+    offered_at: datetime | None = None
+    platform: Literal["bolt", "uber", "heetch", "other"] = "bolt"
+    distance_km: Decimal | None = Field(default=None, gt=0, le=1000, decimal_places=2)
+    estimated_duration_min: int | None = Field(default=None, ge=1, le=600)
+    approach_distance_km: Decimal | None = Field(default=None, ge=0, le=200, decimal_places=2)
+    approach_duration_min: int | None = Field(default=None, ge=0, le=180)
+    surge_multiplier: Decimal | None = Field(default=None, ge=1, le=10, decimal_places=2)
+    pickup_zone: str | None = Field(default=None, max_length=120)
+    destination_zone: str | None = Field(default=None, max_length=120)
+    payment_type: Literal["card", "cash", "pro"] | None = None
+    ride_type: Literal["immediate", "scheduled"] = "immediate"
+
+
+class RideDecisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    decision: Literal["accepted", "refused", "missed"]
+    note: str | None = Field(default=None, max_length=300)
+
+
+class RideOutcomeRequest(BaseModel):
+    """Résultat réel d'une course acceptée : temps mobilisé à la minute (doc 33 §8)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    actual_earning_cents: int = Field(ge=1, le=1_000_000, strict=True)
+    approach_minutes: int = Field(ge=0, le=180)
+    wait_minutes: int = Field(default=0, ge=0, le=180)  # attente au point de prise en charge
+    ride_minutes: int = Field(ge=1, le=600)
+    return_minutes: int = Field(default=0, ge=0, le=300)  # retour estimé après la dépose
+    record_revenue: bool = True  # écrit aussi le revenu au Vault (évite une double saisie)
+    wallet: str = Field(default="cash", min_length=1, max_length=80)
+
+
+class RideOfferRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    session_id: UUID
+    offered_at: datetime
+    source: str
+    platform: str
+    price_cents: int
+    distance_km: Decimal | None
+    estimated_duration_min: int | None
+    approach_distance_km: Decimal | None
+    approach_duration_min: int | None
+    surge_multiplier: Decimal | None
+    pickup_zone: str | None
+    destination_zone: str | None
+    payment_type: str | None
+    ride_type: str
+    features: dict
+    decision: Literal["accepted", "refused", "missed"] | None
+    decided_at: datetime | None
+    decision_note: str | None
+    actual_earning_cents: int | None
+    mobilized_minutes: int | None
+    actual_hourly_rate_cents: int | None
+    revenue_transaction_id: UUID | None
+    version: int
+    signal: None = None  # aucun verdict tant que le modèle n'est pas entraîné (doc 57 §3)
+
+
+class RideOfferListResponse(BaseModel):
+    items: list[RideOfferRead]
+
+
+class TrainingSummaryRead(BaseModel):
+    offers: int
+    decided: int
+    accepted: int
+    refused: int
+    missed: int
+    with_outcome: int  # courses utilisables pour l'apprentissage
+    median_hourly_rate_cents: int | None
+    phase: Literal["cold_start", "transition", "autonomous"]
+    message: str
