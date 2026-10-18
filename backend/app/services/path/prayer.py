@@ -245,20 +245,7 @@ def prayer_windows(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> list[Prayer
     """
     before_min = int(get_parameter(db, "path.window_before_min", default=0))
     after_min = int(get_parameter(db, "path.window_after_min", default=30))
-    zone = ZoneInfo(tz)
-
-    adhans: dict[str, datetime] | None = None
-    mosque = _reference_mosque(db)
-    if mosque is not None:
-        cached = cached_mawaqit_times(db, mosque, d)
-        if cached is not None:
-            adhans = {}
-            for prayer in PRAYERS:
-                hour, minute = map(int, str(cached[prayer]).split(":")[:2])
-                adhans[prayer] = datetime.combine(d, time(hour, minute), tzinfo=zone)
-
-    if adhans is None:
-        adhans = _calculated_times(db, d, zone)
+    adhans, _ = prayer_times(db, d, tz=tz)
 
     windows = []
     for prayer in PRAYERS:
@@ -272,6 +259,21 @@ def prayer_windows(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> list[Prayer
             )
         )
     return windows
+
+
+def prayer_times(db: Session, d: date, *, tz: str = DEFAULT_TZ) -> tuple[dict[str, datetime], str]:
+    """Five adhan times (aware, local) and their source: 'mawaqit' or 'calculated' (doc 41 §6.2)."""
+    zone = ZoneInfo(tz)
+    mosque = _reference_mosque(db)
+    if mosque is not None:
+        cached = cached_mawaqit_times(db, mosque, d)
+        if cached is not None:
+            adhans = {}
+            for prayer in PRAYERS:
+                hour, minute = map(int, str(cached[prayer]).split(":")[:2])
+                adhans[prayer] = datetime.combine(d, time(hour, minute), tzinfo=zone)
+            return adhans, "mawaqit"
+    return _calculated_times(db, d, zone), "calculated"
 
 
 def _calculated_times(db: Session, d: date, zone: ZoneInfo) -> dict[str, datetime]:

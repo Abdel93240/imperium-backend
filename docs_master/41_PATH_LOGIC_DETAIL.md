@@ -121,6 +121,7 @@ Path V1 may emit:
 |---|---|---|
 | `path.prayer.logged` | User marks one of the five obligatory prayers as accomplished. | No automatic completion. |
 | `path.prayer.not_marked` | User explicitly marks the prayer as not accomplished. | UI wording avoids religious judgment language. |
+| `path.prayer.cleared` | User clears the status of a prayer. | Added 2026-10-18 with the code. |
 | `path.fasting.started` | User starts a fast and confirms type. | No inferred intention. |
 | `path.fasting.ended` | User confirms end at iftar or a historical correction. | Pulse constraints update after backend validation. |
 | `path.fasting.broken` | User confirms a broken fast. | Imperium replan prompt is user-confirmed. |
@@ -278,6 +279,21 @@ Headers: Idempotency-Key
 Payload: status, prayed_at, source, optional_note
 ```
 
+> CODÉ (2026-10-18, table `path_prayer_logs`, migration 0064) :
+> - `GET /api/imperium/path/prayers?day=` : les cinq prières du jour de Paris, heure de l'adhan
+>   (cache MAWAQIT de la mosquée de référence, sinon calcul local), source, statut, version.
+> - `POST /api/imperium/path/prayers/{prayer}/mark` (Idempotency-Key) :
+>   `{prayer_date, status, prayed_at?, note?, base_version?}`. Accomplie : `prayed_at` vaut
+>   maintenant par défaut, jamais dans le futur. « Non marquée comme accomplie » : refusée tant
+>   que l'adhan n'est pas passé, sans heure. Un jour futur est refusé (422).
+> - Même statut déjà posé : rien ne change (pas de nouvel événement). Statut différent : il
+>   faut la `base_version` lue, sinon 409 `PRAYER_STATUS_CONFLICT` avec l'état serveur
+>   (`current`) pour la feuille de conflit ; jamais d'écrasement silencieux.
+> - `POST …/prayers/{prayer}/clear` `{prayer_date, base_version}` : efface le statut (la
+>   ligne est supprimée), événement `path.prayer.cleared`.
+> - Événements `path.prayer.logged` / `.not_marked` / `.cleared` sans la note (privacy high).
+> - Pas encore : effet sur le score de discipline, suggestion d'adhkar après la prière.
+
 Offline conflict:
 
 - Same prayer/day/status with same `Idempotency-Key` dedupes.
@@ -374,6 +390,23 @@ TBD POST /api/path/fasting/end
 TBD POST /api/path/fasting/break
 Headers: Idempotency-Key
 ```
+
+> CODÉ (2026-10-18, table `path_fasts`, migration 0064) :
+> - `POST /api/imperium/path/fasts` (Idempotency-Key) `{fasting_type, fasting_date?,
+>   hydration_daytime_allowed?}` : démarre un jeûne le jour même seulement (jamais déduit du
+>   calendrier). Un seul jeûne en cours et un par jour, sinon 409 `FAST_STATE_CONFLICT`
+>   avec le jeûne existant. Fenêtre figée au démarrage : suhoor = fajr − `path.suhoor_offset_min`
+>   (30 min par défaut), iftar = maghrib.
+> - `POST …/fasts/{id}/end` `{ended_at?}` : à l'iftar ou après (correction après coup
+>   acceptée) ; avant l'iftar → 422, il faut rompre. Aucun job ne clôt un jeûne tout seul.
+> - `POST …/fasts/{id}/break` `{confirm: true, broken_at?, reason?}` : avant l'iftar ; la raison
+>   reste dans la ligne, jamais dans l'événement `path.fasting.broken` (`replan_prompt: true`).
+> - `GET …/fasting/state` : `fasting_active` (vrai seulement entre suhoor et iftar), jeûne en
+>   cours, `hydration_limits.daytime`, message. `GET …/fasts?from_day=&to_day=`.
+> - Pulse (doc 40 §15.2) : hydratation refusée dans la fenêtre (409 `FASTING_HYDRATION_BLOCKED`)
+>   sauf `hydration_daytime_allowed`, repas accepté avec avertissement, une bannière jeûne.
+> - Pas encore : abandon (`abandon`), rappels Ramadan / jours blancs (calendrier hégirien),
+>   proposition de replanification Imperium sur rupture, intensité des séances.
 
 Offline conflict:
 
@@ -1020,6 +1053,10 @@ Tabs:
 ## 20. Database Tables
 
 Existing (per doc 05): `prayer_logs` ✅, `fasting_logs` ✅, `sadaqa_records` ✅.
+
+> CODÉ (2026-10-18) : `prayer_logs` et `fasting_logs` n'existaient pas ; ils sont codés sous
+> `path_prayer_logs` et `path_fasts` (un jeûne par ligne avec son état, au lieu d'un journal
+> d'actions). Voir doc 05.
 
 To add:
 

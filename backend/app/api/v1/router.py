@@ -17,6 +17,7 @@ from app.api.v1.routes import (
     imperium,
     imperium_dashboard,
     imperium_path,
+    imperium_path_worship,
     imperium_pulse,
     imperium_pulse_dashboard,
     imperium_pulse_equipment,
@@ -48,6 +49,7 @@ api_router.include_router(imperium_contracts.router, prefix="/imperium", tags=["
 api_router.include_router(imperium_home.router, prefix="/imperium", tags=["imperium-home"])
 api_router.include_router(imperium_frontend.router, prefix="/imperium", tags=["imperium-frontend"])
 api_router.include_router(imperium_path.router, prefix="/imperium/path", tags=["imperium-path"])
+api_router.include_router(imperium_path_worship.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_pulse.router, prefix="/imperium/pulse", tags=["imperium-pulse"])
 api_router.include_router(imperium_pulse_stock.router, prefix="/imperium/pulse", tags=["imperium-pulse-stock"])
 api_router.include_router(imperium_pulse_meals.router, prefix="/imperium/pulse", tags=["imperium-pulse-meals"])

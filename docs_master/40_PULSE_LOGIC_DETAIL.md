@@ -207,7 +207,7 @@ the score card is hidden and an incomplete-data banner is shown.
 > du stock, séances du jour (`workouts`), bannières `stock_expiry`, `meal_drafts`, `meals_without_macros`,
 > `health_score_incomplete`. `health_score` reste vide (pas encore calculé) et la bannière
 > le dit. Douleurs en cours : bannière `pain_open` ; règles médicales actives : bannière
-> `medical_rules` (nombre seulement). Jeûne (Path) : pas encore.
+> `medical_rules` (nombre seulement). Jeûne (Path) : bannière `fasting`, une au plus (en cours avec l'heure de l'iftar, iftar passé à confirmer, terminé ou rompu).
 
 ---
 
@@ -486,7 +486,10 @@ Payload stores `amount_ml`, `logged_at`, `source`, and Path constraint context.
 > - `GET /api/imperium/pulse/hydration-logs?day=` : total et appuis du jour de Paris ;
 >   `target` vide (« Objectif personnalisé pas encore calculé ») tant que le programme
 >   santé n'existe pas.
-> - Blocage pendant le jeûne (Path) : pas encore, aucune donnée de jeûne côté backend.
+> - Blocage pendant le jeûne (Path, CODÉ 2026-10-18) : un appui daté entre suhoor et iftar d'un
+>   jeûne (rupture : jusqu'à l'heure de rupture) → 409 `FASTING_HYDRATION_BLOCKED`, message
+>   « Jeûne en cours - hydratation hors fenêtre désactivée. », sauf si l'eau est permise de
+>   jour pour ce jeûne. Un appui daté hors fenêtre reste accepté.
 
 ```text
 Hydration target is a PERSONALIZED RANGE computed by the health specialist from the user's data
@@ -773,6 +776,11 @@ Deterministic adaptations (hard rules of the brain, not a Pulse↔Path dialogue)
   - hydration logging only in allowed window
   - one fasting banner max on the dashboard
 ```
+
+> CODÉ (2026-10-18) : hydratation bloquée dans la fenêtre, repas noté dans la fenêtre accepté
+> avec l'avertissement « Repas noté pendant les heures de jeûne. » (texte et photo), une
+> bannière `fasting` au plus. Intensité des séances les jours de jeûne : pas encore (adaptation
+> des séances).
 
 ### 15.3 Vault receipt and expense domain
 
