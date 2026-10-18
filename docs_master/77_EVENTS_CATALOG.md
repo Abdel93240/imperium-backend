@@ -255,6 +255,7 @@ acceptation de course / importance / zone doit être testé assez tôt.
 | `rides.ride.refused` | CODE (2026-10-18) : `POST /api/imperium/vector/offers/{id}/decision`. | `{ offer_id, session_id, price_cents, hourly_rate_offered_cents }`, sans la note (privacy medium). | V1 | Fait de refus, utile au scoring et à l'analyse. |
 | `rides.drop_zone.recorded` | CODE (2026-10-18) : `POST …/vector/sessions/{id}/drop-zone`. | `{ session_id, drop_zone_id, zone, real_duration_minutes }` (privacy high). | V1 | Dépose confirmée par l'utilisateur (VEC-10) ; les revenus et dépenses restent `finance.transaction.created` (external_ref `rides:…`). |
 | `rides.zone.recommended` / `rides.recommendation.feedback_recorded` | CODE (2026-10-18) : `/api/imperium/vector/recommendations*`. | `{ recommendation_id, recommendation, zone, confidence, session_id }` ; retour : `{ recommendation_id, useful, ride_user_action }` (privacy medium). | V1 | Doc 33 §5. Conseil seulement, jamais d'action sur l'appli VTC. |
+| `rides.rule.revised` | CODE (2026-10-18) : `PATCH /api/imperium/vector/rules/{code}`. | `{ rule_code, revision_type, version }` (privacy low). | V1 | Doc 57 §4.12 ; l'avant / après reste dans `rides_rule_revisions`. |
 | `rides.zone.repositioned` | Futur/non codé. | Non détaillé dans les sources. | Futur | Déplacement de zone. |
 
 ### VEHICLE

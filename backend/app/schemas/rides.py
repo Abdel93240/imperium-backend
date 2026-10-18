@@ -2,10 +2,10 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 ExpenseCategory = Literal["carburant", "peage", "parking", "entretien", "plateformes", "autre"]
 
@@ -175,6 +175,8 @@ class RideOfferCreate(BaseModel):
     surge_multiplier: Decimal | None = Field(default=None, ge=1, le=10, decimal_places=2)
     pickup_zone: str | None = Field(default=None, max_length=120)
     destination_zone: str | None = Field(default=None, max_length=120)
+    pickup_zone_code: str | None = Field(default=None, pattern=r"^\d{5}$")  # code postal, ex. 75008
+    destination_zone_code: str | None = Field(default=None, pattern=r"^\d{5}$")
     payment_type: Literal["card", "cash", "pro"] | None = None
     ride_type: Literal["immediate", "scheduled"] = "immediate"
 
@@ -228,8 +230,13 @@ class RideOfferRead(BaseModel):
     mobilized_minutes: int | None
     actual_hourly_rate_cents: int | None
     revenue_transaction_id: UUID | None
+    pickup_zone_code: str | None
+    destination_zone_code: str | None
     version: int
-    signal: None = None  # aucun verdict tant que le modèle n'est pas entraîné (doc 57 §3)
+    signal: Literal["green", "red"] | None  # règles seules (doc 57 §3.1) ; aucun = à toi de juger
+    signal_source: str | None
+    signal_reason: str | None
+    triggered_rules: list[str]
 
 
 class RideOfferListResponse(BaseModel):
@@ -246,3 +253,57 @@ class TrainingSummaryRead(BaseModel):
     median_hourly_rate_cents: int | None
     phase: Literal["cold_start", "transition", "autonomous"]
     message: str
+
+
+RideTimeBlock = Literal["night", "morning", "daytime", "evening", "late_evening"]
+
+
+class RuleConditions(BaseModel):
+    """Conditions d'une règle ; toutes celles données doivent être vraies pour qu'elle se déclenche."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    zone_codes: list[Annotated[str, StringConstraints(pattern=r"^\d{5}$")]] | None = Field(default=None, max_length=50)
+    applies_to: list[Literal["pickup", "destination"]] | None = None  # côté(s) testés pour zone_codes
+    destination_prefixes: list[Annotated[str, StringConstraints(pattern=r"^\d{2,5}$")]] | None = Field(default=None, max_length=50)
+    time_blocks: list[RideTimeBlock] | None = None
+    ride_types: list[Literal["immediate", "scheduled"]] | None = None
+
+    @model_validator(mode="after")
+    def coherent(self):
+        if (self.zone_codes is None) != (self.applies_to is None):
+            raise ValueError("zone_codes and applies_to go together.")
+        if all(value is None for value in self.model_dump().values()):
+            raise ValueError("At least one condition is required.")
+        return self
+
+
+class BusinessRuleRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    rule_code: str
+    name: str
+    description: str
+    conditions: dict
+    action: Literal["red", "green"]
+    is_active: bool
+    is_hard_rule: bool
+    times_applied: int
+    revision_count: int
+    version: int
+    last_revised_at: datetime | None
+
+
+class BusinessRuleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: int = Field(ge=1)
+    reason: str = Field(min_length=3, max_length=500)
+    is_active: bool | None = None
+    is_hard_rule: bool | None = None
+    conditions: RuleConditions | None = None
+
+
+class BusinessRuleListResponse(BaseModel):
+    items: list[BusinessRuleRead]
+    not_coded: list[str]  # règles du doc 57 §4 qui attendent des données (géographie, flux externes)

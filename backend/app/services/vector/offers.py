@@ -7,8 +7,9 @@ culte ou à la santé du doc 57 §5.2 ne sont pas reprises : doc 13 §5 les excl
 
 La décision (acceptée, refusée, manquée) est une donnée de comportement : elle n'est jamais
 la cible d'apprentissage. La cible est le résultat réel d'une course acceptée : gain ÷ temps
-mobilisé (approche + attente + course + retour), à la minute. Aucun verdict n'est rendu
-tant que le modèle n'est pas entraîné ; Vector n'agit jamais sur l'appli VTC.
+mobilisé (approche + attente + course + retour), à la minute. Tant que le modèle n'est
+pas entraîné, le signal vient des règles métier seules (doc 57 §3.1, services/vector/rules.py) ;
+Vector n'agit jamais sur l'appli VTC.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -35,6 +36,7 @@ from app.schemas.rides import (
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
 from app.services.vector import sessions
+from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
 PARIS = ZoneInfo("Europe/Paris")
@@ -82,13 +84,23 @@ def record_offer(
     if offered_at > now + CLOCK_SKEW:
         raise OfferInputError("L'heure de la course ne peut pas être dans le futur.")
     session = sessions._active(db, current_user, session_id)
+    variables = features(db, session, payload, offered_at)
+    rules = ensure_rules(db, current_user)
+    signal, fired, reason = evaluate(rules, {
+        "pickup_zone_code": payload.pickup_zone_code, "destination_zone_code": payload.destination_zone_code,
+        "time_block": variables["time_block"], "ride_type": payload.ride_type,
+    })
+    # Variables dérivées des règles (doc 57 §5.7) : le modèle apprendra s'il faut les suivre.
+    variables.update({f"rule_{rule.rule_code}_triggered": rule.rule_code in fired for rule in rules})
     offer = RidesOffer(
         user_id=current_user.id, session_id=session.id, offered_at=offered_at, source="manual", platform=payload.platform,
         price_cents=payload.price_cents, distance_km=payload.distance_km, estimated_duration_min=payload.estimated_duration_min,
         approach_distance_km=payload.approach_distance_km, approach_duration_min=payload.approach_duration_min,
         surge_multiplier=payload.surge_multiplier, pickup_zone=(payload.pickup_zone or "").strip() or None,
         destination_zone=(payload.destination_zone or "").strip() or None, payment_type=payload.payment_type,
-        ride_type=payload.ride_type, features=features(db, session, payload, offered_at), version=1,
+        ride_type=payload.ride_type, features=variables, pickup_zone_code=payload.pickup_zone_code,
+        destination_zone_code=payload.destination_zone_code, signal=signal, signal_source="rules_only",
+        signal_reason=reason, triggered_rules=fired, version=1,
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )
     db.add(offer)

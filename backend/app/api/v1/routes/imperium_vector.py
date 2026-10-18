@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.rides import (
+    BusinessRuleListResponse,
+    BusinessRuleRead,
+    BusinessRuleUpdate,
     CurrentSessionRead,
     DropZoneCreate,
     DropZoneRead,
@@ -33,7 +36,7 @@ from app.schemas.rides import (
 from app.services.imperium import vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import offers, recommendations, sessions
+from app.services.vector import offers, recommendations, rules, sessions
 
 router = APIRouter()
 
@@ -369,3 +372,26 @@ def offer_outcome_route(
                                      request_path=request.url.path)
     except _OFFER_ERRORS as exc:
         return _offer_error(db, exc)
+
+
+# ---------- règles métier ----------
+
+@router.get("/rules", response_model=BusinessRuleListResponse)
+def list_rules_route(current_user: CurrentUserDep, db: SessionDep) -> BusinessRuleListResponse:
+    """Règles du doc 57 §4 codées (R1, R2, R7, R8) et celles qui attendent des données."""
+    return rules.list_rules(db, current_user=current_user)
+
+
+@router.patch("/rules/{rule_code}", response_model=BusinessRuleRead)
+def update_rule_route(rule_code: str, payload: BusinessRuleUpdate, current_user: CurrentUserDep, db: SessionDep):
+    """Activer, désactiver, rendre ferme ou modifier les conditions ; raison et version lue obligatoires."""
+    try:
+        return rules.update_rule(db, current_user=current_user, rule_code=rule_code, payload=payload)
+    except rules.RuleNotFoundError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    except rules.RuleVersionConflictError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "RIDES_RULE_VERSION_CONFLICT", "current": exc.current.model_dump(mode="json"),
+        })
