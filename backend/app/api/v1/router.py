@@ -22,6 +22,7 @@ from app.api.v1.routes import (
     imperium_path_dashboard,
     imperium_path_devotion,
     imperium_path_ghusl,
+    imperium_path_invocations,
     imperium_path_mosques,
     imperium_path_settings,
     imperium_path_sadaqa,
@@ -62,6 +63,7 @@ api_router.include_router(imperium_path_worship.router, prefix="/imperium/path",
 api_router.include_router(imperium_path_sadaqa.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_path_ghusl.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_path_mosques.router, prefix="/imperium/path", tags=["imperium-path"])
+api_router.include_router(imperium_path_invocations.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_path_settings.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_path_devotion.router, prefix="/imperium/path", tags=["imperium-path"])
 api_router.include_router(imperium_path_dashboard.router, prefix="/imperium/path", tags=["imperium-path"])

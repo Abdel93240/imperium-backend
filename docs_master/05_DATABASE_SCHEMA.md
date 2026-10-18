@@ -1503,6 +1503,12 @@ Prieres et jeune Path (CODE, migration 20261018_0064, doc 41 §7-§8) :
   broken_at, break_reason, version, Idempotency-Key unique + empreinte.
 - Remplacent les `prayer_logs` et `fasting_logs` annonces par le doc 41 §20 (jamais crees).
 
+Invocations Path (CODE, migration 20261018_0078, doc 41 §11-bis) :
+- `path_invocations` : situation (quotidien|voyage|protection|difficulte|maladie|peur_anxiete),
+  arabic_text, translation_fr, source (obligatoires), audio_url https, is_favorite,
+  daily_period morning|evening + daily_order (ensemble), version, Idempotency-Key + empreinte.
+- `path_invocation_checks` : coche par invocation et jour de Paris (unique), cascade.
+
 Reglages Path (CODE, migration 20261018_0076, PAT-11) :
 - `path_settings` : une ligne par utilisateur (creee au premier changement) ; calculation_method
   MuslimWorldLeague|Karachi|Egypt|ISNA, madhhab Hanafi|Maliki|Shafii|Hanbali|Jafari, ville
