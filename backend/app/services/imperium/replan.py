@@ -15,8 +15,10 @@ from sqlalchemy.orm import Session
 
 from app.models.ai import AITask
 from app.models.auth import User
-from app.models.imperium import ImperiumDailyPlan, PlanningReplanEvent
+from app.models.imperium import ImperiumDailyPlan, PlanningDailyPlanVersion, PlanningReplanEvent
 from app.schemas.imperium import (
+    DailyPlanVersionListResponse,
+    DailyPlanVersionRead,
     ReplanProposalAttachRequest,
     ReplanRead,
     ReplanRequestCreate,
@@ -223,12 +225,25 @@ def accept_replan(db: Session, *, current_user: User, replan_id: UUID, now: date
     if plan is None or plan.user_id != current_user.id:
         raise ReplanStateConflictError("No daily plan to replan.")
 
-    version = int((plan.generated_from or {}).get("replan_version", 0)) + 1
+    current = int((plan.generated_from or {}).get("replan_version", 0))
+    version = current + 1
+    # On versionne, on n'écrase pas (doc 05 D4) : la version courante est archivée si elle ne l'est pas.
+    archived = db.scalar(
+        select(PlanningDailyPlanVersion.id).where(
+            PlanningDailyPlanVersion.daily_plan_id == plan.id, PlanningDailyPlanVersion.version == current
+        )
+    )
+    if archived is None:
+        db.add(PlanningDailyPlanVersion(user_id=current_user.id, daily_plan_id=plan.id, version=current,
+                                        plan_blocks=list(plan.plan_blocks or [])))
     plan.plan_blocks = [
         {key: value for key, value in block.items() if key != "change"}
         for block in row.proposal
         if block.get("change") != "removed"
     ]
+    db.add(PlanningDailyPlanVersion(user_id=current_user.id, daily_plan_id=plan.id, version=version,
+                                    plan_blocks=plan.plan_blocks, reason=row.reason_category or row.hook_type,
+                                    trigger=row.trigger, source_replan_event_id=row.id))
     plan.generated_from = {**(plan.generated_from or {}), "replan_version": version, "last_replan_event_id": str(row.id)}
     db.add(
         build_event(
@@ -251,6 +266,27 @@ def accept_replan(db: Session, *, current_user: User, replan_id: UUID, now: date
     db.commit()
     db.refresh(row)
     return ReplanRead.model_validate(row)
+
+
+def list_plan_versions(db: Session, *, current_user: User, plan_id: UUID) -> DailyPlanVersionListResponse:
+    """Historique du plan vivant ; un plan jamais replanifié n'a que sa version courante (0)."""
+    plan = db.get(ImperiumDailyPlan, plan_id)
+    if plan is None or plan.user_id != current_user.id:
+        raise ReplanNotFoundError("Daily plan not found.")
+    current = int((plan.generated_from or {}).get("replan_version", 0))
+    rows = list(
+        db.scalars(
+            select(PlanningDailyPlanVersion)
+            .where(PlanningDailyPlanVersion.daily_plan_id == plan.id)
+            .order_by(PlanningDailyPlanVersion.version.desc())
+        )
+    )
+    items = [DailyPlanVersionRead.model_validate(row).model_copy(update={"is_current": row.version == current})
+             for row in rows]
+    if not items:
+        items = [DailyPlanVersionRead(version=current, plan_blocks=list(plan.plan_blocks or []), reason=None, trigger=None,
+                                      source_replan_event_id=None, created_at=plan.created_at, is_current=True)]
+    return DailyPlanVersionListResponse(plan_id=plan.id, current_version=current, items=items)
 
 
 def cancel_replan(db: Session, *, current_user: User, replan_id: UUID, now: datetime | None = None) -> ReplanRead:

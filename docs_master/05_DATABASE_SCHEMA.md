@@ -1310,10 +1310,9 @@ Contrat D4 daily plan vivant :
   active, complete et annule des lignes `imperium_daily_plans`. Elle est
   utile comme fondation, mais ne code pas encore la generation IA, le replan
   vivant, la validation de proposition ou l'historique de versions.
-- La future table `planning_daily_plan_versions` est FUTURE / NON CODEE. Sa
-  raison d'etre est le versionnement D4 : chaque replan cree une nouvelle
-  version avec sa raison, archive l'ancienne version et nourrit l'apprentissage
-  futur / LoRA. Ne pas inventer son schema detaille avant le chantier D4.
+- La table `planning_daily_plan_versions` est CODEE (2026-10-18, migration 0080) avec le
+  schema du doc 43 §20 : chaque replan accepte cree une nouvelle version avec sa raison et
+  archive l'ancienne ; elle pourra nourrir l'apprentissage futur.
 - On VERSIONNE, on n'ecrase pas. Un replan futur ne doit pas masquer la raison
   de changement ni detruire l'historique de la journee.
 - Le plan vivant doit respecter la garde globale "une seule mission active a la
@@ -1622,8 +1621,12 @@ Vault — memoire de categories (CODE, migration 20261017_0048, doc 42 §7.0) :
   Consultee avant la table en dur ; alimentee par la validation de l'utilisateur.
 
 Tables planning futures / non codees :
-- `planning_daily_plan_versions` : FUTUR / NON CODE. Versionnement du living
-  plan D4 ; chaque replan cree une nouvelle version et conserve la raison.
+- `planning_daily_plan_versions` : CODE (migration 20261018_0080, 2026-10-18). Versionnement du
+  living plan D4 (schema du doc 43 §20) : daily_plan_id (FK, cascade), version (0 = plan
+  d'origine, archive au premier replan accepte ; N = N-ieme replan accepte), plan_blocks JSONB,
+  reason (categorie ou hook), trigger, source_replan_event_id (FK, SET NULL). La version
+  courante est la plus haute (`generated_from.replan_version`). Lecture :
+  `GET /api/imperium/day/plan/{plan_id}/versions`.
 - `planning_replan_events` : CODE (migration 20261017_0045, 2026-10-17). Demande
   (trigger manual|hook, hook_type, reason_category + other_reason + reason_detail
   obligatoires en manuel), statut requested|proposed|revising|accepted|cancelled|failed,

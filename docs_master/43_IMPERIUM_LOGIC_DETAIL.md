@@ -766,6 +766,9 @@ CREATE TABLE imperium_replan_events (
                          -- 'pending' | 'completed' | 'rejected'
 );
 
+-- CODÉ (2026-10-18, migration 0080) sous le nom planning_daily_plan_versions (doc 05) :
+-- daily_plan_id au lieu de (user_id, date) ; version 0 = plan d'origine ; is_current dérivé
+-- (version la plus haute) ; reason + trigger en plus. GET /api/imperium/day/plan/{id}/versions.
 CREATE TABLE imperium_daily_plan_versions (
   id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id                UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

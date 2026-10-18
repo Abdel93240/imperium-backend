@@ -33,6 +33,7 @@ from app.schemas.imperium import (
     CreatePathItemRequest,
     DayReviewResponse,
     DailyPlanResponse,
+    DailyPlanVersionListResponse,
     DailyPlanWriteResponse,
     DecisionFrameworkPrioritiesResponse,
     DecisionFrameworkPrioritiesUpdateRequest,
@@ -165,6 +166,7 @@ from app.services.imperium.replan import (
     ReplanNotFoundError,
     ReplanStateConflictError,
     accept_replan,
+    list_plan_versions,
     cancel_replan,
     get_replan_state,
     request_replan,
@@ -693,6 +695,15 @@ def get_daily_plan_route(
     if plan is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No daily plan found.")
     return DailyPlanResponse.model_validate(plan)
+
+
+@router.get("/day/plan/{plan_id}/versions", response_model=DailyPlanVersionListResponse)
+def daily_plan_versions_route(plan_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> DailyPlanVersionListResponse:
+    """Historique du plan vivant : version d'origine puis une version par replan accepté (raison, demande source)."""
+    try:
+        return list_plan_versions(db, current_user=current_user, plan_id=plan_id)
+    except ReplanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post("/day/plan/{plan_id}/activate", response_model=DailyPlanWriteResponse)
