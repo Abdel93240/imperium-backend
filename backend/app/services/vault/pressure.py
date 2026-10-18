@@ -13,6 +13,7 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.toolbox import SignalValue
 from app.models.vault import ImperiumVaultTransaction, PressureSnapshot, UpcomingExpense
+from app.services.vault import wallet
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
 
@@ -181,10 +182,16 @@ def load_pressure_inputs(
     )
     liquidity = ZERO
     current_week_income = ZERO
+    # Liquidité : dernier relevé réel (cash + banque, doc 42 §8.1) puis mouvements depuis ;
+    # sans relevé, somme des transactions cash/banque comme avant.
+    snapshot = wallet.latest_snapshot(db, current_user, now)
+    if snapshot is not None:
+        deltas, _, _ = wallet.movements_since(db, current_user, snapshot.recorded_at, now)
+        liquidity = Decimal(snapshot.cash_cents + snapshot.bank_cents + deltas["cash"] + deltas["bank"]) / Decimal("100")
     for transaction in transactions:
         amount = Decimal(transaction.amount_cents) / Decimal("100")
         signed = amount if transaction.transaction_type == "income" else -amount
-        if transaction.wallet in {"cash", "bank"} and transaction.occurred_at <= now:
+        if snapshot is None and transaction.wallet in {"cash", "bank"} and transaction.occurred_at <= now:
             liquidity += signed
         if (
             transaction.transaction_type == "income"

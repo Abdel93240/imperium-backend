@@ -125,6 +125,8 @@ class UpcomingExpense(UUIDPrimaryKeyMixin, Base):
     wallet: Mapped[str | None] = mapped_column(Text, nullable=True)
     mandatory: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paid_transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -222,3 +224,27 @@ class VaultReceiptExtraction(UUIDPrimaryKeyMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class VaultWalletSnapshot(UUIDPrimaryKeyMixin, Base):
+    """Soldes réels saisis par l'utilisateur (VAU-10, doc 42 §8.1) : cash, banque, crypto en EUR."""
+
+    __tablename__ = "vault_wallet_snapshots"
+    __table_args__ = (
+        CheckConstraint("cash_cents >= 0", name="cash_not_negative"),
+        CheckConstraint("crypto_cents >= 0", name="crypto_not_negative"),
+        CheckConstraint("source IN ('manual', 'sync')", name="source_check"),
+        Index("vault_wallet_snapshots_user_recorded_idx", "user_id", desc("recorded_at")),
+        Index("vault_wallet_snapshots_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    cash_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    bank_cents: Mapped[int] = mapped_column(Integer, nullable=False)  # peut être négatif (découvert)
+    crypto_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="manual", server_default="manual")
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
