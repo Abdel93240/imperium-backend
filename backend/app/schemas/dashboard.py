@@ -1,11 +1,12 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.imperium import ActiveMissionRead
 from app.schemas.path import PathTodayItemRead
 from app.schemas.pulse import PulseEntryRead
+from app.schemas.vault import VaultDailyTargets
 
 
 class ImperiumDashboardMissionSection(BaseModel):
@@ -76,3 +77,27 @@ class ImperiumDashboardFoundationResponse(BaseModel):
     readiness: ImperiumDashboardReadinessSection
     meta: ImperiumDashboardMetaSection
     safe_explanation: str = "Imperium dashboard snapshot for current user."
+
+
+class DashboardNextPrayerWidget(BaseModel):
+    """Compte à rebours de la prochaine prière (doc 59 §12.2) ; mêmes horaires que Path."""
+
+    prayer_name: Literal["fajr", "dhuhr", "asr", "maghrib", "isha"]
+    adhan_at: datetime
+    countdown_seconds: int
+    source: Literal["mawaqit", "calculated"]
+
+
+class DashboardPressureWidget(BaseModel):
+    """Score de pression calculé à la lecture, sans instantané ni événement (doc 11)."""
+
+    score: int = Field(ge=0, le=100)
+    label: Literal["safe", "stable", "attention", "pressure", "critical"]
+    daily_targets: VaultDailyTargets
+    computed_at: datetime
+
+
+class ImperiumDashboardWidgetsResponse(BaseModel):
+    next_prayer: DashboardNextPrayerWidget
+    pressure: DashboardPressureWidget
+    generated_at: datetime

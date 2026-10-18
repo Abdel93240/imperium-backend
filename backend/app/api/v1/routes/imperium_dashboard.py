@@ -4,8 +4,9 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.dashboard import ImperiumDashboardFoundationResponse
+from app.schemas.dashboard import ImperiumDashboardFoundationResponse, ImperiumDashboardWidgetsResponse
 from app.services.imperium.dashboard import get_imperium_dashboard_foundation
+from app.services.imperium.dashboard_widgets import dashboard_widgets
 from app.services.imperium.missions import MultipleActiveMissionsError
 
 router = APIRouter()
@@ -30,3 +31,9 @@ def imperium_dashboard_route(
             status_code=status.HTTP_409_CONFLICT,
             detail="Multiple active missions found for current user.",
         ) from exc
+
+
+@router.get("/dashboard/widgets", response_model=ImperiumDashboardWidgetsResponse)
+def imperium_dashboard_widgets_route(current_user: CurrentUserDep, db: SessionDep) -> ImperiumDashboardWidgetsResponse:
+    """Prochaine prière (compte à rebours) et score de pression, en lecture seule (doc 59 §12.2)."""
+    return dashboard_widgets(db, current_user=current_user)

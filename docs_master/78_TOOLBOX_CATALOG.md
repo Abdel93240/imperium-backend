@@ -229,7 +229,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
   existe (URL fournie par la configuration, job `path.mawaqit_refresh` semé désactivé) ; son
   activation attend la décision utilisateur sur les appels réseau sortants.
 - consommateurs_actuels (2026-10-18) : Path (prières marquées, jeûne, ghusl, tableau de bord,
-  détail mosquée).
+  détail mosquée) ; Imperium (widget prochaine prière, `GET /api/imperium/dashboard/widgets`).
 - consommateurs_prevus_par_specs : aucune des 4 specs (angle mort confirmé).
 - consommateurs_probables_non_documentés (sourcés docs) : The Path (affichage PAT-01/02) ; **Imperium planning** (awareness zones de prière créées PAR le daily planning, doc 41 §7-bis → le futur Daily Orchestrator devrait traiter les prières comme engagements, cf. QUESTION Q6) ; **Vector HUD** doc 55 §9.5 (overlay mosquées, couleur = urgence prochaine prière) ; Pulse (fenêtres suhoor/iftar lues via l'état de jeûne Path, doc 40 §15.2/41 §8) ; doc 52 §8.2 CATEGORY 8 (« Daily prayers » en engagements récurrents).
 - seconde_regle_consommateur : PASSE (Path + planning + HUD).
@@ -239,11 +239,11 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - description : score déterministe 0-100 + label + facteurs explicables + objectifs journaliers min/comfortable/optimal (formule doc 11 complète).
 - famille : F1 (tables F2-15/16 associées)
 - vit_aujourd_hui : CODÉ (phase E Vault, migrations 0040/0041, 2026-07-16) — `app/services/vault/pressure.py` : score 0-100, label (safe … critical), facteurs, objectifs journaliers ; entrées : registre canonique, échéances (F2-15), soldes réels (`vault_wallet_snapshots`, 0073), corrections manuelles (0079) ; instantanés `pressure_snapshots`, signal `vault.pressure` écrit dans `signal_values` (F2-13). Routes `GET /api/vault/pressure`, `/explain`, `/history`, `/corrections`. Formule canonique : doc 11 ; doc 42 §9 (résumé, ⚠ échelle 0-10 divergente, voir FINDINGS DV-4). (Fiche « MANQUANT » du 2026-07-10, antérieure à la phase E.)
-- consommateurs_actuels : Vault (jauge, « Voir pourquoi », historique, corrections).
+- consommateurs_actuels : Vault (jauge, « Voir pourquoi », historique, corrections) ; Imperium (widget du tableau de bord, `GET /api/imperium/dashboard/widgets`, calcul en mémoire sans instantané, 2026-10-18).
 - consommateurs_prevus_par_specs : WR W1 (« rollups finance (flux, pression) », spec WR §4).
 - consommateurs_probables_non_documentés (sourcés docs) : Vault (affichage + « Voir pourquoi », doc 42 §14) ; Imperium (sizing objectif quotidien, doc 42 §15.4, doc 52 §8.2 CATEGORY 2) ; Vector (urgence via le plan, PAS en direct — doc 42 §9 correction) ; Daily Orchestrator (candidat via plan, non sourcé dans la spec → QUESTION Q7).
 - seconde_regle_consommateur : PASSE (Vault + Imperium + WR).
-- statut : existe_codé (consommateurs Imperium et WR W1 encore à brancher).
+- statut : existe_codé (Imperium : affichage seulement ; dimensionnement du plan et WR W1 encore à brancher).
 
 ### F1-18 `toolbox.dialogue` — moteur de dialogue partagé
 - description : conducteur local unique, contexte de session détenu par le backend, spécialistes consultés en coulisse, escalade par tour, un seul interlocuteur.
