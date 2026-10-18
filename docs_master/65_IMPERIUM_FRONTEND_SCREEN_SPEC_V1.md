@@ -575,6 +575,9 @@ Fixture locale canonique : `history_mock_v1`.
 - `GET /api/imperium/day/plan`
 - `GET /api/imperium/history/events?filter=all|missions|decisions|weekly|failed&query=&limit=&offset=` (codé 2026-10-18)
 - `GET /api/imperium/history/events/{event_id}` (codé 2026-10-18 : élément + `details`)
+- `GET /api/imperium/history/days?limit=&offset=` (codé 2026-10-18 : Historique des journées — démarrage, clôture, durée, ressenti, missions faites / ratées / annulées terminées pendant la journée, annexes faites à part)
+- `GET /api/imperium/history/finances?period=week|month|3months|year|all` (codé 2026-10-18 : Finances — résultat net EUR par jour de Paris, périodes glissantes de 7/30/90/365 jours, écart avec la période précédente, « Tout » depuis la première transaction ; `balance_cents` = solde prévu du jour, hors période)
+- Régularité : pas encore (coefficients urgente/importante/secondaire du doc 43 §6 non portés par le code).
 
 Code (2026-10-18) : projection en lecture seule du registre d'événements, limitée aux faits
 Imperium (missions, journées, plans, priorités, demandes de replan, projets) et aux Weekly
