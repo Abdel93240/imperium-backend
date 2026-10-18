@@ -490,6 +490,9 @@ At the end of a VTC session, the BACKEND (Vault service) writes the confirmed
 income into the Vault tables. Vector only writes its own operational tables; it
 never creates a Vault transaction. Fuel expenses likewise are written by the
 backend into the Vault domain.
+CODÉ (2026-10-18) : `POST /api/imperium/vector/sessions/{id}/manual-revenue|manual-expense`
+passent par le service Vault (source vector_manual, external_ref `rides:{session}:{clé}`) ;
+revenu catégorie vtc, dépenses carburant/entretien/plateformes, sinon charges.
 ```
 
 ### 15.4 With Imperium
