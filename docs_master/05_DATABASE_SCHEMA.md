@@ -1125,6 +1125,7 @@ user_reported_signals   JSONB NULL
 ai_usable_reason        BOOLEAN NULL
 created_by_event_id     UUID NULL FK events.id
 ended_by_event_id       UUID NULL FK events.id
+replan_event_id         UUID NULL FK planning_replan_events.id ON DELETE SET NULL -- CODE (20261018_0082) : replan demandé depuis la mission ratée ou annulée (doc 43 §3.1)
 created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -1134,6 +1135,7 @@ Contraintes et index :
 - FK : `imperium_missions.user_id -> users.id`
 - FK : `imperium_missions.created_by_event_id -> events.id`
 - FK : `imperium_missions.ended_by_event_id -> events.id`
+- FK : `imperium_missions.replan_event_id -> planning_replan_events.id` (SET NULL)
 - Check `imperium_missions_status_check` :
   `status IN ('backlog', 'active', 'completed', 'failed', 'abandoned', 'cancelled')`
 - Check `imperium_missions_domain_check` :

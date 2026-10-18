@@ -477,6 +477,7 @@ class MissionResponse(BaseModel):
     failure_reason_code: str | None = None
     user_reported_signals: dict | None
     ai_usable_reason: bool | None
+    replan_event_id: UUID | None = None  # replan demandé depuis cette mission ratée ou annulée
     event_id: str | None = None
     idempotency_key: str | None = None
 
@@ -711,7 +712,8 @@ class PromoteBacklogMissionResponse(BaseModel):
 
 
 class FailureReplanRead(BaseModel):
-    """Suite d'une mission ratée (doc 43 §3.1, §15 replan_on_failure_urgent / _other)."""
+    """Suite d'une mission ratée (doc 43 §3.1, §15 replan_on_failure_urgent / _other) ou
+    annulée en cours (toujours « ask » : le replan attend POST /missions/{id}/replan)."""
 
     action: Literal["replan", "ask"]
     urgent: bool  # échéance dans les 24 h
@@ -728,7 +730,7 @@ class MissionWriteResponse(BaseModel):
     status: str
     score_created: bool = False
     decision_score: MissionDecisionScoreSummary | None = None
-    replan: FailureReplanRead | None = None  # seulement après « Ratée »
+    replan: FailureReplanRead | None = None  # après « Ratée », ou « Annulée » d'une mission en cours
 
 
 class PriorityRuleInput(BaseModel):
@@ -1561,3 +1563,10 @@ class ReplanStateResponse(BaseModel):
     can_request: bool
     debounce_minutes: int
     open_request: ReplanRead | None
+
+
+class MissionReplanResponse(BaseModel):
+    """Replan demandé depuis une mission ratée ou annulée (doc 43 §3.1)."""
+
+    mission: MissionResponse
+    replan: ReplanRead

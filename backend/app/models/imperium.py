@@ -295,6 +295,12 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
         ForeignKey("events.id"),
         nullable=True,
     )
+    # Replan demandé depuis cette mission ratée ou annulée (doc 43 §3.1).
+    replan_event_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("planning_replan_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

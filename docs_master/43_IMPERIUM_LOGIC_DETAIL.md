@@ -144,8 +144,9 @@ Pulse « pain logged » : CODÉ (2026-10-18), seulement après accord de l'utili
 (`POST /api/imperium/pulse/pain-logs/{id}/replan`, hook `pain`). Vector « session terminée » :
 CODÉ (2026-10-18), à la demande de l'utilisateur après la clôture
 (`POST /api/imperium/vector/sessions/{id}/replan`, hook `vector_session_ended`, migration 0081 ;
-jamais automatique tant que le runner est désactivé). « Annulée », séance annulée et Vault :
-pas encore raccordés.
+jamais automatique tant que le runner est désactivé). « Annulée » : CODÉ (2026-10-18), proposé
+puis demandé par `POST /api/imperium/missions/{id}/replan` (hook `mission_cancelled`, §5).
+Séance annulée et Vault : pas encore raccordés.
 CODÉ (2026-10-18) : `POST /api/imperium/path/ghusl/activate` appelle le hook ghusl_required et crée
 la mission « Faire le ghusl avant {prière} » ; `…/ghusl/complete` la passe completed (doc 41 §10).
 Runner (CODE 2026-10-17, migration 20261017_0046) : job imperium.rolling_replan, abonné à
@@ -239,6 +240,12 @@ Code (2026-10-18) : « annulée » = `POST /api/imperium/missions/{id}/cancel`
 définitif, raison gardée dans `completion_note` comme pour une suppression depuis
 Operations (`failure_reason` reste réservé aux « pas fait » du doc 52 §10). Les annexes en attente retournent au backlog.
 Événement `planning.mission.aborted` avec `reason: cancelled`.
+CODÉ (2026-10-18, migration 0082) : annuler une mission EN COURS renvoie `replan`
+{ action: ask, status: suggested } (jamais de replan automatique) ; le replan se demande par
+`POST /api/imperium/missions/{id}/replan` (mission ratée ou annulée ; hook `mission_cancelled`
+ou `mission_failed`), qui accepte aussi le « ask » d'une mission ratée. Le replan est lié à la
+mission (`replan_event_id`, y compris celui demandé automatiquement à l'échec) ; demande
+ouverte → 200 ; 409 `MISSION_NOT_ENDED`, `DAY_NOT_STARTED`, `REPLAN_COOLDOWN`, `REPLAN_ALREADY_OPEN`.
 
 ### 5.1 Why this simplicity
 

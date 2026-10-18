@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -51,6 +51,7 @@ from app.schemas.imperium import (
     MissionHistoryResponse,
     MissionHistoryStatus,
     MissionResponse,
+    MissionReplanResponse,
     MissionWriteResponse,
     PathItemResponse,
     PathItemWriteResponse,
@@ -185,6 +186,7 @@ from app.services.imperium.missions import (
     complete_mission,
     create_backlog_mission,
     cancel_mission,
+    request_mission_replan,
     fail_mission,
     get_backlog_decision_preview,
     get_current_active_mission,
@@ -1269,6 +1271,31 @@ def fail_mission_route(
         ) from exc
 
     if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post("/missions/{mission_id}/replan", response_model=MissionReplanResponse, status_code=status.HTTP_201_CREATED)
+def replan_from_mission_route(mission_id: UUID, response: Response, current_user: CurrentUserDep, db: SessionDep):
+    """Après « Ratée » ou « Annulée », à la demande : replan de la journée ; demande ouverte → 200."""
+    try:
+        result, created = request_mission_replan(db, current_user=current_user, mission_id=mission_id)
+    except MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MissionStateConflictError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": "MISSION_NOT_ENDED"})
+    except ReplanCooldownError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={
+            "detail": str(exc), "code": "REPLAN_COOLDOWN", "eligible_at": exc.eligible_at.isoformat(),
+        })
+    except ReplanStateConflictError as exc:
+        db.rollback()
+        code = "DAY_NOT_STARTED" if "No operational day" in str(exc) else "REPLAN_ALREADY_OPEN"
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": code})
+    if not created:
         response.status_code = status.HTTP_200_OK
     return result
 
