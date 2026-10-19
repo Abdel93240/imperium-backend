@@ -1962,11 +1962,25 @@ Usine du WR — `wr_worker_runs` et `wr_worker_cursors` : CODE (migration 202610
 Ordre d'un passage : W1 rollups -> W4 anomalies -> W2 causal -> W3 apprentissages -> W5 docket ;
 chaque worker traite ]curseur, maintenant] puis avance son curseur. Un echec n'avance pas le
 curseur et arrete la chaine ; le passage suivant reprend le meme lot. Worker non code : saute,
-sans curseur (premier lot = depuis minuit, heure de Paris). Seul W5 est code (recalcul des
-priorites du docket) ; aucun appel de modele. Jobs semes desactives :
+sans curseur (premier lot = depuis minuit, heure de Paris). Un worker code ne tourne que s'il
+est liste dans le parametre `wr.factory_workers_enabled` (seme vide ; carte V18). Codes : W1
+(rollups, ci-dessous) et W5 (recalcul des priorites du docket) ; aucun appel de modele. Jobs
+semes desactives :
 `wr.factory_on_session_end` (abonne a `rides.session.ended`) et `wr.factory_fallback` (cron
 UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne ce jour-la).
 Event `planning.factory.run_completed` par worker passe.
+
+Rollups W1 — `wr_rollups_daily` : CODE (migration 20261019_0091, 2026-10-19, spec WR §4 W1 ;
+pas de DDL dans la spec). Une ligne par utilisateur, jour de Paris et domaine, `metrics` JSONB
+reecrit en entier a chaque passage (upsert, unique user/jour/domaine). Sources canoniques
+seulement (AD-2) : finance = ledger `imperium_vault_transactions` du jour (income, expense,
+net, nombre, reversals ; regles du rapport hebdo) + score du dernier `pressure_snapshots` du
+jour ; rides = sessions terminees (revenu, depense, minutes, net par heure) + deposes (nombre,
+5 zones les plus frequentes) ; missions = demarrees, terminees/ratees/annulees, terminees en
+retard et retard moyen sur la deadline, ouvertes en retard en fin de jour (statut a l'instant
+du calcul). Pulse : stub neutre (aucune ligne ; lecture des donnees de sante par l'usine a
+trancher). Jours recalcules : ceux de la fenetre + ceux des lignes creees ou modifiees dans la
+fenetre (saisie tardive). Le digest ne lit pas encore ces rollups (`unavailable`).
 
 Metriques du WR — `wr_metrics_weekly` : CODE (migration 20261019_0085, 2026-10-19, spec WR §3.8).
 Colonnes de la spec + `user_id` ; une ligne par utilisateur et par lundi (unique), NULL = pas

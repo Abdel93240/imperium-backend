@@ -4,9 +4,11 @@ Un run traite, pour chaque worker, la fenêtre ]curseur, maintenant] dans l'ordr
 puis avance le curseur du worker. Un worker qui échoue n'avance PAS son curseur et arrête la chaîne
 (les suivants dépendent de lui) : le run suivant reprend le même lot. Un worker pas encore codé est
 sauté sans curseur ; codé plus tard, il partira du début du jour de Paris de son premier run.
+Un worker codé ne tourne que s'il est listé dans `wr.factory_workers_enabled` (vide au départ :
+bascule worker par worker, carte V18), sinon il est sauté sans curseur lui aussi.
 
-Codé aujourd'hui : W5 (recalcul persistant des priorités du docket). W1 rollups, W4 anomalies,
-W2 découverte causale (IA) et W3 apprentissages (IA) restent à coder ; ce module n'appelle aucun
+Codés aujourd'hui : W1 (rollups quotidiens, rollups.py) et W5 (recalcul persistant des priorités
+du docket). W4 anomalies, W2 découverte causale (IA) et W3 apprentissages (IA) restent à coder ; ce module n'appelle aucun
 modèle. Les jobs `wr.factory_on_session_end` et `wr.factory_fallback` sont semés désactivés.
 """
 
@@ -25,7 +27,8 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.wr import WrWorkerCursor, WrWorkerRun
 from app.services.events.emitter import build_event
-from app.services.wr import docket
+from app.services.params import get_parameter
+from app.services.wr import docket, rollups
 
 PARIS = ZoneInfo("Europe/Paris")
 WORKER_ORDER = ("w1_rollups", "w4_anomalies", "w2_causal", "w3_learning", "w5_docket")
@@ -42,6 +45,13 @@ class WorkerOutcome:
 Worker = Callable[[Session, User, datetime, datetime], WorkerOutcome]
 
 
+def _w1_rollups(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
+    days = rollups.touched_days(db, user=user, window_from=window_from, window_to=window_to)
+    written = rollups.rollup_days(db, user=user, days=days, now=window_to)
+    return WorkerOutcome(items_in=len(days), items_out=written,
+                         detail={"days": [day.isoformat() for day in days], "pulse": "stub"})
+
+
 def _w5_docket(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
     count = docket.reprioritize(db, current_user=user, now=window_to)
     return WorkerOutcome(items_in=count, items_out=count, detail={"reprioritized": count})
@@ -49,7 +59,7 @@ def _w5_docket(db: Session, user: User, window_from: datetime, window_to: dateti
 
 # None = worker pas encore codé (sauté, sans curseur).
 WORKERS: dict[str, Worker | None] = {
-    "w1_rollups": None,
+    "w1_rollups": _w1_rollups,
     "w4_anomalies": None,
     "w2_causal": None,
     "w3_learning": None,
@@ -68,11 +78,15 @@ def run_factory(
     causation_id: str | None = None,
 ) -> dict:
     """Un passage de l'usine ; rend le résumé (workers faits, sautés, en échec)."""
-    summary: dict = {"completed": [], "not_coded": [], "failed": None}
+    summary: dict = {"completed": [], "not_coded": [], "disabled": [], "failed": None}
+    enabled = set(get_parameter(db, "wr.factory_workers_enabled", default=[]) or [])
     for worker in WORKER_ORDER:
         handler = WORKERS[worker]
         if handler is None:
             summary["not_coded"].append(worker)
+            continue
+        if worker not in enabled:
+            summary["disabled"].append(worker)
             continue
         cursor = db.get(WrWorkerCursor, worker)
         window_from = cursor.last_processed_event_ts if cursor else _day_start(now)

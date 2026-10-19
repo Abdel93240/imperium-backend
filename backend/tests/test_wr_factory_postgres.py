@@ -53,6 +53,16 @@ def db(engine):
         _cleanup(session)
 
 
+@pytest.fixture(autouse=True)
+def all_workers_enabled(monkeypatch):
+    real = factory.get_parameter
+
+    def fake(db, code, default=None):
+        return list(factory.WORKER_ORDER) if code == "wr.factory_workers_enabled" else real(db, code, default=default)
+
+    monkeypatch.setattr(factory, "get_parameter", fake)
+
+
 def _user(db) -> User:
     user_id = uuid4()
     db.execute(text("INSERT INTO users (id, email, single_user_mode, created_at, updated_at) "
@@ -98,7 +108,7 @@ def test_workers_run_in_order_and_cursors_leave_no_hole(db, monkeypatch) -> None
     db.commit()
     assert [name for name, *_ in calls] == ["w1_rollups", "w4_anomalies", "w3_learning", "w5_docket"]
     assert summary == {"completed": ["w1_rollups", "w4_anomalies", "w3_learning", "w5_docket"],
-                       "not_coded": ["w2_causal"], "failed": None}
+                       "not_coded": ["w2_causal"], "disabled": [], "failed": None}
     day_start = datetime(2026, 10, 13, 22, 0, tzinfo=UTC)  # minuit à Paris
     assert all(window_from == day_start for _, window_from, _ in calls)
     assert _cursor(db, "w5_docket") == NOW and _cursor(db, "w2_causal") is None
@@ -190,3 +200,24 @@ def test_triggers_fallback_and_session_end(db, monkeypatch) -> None:
 
     week = metrics.compute_week(db, current_user=user, week_start=date(2026, 10, 12), now=at_23 + timedelta(hours=1))
     assert week.factory_runs == 2  # deux passages (fallback, fin de session)
+
+
+def test_only_enabled_workers_run(db, monkeypatch) -> None:
+    user = _user(db)
+    calls: list = []
+    _fake_workers(monkeypatch, calls)
+    monkeypatch.setattr(factory, "get_parameter", lambda _db, code, default=None: ["w5_docket"])
+    summary = factory.run_factory(db, user=user, trigger="manual", now=NOW)
+    db.commit()
+    assert [name for name, *_ in calls] == ["w5_docket"]
+    assert summary["disabled"] == ["w1_rollups", "w4_anomalies", "w3_learning"]
+    assert _cursor(db, "w1_rollups") is None and _cursor(db, "w5_docket") == NOW
+    # Valeur semée : aucun worker.
+    monkeypatch.setattr(factory, "get_parameter", _seeded_get_parameter)
+    assert factory.run_factory(db, user=user, trigger="manual", now=NOW + timedelta(hours=1))["completed"] == []
+
+
+def _seeded_get_parameter(db, code, default=None):
+    from app.services.params import get_parameter
+
+    return get_parameter(db, code, default=default)
