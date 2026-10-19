@@ -15,9 +15,13 @@ from app.schemas.wr import (
     DocketItemType,
     DocketListResponse,
     DocketStatus,
+    SlotAuditStateRead,
+    SlotAuditStatesResponse,
+    SlotTransitionUpdateRequest,
     WrMetricsWeekRead,
     WrMetricsWeeklyResponse,
 )
+from app.services.ai import audit_loop
 from app.services.wr import digest, docket, metrics
 
 router = APIRouter()
@@ -102,3 +106,33 @@ def weekly_metrics_route(
     """Dernières semaines, en cours comprise, calculées à l'instant (lecture seule)."""
     rows = metrics.recent_weeks(db, current_user=current_user, weeks=weeks)
     return WrMetricsWeeklyResponse(weeks=[WrMetricsWeekRead.model_validate(row) for row in rows])
+
+
+@router.get("/admin/transition", response_model=SlotAuditStatesResponse)
+def slot_transition_states_route(current_user: CurrentUserDep, db: SessionDep) -> SlotAuditStatesResponse:
+    """Slots IA, agreement des semaines closes et décroissance proposée (lecture seule)."""
+    return SlotAuditStatesResponse(slots=audit_loop.slot_states(db))
+
+
+@router.post("/admin/transition", response_model=SlotAuditStateRead)
+def slot_transition_update_route(
+    payload: SlotTransitionUpdateRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> SlotAuditStateRead | JSONResponse:
+    """Décision utilisateur : taux d'audit ou cible d'agreement d'un slot (jamais le tier)."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        return audit_loop.update_slot(
+            db, current_user=current_user, request=payload,
+            idempotency_key=idempotency_key, request_path=request.url.path,
+        )
+    except audit_loop.UnknownSlotError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    except audit_loop.SlotIdempotencyConflictError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})

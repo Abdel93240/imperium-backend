@@ -439,6 +439,20 @@ Vues 5 a 10 du §17.4 (`ai_hallucination_tracker`, `ai_error_analysis`, `ai_late
 une notification `normal`/`system` par seuil et par jour de Paris, rien n'est coupe ni reroute.
 Requetes manuelles §17.5 : non codees (requetes ad hoc).
 
+### ai_slot_transition et ai_audit_samples
+
+Tables partagees du socle (migration 20260715_0038, spec WR §3.7 ; doc 78 F1-13, F2-09).
+`ai_slot_transition` : une ligne par slot IA (registre + tier `local_default|cloud_forced|routed`,
+`audit_sample_pct`, `agreement_target_pct`, `version`). Migration 20261019_0088 : 10 slots WR
+(spec WR §10) et 2 slots Daily (spec Daily §13) semes, audit 100 %, cible 92 %.
+`ai_audit_samples` : une contre-lecture cloud d'une sortie locale ; 0088 ajoute `cloud_model`,
+`disagreement_class` (label du futur dataset) et l'unicite partielle (`slot_code`, `run_ref`).
+Vue `v_ai_slot_agreement_weekly` : echantillons et agreement par slot et semaine de Paris ;
+`v_ai_training_pairs` (0038) : desaccords. Le code (`app/services/ai/audit_loop.py`) tire
+l'echantillon de facon deterministe, enregistre les resultats et PROPOSE une decroissance ;
+seul l'utilisateur la decide (`POST /api/wr/admin/transition`, event `decision.ai_audit.updated`).
+Le tier ne change jamais par cette route. Aucune contre-lecture cloud n'est branchee.
+
 ### ai_memories
 
 Nom actuel : `ai_memories`

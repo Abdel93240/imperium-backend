@@ -92,3 +92,42 @@ class WrMetricsWeekRead(BaseModel):
 
 class WrMetricsWeeklyResponse(BaseModel):
     weeks: list[WrMetricsWeekRead]
+
+
+class SlotAuditWeekRead(BaseModel):
+    week_start: date
+    samples: int
+    agreement_pct: float
+
+
+class SlotAuditStateRead(BaseModel):
+    """État d'audit d'un slot IA (spec WR §3.7) ; la décroissance n'est qu'une proposition."""
+
+    slot_code: str
+    domain: str
+    tier: Literal["local_default", "cloud_forced", "routed"]
+    audit_sample_pct: int
+    agreement_target_pct: int | None
+    version: int
+    weeks: list[SlotAuditWeekRead]
+    decay_proposed: bool
+    proposed_audit_sample_pct: int | None
+
+
+class SlotAuditStatesResponse(BaseModel):
+    slots: list[SlotAuditStateRead]
+
+
+class SlotTransitionUpdateRequest(BaseModel):
+    """Décision utilisateur sur l'audit d'un slot. Le tier ne se change pas ici (routage doc 30)."""
+
+    slot_code: str = Field(min_length=1, max_length=128)
+    audit_sample_pct: int | None = Field(default=None, ge=0, le=100)
+    agreement_target_pct: int | None = Field(default=None, ge=1, le=100)
+    reason_fr: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _something_changes(self) -> "SlotTransitionUpdateRequest":
+        if self.audit_sample_pct is None and self.agreement_target_pct is None:
+            raise ValueError("Give audit_sample_pct or agreement_target_pct.")
+        return self

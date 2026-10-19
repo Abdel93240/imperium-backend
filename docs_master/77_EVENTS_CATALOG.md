@@ -237,6 +237,7 @@ Le domaine `decision` porte les faits rares qui changent l'arbitrage du système
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
 |---|---|---|---|---|
 | `decision.priorities.updated` | Actuel : `priority.rules.updated`. Existe, à renommer. | `ReplacePriorityRulesRequest` complet : liste de `priority_key`, `label`, `rank_order`, `importance_score`. | V1 | L'utilisateur change l'ordre religious/business/finance/health ; cela recalcule tout le scoring. |
+| `decision.ai_audit.updated` | CODE (2026-10-19) : `POST /api/wr/admin/transition`. | `{ slot_code, version, previous: {audit_sample_pct, agreement_target_pct}, audit_sample_pct, agreement_target_pct, reason_fr }` (privacy low : réglage système, aucune donnée personnelle). | V1 | Spec WR §3.7 : la décroissance de l'audit d'un slot IA est une décision utilisateur, jamais automatique. Un rejeu de la même clé n'émet rien. |
 
 Il n'y a pas de `decision.override.applied`. C'est un choix de design : Imperium
 doit planifier à la place de l'utilisateur pour décharger son cerveau. Les
