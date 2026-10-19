@@ -248,6 +248,10 @@ def decide(
         item.consecutive_defers += 1
         if item.consecutive_defers >= int(get_parameter(db, "wr.docket_max_defers", default=3)):
             item.force_decision = forced = True
+    if item.item_type == "chain_proposal":
+        from app.services.wr import causal  # import local : causal dépose ses items via ce module
+
+        causal.mirror_decision(db, docket_item_id=item.id, decision=request.decision)
     db.flush()
     decided = _emit(db, current_user, "planning.docket.item_decided", item, suffix=idempotency_key,
                     extra={"modified": True} if request.modified_payload is not None else None, occurred_at=now)

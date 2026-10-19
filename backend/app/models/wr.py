@@ -9,7 +9,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -217,6 +217,78 @@ class PlanDelta(UUIDPrimaryKeyMixin, Base):
     rejection_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
     model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChainProbe(UUIDPrimaryKeyMixin, Base):
+    """Divergent probe of W2 — a query, never knowledge (migration 0096, spec WR §3.3, §5.1)."""
+
+    __tablename__ = "chain_probes"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    target_event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    probe_text: Mapped[str] = mapped_column(Text, nullable=False)
+    probe_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_by: Mapped[str] = mapped_column(Text, nullable=False)
+    run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("wr_worker_runs.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChainCandidate(UUIDPrimaryKeyMixin, Base):
+    """Candidate cause found by the code search of W2 (migration 0096, spec WR §5.2)."""
+
+    __tablename__ = "chain_candidates"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    target_event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    candidate_event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    channels: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    probe_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("chain_probes.id"), nullable=True)
+    similarity: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    passed_hard_filters: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    rerank_score: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    retained: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChainPairVerdict(UUIDPrimaryKeyMixin, Base):
+    """Paired verdict on one retained candidate (migration 0096, spec WR §5.3)."""
+
+    __tablename__ = "chain_pair_verdicts"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    candidate_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("chain_candidates.id"), nullable=False)
+    verdict: Mapped[str] = mapped_column(Text, nullable=False)
+    mechanism_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_used: Mapped[str] = mapped_column(Text, nullable=False)
+    run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    valid: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChainAssembly(UUIDPrimaryKeyMixin, Base):
+    """Proposed causal links of one target event, awaiting the docket (migration 0096, spec WR §5.4)."""
+
+    __tablename__ = "chain_assemblies"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    target_event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    proposed_links: Mapped[list] = mapped_column(JSONB, nullable=False)
+    conflicts: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    docket_item_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wr_docket_items.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

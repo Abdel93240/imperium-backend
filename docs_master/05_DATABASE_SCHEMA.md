@@ -2002,11 +2002,32 @@ chaque worker traite ]curseur, maintenant] puis avance son curseur. Un echec n'a
 curseur et arrete la chaine ; le passage suivant reprend le meme lot. Worker non code : saute,
 sans curseur (premier lot = depuis minuit, heure de Paris). Un worker code ne tourne que s'il
 est liste dans le parametre `wr.factory_workers_enabled` (seme vide ; carte V18). Codes : W1
-(rollups, ci-dessous), W4 (anomalies, ci-dessous) et W5 (items `anomaly` depuis W4 puis
-recalcul des priorites du docket) ; aucun appel de modele. Jobs semes desactives :
+(rollups, ci-dessous), W4 (anomalies, ci-dessous), W2 en dry-run (ci-dessous) et W5 (items
+`anomaly` depuis W4 puis recalcul des priorites du docket) ; aucun appel de modele. Jobs semes desactives :
 `wr.factory_on_session_end` (abonne a `rides.session.ended`) et `wr.factory_fallback` (cron
 UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne ce jour-la).
 Event `planning.factory.run_completed` par worker passe.
+
+Decouverte causale W2 — `chain_probes`, `chain_candidates`, `chain_pair_verdicts`,
+`chain_assemblies` : CODE (migration 20261019_0096, 2026-10-19, spec WR §3.3 et §5 ; carte V20
+ACT-WR-10). DDL de la spec + user_id et created_at partout, FK vers `events.id`,
+`chain_assemblies.dry_run`. Antichambre : rien n'entre dans le graphe causal reel (causation_id,
+depth des events, E2) avant la Phase 5. Events notables choisis par le code selon le parametre
+editable `wr.notable_criteria` (types notables `planning.mission.aborted`,
+`planning.replan.requested`, `finance.pressure.corrected` ; red flag `planning.docket.red_notified` ;
+questions utilisateur : aucune encore ; anomalie W4 >= orange le meme jour de Paris dans le domaine
+de l'event ; 10 cibles au plus par passage, red flags d'abord ; un event deja sonde n'est pas
+repris ; a valider). Candidats (code) : anteriorite stricte, `wr.chain_window_days` (90), cause
+declaree exclue, events internes du WR exclus ; canaux graph (meme correlation_id) et metadata
+(meme famille ou meme jour) ; canaux vectoriels eteints ; rerank composite canal x proximite,
+`wr.chain_topn` (10) retenus. Sondes et verdicts FACTICES tant que `real_ai_enabled` est faux
+(`generated_by` / `model_used` = `dry_run`, tirage deterministe) ; W2 reel non code (V21) : avec
+`real_ai_enabled` vrai, le worker echoue sans avancer son curseur. Assemblage (code) : verdicts
+direct_cause|favoring_condition >= `wr.chain_min_confidence` (60) -> liens (depth = depth de la
+cause + 1), plusieurs causes directes ou cycle -> `conflicts` ; avec au moins un lien, item
+docket `chain_proposal` (titre « [essai] », payload.dry_run, sans confiance donc jamais
+auto-accepte). Le statut de l'assemblage suit la decision du docket (valide, refuse ; archive =
+refuse ; report = inchange).
 
 Rollups W1 — `wr_rollups_daily` : CODE (migration 20261019_0091, 2026-10-19, spec WR §4 W1 ;
 pas de DDL dans la spec ; lu par le digest depuis 0094). Une ligne par utilisateur, jour de Paris et domaine, `metrics` JSONB
