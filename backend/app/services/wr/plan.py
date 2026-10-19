@@ -8,27 +8,38 @@ Plan courant = `v_plan_current` (version active + deltas appliqués, dans l'ordr
 l'applicateur : move (params.to_week), add (params : title_fr, week, params), remove, modify
 (params : title_fr et/ou params ; la semaine ne change que par move). Un delta s'applique en entier
 ou pas du tout : ref absente (ou déjà présente pour add), semaine hors horizon, champ interdit →
-rejet motivé. La génération (régénérations, deltas hebdo) arrive en V23/V24.
+rejet motivé. La génération des deltas hebdo arrive en V23.
+
+Régénération choc (§8.1, carte ACT-WR-20) : déclenchée À LA MAIN (POST plan/shock) avec une raison
+de la taxonomie éditable `wr.shock_taxonomy`, servie seulement si `wr.plan_enabled` et
+`wr.plan_shock_enabled`. Aucun abonnement aux replans ordinaires, qui restent inchangés. Tant que
+`real_ai_enabled` est faux, c'est un essai à blanc : la version proposée est la copie du plan courant
+(deltas appliqués) recalée sur aujourd'hui, `model_used=dry_run`. Toujours `proposed` : elle ne
+devient active que par activate ; une seule régénération proposée en attente à la fois.
 """
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.auth import User
 from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.wr import PlanVersion
-from app.schemas.wr import PlanCurrentRead, PlanInitialRequest, PlanItem, PlanVersionRead
+from app.schemas.wr import PlanCurrentRead, PlanInitialRequest, PlanItem, PlanShockRequest, PlanVersionRead
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
 
 MODIFIABLE_FIELDS = frozenset({"title_fr", "params"})
+PARIS = ZoneInfo("Europe/Paris")
+DRY_RUN = "dry_run"
 
 
 class PlanVersionNotFoundError(LookupError):
@@ -47,8 +58,20 @@ class PlanDeltaRejectedError(ValueError):
         self.reasons = reasons
 
 
+class PlanShockReasonError(ValueError):
+    pass
+
+
 def plan_enabled(db: Session) -> bool:
     return bool(get_parameter(db, "wr.plan_enabled", default=False))
+
+
+def shock_enabled(db: Session) -> bool:
+    return bool(get_parameter(db, "wr.plan_shock_enabled", default=False))
+
+
+def shock_taxonomy(db: Session) -> dict[str, str]:
+    return {entry["code"]: entry["label_fr"] for entry in get_parameter(db, "wr.shock_taxonomy", default=[]) or []}
 
 
 def horizon_weeks(horizon_start, horizon_end) -> int:
@@ -137,18 +160,10 @@ def create_initial(
     request_path: str,
     now: datetime | None = None,
 ) -> PlanVersionRead:
-    fingerprint = hashlib.sha256(
-        json.dumps({"ns": "wr.plan.initial", **request.model_dump(mode="json")}, sort_keys=True).encode()
-    ).hexdigest()
-    previous = db.scalar(
-        select(IdempotencyKey).where(
-            IdempotencyKey.user_id == current_user.id, IdempotencyKey.idempotency_key == idempotency_key
-        )
-    )
-    if previous is not None:
-        if previous.request_path != request_path or previous.request_hash != fingerprint or previous.response_body is None:
-            raise PlanStateError("Idempotency key already used with a different request.", "IDEMPOTENCY_CONFLICT")
-        return PlanVersionRead.model_validate(previous.response_body)
+    fingerprint = _fingerprint("wr.plan.initial", request.model_dump(mode="json"))
+    replay = _replay(db, current_user, idempotency_key, request_path, fingerprint)
+    if replay is not None:
+        return replay
 
     if _active(db, current_user) is not None:
         raise PlanStateError("A plan is already active: the next versions come from regenerations.",
@@ -162,14 +177,64 @@ def create_initial(
     db.add(row)
     db.flush()
     _emit(db, current_user, "planning.plan.proposed", row, {}, now)
-    read = PlanVersionRead.model_validate(row)
-    db.add(IdempotencyKey(
-        user_id=current_user.id, idempotency_key=idempotency_key, request_method="POST", request_path=request_path,
-        request_hash=fingerprint, status=IdempotencyStatus.completed, response_status_code=201,
-        response_body=read.model_dump(mode="json"),
-    ))
-    db.commit()
-    return read
+    return _remember(db, current_user, row, idempotency_key, request_path, fingerprint)
+
+
+def request_shock(
+    db: Session,
+    *,
+    current_user: User,
+    request: PlanShockRequest,
+    idempotency_key: str,
+    request_path: str,
+    now: datetime | None = None,
+) -> PlanVersionRead:
+    """Choc exogène déclaré par l'utilisateur → régénération complète PROPOSÉE (jamais activée ici)."""
+    fingerprint = _fingerprint("wr.plan.shock", request.model_dump(mode="json"))
+    replay = _replay(db, current_user, idempotency_key, request_path, fingerprint)
+    if replay is not None:
+        return replay
+
+    taxonomy = shock_taxonomy(db)
+    if request.reason_code not in taxonomy:
+        raise PlanShockReasonError(f"Unknown shock reason '{request.reason_code}' (wr.shock_taxonomy).")
+    if get_settings().real_ai_enabled:
+        raise PlanStateError("Real shock regeneration (wr.plan_regen) is not coded yet: card V24.",
+                             "PLAN_REGEN_NOT_CODED")
+    active = _active(db, current_user)
+    if active is None:
+        raise PlanStateError("No active plan to regenerate.", "PLAN_NOT_ACTIVE")
+    pending = db.scalar(select(PlanVersion.id).where(
+        PlanVersion.user_id == current_user.id, PlanVersion.status == "proposed",
+        PlanVersion.origin.in_(("shock_regen", "monthly_regen"))))
+    if pending is not None:
+        raise PlanStateError(f"A regenerated plan is already waiting for validation ({pending}).",
+                             "PLAN_REGEN_PENDING")
+
+    now = now or datetime.now(UTC)
+    current = current_plan(db, current_user=current_user)
+    shock = build_event(
+        db, user_id=current_user.id, event_type="planning.plan.shock_requested",
+        payload={"reason_code": request.reason_code, "active_plan_version_id": str(active.id)},
+        idempotency_key=f"planning.plan.shock_requested.{idempotency_key}", source_app=SourceApp.imperium,
+        privacy_level=PrivacyLevel.medium, occurred_at=now,
+    )
+    db.add(shock)
+    db.flush()
+    start = now.astimezone(PARIS).date()
+    row = PlanVersion(
+        user_id=current_user.id, horizon_start=start,
+        horizon_end=start + timedelta(days=(current.horizon_end - current.horizon_start).days),
+        plan=current.plan, origin="shock_regen", origin_ref=shock.id, model_used=DRY_RUN,
+        rationale_fr=f"[essai] Régénération choc ({taxonomy[request.reason_code]}) : copie du plan courant, "
+                     "aucun modèle appelé.",
+        status="proposed", created_at=now,
+    )
+    db.add(row)
+    db.flush()
+    _emit(db, current_user, "planning.plan.regenerated", row,
+          {"reason_code": request.reason_code, "dry_run": True}, now, causation_id=shock.event_id)
+    return _remember(db, current_user, row, idempotency_key, request_path, fingerprint)
 
 
 def activate(db: Session, *, current_user: User, version_id: UUID, now: datetime | None = None) -> PlanVersionRead:
@@ -208,6 +273,36 @@ def supersede(
     return PlanVersionRead.model_validate(row)
 
 
+def _fingerprint(namespace: str, body: dict) -> str:
+    return hashlib.sha256(json.dumps({"ns": namespace, **body}, sort_keys=True).encode()).hexdigest()
+
+
+def _replay(db: Session, current_user: User, idempotency_key: str, request_path: str,
+            fingerprint: str) -> PlanVersionRead | None:
+    previous = db.scalar(
+        select(IdempotencyKey).where(
+            IdempotencyKey.user_id == current_user.id, IdempotencyKey.idempotency_key == idempotency_key
+        )
+    )
+    if previous is None:
+        return None
+    if previous.request_path != request_path or previous.request_hash != fingerprint or previous.response_body is None:
+        raise PlanStateError("Idempotency key already used with a different request.", "IDEMPOTENCY_CONFLICT")
+    return PlanVersionRead.model_validate(previous.response_body)
+
+
+def _remember(db: Session, current_user: User, row: PlanVersion, idempotency_key: str, request_path: str,
+              fingerprint: str) -> PlanVersionRead:
+    read = PlanVersionRead.model_validate(row)
+    db.add(IdempotencyKey(
+        user_id=current_user.id, idempotency_key=idempotency_key, request_method="POST", request_path=request_path,
+        request_hash=fingerprint, status=IdempotencyStatus.completed, response_status_code=201,
+        response_body=read.model_dump(mode="json"),
+    ))
+    db.commit()
+    return read
+
+
 def _active(db: Session, current_user: User) -> PlanVersion | None:
     return db.scalar(select(PlanVersion).where(PlanVersion.user_id == current_user.id,
                                                PlanVersion.status == "active").with_for_update())
@@ -220,7 +315,8 @@ def _owned(db: Session, current_user: User, version_id: UUID) -> PlanVersion:
     return row
 
 
-def _emit(db: Session, current_user: User, event_type: str, row: PlanVersion, extra: dict, now: datetime) -> None:
+def _emit(db: Session, current_user: User, event_type: str, row: PlanVersion, extra: dict, now: datetime,
+          causation_id: str | None = None) -> None:
     db.add(build_event(
         db, user_id=current_user.id, event_type=event_type,
         payload={"plan_version_id": str(row.id), "origin": row.origin,
@@ -228,6 +324,6 @@ def _emit(db: Session, current_user: User, event_type: str, row: PlanVersion, ex
                  "horizon_start": row.horizon_start.isoformat(), "horizon_end": row.horizon_end.isoformat(),
                  "items": len(row.plan.get("items", [])), **extra},
         idempotency_key=f"{event_type}.{row.id}", source_app=SourceApp.imperium,
-        privacy_level=PrivacyLevel.medium, occurred_at=now,
+        privacy_level=PrivacyLevel.medium, causation_id=causation_id, occurred_at=now,
     ))
     db.flush()
