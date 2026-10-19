@@ -292,3 +292,48 @@ class ChainAssembly(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class WrPatternExtraction(UUIDPrimaryKeyMixin, Base):
+    """Pattern extracted at an episode close, before any memory write (migration 0097, spec WR §6.1)."""
+
+    __tablename__ = "wr_pattern_extractions"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    episode_event_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("events.id"), nullable=False)
+    statement_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    pattern_domain: Mapped[str] = mapped_column(Text, nullable=False)
+    context_predicate: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    predicate_rejected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    evidence_event_ids: Mapped[list[UUID]] = mapped_column(ARRAY(PG_UUID(as_uuid=True)), nullable=False)
+    suggested_confidence: Mapped[int] = mapped_column(Integer, nullable=False)
+    canonical_errors: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    model_used: Mapped[str] = mapped_column(Text, nullable=False)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MemoryConfrontation(UUIDPrimaryKeyMixin, Base):
+    """Identity confrontation of an extracted pattern with a memory neighbour (migration 0097, spec WR §6.2)."""
+
+    __tablename__ = "memory_confrontations"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    extraction_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wr_pattern_extractions.id"), nullable=False
+    )
+    new_statement: Mapped[str] = mapped_column(Text, nullable=False)
+    neighbor_memory_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_memories.id"), nullable=True
+    )
+    relation: Mapped[str] = mapped_column(Text, nullable=False)
+    rationale_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    applied_effect: Mapped[str] = mapped_column(Text, nullable=False)
+    model_used: Mapped[str] = mapped_column(Text, nullable=False)
+    run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

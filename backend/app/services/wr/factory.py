@@ -10,8 +10,9 @@ bascule worker par worker, carte V18), sinon il est sauté sans curseur lui auss
 Codés aujourd'hui : W1 (rollups quotidiens, rollups.py), W4 (anomalies sur les rollups,
 anomalies.py) et W5 (items `anomaly` depuis W4, dédoublonnés par signal et jour, puis recalcul des
 priorités du docket) ; W2 découverte causale en dry-run seulement (causal.py : sondes et verdicts
-factices tant que `real_ai_enabled` est faux, échec explicite sinon). W3 apprentissages (IA) reste à
-coder ; ce module n'appelle aucun modèle. Les jobs `wr.factory_on_session_end` et `wr.factory_fallback` sont semés désactivés.
+factices tant que `real_ai_enabled` est faux, échec explicite sinon) et W3 apprentissages en dry-run
+seulement (learning.py : extractions factices, confrontations journalisées, aucune écriture mémoire).
+Ce module n'appelle aucun modèle. Les jobs `wr.factory_on_session_end` et `wr.factory_fallback` sont semés désactivés.
 """
 
 import time
@@ -31,7 +32,7 @@ from app.models.toolbox import SignalDefinition, SignalValue
 from app.models.wr import WrDocketItem, WrWorkerCursor, WrWorkerRun
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
-from app.services.wr import anomalies, causal, docket, rollups
+from app.services.wr import anomalies, causal, docket, learning, rollups
 
 PARIS = ZoneInfo("Europe/Paris")
 WORKER_ORDER = ("w1_rollups", "w4_anomalies", "w2_causal", "w3_learning", "w5_docket")
@@ -72,6 +73,14 @@ def _w2_causal(db: Session, user: User, window_from: datetime, window_to: dateti
                          detail={"dry_run": True, "reasons": stats.reasons, "probes": stats.probes,
                                  "candidates": stats.candidates, "retained": stats.retained,
                                  "verdicts": stats.verdicts, "links": stats.links, "vector_channels": "off"})
+
+
+def _w3_learning(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
+    stats = learning.run_window(db, user=user, window_from=window_from, window_to=window_to)
+    return WorkerOutcome(items_in=stats.episodes, items_out=stats.extractions,
+                         detail={"dry_run": True, "rejected": stats.rejected,
+                                 "predicates_rejected": stats.predicates_rejected,
+                                 "confrontations": stats.confrontations, "memory_writes": 0})
 
 
 def _w5_docket(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
@@ -123,7 +132,7 @@ WORKERS: dict[str, Worker | None] = {
     "w1_rollups": _w1_rollups,
     "w4_anomalies": _w4_anomalies,
     "w2_causal": _w2_causal,
-    "w3_learning": None,
+    "w3_learning": _w3_learning,
     "w5_docket": _w5_docket,
 }
 
