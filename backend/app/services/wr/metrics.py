@@ -3,7 +3,7 @@
 Semaine = [lundi 00:00, lundi suivant 00:00) en Europe/Paris. Sources :
 - docket : items créés dans la semaine (et par type pour chain_proposals, patterns_new,
   contradictions) ; décisions et décisions forcées = events `planning.docket.*` de la semaine ;
-- usine : runs `wr.factory*` du runner (aucun job d'usine n'existe encore → 0) ;
+- usine : passages de l'usine (`wr_worker_runs`, un instant `window_to` par passage) ;
 - WR : session de la semaine. Lancée → wr_mode `full` (le mode court n'est pas encore
   enregistré sur la session) et durée lancement → fin. Rien de lancé quand la fenêtre est
   close (lundi de S+2, la revue de S se tenant pendant S+1) → `skipped` ; avant, NULL.
@@ -20,9 +20,8 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.event import Event
 from app.models.imperium import ImperiumWeeklyReviewSession
-from app.models.toolbox import JobRun
 from app.services.ai import audit_loop
-from app.models.wr import WrDocketItem, WrMetricsWeekly
+from app.models.wr import WrDocketItem, WrMetricsWeekly, WrWorkerRun
 
 
 PARIS = ZoneInfo("Europe/Paris")
@@ -66,10 +65,10 @@ def compute_week(
         .where(Event.user_id == current_user.id, Event.event_type == "planning.docket.item_forced",
                Event.occurred_at >= start, Event.occurred_at < end)
     )
+    # Un passage de l'usine = un instant `window_to` partagé par tous ses workers.
     factory_runs = db.scalar(
-        select(func.count()).select_from(JobRun)
-        .where(JobRun.job_code.like("wr.factory%"), JobRun.status == "completed",
-               JobRun.created_at >= start, JobRun.created_at < end)
+        select(func.count(func.distinct(WrWorkerRun.window_to)))
+        .where(WrWorkerRun.window_to >= start, WrWorkerRun.window_to < end)
     )
     session = db.scalar(
         select(ImperiumWeeklyReviewSession).where(
