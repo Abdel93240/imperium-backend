@@ -1692,6 +1692,16 @@ Tables planning futures / non codees :
 Tables d'arbitrage et scoring :
 `imperium_user_priorities`, `imperium_mission_scores`.
 
+Baremes externalises (migration 20261019_0101, 2026-10-19, spec Daily §4, carte ACT-DLY-01) :
+parametres versionnes `df.deadline_points`, `df.impact_points`, `df.mission_type_points`,
+`df.dependency_points`, `df.recurrence_points`, `df.criterion_max`, `df.coefficient_by_position`,
+`df.priority_buckets` (domaine `df`), semes a l'identique depuis les constantes du code. Le
+service (`decision_framework.load_scales`) les lit avec un cache par version ; parametre absent
+ou invalide → constantes du code, journalise. Parite prouvee par 83 cas dores captures avant
+l'externalisation (`tests/fixtures/df_golden_scores.json`). L'ORDRE des domaines reste dans
+`imperium_user_priorities` ; seuls les VALEURS des coefficients sont des parametres. Pas de
+reglage par API (carte ACT-DLY-02) ni de refresh du registre (ACT-DLY-03). Audit : `DAILY_MAPPING.md`.
+
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
 jusqu'a une migration explicite future. Ne pas renommer les tables dans les

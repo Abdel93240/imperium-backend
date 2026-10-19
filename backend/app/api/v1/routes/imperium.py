@@ -158,6 +158,7 @@ from app.services.imperium.decision_framework import (
     get_canonical_priority_order,
     get_or_initialize_user_priorities,
     get_user_priority_context,
+    load_scales,
     preview_decision_framework_score,
     replace_user_priorities,
 )
@@ -325,7 +326,7 @@ def decision_framework_score_preview_route(
 ) -> DecisionFrameworkScorePreviewResponse:
     try:
         priorities = get_user_priority_context(db, current_user=current_user)
-        return preview_decision_framework_score(payload, priorities=priorities)
+        return preview_decision_framework_score(payload, priorities=priorities, scales=load_scales(db))
     except DecisionFrameworkValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 

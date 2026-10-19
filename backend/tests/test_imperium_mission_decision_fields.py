@@ -13,6 +13,11 @@ from app.services.imperium.decision_framework import get_domain_coefficient
 from app.services.imperium.missions import _hash_request, _stable_dump, get_mission_decision_score, start_mission
 
 
+class EmptyResult:
+    def all(self):
+        return []
+
+
 class FakeDb:
     def __init__(self, *, scalar_result=None, scalar_results=None, scalars_result=None) -> None:
         self.scalar_result = scalar_result
@@ -33,6 +38,9 @@ class FakeDb:
 
     def commit(self) -> None:
         self.committed = True
+
+    def execute(self, _query, _params=None):
+        return EmptyResult()  # aucun paramètre df.* : le service garde les barèmes du code
 
     def scalar(self, _query):
         if self.scalar_results is not None:

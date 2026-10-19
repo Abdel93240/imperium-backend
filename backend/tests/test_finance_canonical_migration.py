@@ -13,6 +13,11 @@ from app.services.imperium.dashboard import get_dashboard_snapshot
 from app.services.imperium.weekly_report import get_weekly_report
 
 
+class EmptyResult:
+    def all(self):
+        return []
+
+
 class FakeDb:
     def __init__(self, *, scalar_results=None, scalars_results=None) -> None:
         self.scalar_results = list(scalar_results or [])
@@ -37,6 +42,9 @@ class FakeDb:
 
     def rollback(self) -> None:
         self.rolled_back = True
+
+    def execute(self, _query, _params=None):
+        return EmptyResult()  # aucun paramètre df.* : le service garde les barèmes du code
 
     def scalar(self, query):
         self.queries.append(query)

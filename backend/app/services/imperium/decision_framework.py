@@ -1,10 +1,22 @@
+"""Decision Framework (doc 52) : score intrinsèque A-E, coefficient de domaine, bucket de priorité.
+
+Barèmes externalisés (spec Daily §4, carte ACT-DLY-01) : les valeurs vivent dans les paramètres
+versionnés `df.*`, semés À L'IDENTIQUE depuis les constantes ci-dessous (`CODE_SCALES`). Le service
+lit `load_scales(db)` (cache mémoire par version de paramètre) ; sans paramètre ou avec un paramètre
+invalide, il retombe sur `CODE_SCALES` (journalisé). Parité prouvée par tests dorés
+(tests/fixtures/df_golden_scores.json). `imperium_user_priorities` reste la source de l'ORDRE des
+domaines ; les VALEURS des coefficients deviennent des paramètres.
+"""
+
 import hashlib
 import json
+import logging
 import unicodedata
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from uuid import NAMESPACE_URL, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
@@ -28,6 +40,8 @@ SUPPORTED_DOMAINS = ("religious", "business", "finance", "health")
 DEFAULT_PRIORITY_ORDER = ("religious", "business", "finance", "health")
 COEFFICIENT_BY_POSITION = {1: 10, 2: 8, 3: 5, 4: 4}
 SOURCE = "decision_framework_v1"
+
+logger = logging.getLogger(__name__)
 
 _DOMAIN_ALIASES = {
     "religious": "religious",
@@ -105,6 +119,49 @@ _RECURRENCE_POINTS = {
     "unique": 10,
 }
 
+_DEADLINE_POINTS = {"overdue_or_today": 30, "bands": [[2, 25], [6, 20], [14, 15], [30, 10]], "beyond": 5}
+_DEPENDENCY_SCALE = {"bool_true": 5, "bool_false": 0, "blocked_count_bands": [[0, 0], [2, 5]], "blocked_count_beyond": 10}
+_CRITERION_MAX = {"deadline": 30, "impact": 30, "mission_type": 20, "dependency": 10, "recurrence": 10}
+_PRIORITY_BUCKETS = [[700, 10], [600, 9], [500, 8], [400, 7], [300, 6], [200, 5], [100, 4], [50, 3], [20, 2]]
+_PRIORITY_BUCKET_FLOOR = 1
+
+
+@dataclass(frozen=True)
+class ScoringScales:
+    """Barèmes du doc 52 : une instance = un jeu de versions des paramètres `df.*`."""
+
+    deadline: dict
+    impact: dict
+    mission_type: dict
+    dependency_labels: dict
+    dependency: dict
+    recurrence: dict
+    criterion_max: dict
+    coefficient_by_position: dict
+    priority_buckets: list
+    priority_bucket_floor: int
+
+
+CODE_SCALES = ScoringScales(
+    deadline=_DEADLINE_POINTS, impact=_IMPACT_POINTS, mission_type=_MISSION_TYPE_POINTS,
+    dependency_labels=_DEPENDENCY_POINTS, dependency=_DEPENDENCY_SCALE, recurrence=_RECURRENCE_POINTS,
+    criterion_max=_CRITERION_MAX, coefficient_by_position=COEFFICIENT_BY_POSITION, priority_buckets=_PRIORITY_BUCKETS,
+    priority_bucket_floor=_PRIORITY_BUCKET_FLOOR,
+)
+
+# Paramètre `df.*` → champ(s) de ScoringScales ; la valeur semée = CODE_SCALES (migration 0101).
+SCALE_PARAMETERS = {
+    "df.deadline_points": "deadline",
+    "df.impact_points": "impact",
+    "df.mission_type_points": "mission_type",
+    "df.dependency_points": "dependency",
+    "df.recurrence_points": "recurrence",
+    "df.criterion_max": "criterion_max",
+    "df.coefficient_by_position": "coefficient_by_position",
+    "df.priority_buckets": "priority_buckets",
+}
+_scales_cache: dict[tuple, ScoringScales] = {}
+
 _UNSAFE_PAYLOAD_MARKERS = (
     "raw_payload",
     "provider_payload",
@@ -134,6 +191,110 @@ class DecisionFrameworkValidationError(ValueError):
     pass
 
 
+def scale_parameter_values(scales: ScoringScales = CODE_SCALES) -> dict[str, object]:
+    """Valeurs JSON des paramètres `df.*` pour un jeu de barèmes (seed et lecture partagent ce format)."""
+    return {
+        "df.deadline_points": scales.deadline,
+        "df.impact_points": scales.impact,
+        "df.mission_type_points": scales.mission_type,
+        "df.dependency_points": {"labels": scales.dependency_labels, **scales.dependency},
+        "df.recurrence_points": scales.recurrence,
+        "df.criterion_max": scales.criterion_max,
+        "df.coefficient_by_position": {str(position): value for position, value in scales.coefficient_by_position.items()},
+        "df.priority_buckets": {"thresholds": scales.priority_buckets, "floor": scales.priority_bucket_floor},
+    }
+
+
+def scales_from_parameter_values(values: dict[str, object]) -> ScoringScales:
+    """Construit et valide un jeu de barèmes ; ValueError si une valeur est mal formée."""
+    def bands(code: str, raw, *, descending: bool) -> list:
+        if not isinstance(raw, list) or not all(
+                isinstance(band, list) and len(band) == 2 and all(_is_int(x) for x in band) for band in raw):
+            raise ValueError(f"{code}: expected a list of [bound, points] pairs")
+        bounds = [band[0] for band in raw]
+        if bounds != sorted(bounds, reverse=descending) or len(set(bounds)) != len(bounds):
+            raise ValueError(f"{code}: bounds must be strictly {'decreasing' if descending else 'increasing'}")
+        return [list(band) for band in raw]
+
+    criterion_max = values["df.criterion_max"]
+    if not isinstance(criterion_max, dict) or set(criterion_max) != set(_CRITERION_MAX) or not all(
+            _is_int(v) and v >= 0 for v in criterion_max.values()) or sum(criterion_max.values()) > 100:
+        raise ValueError("df.criterion_max: the five criteria A-E with non-negative maxima summing to at most 100")
+    deadline = values["df.deadline_points"]
+    if not isinstance(deadline, dict) or set(deadline) != {"overdue_or_today", "bands", "beyond"}:
+        raise ValueError("df.deadline_points: expected overdue_or_today, bands, beyond")
+    deadline_bands = bands("df.deadline_points", deadline["bands"], descending=False)
+    if not all(_is_int(deadline[key]) for key in ("overdue_or_today", "beyond")) or not all(
+            0 <= p <= criterion_max["deadline"] for p in
+            [deadline["overdue_or_today"], deadline["beyond"], *(band[1] for band in deadline_bands)]):
+        raise ValueError("df.deadline_points: points out of range")
+    dependency = values["df.dependency_points"]
+    if not isinstance(dependency, dict) or set(dependency) != {"labels", *_DEPENDENCY_SCALE}:
+        raise ValueError("df.dependency_points: expected labels, bool_true, bool_false, blocked_count_bands, "
+                         "blocked_count_beyond")
+    dependency_labels = _points_map(dependency["labels"], "df.dependency_points", criterion_max["dependency"])
+    blocked = bands("df.dependency_points", dependency["blocked_count_bands"], descending=False)
+    if not all(_is_int(dependency[key]) and 0 <= dependency[key] <= criterion_max["dependency"]
+               for key in ("bool_true", "bool_false", "blocked_count_beyond")):
+        raise ValueError("df.dependency_points: points out of range")
+    coefficients = values["df.coefficient_by_position"]
+    if not isinstance(coefficients, dict) or set(coefficients) != {"1", "2", "3", "4"} or not all(
+            _is_int(v) and v > 0 for v in coefficients.values()):
+        raise ValueError("df.coefficient_by_position: positions 1-4 with positive coefficients")
+    buckets = values["df.priority_buckets"]
+    if not isinstance(buckets, dict) or set(buckets) != {"thresholds", "floor"} or not _is_int(buckets["floor"]):
+        raise ValueError("df.priority_buckets: expected thresholds and floor")
+    return ScoringScales(
+        deadline={"overdue_or_today": deadline["overdue_or_today"], "bands": deadline_bands,
+                  "beyond": deadline["beyond"]},
+        impact=_points_map(values["df.impact_points"], "df.impact_points", criterion_max["impact"]),
+        mission_type=_points_map(values["df.mission_type_points"], "df.mission_type_points", criterion_max["mission_type"]),
+        dependency_labels=dependency_labels,
+        dependency={"bool_true": dependency["bool_true"], "bool_false": dependency["bool_false"],
+                    "blocked_count_bands": blocked, "blocked_count_beyond": dependency["blocked_count_beyond"]},
+        recurrence=_points_map(values["df.recurrence_points"], "df.recurrence_points", criterion_max["recurrence"]),
+        criterion_max=dict(criterion_max),
+        coefficient_by_position={int(position): value for position, value in coefficients.items()},
+        priority_buckets=bands("df.priority_buckets", buckets["thresholds"], descending=True),
+        priority_bucket_floor=buckets["floor"],
+    )
+
+
+def _points_map(mapping, code: str, upper: int) -> dict:
+    if not isinstance(mapping, dict) or not mapping or not all(
+            isinstance(k, str) and _is_int(v) and 0 <= v <= upper for k, v in mapping.items()):
+        raise ValueError(f"{code}: expected a non-empty map of labels to points in 0..{upper}")
+    return dict(mapping)
+
+
+def load_scales(db: Session) -> ScoringScales:
+    """Barèmes courants depuis `df.*` ; cache par (code, version) ; repli sur CODE_SCALES si absent ou invalide."""
+    rows = db.execute(
+        text("SELECT code, version, value FROM v_parameters_current WHERE code = ANY(:codes) ORDER BY code"),
+        {"codes": list(SCALE_PARAMETERS)},
+    ).all()
+    if len(rows) != len(SCALE_PARAMETERS):
+        if rows:
+            logger.warning("Incomplete df.* parameters: code scales used.", extra={"found": [row[0] for row in rows]})
+        return CODE_SCALES
+    key = tuple((row[0], row[1]) for row in rows)
+    cached = _scales_cache.get(key)
+    if cached is not None:
+        return cached
+    try:
+        scales = scales_from_parameter_values({row[0]: row[2] for row in rows})
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.warning("Invalid df.* parameters: code scales used.", extra={"error": str(exc)})
+        return CODE_SCALES
+    _scales_cache.clear()
+    _scales_cache[key] = scales
+    return scales
+
+
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 class DecisionFrameworkIdempotencyConflictError(ValueError):
     pass
 
@@ -146,9 +307,9 @@ def normalize_domain(domain: str) -> str:
     return canonical
 
 
-def get_domain_coefficient(position: int) -> int:
+def get_domain_coefficient(position: int, scales: ScoringScales = CODE_SCALES) -> int:
     try:
-        return COEFFICIENT_BY_POSITION[position]
+        return scales.coefficient_by_position[position]
     except KeyError as exc:
         raise DecisionFrameworkValidationError("Priority position must be between 1 and 4.") from exc
 
@@ -177,13 +338,14 @@ def get_canonical_priority_order(
     priorities = _get_active_user_priorities(db, current_user=current_user)
     if priorities:
         return sorted(priorities, key=lambda item: item.position)
-    return _build_default_priorities(current_user=current_user, transient=True)
+    return _build_default_priorities(current_user=current_user, transient=True, scales=load_scales(db))
 
 
 def _build_default_priorities(
     *,
     current_user: User,
     transient: bool = False,
+    scales: ScoringScales = CODE_SCALES,
 ) -> list[ImperiumUserPriority]:
     now = datetime.now(UTC)
     return [
@@ -192,7 +354,7 @@ def _build_default_priorities(
             user_id=current_user.id,
             domain=domain,
             position=position,
-            coefficient=get_domain_coefficient(position),
+            coefficient=get_domain_coefficient(position, scales),
             is_active=True,
             created_at=now if transient else None,
             updated_at=now if transient else None,
@@ -223,13 +385,14 @@ def replace_user_priorities(
     active_priorities = _get_active_user_priorities(db, current_user=current_user)
     for priority in active_priorities:
         priority.is_active = False
+    scales = load_scales(db)
 
     new_priorities = [
         ImperiumUserPriority(
             user_id=current_user.id,
             domain=domain,
             position=position,
-            coefficient=get_domain_coefficient(position),
+            coefficient=get_domain_coefficient(position, scales),
             is_active=True,
         )
         for position, domain in enumerate(ordered_domains, start=1)
@@ -268,8 +431,10 @@ def get_decision_framework_schema() -> DecisionFrameworkSchemaResponse:
     )
 
 
-def compute_intrinsic_score(candidate: DecisionFrameworkScorePreviewRequest | dict) -> int:
-    explanation = explain_score(candidate)
+def compute_intrinsic_score(
+    candidate: DecisionFrameworkScorePreviewRequest | dict, scales: ScoringScales = CODE_SCALES
+) -> int:
+    explanation = explain_score(candidate, scales=scales)
     return explanation.final_intrinsic_score
 
 
@@ -282,17 +447,18 @@ def explain_score(
     *,
     domain_position: int | None = None,
     domain_coefficient: int | None = None,
+    scales: ScoringScales = CODE_SCALES,
 ) -> DecisionFrameworkScoreExplanation:
     _ = (domain_position, domain_coefficient)
     data = candidate.model_dump() if isinstance(candidate, DecisionFrameworkScorePreviewRequest) else dict(candidate)
     missing_fields: list[str] = []
     flags: list[str] = []
 
-    deadline_points = _deadline_points(data.get("deadline_at"), missing_fields, flags)
-    impact_points = _impact_points(data, missing_fields, flags)
-    mission_type_points = _mission_type_points(data, missing_fields, flags)
-    dependency_points = _dependency_points(data, missing_fields)
-    recurrence_points = _recurrence_points(data, missing_fields, flags)
+    deadline_points = _deadline_points(data.get("deadline_at"), missing_fields, flags, scales)
+    impact_points = _impact_points(data, missing_fields, flags, scales)
+    mission_type_points = _mission_type_points(data, missing_fields, flags, scales)
+    dependency_points = _dependency_points(data, missing_fields, scales)
+    recurrence_points = _recurrence_points(data, missing_fields, flags, scales)
 
     intrinsic_score = _clamp_int(
         deadline_points + impact_points + mission_type_points + dependency_points + recurrence_points,
@@ -319,23 +485,25 @@ def preview_decision_framework_score(
     payload: DecisionFrameworkScorePreviewRequest,
     *,
     priorities: list[ImperiumUserPriority] | None = None,
+    scales: ScoringScales = CODE_SCALES,
 ) -> DecisionFrameworkScorePreviewResponse:
     domain = normalize_domain(payload.domain)
-    domain_position, domain_coefficient = _priority_for_domain(domain, priorities=priorities)
+    domain_position, domain_coefficient = _priority_for_domain(domain, priorities=priorities, scales=scales)
     explanation = explain_score(
         payload,
         domain_position=domain_position,
         domain_coefficient=domain_coefficient,
+        scales=scales,
     )
     weighted_score = compute_weighted_score(explanation.final_intrinsic_score, domain_coefficient)
-    breakdown = _build_breakdown(explanation)
+    breakdown = _build_breakdown(explanation, scales)
     missing_fields = list(explanation.missing_fields)
     score_status = _score_status(explanation)
     return DecisionFrameworkScorePreviewResponse(
         domain=domain,
         domain_position=domain_position,
         intrinsic_score=explanation.final_intrinsic_score,
-        priority_bucket=_priority_bucket(weighted_score),
+        priority_bucket=_priority_bucket(weighted_score, scales),
         score_status=score_status,
         display_title=_display_title(payload),
         display_summary=_display_summary(
@@ -357,6 +525,7 @@ def preview_score_from_mission_like(
     mission_like: dict,
     *,
     priorities: list[ImperiumUserPriority] | None = None,
+    scales: ScoringScales = CODE_SCALES,
 ) -> DecisionFrameworkScorePreviewResponse:
     domain_value = mission_like.get("domain") or mission_like.get("category")
     if domain_value is None:
@@ -373,13 +542,14 @@ def preview_score_from_mission_like(
         recurrence=mission_like.get("recurrence"),
         payload=mission_like.get("payload"),
     )
-    return preview_decision_framework_score(payload, priorities=priorities)
+    return preview_decision_framework_score(payload, priorities=priorities, scales=scales)
 
 
 def build_mission_score_from_start_request(
     payload: StartMissionRequest,
     *,
     priorities: list[ImperiumUserPriority] | None = None,
+    scales: ScoringScales = CODE_SCALES,
 ) -> dict:
     if payload.domain is None:
         raise DecisionFrameworkValidationError("Mission score storage requires a mission domain.")
@@ -396,11 +566,11 @@ def build_mission_score_from_start_request(
         payload=None,
     )
     domain = normalize_domain(score_payload.domain)
-    _domain_position, domain_coefficient = _priority_for_domain(domain, priorities=priorities)
-    explanation = explain_score(score_payload, domain_coefficient=domain_coefficient)
+    _domain_position, domain_coefficient = _priority_for_domain(domain, priorities=priorities, scales=scales)
+    explanation = explain_score(score_payload, domain_coefficient=domain_coefficient, scales=scales)
     intrinsic_score = explanation.final_intrinsic_score
     weighted_score = compute_weighted_score(intrinsic_score, domain_coefficient)
-    priority_bucket = _priority_bucket(weighted_score)
+    priority_bucket = _priority_bucket(weighted_score, scales)
     score_status = _score_status(explanation)
     explanation_payload = explanation.model_dump(mode="json")
     explanation_payload.update(
@@ -423,11 +593,13 @@ def build_mission_score_from_start_request(
     }
 
 
-def mission_decision_score_summary_from_row(score: ImperiumMissionScore) -> MissionDecisionScoreSummary:
+def mission_decision_score_summary_from_row(
+    score: ImperiumMissionScore, scales: ScoringScales = CODE_SCALES
+) -> MissionDecisionScoreSummary:
     explanation = score.explanation or {}
     return MissionDecisionScoreSummary(
         intrinsic_score=int(score.intrinsic_score),
-        priority_bucket=int(explanation.get("priority_bucket", _priority_bucket(int(score.weighted_score)))),
+        priority_bucket=int(explanation.get("priority_bucket", _priority_bucket(int(score.weighted_score), scales))),
         score_status=str(explanation.get("score_status", _score_status_from_explanation_payload(explanation))),
         missing_fields=list(explanation.get("missing_fields") or []),
         source=score.source,
@@ -505,7 +677,9 @@ def _hash_payload(payload: dict) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def _deadline_points(deadline_at: date | datetime | None, missing_fields: list[str], flags: list[str]) -> int:
+def _deadline_points(
+    deadline_at: date | datetime | None, missing_fields: list[str], flags: list[str], scales: ScoringScales
+) -> int:
     if deadline_at is None:
         missing_fields.append("deadline_at")
         return 0
@@ -519,72 +693,70 @@ def _deadline_points(deadline_at: date | datetime | None, missing_fields: list[s
     if delta_days <= 0:
         if delta_days < 0:
             flags.append("deadline_past")
-        return 30
-    if delta_days <= 2:
-        return 25
-    if delta_days <= 6:
-        return 20
-    if delta_days <= 14:
-        return 15
-    if delta_days <= 30:
-        return 10
-    return 5
+        return scales.deadline["overdue_or_today"]
+    for max_days, points in scales.deadline["bands"]:
+        if delta_days <= max_days:
+            return points
+    return scales.deadline["beyond"]
 
 
-def _impact_points(data: dict, missing_fields: list[str], flags: list[str]) -> int:
+def _impact_points(data: dict, missing_fields: list[str], flags: list[str], scales: ScoringScales) -> int:
+    upper = scales.criterion_max["impact"]
     if data.get("impact") is not None:
-        return _controlled_points(data["impact"], _IMPACT_POINTS, max_value=30, field_name="impact")
+        return _controlled_points(data["impact"], scales.impact, max_value=upper, field_name="impact")
     for legacy_field in ("impact_points", "impact_level"):
         if data.get(legacy_field) is not None:
             flags.append(f"legacy_field:{legacy_field}")
-            return _clamp_int(data[legacy_field], 0, 30)
+            return _clamp_int(data[legacy_field], 0, upper)
     missing_fields.append("impact")
     return 0
 
 
-def _mission_type_points(data: dict, missing_fields: list[str], flags: list[str]) -> int:
+def _mission_type_points(data: dict, missing_fields: list[str], flags: list[str], scales: ScoringScales) -> int:
+    upper = scales.criterion_max["mission_type"]
     if data.get("mission_type") is not None:
-        return _controlled_points(data["mission_type"], _MISSION_TYPE_POINTS, max_value=20, field_name="mission_type")
+        return _controlled_points(data["mission_type"], scales.mission_type, max_value=upper, field_name="mission_type")
     if data.get("effort") is not None:
         flags.append("canonical_alias:effort_used_for_mission_type")
-        return _controlled_points(data["effort"], _MISSION_TYPE_POINTS, max_value=20, field_name="effort")
+        return _controlled_points(data["effort"], scales.mission_type, max_value=upper, field_name="effort")
     for legacy_field in ("effort_points", "mission_type_points"):
         if data.get(legacy_field) is not None:
             flags.append(f"legacy_field:{legacy_field}")
-            return _clamp_int(data[legacy_field], 0, 20)
+            return _clamp_int(data[legacy_field], 0, upper)
     missing_fields.append("mission_type")
     return 0
 
 
-def _dependency_points(data: dict, missing_fields: list[str]) -> int:
+def _dependency_points(data: dict, missing_fields: list[str], scales: ScoringScales) -> int:
+    upper = scales.criterion_max["dependency"]
     if data.get("dependency") is not None:
         dependency = data["dependency"]
         if isinstance(dependency, bool):
-            return 5 if dependency else 0
-        return _controlled_points(dependency, _DEPENDENCY_POINTS, max_value=10, field_name="dependency")
+            return scales.dependency["bool_true"] if dependency else scales.dependency["bool_false"]
+        return _controlled_points(dependency, scales.dependency_labels, max_value=upper, field_name="dependency")
     if data.get("dependency_points") is not None:
-        return _clamp_int(data["dependency_points"], 0, 10)
+        return _clamp_int(data["dependency_points"], 0, upper)
     blocked_count = data.get("blocked_mission_count")
     if blocked_count is None:
         missing_fields.append("dependency")
         return 0
-    if blocked_count <= 0:
-        return 0
-    if blocked_count <= 2:
-        return 5
-    return 10
+    for max_count, points in scales.dependency["blocked_count_bands"]:
+        if blocked_count <= max_count:
+            return points
+    return scales.dependency["blocked_count_beyond"]
 
 
-def _recurrence_points(data: dict, missing_fields: list[str], flags: list[str]) -> int:
+def _recurrence_points(data: dict, missing_fields: list[str], flags: list[str], scales: ScoringScales) -> int:
+    upper = scales.criterion_max["recurrence"]
     recurrence = data.get("recurrence")
     if recurrence is not None:
-        return _controlled_points(recurrence, _RECURRENCE_POINTS, max_value=10, field_name="recurrence")
+        return _controlled_points(recurrence, scales.recurrence, max_value=upper, field_name="recurrence")
     if data.get("alignment") is not None:
         flags.append("canonical_alias:alignment_used_for_recurrence")
-        return _controlled_points(data["alignment"], _RECURRENCE_POINTS, max_value=10, field_name="alignment")
+        return _controlled_points(data["alignment"], scales.recurrence, max_value=upper, field_name="alignment")
     if data.get("alignment_points") is not None:
         flags.append("legacy_field:alignment_points")
-        return _clamp_int(data["alignment_points"], 0, 10)
+        return _clamp_int(data["alignment_points"], 0, upper)
     missing_fields.append("recurrence")
     return 0
 
@@ -608,6 +780,7 @@ def _priority_for_domain(
     priorities: list[ImperiumUserPriority] | None,
     fallback_position: int | None = None,
     fallback_coefficient: int | None = None,
+    scales: ScoringScales = CODE_SCALES,
 ) -> tuple[int, int]:
     if priorities:
         for priority in priorities:
@@ -616,7 +789,7 @@ def _priority_for_domain(
     if fallback_position is not None and fallback_coefficient is not None:
         return fallback_position, fallback_coefficient
     default_position = DEFAULT_PRIORITY_ORDER.index(domain) + 1
-    return default_position, get_domain_coefficient(default_position)
+    return default_position, get_domain_coefficient(default_position, scales)
 
 
 def _unsafe_payload_warnings(payload: object) -> list[str]:
@@ -634,41 +807,44 @@ def _legacy_field_warnings(data: dict) -> list[str]:
     return [f"legacy_field:{field}" for field in _LEGACY_SCORE_FIELDS if data.get(field) is not None]
 
 
-def _build_breakdown(explanation: DecisionFrameworkScoreExplanation) -> list[DecisionFrameworkScoreBreakdownItem]:
+def _build_breakdown(
+    explanation: DecisionFrameworkScoreExplanation, scales: ScoringScales = CODE_SCALES
+) -> list[DecisionFrameworkScoreBreakdownItem]:
+    maxima = scales.criterion_max
     return [
         DecisionFrameworkScoreBreakdownItem(
             label="Deadline proximity",
             key="deadline",
             points=explanation.deadline_points,
-            max_points=30,
+            max_points=maxima["deadline"],
             reason=_reason_for_points(explanation.deadline_points, missing="deadline_at" in explanation.missing_fields),
         ),
         DecisionFrameworkScoreBreakdownItem(
             label="Impact gravity",
             key="impact",
             points=explanation.impact_points,
-            max_points=30,
+            max_points=maxima["impact"],
             reason=_reason_for_points(explanation.impact_points, missing="impact" in explanation.missing_fields),
         ),
         DecisionFrameworkScoreBreakdownItem(
             label="Mission type",
             key="mission_type",
             points=explanation.mission_type_points,
-            max_points=20,
+            max_points=maxima["mission_type"],
             reason=_reason_for_points(explanation.mission_type_points, missing="mission_type" in explanation.missing_fields),
         ),
         DecisionFrameworkScoreBreakdownItem(
             label="Dependency",
             key="dependency",
             points=explanation.dependency_points,
-            max_points=10,
+            max_points=maxima["dependency"],
             reason=_reason_for_points(explanation.dependency_points, missing="dependency" in explanation.missing_fields),
         ),
         DecisionFrameworkScoreBreakdownItem(
             label="Recurrence",
             key="recurrence",
             points=explanation.recurrence_points,
-            max_points=10,
+            max_points=maxima["recurrence"],
             reason=_reason_for_points(
                 explanation.recurrence_points,
                 missing="recurrence" in explanation.missing_fields,
@@ -717,26 +893,11 @@ def _display_summary(*, domain: str, domain_position: int, score_status: str, mi
     return f"Mission {domain} classee selon la position {domain_position}. Score partiel car {missing_count} signaux sont manquants."
 
 
-def _priority_bucket(weighted_score: int) -> int:
-    if weighted_score >= 700:
-        return 10
-    if weighted_score >= 600:
-        return 9
-    if weighted_score >= 500:
-        return 8
-    if weighted_score >= 400:
-        return 7
-    if weighted_score >= 300:
-        return 6
-    if weighted_score >= 200:
-        return 5
-    if weighted_score >= 100:
-        return 4
-    if weighted_score >= 50:
-        return 3
-    if weighted_score >= 20:
-        return 2
-    return 1
+def _priority_bucket(weighted_score: int, scales: ScoringScales = CODE_SCALES) -> int:
+    for threshold, bucket in scales.priority_buckets:
+        if weighted_score >= threshold:
+            return bucket
+    return scales.priority_bucket_floor
 
 
 def _clamp_int(value: object, lower: int, upper: int) -> int:
