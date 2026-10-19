@@ -204,3 +204,91 @@ class WalkNextResponse(BaseModel):
     budget_exhausted: bool
     remaining_items: int
     decided_in_walk: int
+
+
+PLAN_REF_PATTERN = r"^[a-z_]+:[A-Za-z0-9_.:-]{1,120}$"
+PLAN_MAX_DAYS = 42
+
+
+class PlanItem(BaseModel):
+    """Un élément du plan : `ref` stable (`mission:…`, `objective:…`) que visent les deltas."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref: str = Field(pattern=PLAN_REF_PATTERN)
+    title_fr: str = Field(min_length=1, max_length=200)
+    week: int = Field(ge=1, le=6)
+    params: dict = Field(default_factory=dict)
+
+
+class PlanContent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[PlanItem] = Field(min_length=1, max_length=300)
+    invariants_fr: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def _unique_refs(self) -> "PlanContent":
+        refs = [item.ref for item in self.items]
+        if len(refs) != len(set(refs)):
+            raise ValueError("plan item refs must be unique")
+        return self
+
+
+class PlanInitialRequest(BaseModel):
+    """Plan initial SAISI et validé par l'utilisateur (carte ACT-WR-18) : jamais généré ici."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    horizon_start: date
+    horizon_end: date
+    plan: PlanContent
+    rationale_fr: str = Field(min_length=1, max_length=1000)
+
+    @model_validator(mode="after")
+    def _horizon(self) -> "PlanInitialRequest":
+        days = (self.horizon_end - self.horizon_start).days + 1
+        if not 7 <= days <= PLAN_MAX_DAYS:
+            raise ValueError(f"horizon must span 7 to {PLAN_MAX_DAYS} days")
+        weeks = -(-days // 7)
+        if any(item.week > weeks for item in self.plan.items):
+            raise ValueError(f"item week beyond the horizon ({weeks} weeks)")
+        return self
+
+
+class PlanVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    horizon_start: date
+    horizon_end: date
+    plan: dict
+    origin: Literal["initial", "monthly_regen", "shock_regen"]
+    status: Literal["proposed", "active", "superseded"]
+    rationale_fr: str | None
+    created_at: datetime
+    activated_at: datetime | None
+    superseded_at: datetime | None
+    superseded_reason_fr: str | None
+
+
+class PlanVersionListResponse(BaseModel):
+    versions: list[PlanVersionRead]
+
+
+class PlanSupersedeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason_fr: str = Field(min_length=1, max_length=500)
+
+
+class PlanCurrentRead(BaseModel):
+    """v_plan_current : la version active avec ses deltas appliqués, dans l'ordre."""
+
+    plan_version_id: UUID
+    horizon_start: date
+    horizon_end: date
+    origin: str
+    activated_at: datetime
+    plan: dict
+    applied_delta_ids: list[UUID]

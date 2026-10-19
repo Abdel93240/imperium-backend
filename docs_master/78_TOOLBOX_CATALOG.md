@@ -21,7 +21,7 @@ les specs le font déjà via leurs seeds. Pas de document séparé.
 > (prières : Hijri, Qibla, mosquées et réglages livrés), F1-17 (pression codée depuis la phase E
 > Vault, 2026-07-16), F2-12 (versions du plan quotidien Imperium, partiel), F2-15 et F2-16
 > (tables présentes) mises à jour ; compteurs recalculés. Les autres fiches gardent l'état du
-> 2026-07-16. **2026-10-19** : F2-11 (docket du WR) et F2-14 (journal des appels IA) codées, compteurs F2 recalculés.
+> 2026-07-16. **2026-10-19** : F2-11 (docket du WR), F2-12 (plan stratégique) et F2-14 (journal des appels IA) codées, compteurs F2 recalculés.
 
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
@@ -32,8 +32,8 @@ n8n sur disque (`ops/n8n/workflows/`).
 ## RÉPONSE CHIFFRÉE
 
 **Le système compte 55 outils : 25 en F1 (dont 14 codés — 7 livrés éteints par la passe 0 —,
-10 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 16 codées,
-1 spécifiée, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
+10 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 17 codées,
+0 spécifiée, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
 plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
 Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
 D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), puis le 2026-10-18
@@ -372,9 +372,9 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé (R3 appliquée — partagée d'emblée, colonne `domain`).
 
 ### F2-12 `plan_versions` + `plan_deltas` + vue `v_plan_current`
-- vit : spécifiées (spec WR §3.5). MANQUANTES. Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 — voir FINDINGS DV-5. Partiel (2026-10-18) : `planning_daily_plan_versions` (0080) versionne le plan QUOTIDIEN Imperium à chaque replan accepté (doc 43 §20) ; ni `plan_deltas` ni `v_plan_current` ni plan hebdo/mensuel.
+- vit : **CODÉES (2026-10-19, migration 0095, carte ACT-WR-18)** — `plan_versions` (une active par utilisateur, jamais de DELETE), `plan_deltas`, vue `v_plan_current` (version active + deltas appliqués) et applicateur de deltas tout-ou-rien (`app/services/wr/plan.py`) ; plan initial saisi puis validé par l'utilisateur, `GET /api/wr/plan/current` derrière `wr.plan_enabled` (false) ; génération (deltas hebdo V23, régénérations V24) non codée. Historique — spécifiées (spec WR §3.5). Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 — voir FINDINGS DV-5. Partiel (2026-10-18) : `planning_daily_plan_versions` (0080) versionne le plan QUOTIDIEN Imperium à chaque replan accepté (doc 43 §20) ; ni `plan_deltas` ni `v_plan_current` ni plan hebdo/mensuel.
 - consommateurs prévus : WR (deltas hebdo, régénérations), Daily (G1 périmètre « plan courant », §0.5), le local_executor terrain (« le lit ENTIER »).
-- statut : spécifié.
+- statut : existe_codé (génération du plan à venir).
 
 ### F2-13 définitions de signaux partagées (`signal_definitions`/`signal_values`)
 - vit : CRÉÉES au socle (0038) — tables partagées avec colonne `domain` (cf. F1-02) ; seeds des signaux = chaque passe (32 signaux Pulse par la passe Pulse). Écrivains : `vault.pressure` (phase E) ; W4 de l'usine WR (2026-10-19, migration 0092) : 8 signaux `wr.*` (domain `wr`) semés INACTIFS sur les rollups W1, bandes médiane 28 j ± MAD (`app/services/wr/anomalies.py`), `detail.user_id` faute de colonne utilisateur.

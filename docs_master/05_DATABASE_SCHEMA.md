@@ -1942,6 +1942,25 @@ passent par `POST /api/wr/docket/{id}/decision`. `POST /api/wr/walk` (201, 200 s
 demarree, 409 `WR_NOT_OPEN`), `POST /api/wr/walk/close` (idempotente, les items non tranches
 portent). Events `planning.wr_walk.started` / `.closed`.
 
+Plan strategique — `plan_versions`, `plan_deltas`, vue `v_plan_current` : CODE (migration
+20261019_0095, 2026-10-19, spec WR §3.5 et §8 ; Q8 ; carte V20 ACT-WR-18). DDL de la spec +
+user_id, activated_at, superseded_at, superseded_reason_fr (plan_versions) et user_id,
+rejection_fr, created_at (plan_deltas). `plan_versions` : horizon 7 a 42 jours, `plan` objet
+`{items: [{ref, title_fr, week, params}], invariants_fr}` (ref `type:id` unique, semaine dans
+l'horizon), origin initial|monthly_regen|shock_regen, status proposed|active|superseded, une
+seule version active par utilisateur (index partiel) ; DELETE interdit (trigger) : le retour
+arriere passe la version en superseded. `plan_deltas` : operations move|add|remove|modify,
+origin wr_weekly|user_request|shock_minor, status proposed|accepted|refused|applied
+(applied_at ssi applied), proposal_id (FK docket). `v_plan_current` : version active + deltas
+appliques dans l'ordre ; le code les rejoue (un delta s'applique en entier ou est rejete avec
+ses raisons : ref absente ou deja presente, semaine hors horizon, champ non modifiable).
+Plan initial SAISI par l'utilisateur : `POST /api/wr/plan/initial` (Idempotency-Key, cree
+`proposed`, 409 `PLAN_ALREADY_ACTIVE`), `POST /api/wr/plan/versions/{id}/activate` (validation ;
+l'ancienne active passe superseded ; 409 `PLAN_SUPERSEDED`), `POST …/{id}/supersede` (raison
+obligatoire), `GET /api/wr/plan/versions`, `GET /api/wr/plan/current` (409 `PLAN_DISABLED` tant
+que `wr.plan_enabled` = false, seme ; 404 sans version active). Events `planning.plan.proposed`,
+`.activated`, `.superseded`. Generation (deltas hebdo, regenerations) : V23/V24.
+
 Classes d'auto-acceptation — `wr_autoaccept_classes` : CODE (migration 20261019_0089,
 2026-10-19, spec WR §9 P4 et §13.8 : « table vide + mecanique, activation = decision user » ;
 pas de DDL dans la spec). Colonnes : user_id, item_type (7 types ; jamais autoaccept_spotcheck,
@@ -1969,7 +1988,9 @@ Depuis la migration 0094 : section `rollups` (totaux de la semaine par domaine d
 `wr_rollups_daily` : jours couverts, sommes, derniere et pire pression, net VTC par heure,
 missions ouvertes en retard le dernier jour) et section `anomalies` (journees hors green des
 signaux W4 de la semaine, |z| decroissant, au plus `wr.digest_anomaly_signals_cap` = 20, a
-valider). Etat du plan absent (`unavailable`). Routes : `POST /api/wr/digest` (session WR lancee
+valider). Depuis la migration 0095 : section `plan_state` (plan courant de `v_plan_current`,
+deltas appliques) quand `wr.plan_enabled` est vrai et qu'une version est active, sinon
+`unavailable: ["plan_state"]`. Routes : `POST /api/wr/digest` (session WR lancee
 et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige), `GET /api/wr/digest/current`.
 Job `wr.digest_on_open` (seme desactive) : abonne a `planning.weekly_review.launched`, emis au
 premier lancement de la session WR.

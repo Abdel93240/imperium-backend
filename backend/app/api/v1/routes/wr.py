@@ -1,5 +1,6 @@
 """Docket et digest du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`,
-`POST digest`, `GET digest/current`, `GET metrics/weekly`."""
+`POST digest`, `GET digest/current`, `GET metrics/weekly`, `GET plan/current`, `GET plan/versions`,
+`POST plan/initial`, `POST plan/versions/{id}/activate|supersede`."""
 
 from typing import Annotated, Literal
 from uuid import UUID
@@ -18,6 +19,11 @@ from app.schemas.wr import (
     DocketItemType,
     DocketListResponse,
     DocketStatus,
+    PlanCurrentRead,
+    PlanInitialRequest,
+    PlanSupersedeRequest,
+    PlanVersionListResponse,
+    PlanVersionRead,
     SlotAuditStateRead,
     SlotAuditStatesResponse,
     SlotTransitionUpdateRequest,
@@ -28,7 +34,7 @@ from app.schemas.wr import (
     WrMetricsWeeklyResponse,
 )
 from app.services.ai import audit_loop
-from app.services.wr import autoaccept, digest, docket, metrics, walker
+from app.services.wr import autoaccept, digest, docket, metrics, plan, walker
 
 router = APIRouter()
 
@@ -217,3 +223,67 @@ def close_walk_route(current_user: CurrentUserDep, db: SessionDep) -> WalkRead |
     except walker.WalkStateError as exc:
         db.rollback()
         return _walk_conflict(exc)
+
+
+def _plan_conflict(exc: plan.PlanStateError) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": exc.code})
+
+
+@router.get("/plan/current", response_model=PlanCurrentRead)
+def current_plan_route(current_user: CurrentUserDep, db: SessionDep) -> PlanCurrentRead | JSONResponse:
+    """v_plan_current : version active + deltas appliqués ; servi seulement si `wr.plan_enabled`."""
+    if not plan.plan_enabled(db):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                            content={"detail": "The WR plan is not enabled.", "code": "PLAN_DISABLED"})
+    current = plan.current_plan(db, current_user=current_user)
+    if current is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active plan.")
+    return current
+
+
+@router.get("/plan/versions", response_model=PlanVersionListResponse)
+def plan_versions_route(current_user: CurrentUserDep, db: SessionDep) -> PlanVersionListResponse:
+    return PlanVersionListResponse(versions=plan.list_versions(db, current_user=current_user))
+
+
+@router.post("/plan/initial", response_model=PlanVersionRead, status_code=status.HTTP_201_CREATED)
+def create_initial_plan_route(
+    payload: PlanInitialRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PlanVersionRead | JSONResponse:
+    """Plan initial saisi par l'utilisateur, créé `proposed` : il ne devient actif que par activate."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        return plan.create_initial(db, current_user=current_user, request=payload,
+                                   idempotency_key=idempotency_key, request_path=request.url.path)
+    except plan.PlanStateError as exc:
+        db.rollback()
+        return _plan_conflict(exc)
+
+
+@router.post("/plan/versions/{version_id}/activate", response_model=PlanVersionRead)
+def activate_plan_route(version_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> PlanVersionRead | JSONResponse:
+    try:
+        return plan.activate(db, current_user=current_user, version_id=version_id)
+    except plan.PlanVersionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except plan.PlanStateError as exc:
+        db.rollback()
+        return _plan_conflict(exc)
+
+
+@router.post("/plan/versions/{version_id}/supersede", response_model=PlanVersionRead)
+def supersede_plan_route(
+    version_id: UUID, payload: PlanSupersedeRequest, current_user: CurrentUserDep, db: SessionDep
+) -> PlanVersionRead:
+    """Retour arrière (jamais de DELETE) : la version passe superseded, raison obligatoire."""
+    try:
+        return plan.supersede(db, current_user=current_user, version_id=version_id, reason_fr=payload.reason_fr)
+    except plan.PlanVersionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

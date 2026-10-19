@@ -174,3 +174,49 @@ class WrWalk(UUIDPrimaryKeyMixin, Base):
     budget_min: Mapped[int] = mapped_column(Integer, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PlanVersion(UUIDPrimaryKeyMixin, Base):
+    """Full version of the rolling strategic plan (migration 0095, spec WR §3.5) — never deleted."""
+
+    __tablename__ = "plan_versions"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    horizon_start: Mapped[date] = mapped_column(Date, nullable=False)
+    horizon_end: Mapped[date] = mapped_column(Date, nullable=False)
+    plan: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    origin: Mapped[str] = mapped_column(Text, nullable=False)
+    origin_ref: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rationale_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="proposed", server_default="proposed")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    superseded_reason_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class PlanDelta(UUIDPrimaryKeyMixin, Base):
+    """Operations on one plan version, applied in WR P5 (migration 0095, spec WR §3.5, §8.2)."""
+
+    __tablename__ = "plan_deltas"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    plan_version_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("plan_versions.id"), nullable=False
+    )
+    operations: Mapped[list] = mapped_column(JSONB, nullable=False)
+    origin: Mapped[str] = mapped_column(Text, nullable=False)
+    proposal_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wr_docket_items.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="proposed", server_default="proposed")
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
