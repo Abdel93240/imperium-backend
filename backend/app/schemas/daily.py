@@ -143,6 +143,7 @@ class SelectionLogRead(BaseModel):
     at_ts: datetime
     remaining_min: int
     next_fixed_ref: UUID | None
+    next_fixed_kind: str | None
     scope: str
     feasible_set: list
     mandatory_set: list
@@ -179,6 +180,7 @@ class QueueRead(BaseModel):
     condition: str | None
     remaining_min: int
     next_fixed_ref: UUID | None
+    next_fixed_kind: str | None
     chosen_mission_id: UUID | None
     ranking: list[UUID]
     entries: list[QueueEntryRead]

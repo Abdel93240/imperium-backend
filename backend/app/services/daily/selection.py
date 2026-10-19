@@ -10,7 +10,9 @@ Périmètre (G1) : missions `backlog` (ni annexe, ni engagement fixe) prévues o
 aujourd'hui (Paris), plus celles du plan courant dont `params.day` est aujourd'hui si le plan WR
 est servi. Pull-forward (`daily.pullforward_enabled`) : jour épuisé et temps restant ≥ seuil →
 même pipeline sur le reste de la semaine (dates jusqu'à dimanche, plan : semaine courante). Sans
-engagement fixe, le temps restant court jusqu'à minuit (Paris).
+engagement fixe, le temps restant court jusqu'à minuit (Paris). Engagements fixes : missions
+`is_fixed_commitment`, plus les événements calendrier `blocks_time` à venir si
+`daily.calendar_commitments_enabled` (semé false).
 
 Niveau 2 non codé : un ensemble faisable vide alors que le jour a des missions (C1) ou un conflit
 d'obligatoires (C2) est journalisé `arbitration_pending` (level 2) sans arbitrage. G5 (Pulse) lit
@@ -34,7 +36,7 @@ from app.models.auth import User
 from app.models.daily import DailySelectionLog, MissionDependency
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
-from app.models.imperium import ImperiumMission, ImperiumMissionScore
+from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, ImperiumMissionScore
 from app.schemas.daily import DailyCurrentRead, NextMissionRead, QueueEntryRead, QueueRead, SelectionRead
 from app.services.events.emitter import build_event
 from app.services.imperium import decision_framework as df
@@ -75,6 +77,13 @@ class Candidate:
 
 
 @dataclass
+class FixedCommitment:
+    kind: str  # mission | calendar_event
+    ref: UUID
+    at: datetime
+
+
+@dataclass
 class Selection:
     outcome: str
     level: int
@@ -84,7 +93,7 @@ class Selection:
     chosen: Candidate | None = None
     condition: str | None = None
     pulled_forward: bool = False
-    next_fixed: ImperiumMission | None = None
+    next_fixed: FixedCommitment | None = None
     tiebreak: dict | None = None
     ranking: list[Candidate] = field(default_factory=list)
 
@@ -95,6 +104,10 @@ def selection_enabled(db: Session) -> bool:
 
 def pullforward_enabled(db: Session) -> bool:
     return bool(get_parameter(db, "daily.pullforward_enabled", default=False))
+
+
+def calendar_commitments_enabled(db: Session) -> bool:
+    return bool(get_parameter(db, "daily.calendar_commitments_enabled", default=False))
 
 
 def g5_enabled(db: Session) -> bool:
@@ -155,13 +168,8 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
     """Calcule la sélection sans rien écrire (sert aussi GET queue)."""
     now_local = now.astimezone(PARIS)
     today = now_local.date()
-    next_fixed = db.scalar(
-        select(ImperiumMission).where(
-            ImperiumMission.user_id == current_user.id, ImperiumMission.is_fixed_commitment.is_(True),
-            ImperiumMission.status == "backlog", ImperiumMission.fixed_at > now,
-        ).order_by(ImperiumMission.fixed_at).limit(1)
-    )
-    horizon = next_fixed.fixed_at if next_fixed is not None else datetime.combine(
+    next_fixed = next_commitment(db, current_user, now)
+    horizon = next_fixed.at if next_fixed is not None else datetime.combine(
         today + timedelta(days=1), datetime.min.time(), tzinfo=PARIS)
     remaining_min = max(0, int((horizon - now).total_seconds() // 60))
 
@@ -199,6 +207,31 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
     return result
 
 
+def next_commitment(db: Session, current_user: User, now: datetime) -> FixedCommitment | None:
+    """Prochain engagement fixe à venir : mission `is_fixed_commitment`, et, si
+    `daily.calendar_commitments_enabled`, événement calendrier `blocks_time` non supprimé. Un événement
+    déjà commencé n'est pas une borne (l'appel montre que l'utilisateur est disponible)."""
+    anchors = []
+    mission = db.execute(
+        select(ImperiumMission.id, ImperiumMission.fixed_at).where(
+            ImperiumMission.user_id == current_user.id, ImperiumMission.is_fixed_commitment.is_(True),
+            ImperiumMission.status == "backlog", ImperiumMission.fixed_at > now,
+        ).order_by(ImperiumMission.fixed_at).limit(1)
+    ).first()
+    if mission is not None:
+        anchors.append(FixedCommitment(kind="mission", ref=mission.id, at=mission.fixed_at))
+    if calendar_commitments_enabled(db):
+        event = db.execute(
+            select(ImperiumCalendarEvent.id, ImperiumCalendarEvent.starts_at).where(
+                ImperiumCalendarEvent.user_id == current_user.id, ImperiumCalendarEvent.blocks_time.is_(True),
+                ImperiumCalendarEvent.deleted_at.is_(None), ImperiumCalendarEvent.starts_at > now,
+            ).order_by(ImperiumCalendarEvent.starts_at, ImperiumCalendarEvent.id).limit(1)
+        ).first()
+        if event is not None:
+            anchors.append(FixedCommitment(kind="calendar_event", ref=event.id, at=event.starts_at))
+    return min(anchors, key=lambda anchor: anchor.at) if anchors else None
+
+
 def select_next(
     db: Session,
     *,
@@ -220,7 +253,8 @@ def select_next(
     latency_ms = int((clock.perf_counter() - started) * 1000)
     row = DailySelectionLog(
         user_id=current_user.id, trigger=trigger, trigger_ref=trigger_ref, at_ts=now,
-        remaining_min=result.remaining_min, next_fixed_ref=result.next_fixed.id if result.next_fixed else None,
+        remaining_min=result.remaining_min, next_fixed_ref=result.next_fixed.ref if result.next_fixed else None,
+        next_fixed_kind=result.next_fixed.kind if result.next_fixed else None,
         scope=result.scope, feasible_set=[c.entry() for c in result.candidates],
         mandatory_set=[str(c.mission.id) for c in result.candidates if c.mandatory],
         chosen_mission_id=result.chosen.mission.id if result.chosen else None, tiebreak_applied=result.tiebreak,
@@ -450,7 +484,8 @@ def queue(db: Session, *, current_user: User, origin: LatLng | None = None, now:
     result = compute(db, current_user=current_user, now=now or datetime.now(UTC), origin=origin)
     return QueueRead(
         outcome=result.outcome, scope=result.scope, condition=result.condition, remaining_min=result.remaining_min,
-        next_fixed_ref=result.next_fixed.id if result.next_fixed else None,
+        next_fixed_ref=result.next_fixed.ref if result.next_fixed else None,
+        next_fixed_kind=result.next_fixed.kind if result.next_fixed else None,
         chosen_mission_id=result.chosen.mission.id if result.chosen else None,
         ranking=[c.mission.id for c in result.ranking],
         entries=[QueueEntryRead(mission_id=c.mission.id, title=c.mission.title, score=c.score, mandatory=c.mandatory,

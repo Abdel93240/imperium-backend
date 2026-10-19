@@ -1736,7 +1736,7 @@ mission_dependencies (id, user_id FK users, parent_mission_id FK imperium_missio
   child_mission_id FK imperium_missions ON DELETE CASCADE, hard BOOLEAN NOT NULL DEFAULT true, created_at,
   UNIQUE (parent_mission_id, child_mission_id), CHECK parent <> child)
 daily_selection_log (id, user_id FK users, trigger mission_completed|day_start|disruption_resolved|manual,
-  trigger_ref, at_ts, remaining_min, next_fixed_ref, scope day|week, feasible_set JSONB array
+  trigger_ref, at_ts, remaining_min, next_fixed_ref, next_fixed_kind mission|calendar_event (0107), scope day|week, feasible_set JSONB array
   [{mission_id, gates_passed, blocked_by, score, duration_min, travel_min, travel_source, mandatory, g5}],
   mandatory_set JSONB array, chosen_mission_id FK imperium_missions ON DELETE SET NULL, tiebreak_applied JSONB
   {band_pct, band_floor, band_members, travel_costs, winner_reason, pool}, outcome next_mission|arbitration_pending|day_done,
@@ -1796,6 +1796,12 @@ RF_lab_out_of_range et RF_rhr_sustained ne se levent jamais tant que bilans stru
 n'existent pas. Un sujet n'est leve qu'une fois ; l'acquittement ne leve pas le blocage, seule la
 resolution le fait. Daily G5 lit seulement la vue, derriere `daily.g5_enabled` (seme false ; sinon
 porte passante `g5: stub`) ; `daily.pulse_block_load` 4 (A VALIDER).
+Engagements fixes calendrier (migration 20261019_0107, 2026-10-19, spec Daily §5 G4, PATCH_DAILY D-8) :
+`daily_selection_log.next_fixed_kind` (mission | calendar_event, CHECK present ssi `next_fixed_ref`
+present ; lignes anterieures : mission). Quand `daily.calendar_commitments_enabled` (seme false) est
+vrai, le temps restant s'arrete au plus proche entre la mission `is_fixed_commitment` a venir et
+l'evenement `imperium_calendar_events` a venir, `blocks_time`, non soft-supprime. Un evenement deja
+commence n'est pas une borne. Les prieres (Q6) restent hors de ce lot.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
