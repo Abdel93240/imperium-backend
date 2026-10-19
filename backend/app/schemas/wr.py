@@ -1,6 +1,6 @@
 """Docket du WR (spec WR §3.1, §7, §12) : lecture et décision."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -52,3 +52,15 @@ class DocketDecisionRequest(BaseModel):
         if self.modified_payload is not None and self.decision != "validated":
             raise ValueError("modified_payload is only allowed with decision 'validated'.")
         return self
+
+
+class DigestRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    review_session_id: UUID
+    window_from: date
+    window_to: date
+    digest: dict
+    token_estimate: int
+    created_at: datetime

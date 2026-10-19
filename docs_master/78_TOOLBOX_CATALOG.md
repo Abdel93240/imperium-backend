@@ -481,8 +481,8 @@ Colonne « Système » = usine WR, orchestrateur de build, routage, runner.
 | D-01 | solveur repas (PuLP+CBC) | Pulse | un seul consommateur plausible ; Daily exclut explicitement le TSP (« aucun TSP », spec Daily §16) | spec Pulse §9 |
 | D-02 | générateur de coups légaux (préconditions DSL) | Pulse | mécanique élégante (portes+menu) mais préconditions spécifiques entraînement ; les portes Daily G1-G5 sont plus simples et déjà spécifiées à part | spec Pulse §8 |
 | D-03 | moteur de croyances (exposition/confirmation) | WR | cœur du domaine mémoire WR ; personne d'autre n'évalue de prédicats d'exposition | spec WR §6.3 |
-| D-04 | walker de docket (budget d'attention, modes full/light) | WR | un seul rituel consommateur | spec WR §9 P4 |
-| D-05 | assembleur de digest (caps par type, plafond 40k) | WR | idem | spec WR §9 P1 |
+| D-04 | walker de docket (budget d'attention, modes full/light) | WR | un seul rituel consommateur — codé DANS le domaine WR (2026-10-19 : `GET /api/wr/docket?mode=light`), pas comme outil | spec WR §9 P4 |
+| D-05 | assembleur de digest (caps par type, plafond 40k) | WR | idem — codé DANS le domaine WR (2026-10-19 : `app/services/wr/digest.py`, table `wr_digests`), pas comme outil | spec WR §9 P1 |
 | D-06 | pipeline montre (features device) | Pulse | données brutes interdites de sortie ; consommé par les seuls signaux Pulse | spec Pulse §10 |
 | D-07 | fuel smart tracking | Vector/Vault | V2 explicite ; réconciliation hebdo touche Vault et sadaqa → repasser en revue au moment V2 | doc 46 |
 | D-08 | music shaker | Vector | feature isolée | doc 48 |

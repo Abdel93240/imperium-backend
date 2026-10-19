@@ -1892,6 +1892,21 @@ decision_note. Parametres semes (`parameters`, a valider) : `wr.docket_halflife_
 x (0,5 + confidence/200, ou 1 sans confidence). Une decision ne fait qu'enregistrer le choix ;
 rien n'est applique par le docket. Routes : `GET /api/wr/docket?status=&type=`,
 `GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision` (Idempotency-Key).
+`GET /api/wr/docket?mode=light` = WR court (spec WR §9 P4) : rouges, decisions forcees,
+contradictions et deltas de plan seulement ; le reste porte sans penalite.
+
+Digest du WR — `wr_digests` : CODE (migration 20261019_0084, 2026-10-19, spec WR §3.6).
+Un digest par session WR (`review_session_id` unique, FK cascade), fige a l'assemblage :
+user_id, window_from/window_to (= week_start/week_end), digest JSONB (sections whitelistees
+window, docket par type, counts open/included, truncated, unavailable), token_estimate
+(caracteres JSON / 4). Parametres semes (a valider) : `wr.digest_token_cap` = 40000 et
+`wr.digest_caps` (chain_proposal 12, pattern_new 10, pattern_contradiction 8, anomaly 10,
+belief_review_due 6, plan_delta_proposal 8 ; un type sans plafond n'est borne que par les
+tokens). Troncature par priorite, rouges et decisions forcees en dernier recours. Payload
+d'item contenant du brut (conversation, transcript, texte de document, image...) -> refus.
+Rollups W1 et etat du plan absents (`unavailable`). Routes : `POST /api/wr/digest` (session
+WR lancee et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige),
+`GET /api/wr/digest/current`. L'assemblage n'est pas encore branche sur le lancement du WR.
 
 ### review_sessions
 
