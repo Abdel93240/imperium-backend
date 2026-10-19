@@ -21,7 +21,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
+from app.services.ai import call_log
 from app.services.params import get_parameter
+
+EMBEDDING_ROLE = "embedding_service"
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +95,18 @@ class LocalQwen3Embedding:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        try:
-            with urllib.request.urlopen(  # nosec B310 - Tailscale-only internal URL
-                request, timeout=self.settings.embedding_request_timeout_seconds
-            ) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise GpuServiceUnreachable(f"Embedding service unreachable: {exc}") from exc
+        with call_log.timed() as elapsed:
+            try:
+                with urllib.request.urlopen(  # nosec B310 - Tailscale-only internal URL
+                    request, timeout=self.settings.embedding_request_timeout_seconds
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                call_log.record(app_name="imperium", task_type="embedding.embed", model_role=EMBEDDING_ROLE,
+                                model_tier="local", duration_ms=elapsed(), success=False, error_code="unreachable")
+                raise GpuServiceUnreachable(f"Embedding service unreachable: {exc}") from exc
+        call_log.record(app_name="imperium", task_type="embedding.embed", model_role=EMBEDDING_ROLE,
+                        model_tier="local", duration_ms=elapsed())
         vectors = payload.get("vectors")
         if not isinstance(vectors, list) or len(vectors) != len(batch):
             raise EmbeddingError("Embedding service returned a malformed response.")

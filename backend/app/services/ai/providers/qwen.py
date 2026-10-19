@@ -8,7 +8,13 @@ from urllib.parse import urlparse
 from app.core.config import Settings, get_settings
 from app.models.imperium import ImperiumWeeklyReviewSession
 from app.schemas.ai import QwenRoutingDecision, QwenScoreBreakdown, QwenWeeklySummary
+from app.services.ai import call_log
 from app.services.ai.roles import LOCAL_EXECUTOR_ROLE, resolve_model_id
+
+
+# Journal des appels (doc 43 §17) : application d'origine de chaque mode d'appel.
+MODE_APPS = {"vault_category": "vault", "replan_revision": "imperium", "knowledge_inbox": "imperium",
+             "weekly_summary": "imperium"}
 
 
 class QwenProviderError(RuntimeError):
@@ -114,19 +120,28 @@ class QwenClient:
             raise QwenProviderError("QWEN_BASE_URL is required when Qwen dry-run is disabled.")
 
         url = self.settings.qwen_base_url.rstrip("/") + "/api/generate"
-        try:
-            response = self._http_post(
-                url,
-                {
-                    "model": self.model_id,
-                    "prompt": prompt,
-                    "stream": False,
-                    "format": "json",
-                },
-                self.settings.qwen_request_timeout_seconds,
-            )
-        except Exception as exc:
-            raise QwenProviderError("Qwen provider call failed.") from exc
+        app_name = MODE_APPS.get(mode, "imperium")
+        with call_log.timed() as elapsed:
+            try:
+                response = self._http_post(
+                    url,
+                    {
+                        "model": self.model_id,
+                        "prompt": prompt,
+                        "stream": False,
+                        "format": "json",
+                    },
+                    self.settings.qwen_request_timeout_seconds,
+                )
+            except Exception as exc:
+                call_log.record(app_name=app_name, task_type=mode, model_used=self.model_id, model_tier="local",
+                                duration_ms=elapsed(), success=False, error_code="provider_error")
+                raise QwenProviderError("Qwen provider call failed.") from exc
+        call_log.record(
+            app_name=app_name, task_type=mode, model_used=self.model_id, model_tier="local",
+            input_tokens=_count(response, "prompt_eval_count"), output_tokens=_count(response, "eval_count"),
+            duration_ms=elapsed(),
+        )
 
         model_text = response.get("response", response)
         if isinstance(model_text, str):
@@ -206,6 +221,11 @@ class QwenClient:
         if not isinstance(parsed, dict):
             raise QwenProviderError("Qwen HTTP response JSON was not an object.")
         return parsed
+
+
+def _count(response: Any, key: str) -> int | None:
+    value = response.get(key) if isinstance(response, dict) else None
+    return value if isinstance(value, int) else None
 
 
 def _validate_http_url(url: str) -> None:

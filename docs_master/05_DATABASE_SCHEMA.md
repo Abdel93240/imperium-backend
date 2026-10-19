@@ -418,6 +418,21 @@ Notes migration/ORM :
 - Divergence mineure : la migration donne a `id` un default serveur
   `gen_random_uuid()`, tandis que le mixin ORM genere aussi un UUID cote Python.
 
+### ai_call_logs et ai_model_pricing
+
+CODE (migration 20261019_0086, 2026-10-19, doc 43 §17.1-§17.4 ; doc 78 F2-14). Colonnes du
+doc 43 §17.1 (sans `user_id` : journal systeme), index §17.1, fonction
+`compute_ai_call_cost` + trigger `ai_call_logs_auto_cost` (§17.3), vues `ai_monthly_by_model`,
+`ai_monthly_by_app`, `ai_monthly_by_task`, `ai_daily_spend` (§17.4 ; jour Europe/Paris).
+Une ligne par appel reel de modele, ecrite par `app/services/ai/call_log.py` dans sa propre
+session (survit au rollback de l'appelant, ne casse jamais l'appel) : executant local, OCR et
+vision, embeddings. Jamais de prompt, de reponse ni de texte reconnu. Le dry-run n'ecrit rien.
+`model_used` = identifiant reel resolu par role (`ai_role_models`), le code du role a defaut.
+Cout : 0 en local ; sinon calcule par le trigger depuis `ai_model_pricing`, NULL sans prix.
+`ai_model_pricing` nait VIDE : le seed historique du doc 43 §17.2 est perime (DV-8), la grille
+reste a fournir. Lecture : `GET /api/ai/call-logs?limit=`, `GET /api/ai/call-logs/daily?days=`.
+Vues 5+ (§17.4 suite), requetes §17.5 et alertes §17.6 : pas encore.
+
 ### ai_memories
 
 Nom actuel : `ai_memories`

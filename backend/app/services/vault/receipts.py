@@ -333,4 +333,6 @@ def _emit(db: Session, current_user: User, event_type: str, extraction: VaultRec
 def _default_recognizer() -> RecognizeFile | None:
     if not ocr.ocr_available():
         return None
-    return lambda data, filename, content_type: ocr.recognize(data, filename=filename, content_type=content_type)
+    return lambda data, filename, content_type: ocr.recognize(
+        data, filename=filename, content_type=content_type, app_name="vault"
+    )
