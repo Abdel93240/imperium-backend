@@ -2002,7 +2002,7 @@ chaque worker traite ]curseur, maintenant] puis avance son curseur. Un echec n'a
 curseur et arrete la chaine ; le passage suivant reprend le meme lot. Worker non code : saute,
 sans curseur (premier lot = depuis minuit, heure de Paris). Un worker code ne tourne que s'il
 est liste dans le parametre `wr.factory_workers_enabled` (seme vide ; carte V18). Codes : W1
-(rollups, ci-dessous), W4 (anomalies, ci-dessous), W2 en dry-run (ci-dessous) et W5 (items
+(rollups, ci-dessous), W4 (anomalies, ci-dessous), W2 et W3 en dry-run (ci-dessous) et W5 (items
 `anomaly` depuis W4 puis recalcul des priorites du docket) ; aucun appel de modele. Jobs semes desactives :
 `wr.factory_on_session_end` (abonne a `rides.session.ended`) et `wr.factory_fallback` (cron
 UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne ce jour-la).
@@ -2028,6 +2028,26 @@ cause + 1), plusieurs causes directes ou cycle -> `conflicts` ; avec au moins un
 docket `chain_proposal` (titre « [essai] », payload.dry_run, sans confiance donc jamais
 auto-accepte). Le statut de l'assemblage suit la decision du docket (valide, refuse ; archive =
 refuse ; report = inchange).
+
+Apprentissages W3 — `wr_pattern_extractions` et `memory_confrontations` : CODE (migration
+20261019_0097, 2026-10-19, spec WR §6.1-6.2, §13.4-13.5 ; carte V20 ACT-WR-10).
+`wr_pattern_extractions` est un ajout (la spec insere directement dans ai_memories) : journal des
+patterns extraits a la cloture d'un episode (statement_fr, pattern_domain, context_predicate valide
+ou null, predicate_rejected, evidence_event_ids, suggested_confidence, canonical_errors,
+model_used, dry_run). `memory_confrontations` : DDL de la spec + user_id, extraction_id, dry_run ;
+`neighbor_memory_id` nullable (aucun voisin = `unrelated`). Episodes choisis par le code selon
+`wr.episode_criteria` (types `planning.mission.completed`, `planning.mission.aborted`,
+`planning.wr_walk.closed` ; decision du docket validee ou refusee avec explication, hors
+auto-acceptation ; 20 au plus par passage ; a valider). Code reel : regles de canonicite (240
+caracteres, affirmative, pas de pronom en tete, pas de date relative, une seule affirmation) et
+vocabulaire des context_predicate (`all`|`any` de conditions field/op/value sur `day.day_of_week`,
+`day.is_weekend` et les metriques des rollups W1 `finance.*`, `rides.*`, `missions.*`) ;
+statement non canonique -> journalise, pas confronte ; predicat invalide -> null. Extraction et
+verdict d'identite FACTICES tant que `real_ai_enabled` est faux (`dry_run`), aucun voisin
+(recherche vectorielle eteinte) : effet prevu journalise, jamais applique. AUCUNE ecriture dans
+ai_memories (extension croyances : DV-1 ; commit memoire : V25). Parametre `wr.identity_topk` (5)
+seme pour la V25. W3 reel non code : avec `real_ai_enabled` vrai, le worker echoue sans avancer
+son curseur.
 
 Rollups W1 — `wr_rollups_daily` : CODE (migration 20261019_0091, 2026-10-19, spec WR §4 W1 ;
 pas de DDL dans la spec ; lu par le digest depuis 0094). Une ligne par utilisateur, jour de Paris et domaine, `metrics` JSONB
