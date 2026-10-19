@@ -59,3 +59,33 @@ class WrDigest(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class WrMetricsWeekly(UUIDPrimaryKeyMixin, Base):
+    """Weekly WR metrics (spec WR §3.8 + user_id ; one row per user and week, migration 0085).
+
+    NULL = not measurable yet (the worker or engine feeding it is not coded).
+    """
+
+    __tablename__ = "wr_metrics_weekly"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    week_start: Mapped[date] = mapped_column(Date(), nullable=False)
+    factory_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    events_processed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chain_proposals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    patterns_new: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    patterns_reinforced: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    contradictions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docket_created: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docket_validated: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docket_refused: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docket_deferred: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    docket_forced_decisions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wr_duration_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wr_mode: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cloud_cost_estimate: Mapped[Decimal | None] = mapped_column(Numeric, nullable=True)
+    agreement_by_slot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

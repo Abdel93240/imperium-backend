@@ -64,3 +64,31 @@ class DigestRead(BaseModel):
     digest: dict
     token_estimate: int
     created_at: datetime
+
+
+class WrMetricsWeekRead(BaseModel):
+    """Métriques d'une semaine (spec WR §3.8) ; NULL = pas encore mesurable."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    week_start: date
+    factory_runs: int | None
+    events_processed: int | None
+    chain_proposals: int | None
+    patterns_new: int | None
+    patterns_reinforced: int | None
+    contradictions: int | None
+    docket_created: int | None
+    docket_validated: int | None
+    docket_refused: int | None
+    docket_deferred: int | None
+    docket_forced_decisions: int | None
+    wr_duration_min: int | None
+    wr_mode: Literal["full", "light", "skipped"] | None
+    cloud_cost_estimate: float | None
+    agreement_by_slot: dict | None
+    computed_at: datetime
+
+
+class WrMetricsWeeklyResponse(BaseModel):
+    weeks: list[WrMetricsWeekRead]
