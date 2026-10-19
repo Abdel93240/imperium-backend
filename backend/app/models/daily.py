@@ -39,6 +39,7 @@ class DailySelectionLog(UUIDPrimaryKeyMixin, Base):
     at_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     remaining_min: Mapped[int] = mapped_column(Integer, nullable=False)
     next_fixed_ref: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    next_fixed_kind: Mapped[str | None] = mapped_column(Text, nullable=True)  # mission | calendar_event
     scope: Mapped[str] = mapped_column(Text, nullable=False)
     feasible_set: Mapped[list] = mapped_column(JSONB, nullable=False)
     mandatory_set: Mapped[list] = mapped_column(JSONB, nullable=False)

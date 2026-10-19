@@ -26,7 +26,7 @@ from app.api.v1.routes import daily, imperium  # noqa: E402
 from app.models.auth import User  # noqa: E402
 from app.models.daily import DailySelectionLog, MissionDependency  # noqa: E402
 from app.models.event import Event  # noqa: E402
-from app.models.imperium import ImperiumMission, ImperiumMissionScore  # noqa: E402
+from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, ImperiumMissionScore  # noqa: E402
 from app.services.daily import scores_refresh, selection  # noqa: E402
 from app.services.params import set_parameter  # noqa: E402
 from app.services.runner.engine import RunContext, Window  # noqa: E402
@@ -204,9 +204,39 @@ def test_time_gate_before_next_fixed_commitment(db) -> None:
     long = _mission(db, user, "Longue", score=90, minutes=30)
     short = _mission(db, user, "Courte", score=50, minutes=20)
     row = _select(db, user)
-    assert row.remaining_min == 25 and row.next_fixed_ref == fixed.id
+    assert row.remaining_min == 25 and row.next_fixed_ref == fixed.id and row.next_fixed_kind == "mission"
     assert _entry(row, long)["blocked_by"] == "G4" and row.chosen_mission_id == short.id
     assert all(e["mission_id"] != str(fixed.id) or e["blocked_by"] == "G1" for e in row.feasible_set)
+
+
+def _calendar(db, user, title: str, starts_in: int, *, blocks: bool = True, deleted: bool = False):
+    event = ImperiumCalendarEvent(user_id=user.id, event_type="event", title=title,
+                                  starts_at=NOW + timedelta(minutes=starts_in),
+                                  ends_at=NOW + timedelta(minutes=starts_in + 60), blocks_time=blocks,
+                                  deleted_at=NOW if deleted else None)
+    db.add(event)
+    db.commit()
+    return event
+
+
+def test_blocking_calendar_events_bound_the_time_gate_once_enabled(db) -> None:
+    user = _user(db)
+    _mission(db, user, "Rendez-vous", is_fixed_commitment=True, fixed_at=NOW + timedelta(minutes=120), planned=None)
+    long = _mission(db, user, "Longue", score=90, minutes=30)
+    short = _mission(db, user, "Courte", score=50, minutes=20)
+    _calendar(db, user, "Déjà commencé", -10)  # en cours : pas une borne
+    _calendar(db, user, "Libre", 5, blocks=False)
+    _calendar(db, user, "Supprimé", 10, deleted=True)
+    dentist = _calendar(db, user, "Dentiste", 25)
+    off = _select(db, user)
+    assert off.remaining_min == 120 and off.next_fixed_kind == "mission" and off.chosen_mission_id == long.id
+
+    _flags(db, calendar_commitments_enabled=True)
+    row = _select(db, user)
+    assert (row.remaining_min, row.next_fixed_ref, row.next_fixed_kind) == (25, dentist.id, "calendar_event")
+    assert _entry(row, long)["blocked_by"] == "G4" and row.chosen_mission_id == short.id
+    queue = selection.queue(db, current_user=user, now=NOW)
+    assert (queue.next_fixed_ref, queue.next_fixed_kind) == (dentist.id, "calendar_event")
 
 
 def test_tiebreak_least_travel_inside_the_band_and_score_outside(db, no_network) -> None:
