@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.services.ai import call_log
+from app.services.ai import call_alerts, call_log
 from app.services.ai import logs as ai_logs
 
 router = APIRouter()
@@ -30,6 +30,14 @@ def ai_daily_spend_route(
 ) -> call_log.AIDailySpendResponse:
     """Appels et dépense par jour (vue ai_daily_spend, jour Europe/Paris)."""
     return call_log.daily_spend(db, days=days)
+
+
+@router.get("/call-logs/alerts", response_model=call_log.AICallAlertsResponse)
+def ai_call_alerts_route(current_user: CurrentUserDep, db: SessionDep) -> call_log.AICallAlertsResponse:
+    """Seuils du doc 43 §17.6 franchis maintenant (lecture seule, aucune notification)."""
+    return call_log.AICallAlertsResponse(
+        alerts=[call_log.AICallAlertRead(**alert.__dict__) for alert in call_alerts.evaluate(db)]
+    )
 
 
 @router.get("/logs/{log_id}", response_model=ai_logs.AILogRead)
