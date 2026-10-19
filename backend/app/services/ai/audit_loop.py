@@ -133,12 +133,39 @@ def _proposal(slot: AISlotTransition, history: list[_Week], *, current_week: dat
     expected = [current_week - timedelta(weeks=offset) for offset in range(1, decay_weeks + 1)]
     if expected[-1] < changed_week:
         return None
-    measured = {week.week_start: week for week in history}
-    for week_start in expected:
-        week = measured.get(week_start)
-        if week is None or week.samples < min_samples or week.agreement_pct < slot.agreement_target_pct:
-            return None
+    if not _weeks_hold(history, expected, min_samples=min_samples, target=slot.agreement_target_pct):
+        return None
     return max(floor, int(round(slot.audit_sample_pct * factor)))
+
+
+def _weeks_hold(history: list[_Week], expected: list[date], *, min_samples: int, target: int) -> bool:
+    measured = {week.week_start: week for week in history}
+    return all(
+        (week := measured.get(week_start)) is not None and week.samples >= min_samples
+        and week.agreement_pct >= target
+        for week_start in expected
+    )
+
+
+def agreement_holds(db: Session, *, slot_code: str, now: datetime | None = None) -> bool:
+    """L'agreement du slot tient-il sa cible sur les `ai.audit_decay_weeks` dernières semaines closes ?"""
+    slot = _slot(db, slot_code)
+    if slot.agreement_target_pct is None:
+        return False
+    now = now or datetime.now(UTC)
+    current_week = _monday(now.astimezone(PARIS).date())
+    decay_weeks = int(get_parameter(db, "ai.audit_decay_weeks", default=3))
+    expected = [current_week - timedelta(weeks=offset) for offset in range(1, decay_weeks + 1)]
+    history = [
+        _Week(row.week_start, row.samples, float(row.agreement_pct))
+        for row in db.execute(
+            text("SELECT week_start, samples, agreement_pct FROM v_ai_slot_agreement_weekly "
+                 "WHERE slot_code = :slot AND week_start >= :oldest AND week_start < :current"),
+            {"slot": slot_code, "oldest": expected[-1], "current": current_week},
+        )
+    ]
+    return _weeks_hold(history, expected, min_samples=int(get_parameter(db, "ai.audit_min_samples_week", default=5)),
+                       target=slot.agreement_target_pct)
 
 
 def update_slot(
