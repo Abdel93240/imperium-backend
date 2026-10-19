@@ -1161,6 +1161,16 @@ ai_usable_reason        BOOLEAN NULL
 created_by_event_id     UUID NULL FK events.id
 ended_by_event_id       UUID NULL FK events.id
 replan_event_id         UUID NULL FK planning_replan_events.id ON DELETE SET NULL -- CODE (20261018_0082) : replan demandé depuis la mission ratée ou annulée (doc 43 §3.1)
+location_lat            NUMERIC(9,6) NULL -- CODE (20261019_0104) : lieu (spec Daily §3.2), lat/lng ensemble ou aucun
+location_lng            NUMERIC(9,6) NULL
+location_label          TEXT NULL
+window_start            TIME NULL -- CODE (20261019_0104) : fenêtre d'exécution (Paris), window_start < window_end ; null = libre
+window_end              TIME NULL
+window_days             TEXT[] NULL -- CODE (20261019_0104) : ⊂ {mon..sun} ; null = tous les jours
+is_fixed_commitment     BOOLEAN NOT NULL DEFAULT false -- CODE (20261019_0104) : rendez-vous à heure fixe, borne le temps restant (porte G4)
+fixed_at                TIMESTAMPTZ NULL -- requis si is_fixed_commitment
+physical_load           INTEGER NULL -- CODE (20261019_0104) : 1-5, lu par la porte Pulse G5 (stub en V28)
+cognitive_load          INTEGER NULL -- 1-5
 created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -1717,7 +1727,30 @@ rejoues en entier avec les baremes courants ; les lignes plus anciennes ne recal
 critere A (les points B-E stockes restent). Coefficient et bucket suivent toujours baremes et
 hierarchie courants. Jobs semes desactives : `daily.scores_refresh` (cron `30 4,5 * * *` UTC, ne
 tourne qu'a 6 h de Paris) et `daily.day_start` (abonne a `planning.day.started` : refresh ; la
-selection du Niveau 1 n'est pas codee, no-op journalise). Aucun des deux ne demarre une journee.
+selection initiale du Niveau 1 si `daily.selection_enabled`). Aucun des deux ne demarre une journee.
+Selection Niveau 1 (migration 20261019_0104, 2026-10-19, spec Daily §3.1-3.3 et §5-7, cartes
+ACT-DLY-04, ACT-DLY-06, ACT-SYS-08) :
+
+```sql
+mission_dependencies (id, user_id FK users, parent_mission_id FK imperium_missions ON DELETE CASCADE,
+  child_mission_id FK imperium_missions ON DELETE CASCADE, hard BOOLEAN NOT NULL DEFAULT true, created_at,
+  UNIQUE (parent_mission_id, child_mission_id), CHECK parent <> child)
+daily_selection_log (id, user_id FK users, trigger mission_completed|day_start|disruption_resolved|manual,
+  trigger_ref, at_ts, remaining_min, next_fixed_ref, scope day|week, feasible_set JSONB array
+  [{mission_id, gates_passed, blocked_by, score, duration_min, travel_min, travel_source, mandatory, g5}],
+  mandatory_set JSONB array, chosen_mission_id FK imperium_missions ON DELETE SET NULL, tiebreak_applied JSONB
+  {band_pct, band_floor, band_members, travel_costs, winner_reason, pool}, outcome next_mission|arbitration_pending|day_done,
+  condition empty_feasible|mandatory_conflict, pulled_forward, level 1|2|3, latency_ms, created_at ;
+  CHECK chosen_mission_id present ssi outcome = next_mission)
+```
+
+Aucun backfill des dependances (aucune arete n'existait). Cycles refuses a l'ecriture
+(`POST /api/daily/dependencies`, 422 `DEPENDENCY_CYCLE`). Parametres semes eteints :
+`daily.selection_enabled`, `daily.pullforward_enabled` (la carte corrige le defaut true de la spec),
+`daily.queue_debug_enabled`, `toolbox.travel_enabled` (le fournisseur de trajet n'est appele que si ce
+parametre est vrai ET une cle est configuree ; sinon repli local distance/25 km/h ×1,3 marque
+`fallback`) ; reglages `daily.top_band_pct` 15, `daily.pullforward_min_threshold` 45,
+`daily.default_mission_duration` 30, `daily.selection_latency_target_ms` 500 (A VALIDER).
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

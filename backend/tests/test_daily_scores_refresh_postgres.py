@@ -160,7 +160,7 @@ def test_jobs(db, monkeypatch) -> None:
     assert (ctx.items_in, ctx.items_out) == (1, 1)
     start = RunContext(db=db, job=None, run_id=uuid4(), trigger="event", trigger_ref=None)
     scores_refresh.day_start_job(start, Window(from_ts=None, to_ts=None))
-    assert start.detail["selection"] == "level1_not_coded" and start.items_out == 0
+    assert start.detail["selection"] == "disabled" and start.items_out == 0
     jobs = db.execute(text("SELECT code, enabled, schedule, event_types FROM job_definitions "
                            "WHERE code LIKE 'daily.%' ORDER BY code")).all()
     assert [tuple(row) for row in jobs] == [("daily.day_start", False, None, ["planning.day.started"]),
