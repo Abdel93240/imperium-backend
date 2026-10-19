@@ -26,6 +26,7 @@ from sqlalchemy import (
     Numeric,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -280,6 +281,8 @@ class AIAuditSample(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "ai_audit_samples"
     __table_args__ = (
         Index("ai_audit_samples_slot_created_idx", "slot_code", "created_at"),
+        Index("ai_audit_samples_slot_run_unique", "slot_code", "run_ref", unique=True,
+              postgresql_where=text("run_ref IS NOT NULL")),
     )
 
     slot_code: Mapped[str] = mapped_column(
@@ -289,7 +292,9 @@ class AIAuditSample(UUIDPrimaryKeyMixin, Base):
     input_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     local_output: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     cloud_output: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    cloud_model: Mapped[str | None] = mapped_column(Text, nullable=True)
     agreement: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    disagreement_class: Mapped[str | None] = mapped_column(Text, nullable=True)
     disagreement_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     user_reaction: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

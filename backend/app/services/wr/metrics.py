@@ -21,6 +21,7 @@ from app.models.auth import User
 from app.models.event import Event
 from app.models.imperium import ImperiumWeeklyReviewSession
 from app.models.toolbox import JobRun
+from app.services.ai import audit_loop
 from app.models.wr import WrDocketItem, WrMetricsWeekly
 
 
@@ -90,7 +91,7 @@ def compute_week(
         docket_created=sum(created_by_type.values()), docket_validated=decided_by_status.get("validated", 0),
         docket_refused=decided_by_status.get("refused", 0), docket_deferred=decided_by_status.get("deferred", 0),
         docket_forced_decisions=forced, wr_duration_min=duration, wr_mode=wr_mode, cloud_cost_estimate=None,
-        agreement_by_slot=None, computed_at=now,
+        agreement_by_slot=audit_loop.agreement_by_slot(db, week_start=week_start), computed_at=now,
     )
 
 

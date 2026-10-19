@@ -31,8 +31,8 @@ n8n sur disque (`ops/n8n/workflows/`).
 
 ## RÉPONSE CHIFFRÉE
 
-**Le système compte 55 outils : 25 en F1 (dont 13 codés — 7 livrés éteints par la passe 0 —,
-11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 16 codées,
+**Le système compte 55 outils : 25 en F1 (dont 14 codés — 7 livrés éteints par la passe 0 —,
+10 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 16 codées,
 1 spécifiée, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
 plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
 Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
@@ -195,16 +195,16 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 ### F1-13 `toolbox.audit_loop` — audit décroissant des slots IA
 - description : contre-lecture cloud échantillonnée des sorties locales, agreement par slot, décroissance = décision utilisateur, dataset LoRA depuis désaccords + refus expliqués.
 - famille : F1 (tables F2-09)
-- vit_aujourd_hui : tables partagées CODÉES (passe 0) — `ai_slot_transition`/`ai_audit_samples` + vue `v_ai_training_pairs` (0038, schéma spec WR §3.7 verbatim, vides). La BOUCLE (échantillonnage cloud, agreement par slot, décroissance) reste à coder par les passes. Historique : spec Pulse §3.9 nommait `pulse_ai_transition`/`pulse_audit_samples` ; spec WR §3.7 généralisait ; spec Daily (2 slots seedés) ; spec Vector §4.7 (même principe appliqué au capteur OCR) ; racine conceptuelle : CONCEPTION_chainage_V2 Étape 4.
+- vit_aujourd_hui : tables partagées CODÉES (passe 0) — `ai_slot_transition`/`ai_audit_samples` + vue `v_ai_training_pairs` (0038, schéma spec WR §3.7 verbatim). **MÉCANIQUE CODÉE (migration 20261019_0088, 2026-10-19)** — 10 slots WR (§10) + 2 slots Daily semés (audit 100 %, cible 92 %) ; `app/services/ai/audit_loop.py` : tirage déterministe `should_audit()` (slots `local_default` seulement), `record_sample()` idempotent par `run_ref` (+ colonnes `cloud_model`, `disagreement_class`), vue `v_ai_slot_agreement_weekly` (semaine de Paris), proposition de décroissance quand l'agreement tient >= cible sur `ai.audit_decay_weeks` (3) semaines closes postérieures au dernier changement, avec au moins `ai.audit_min_samples_week` (5) contre-lectures, pas `ai.audit_decay_factor` (0,5), plancher `ai.audit_floor_pct` (5) — trois derniers paramètres ajoutés, À VALIDER ; `GET /api/wr/admin/transition` (lecture) et `POST /api/wr/admin/transition` (décision utilisateur, Idempotency-Key, raison obligatoire, event `decision.ai_audit.updated` ; jamais le tier) ; job `wr.audit_weekly` (lundi 05:15, semé désactivé) qui notifie la proposition sans l'appliquer ; `wr_metrics_weekly.agreement_by_slot` rempli. La contre-lecture cloud elle-même n'est PAS branchée (aucun appel de modèle) : les producteurs appelleront `should_audit()` puis `record_sample()`. Historique : spec Pulse §3.9 nommait `pulse_ai_transition`/`pulse_audit_samples` ; spec WR §3.7 généralisait ; spec Daily (2 slots seedés) ; spec Vector §4.7 (même principe appliqué au capteur OCR) ; racine conceptuelle : CONCEPTION_chainage_V2 Étape 4.
 - doublons : TRANCHÉ au socle — créées PARTAGÉES d'emblée (R1 appliquée) ; pas de tables `pulse_*`, pas de danse de migration WR.
 - seconde_regle_consommateur : PASSE (4 specs).
-- statut : spécifié (tables codées au socle ; boucle = passes).
+- statut : existe_codé (mécanique d'audit ; contre-lecture cloud non branchée, aucun producteur).
 
 ### F1-14 `toolbox.runner` — runner de jobs backend (successeur de n8n ; ex-trou T2, refermé)
 - description : APScheduler + LISTEN/NOTIFY + advisory locks ; crons, abonnements events, verrous, un SEUL mécanisme pour toutes les passes.
 - famille : F1
 - vit_aujourd_hui : **CODÉ (passe 0, éteint)** — `app/services/runner/` (`engine.py`, `scheduler.py`, `jobs.py`) : APScheduler + LISTEN/NOTIFY (canal `events_new`) + advisory locks ; tables `job_definitions`/`job_runs`/`job_cursors` (0038) ; jobs seedés `enabled=false` (0039) ; skip global si `runner_enabled=False`. n8n est SORTI du chemin de production : exports portés en fonctions backend, `n8n_client.py` déprécié, `N8N_*` deprecated dans config (SOCLE_MAPPING §4). Chaque spec disait « workflows n8n ou crons backend, au choix de l'exécuteur, mais UN seul mécanisme » (Pulse §7, WR §12, Daily §12) : le mécanisme unique est ce runner.
-- consommateurs_prevus_par_specs : ~25 jobs — Pulse (features_daily 06:45, sentinel am/pm, pre_session, runners, weekly, monthly, scientific_review, audit_weekly, metrics_rollup) ; WR (factory_on_session_end, fallback 23:30, exposure_daily, review_due_weekly, digest_on_open, audit_weekly, metrics — `wr.metrics_rollup` semé désactivé le 2026-10-19 —, monthly_regen) ; Daily (scores_refresh 06:30, day_start, override_aggregation, gmaps_cache_gc) ; Vector (builders 5 min/60 min/hebdo/nocturne, entraînement, fantôme).
+- consommateurs_prevus_par_specs : ~25 jobs — Pulse (features_daily 06:45, sentinel am/pm, pre_session, runners, weekly, monthly, scientific_review, audit_weekly, metrics_rollup) ; WR (factory_on_session_end, fallback 23:30, exposure_daily, review_due_weekly, digest_on_open, audit_weekly — `wr.audit_weekly` semé désactivé le 2026-10-19 —, metrics — `wr.metrics_rollup` semé désactivé le 2026-10-19 —, monthly_regen) ; Daily (scores_refresh 06:30, day_start, override_aggregation, gmaps_cache_gc) ; Vector (builders 5 min/60 min/hebdo/nocturne, entraînement, fantôme).
 - seconde_regle_consommateur : PASSE.
 - statut : **existe_codé** (éteint ; trou T2 refermé au socle — les ~25 jobs des passes s'y branchent en seeds `enabled=false`).
 
@@ -358,9 +358,9 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé.
 
 ### F2-09 `ai_slot_transition` + `ai_audit_samples` + vue `v_ai_training_pairs`
-- vit : CRÉÉES au socle (0038, schéma spec WR §3.7 verbatim, généralisation du pattern Pulse §3.9). Vides — chaque passe y seede ses slots.
+- vit : CRÉÉES au socle (0038, schéma spec WR §3.7 verbatim, généralisation du pattern Pulse §3.9). Slots WR + Daily semés et mécanique d'audit codée le 2026-10-19 (migration 0088, voir F1-13) ; échantillons encore vides.
 - consommateurs prévus : Pulse (tous slots), WR (10 slots §10), Daily (2 slots), Vector (audit OCR §4.7, même esprit).
-- statut : existe_codé (vides ; R1 appliquée — partagées d'emblée).
+- statut : existe_codé (12 slots semés, échantillons vides ; R1 appliquée — partagées d'emblée).
 
 ### F2-10 store de paramètres versionnés partagé
 - vit : CRÉÉ au socle (0038) — table `parameters` + vue `v_parameters_current` (cf. F1-12).
