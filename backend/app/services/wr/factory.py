@@ -7,15 +7,16 @@ sauté sans curseur ; codé plus tard, il partira du début du jour de Paris de 
 Un worker codé ne tourne que s'il est listé dans `wr.factory_workers_enabled` (vide au départ :
 bascule worker par worker, carte V18), sinon il est sauté sans curseur lui aussi.
 
-Codés aujourd'hui : W1 (rollups quotidiens, rollups.py) et W5 (recalcul persistant des priorités
-du docket). W4 anomalies, W2 découverte causale (IA) et W3 apprentissages (IA) restent à coder ; ce module n'appelle aucun
+Codés aujourd'hui : W1 (rollups quotidiens, rollups.py), W4 (anomalies sur les rollups,
+anomalies.py) et W5 (items `anomaly` depuis W4, dédoublonnés par signal et jour, puis recalcul des
+priorités du docket). W2 découverte causale (IA) et W3 apprentissages (IA) restent à coder ; ce module n'appelle aucun
 modèle. Les jobs `wr.factory_on_session_end` et `wr.factory_fallback` sont semés désactivés.
 """
 
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -25,14 +26,18 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
-from app.models.wr import WrWorkerCursor, WrWorkerRun
+from app.models.toolbox import SignalDefinition, SignalValue
+from app.models.wr import WrDocketItem, WrWorkerCursor, WrWorkerRun
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
-from app.services.wr import docket, rollups
+from app.services.wr import anomalies, docket, rollups
 
 PARIS = ZoneInfo("Europe/Paris")
 WORKER_ORDER = ("w1_rollups", "w4_anomalies", "w2_causal", "w3_learning", "w5_docket")
 FALLBACK_LOCAL_HOUR = 23
+ANOMALY_LOOKBACK_DAYS = 7
+# Domaine du rollup → domaine du docket.
+ANOMALY_DOMAINS = {"finance": "vault", "rides": "vector", "missions": "imperium"}
 
 
 @dataclass
@@ -52,15 +57,62 @@ def _w1_rollups(db: Session, user: User, window_from: datetime, window_to: datet
                          detail={"days": [day.isoformat() for day in days], "pulse": "stub"})
 
 
+def _w4_anomalies(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
+    days = anomalies.touched_days(db, user=user, window_from=window_from, window_to=window_to)
+    values = anomalies.evaluate_days(db, user=user, days=days)
+    flagged = [value for value in values if value.band != "green"]
+    return WorkerOutcome(items_in=len(days), items_out=len(values),
+                         detail={"days": [day.isoformat() for day in days], "flagged": len(flagged)})
+
+
 def _w5_docket(db: Session, user: User, window_from: datetime, window_to: datetime) -> WorkerOutcome:
+    created = _anomaly_items(db, user, window_to)
     count = docket.reprioritize(db, current_user=user, now=window_to)
-    return WorkerOutcome(items_in=count, items_out=count, detail={"reprioritized": count})
+    return WorkerOutcome(items_in=count, items_out=count + created,
+                         detail={"reprioritized": count, "anomaly_items": created})
+
+
+def _anomaly_items(db: Session, user: User, now: datetime) -> int:
+    """Une anomalie W4 >= `wr.anomaly_docket_min_band` des 7 derniers jours → un item `anomaly`, une seule fois."""
+    minimum = str(get_parameter(db, "wr.anomaly_docket_min_band", default="orange"))
+    labels = dict(db.execute(select(SignalDefinition.code, SignalDefinition.label_fr)
+                             .where(SignalDefinition.domain == "wr")).all())
+    values = db.scalars(
+        select(SignalValue).where(SignalValue.signal_code.like("wr.%"),
+                                  SignalValue.measured_at > now - timedelta(days=ANOMALY_LOOKBACK_DAYS),
+                                  SignalValue.measured_at <= now + timedelta(days=1),
+                                  SignalValue.detail["user_id"].astext == str(user.id))
+        .order_by(SignalValue.measured_at)
+    ).all()
+    created = 0
+    for value in values:
+        if not anomalies.band_at_least(value.band, minimum):
+            continue
+        refs = {"signal_code": value.signal_code, "local_date": value.detail["local_date"]}
+        exists = db.scalar(select(WrDocketItem.id).where(
+            WrDocketItem.user_id == user.id, WrDocketItem.item_type == "anomaly",
+            WrDocketItem.evidence_refs.contains(refs)).limit(1))
+        if exists is not None:
+            continue
+        domain = value.signal_code.split(".")[1]
+        docket.create_item(
+            db, current_user=user, item_type="anomaly", domain=ANOMALY_DOMAINS.get(domain, "wr"),
+            title_fr=f"{labels.get(value.signal_code, value.signal_code)} inhabituel le {value.detail['local_date']}",
+            payload={"signal_code": value.signal_code, "local_date": value.detail["local_date"],
+                     "value": float(value.value), "baseline": value.detail["baseline"], "z": value.detail["z"],
+                     "band": value.band, "unexplained": bool((value.flags or {}).get("unexplained"))},
+            evidence_refs={**refs, "signal_value_id": str(value.id)},
+            impact_estimate=4 if value.band == "red" else 3, source_worker="w4",
+            severity="elevated" if value.band == "red" else "normal", now=now,
+        )
+        created += 1
+    return created
 
 
 # None = worker pas encore codé (sauté, sans curseur).
 WORKERS: dict[str, Worker | None] = {
     "w1_rollups": _w1_rollups,
-    "w4_anomalies": None,
+    "w4_anomalies": _w4_anomalies,
     "w2_causal": None,
     "w3_learning": None,
     "w5_docket": _w5_docket,

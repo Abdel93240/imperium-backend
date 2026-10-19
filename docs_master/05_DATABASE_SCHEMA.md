@@ -1964,8 +1964,8 @@ chaque worker traite ]curseur, maintenant] puis avance son curseur. Un echec n'a
 curseur et arrete la chaine ; le passage suivant reprend le meme lot. Worker non code : saute,
 sans curseur (premier lot = depuis minuit, heure de Paris). Un worker code ne tourne que s'il
 est liste dans le parametre `wr.factory_workers_enabled` (seme vide ; carte V18). Codes : W1
-(rollups, ci-dessous) et W5 (recalcul des priorites du docket) ; aucun appel de modele. Jobs
-semes desactives :
+(rollups, ci-dessous), W4 (anomalies, ci-dessous) et W5 (items `anomaly` depuis W4 puis
+recalcul des priorites du docket) ; aucun appel de modele. Jobs semes desactives :
 `wr.factory_on_session_end` (abonne a `rides.session.ended`) et `wr.factory_fallback` (cron
 UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne ce jour-la).
 Event `planning.factory.run_completed` par worker passe.
@@ -1981,6 +1981,19 @@ retard et retard moyen sur la deadline, ouvertes en retard en fin de jour (statu
 du calcul). Pulse : stub neutre (aucune ligne ; lecture des donnees de sante par l'usine a
 trancher). Jours recalcules : ceux de la fenetre + ceux des lignes creees ou modifiees dans la
 fenetre (saisie tardive). Le digest ne lit pas encore ces rollups (`unavailable`).
+
+Anomalies W4 — tables partagees `signal_definitions` / `signal_values` (migration
+20261019_0092, spec WR §4 W4 ; jamais de table wr_). 8 signaux `wr.*` (domain `wr`, semes
+INACTIFS : activation = `active=true` par signal) : revenus, depenses, pression, net VTC par
+heure, minutes de conduite, missions ratees, finies en retard, ouvertes en retard. Pour chaque
+jour recalcule par W1 : baseline = mediane des 28 jours precedents, echelle = MAD x 1,4826
+(plancher `min_scale`), z dans le sens qui inquiete ; bandes yellow 2, orange 3, red 4 ; il faut
+14 jours d'historique ; les jours a zero sont ignores pour les signaux VTC. Une valeur par
+signal et par jour (`measured_at` = 23:59:59 a Paris, reecrite au recalcul, `detail.user_id`).
+Marqueur `unexplained` sur toute bande hors green (pas encore de lien causal W2 ni de catalogue
+de raisons). W5 depose un item `anomaly` par signal et par jour a partir de
+`wr.anomaly_docket_min_band` (orange) : rouge -> severite `elevated` et impact 4, orange ->
+`normal` et 3 ; jamais `red` (reserve aux red flags).
 
 Metriques du WR — `wr_metrics_weekly` : CODE (migration 20261019_0085, 2026-10-19, spec WR §3.8).
 Colonnes de la spec + `user_id` ; une ligne par utilisateur et par lundi (unique), NULL = pas
