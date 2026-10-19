@@ -1957,12 +1957,23 @@ Rollups W1 et etat du plan absents (`unavailable`). Routes : `POST /api/wr/diges
 WR lancee et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige),
 `GET /api/wr/digest/current`. L'assemblage n'est pas encore branche sur le lancement du WR.
 
+Usine du WR — `wr_worker_runs` et `wr_worker_cursors` : CODE (migration 20261019_0090,
+2026-10-19, spec WR §3.2 et §4). DDL de la spec + `wr_worker_runs.job_run_id` (run du runner).
+Ordre d'un passage : W1 rollups -> W4 anomalies -> W2 causal -> W3 apprentissages -> W5 docket ;
+chaque worker traite ]curseur, maintenant] puis avance son curseur. Un echec n'avance pas le
+curseur et arrete la chaine ; le passage suivant reprend le meme lot. Worker non code : saute,
+sans curseur (premier lot = depuis minuit, heure de Paris). Seul W5 est code (recalcul des
+priorites du docket) ; aucun appel de modele. Jobs semes desactives :
+`wr.factory_on_session_end` (abonne a `rides.session.ended`) et `wr.factory_fallback` (cron
+UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne ce jour-la).
+Event `planning.factory.run_completed` par worker passe.
+
 Metriques du WR — `wr_metrics_weekly` : CODE (migration 20261019_0085, 2026-10-19, spec WR §3.8).
 Colonnes de la spec + `user_id` ; une ligne par utilisateur et par lundi (unique), NULL = pas
 encore mesurable (events_processed, patterns_reinforced, cloud_cost_estimate,
 agreement_by_slot rempli depuis l'audit des slots (0088) quand il y a des contre-lectures :
-usine W1-W3 non codee ; factory_runs = runs `wr.factory*`,
-0 aujourd'hui). Semaine Europe/Paris. Comptes du docket : items crees (et par type :
+usine W1-W3 non codee ; factory_runs = passages de l'usine dans `wr_worker_runs`).
+Semaine Europe/Paris. Comptes du docket : items crees (et par type :
 chain_proposals, patterns_new, contradictions), decisions et decisions forcees d'apres les
 events `planning.docket.*`. Politique de saut : session de la semaine lancee -> wr_mode `full`
 (le mode court n'est pas encore enregistre sur la session) et duree lancement -> fin ; rien de

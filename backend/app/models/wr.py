@@ -110,3 +110,38 @@ class WrMetricsWeekly(UUIDPrimaryKeyMixin, Base):
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class WrWorkerRun(UUIDPrimaryKeyMixin, Base):
+    """One worker pass of the WR factory (spec WR §3.2 + job_run_id ; CHECKs in migration 0090)."""
+
+    __tablename__ = "wr_worker_runs"
+
+    worker: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    session_ref: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    job_run_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    window_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_to: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    items_in: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    items_out: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    llm_calls: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WrWorkerCursor(Base):
+    """Incremental cursor of one factory worker: it processes ]cursor, now] then advances."""
+
+    __tablename__ = "wr_worker_cursors"
+
+    worker: Mapped[str] = mapped_column(Text, primary_key=True)
+    last_processed_event_ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_processed_event_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
