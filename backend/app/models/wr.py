@@ -145,3 +145,17 @@ class WrWorkerCursor(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class WrRollupDaily(UUIDPrimaryKeyMixin, Base):
+    """W1 daily aggregate of one domain for one Paris day (migration 0091, recomputed by upsert)."""
+
+    __tablename__ = "wr_rollups_daily"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    local_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    domain: Mapped[str] = mapped_column(Text, nullable=False)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
