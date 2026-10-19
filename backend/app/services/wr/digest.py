@@ -6,7 +6,8 @@ plafond dur `wr.digest_token_cap` : on retire les items les moins prioritaires d
 jamais au hasard ; rouges et décisions forcées ne sortent qu'en dernier recours.
 Section `rollups` : totaux de la semaine par domaine depuis `wr_rollups_daily` (W1). Section
 `anomalies` : journées hors green des signaux W4 de la semaine, |z| décroissant, au plus
-`wr.digest_anomaly_signals_cap`. L'état du plan (plan_versions) n'est pas codé : `unavailable`.
+`wr.digest_anomaly_signals_cap`. Section `plan_state` : le plan courant (v_plan_current, deltas
+appliqués) quand `wr.plan_enabled` est vrai et qu'une version est active ; sinon `unavailable`.
 Le job `wr.digest_on_open` (abonné à `planning.weekly_review.launched`, semé désactivé)
 assemble le digest au lancement du WR.
 
@@ -33,9 +34,11 @@ from app.models.toolbox import SignalValue
 from app.models.wr import WrDigest, WrRollupDaily
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
-from app.services.wr import docket
+from app.services.wr import docket, plan
 
-ALLOWED_SECTIONS = frozenset({"window", "docket", "counts", "rollups", "anomalies", "truncated", "unavailable"})
+ALLOWED_SECTIONS = frozenset({
+    "window", "docket", "counts", "rollups", "anomalies", "plan_state", "truncated", "unavailable",
+})
 FORBIDDEN_KEYS = frozenset({
     "conversation", "messages", "transcript", "raw", "raw_text", "device_raw", "sensor_samples",
     "document_text", "ocr_text", "medical_document", "medical_text", "file_bytes", "image", "audio",
@@ -45,7 +48,6 @@ ENTRY_FIELDS = (
     "severity", "priority", "force_decision", "consecutive_defers",
 )
 CLOSED_SESSION_STATUSES = ("stored", "cancelled", "failed")
-UNAVAILABLE = ["plan_state"]
 PARIS = ZoneInfo("Europe/Paris")
 SUMMED = {
     "finance": ("income_cents", "expense_cents", "net_cents", "transaction_count", "reversal_count"),
@@ -106,6 +108,7 @@ def assemble_digest(db: Session, *, current_user: User) -> tuple[WrDigest, bool]
         "rollups": _rollups(db, current_user, session.week_start, session.week_end),
         "anomalies": _anomalies(db, current_user, session.week_start, session.week_end,
                                 cap=int(get_parameter(db, "wr.digest_anomaly_signals_cap", default=20))),
+        "plan_state": _plan_state(db, current_user),
     }
     _check_no_raw(extras)
     content = _build(session, selected, open_counts, extras, truncated=False)
@@ -159,9 +162,21 @@ def _build(session: ImperiumWeeklyReviewSession, selected: list[dict], open_coun
         },
         "rollups": extras["rollups"],
         "anomalies": extras["anomalies"],
+        **({"plan_state": extras["plan_state"]} if extras["plan_state"] is not None else {}),
         "truncated": truncated,
-        "unavailable": list(UNAVAILABLE),
+        "unavailable": [] if extras["plan_state"] is not None else ["plan_state"],
     }
+
+
+def _plan_state(db: Session, current_user: User) -> dict | None:
+    if not plan.plan_enabled(db):
+        return None
+    current = plan.current_plan(db, current_user=current_user)
+    if current is None:
+        return None
+    return {"plan_version_id": str(current.plan_version_id), "origin": current.origin,
+            "horizon_start": current.horizon_start.isoformat(), "horizon_end": current.horizon_end.isoformat(),
+            "applied_deltas": len(current.applied_delta_ids), "plan": current.plan}
 
 
 def _rollups(db: Session, current_user: User, first: date, last: date) -> dict:
