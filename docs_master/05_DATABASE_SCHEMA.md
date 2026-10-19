@@ -1965,9 +1965,14 @@ window, docket par type, counts open/included, truncated, unavailable), token_es
 belief_review_due 6, plan_delta_proposal 8 ; un type sans plafond n'est borne que par les
 tokens). Troncature par priorite, rouges et decisions forcees en dernier recours. Payload
 d'item contenant du brut (conversation, transcript, texte de document, image...) -> refus.
-Rollups W1 et etat du plan absents (`unavailable`). Routes : `POST /api/wr/digest` (session
-WR lancee et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige),
-`GET /api/wr/digest/current`. L'assemblage n'est pas encore branche sur le lancement du WR.
+Depuis la migration 0094 : section `rollups` (totaux de la semaine par domaine depuis
+`wr_rollups_daily` : jours couverts, sommes, derniere et pire pression, net VTC par heure,
+missions ouvertes en retard le dernier jour) et section `anomalies` (journees hors green des
+signaux W4 de la semaine, |z| decroissant, au plus `wr.digest_anomaly_signals_cap` = 20, a
+valider). Etat du plan absent (`unavailable`). Routes : `POST /api/wr/digest` (session WR lancee
+et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige), `GET /api/wr/digest/current`.
+Job `wr.digest_on_open` (seme desactive) : abonne a `planning.weekly_review.launched`, emis au
+premier lancement de la session WR.
 
 Usine du WR — `wr_worker_runs` et `wr_worker_cursors` : CODE (migration 20261019_0090,
 2026-10-19, spec WR §3.2 et §4). DDL de la spec + `wr_worker_runs.job_run_id` (run du runner).
@@ -1983,7 +1988,7 @@ UTC 21:30 et 22:30 ; ne tourne qu'a 23 h de Paris et si l'usine n'a pas tourne c
 Event `planning.factory.run_completed` par worker passe.
 
 Rollups W1 — `wr_rollups_daily` : CODE (migration 20261019_0091, 2026-10-19, spec WR §4 W1 ;
-pas de DDL dans la spec). Une ligne par utilisateur, jour de Paris et domaine, `metrics` JSONB
+pas de DDL dans la spec ; lu par le digest depuis 0094). Une ligne par utilisateur, jour de Paris et domaine, `metrics` JSONB
 reecrit en entier a chaque passage (upsert, unique user/jour/domaine). Sources canoniques
 seulement (AD-2) : finance = ledger `imperium_vault_transactions` du jour (income, expense,
 net, nombre, reversals ; regles du rapport hebdo) + score du dernier `pressure_snapshots` du
@@ -1992,7 +1997,7 @@ jour ; rides = sessions terminees (revenu, depense, minutes, net par heure) + de
 retard et retard moyen sur la deadline, ouvertes en retard en fin de jour (statut a l'instant
 du calcul). Pulse : stub neutre (aucune ligne ; lecture des donnees de sante par l'usine a
 trancher). Jours recalcules : ceux de la fenetre + ceux des lignes creees ou modifiees dans la
-fenetre (saisie tardive). Le digest ne lit pas encore ces rollups (`unavailable`).
+fenetre (saisie tardive).
 
 Anomalies W4 — tables partagees `signal_definitions` / `signal_values` (migration
 20261019_0092, spec WR §4 W4 ; jamais de table wr_). 8 signaux `wr.*` (domain `wr`, semes

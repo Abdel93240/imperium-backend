@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.ai import AIMemory, AIResult, AITask
 from app.models.auth import User
-from app.models.enums import IdempotencyStatus
+from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import (
     ImperiumMemoryCandidateDecision,
@@ -70,6 +70,7 @@ from app.schemas.ai import AIResultCallback
 from app.services.ai.memories import WR_MEMORY_COMMIT_DISABLED_REASON
 from app.services.ai.roles import LOCAL_EXECUTOR_ROLE, resolve_model_id
 from app.services.ai.tasks import receive_ai_result
+from app.services.events.emitter import build_event
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -186,7 +187,8 @@ def launch_weekly_review_session(
     if session.status in {"cancelled", "failed", "approved", "stored"}:
         raise WeeklyReviewStateConflictError("Weekly review session cannot be launched from its current state.")
 
-    if session.launched_at is None:
+    first_launch = session.launched_at is None
+    if first_launch:
         session.launched_at = datetime.now(UTC)
     if session.status == "ready":
         session.status = "preparing_initial_summary"
@@ -213,6 +215,15 @@ def launch_weekly_review_session(
             ai_task.prepared_payload = prepare_weekly_review_n8n_trigger_payload(session=session, ai_task=ai_task)
 
     db.flush()
+    if first_launch:
+        # Réveille l'assemblage du digest (job `wr.digest_on_open`, spec WR §12) ; références seulement.
+        db.add(build_event(
+            db, user_id=current_user.id, event_type="planning.weekly_review.launched",
+            payload={"review_session_id": str(session.id), "week_start": session.week_start.isoformat()},
+            idempotency_key=f"planning.weekly_review.launched.{session.id}", source_app=SourceApp.imperium,
+            privacy_level=PrivacyLevel.low, occurred_at=session.launched_at,
+        ))
+        db.flush()
     response = WeeklyReviewSessionRead.model_validate(session)
     _store_idempotency(
         db,
