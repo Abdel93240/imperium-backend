@@ -4,7 +4,9 @@ priority = severity_w × impact_estimate × freshness × confidence_factor, avec
 freshness = exp(−âge_jours / wr.docket_halflife_days) et confidence_factor = 0,5 + confidence/200.
 Un item sans confidence (dépôt déterministe, pas de verdict de modèle) prend le facteur 1.
 
-Une décision ne fait qu'enregistrer le choix de l'utilisateur : rien n'est appliqué ici
+Un item qui remplit une classe d'auto-acceptation activée par l'utilisateur (autoaccept.py)
+est validé d'office au dépôt, jamais un rouge. Une décision ne fait qu'enregistrer le choix de
+l'utilisateur : rien n'est appliqué ici
 (les consommateurs — plan, croyances — liront les items validés). Le rouge notifie tout de
 suite et attend la décision, il n'applique rien.
 """
@@ -27,6 +29,7 @@ from app.schemas.wr import DocketDecisionRequest, DocketItemRead
 from app.services.events.emitter import build_event
 from app.services.notifications import notify
 from app.services.params import get_parameter
+from app.services.wr import autoaccept
 
 ITEM_TYPES = frozenset({
     "chain_proposal", "pattern_new", "pattern_contradiction", "anomaly", "belief_review_due",
@@ -123,7 +126,35 @@ def create_item(
             privacy_level=PrivacyLevel.medium, occurred_at=now,
         ))
         db.flush()
+    elif item_type != "autoaccept_spotcheck":
+        autoaccept_class = autoaccept.matching_class(db, item, now=now)
+        if autoaccept_class is not None:
+            _auto_accept(db, current_user, item, autoaccept_class, created, now)
     return item
+
+
+def _auto_accept(db: Session, current_user: User, item: WrDocketItem, autoaccept_class, created, now: datetime) -> None:
+    """Validé d'office par une classe active ; une part tirée sur l'id revient en contrôle."""
+    item.status = "validated"
+    item.decided_at = now
+    item.autoaccept_class_id = autoaccept_class.id
+    db.flush()
+    spotcheck = None
+    if autoaccept.in_spotcheck(db, item.id):
+        spotcheck = create_item(
+            db, current_user=current_user, item_type="autoaccept_spotcheck", domain=item.domain,
+            title_fr=f"Contrôle : {item.title_fr}",
+            payload={"item_id": str(item.id), "item_type": item.item_type, "payload": item.payload},
+            evidence_refs={"docket_item_id": str(item.id), "evidence_refs": item.evidence_refs},
+            impact_estimate=item.impact_estimate, source_worker=item.source_worker, confidence=item.confidence,
+            now=now,
+        )
+        spotcheck.autoaccept_class_id = autoaccept_class.id
+        db.flush()
+    _emit(db, current_user, "planning.docket.item_autoaccepted", item, causation_id=created.event_id,
+          extra={"class_id": str(autoaccept_class.id),
+                 "spotcheck_item_id": str(spotcheck.id) if spotcheck is not None else None},
+          occurred_at=now)
 
 
 def list_items(

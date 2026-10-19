@@ -1930,6 +1930,20 @@ rien n'est applique par le docket. Routes : `GET /api/wr/docket?status=&type=`,
 `GET /api/wr/docket?mode=light` = WR court (spec WR §9 P4) : rouges, decisions forcees,
 contradictions et deltas de plan seulement ; le reste porte sans penalite.
 
+Classes d'auto-acceptation — `wr_autoaccept_classes` : CODE (migration 20261019_0089,
+2026-10-19, spec WR §9 P4 et §13.8 : « table vide + mecanique, activation = decision user » ;
+pas de DDL dans la spec). Colonnes : user_id, item_type (7 types ; jamais autoaccept_spotcheck,
+red_flag_ref ni user_question), domain (NULL = tous), slot_code (FK ai_slot_transition),
+min_confidence 0-100, rationale_fr (raison de l'utilisateur), enabled, created_at, disabled_at ;
+une seule classe active par utilisateur, type et domaine. `wr_docket_items.autoaccept_class_id`
+(FK) marque l'item valide d'office et ses controles. Au depot, un item non rouge avec
+confidence >= min_confidence, dont le slot tient sa cible d'agreement sur les
+`ai.audit_decay_weeks` dernieres semaines closes, passe `validated` ; `wr.spotcheck_pct` (10)
+% d'entre eux, tires sur l'id, sont re-presentes en `autoaccept_spotcheck` (payload = item
+d'origine). Un refus de controle est un label, il ne desactive rien. Routes :
+`GET /api/wr/autoaccept-classes`, `POST /api/wr/autoaccept-classes` (Idempotency-Key, 409
+`AUTOACCEPT_CLASS_EXISTS`), `POST /api/wr/autoaccept-classes/{id}/disable`.
+
 Digest du WR — `wr_digests` : CODE (migration 20261019_0084, 2026-10-19, spec WR §3.6).
 Un digest par session WR (`review_session_id` unique, FK cascade), fige a l'assemblage :
 user_id, window_from/window_to (= week_start/week_end), digest JSONB (sections whitelistees
@@ -1946,7 +1960,8 @@ WR lancee et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige),
 Metriques du WR — `wr_metrics_weekly` : CODE (migration 20261019_0085, 2026-10-19, spec WR §3.8).
 Colonnes de la spec + `user_id` ; une ligne par utilisateur et par lundi (unique), NULL = pas
 encore mesurable (events_processed, patterns_reinforced, cloud_cost_estimate,
-agreement_by_slot : usine W1-W3 et transition IA non codees ; factory_runs = runs `wr.factory*`,
+agreement_by_slot rempli depuis l'audit des slots (0088) quand il y a des contre-lectures :
+usine W1-W3 non codee ; factory_runs = runs `wr.factory*`,
 0 aujourd'hui). Semaine Europe/Paris. Comptes du docket : items crees (et par type :
 chain_proposals, patterns_new, contradictions), decisions et decisions forcees d'apres les
 events `planning.docket.*`. Politique de saut : session de la semaine lancee -> wr_mode `full`

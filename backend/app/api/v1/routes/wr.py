@@ -9,6 +9,9 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.wr import (
+    AutoacceptClassCreateRequest,
+    AutoacceptClassListResponse,
+    AutoacceptClassRead,
     DigestRead,
     DocketDecisionRequest,
     DocketItemRead,
@@ -22,7 +25,7 @@ from app.schemas.wr import (
     WrMetricsWeeklyResponse,
 )
 from app.services.ai import audit_loop
-from app.services.wr import digest, docket, metrics
+from app.services.wr import autoaccept, digest, docket, metrics
 
 router = APIRouter()
 
@@ -136,3 +139,42 @@ def slot_transition_update_route(
     except audit_loop.SlotIdempotencyConflictError as exc:
         db.rollback()
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+@router.get("/autoaccept-classes", response_model=AutoacceptClassListResponse)
+def autoaccept_classes_route(current_user: CurrentUserDep, db: SessionDep) -> AutoacceptClassListResponse:
+    """Classes d'auto-acceptation, agreement du slot à l'instant et bilan des contrôles (lecture seule)."""
+    return AutoacceptClassListResponse(classes=autoaccept.list_classes(db, current_user=current_user))
+
+
+@router.post("/autoaccept-classes", response_model=AutoacceptClassRead, status_code=status.HTTP_201_CREATED)
+def create_autoaccept_class_route(
+    payload: AutoacceptClassCreateRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> AutoacceptClassRead | JSONResponse:
+    """Activation d'une classe : décision de l'utilisateur, raison obligatoire."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    try:
+        return autoaccept.create_class(
+            db, current_user=current_user, request=payload,
+            idempotency_key=idempotency_key, request_path=request.url.path,
+        )
+    except audit_loop.UnknownSlotError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    except autoaccept.AutoacceptStateError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": exc.code})
+
+
+@router.post("/autoaccept-classes/{class_id}/disable", response_model=AutoacceptClassRead)
+def disable_autoaccept_class_route(class_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> AutoacceptClassRead:
+    try:
+        return autoaccept.disable_class(db, current_user=current_user, class_id=class_id)
+    except autoaccept.AutoacceptClassNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

@@ -41,6 +41,27 @@ class WrDocketItem(UUIDPrimaryKeyMixin, Base):
     )
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decision_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    autoaccept_class_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wr_autoaccept_classes.id"), nullable=True
+    )
+
+
+class WrAutoacceptClass(UUIDPrimaryKeyMixin, Base):
+    """User-activated auto-accept class of docket items (migration 0089, spec WR §9 P4)."""
+
+    __tablename__ = "wr_autoaccept_classes"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    item_type: Mapped[str] = mapped_column(Text, nullable=False)
+    domain: Mapped[str | None] = mapped_column(Text, nullable=True)
+    slot_code: Mapped[str] = mapped_column(Text, ForeignKey("ai_slot_transition.slot_code"), nullable=False)
+    min_confidence: Mapped[int] = mapped_column(Integer, nullable=False)
+    rationale_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WrDigest(UUIDPrimaryKeyMixin, Base):

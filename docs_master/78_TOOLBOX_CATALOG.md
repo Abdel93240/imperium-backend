@@ -367,7 +367,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé (R2 appliquée — partagé d'emblée, doublon latent éteint).
 
 ### F2-11 `wr_docket_items` — le docket
-- vit : CODÉE (migration 20261019_0083, 2026-10-19) — `wr_docket_items` (DDL spec WR §3.1 + `user_id`), `app/services/wr/docket.py` (dépôt validé, priorité §7 paramétrée par `wr.docket_halflife_days` et `wr.docket_max_defers`, report → décision forcée, rouge → `notify()` sans rien appliquer) ; `GET /api/wr/docket?status=&type=`, `GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision`. Pas encore de producteur branché (W1-W5 et phases WR non codés) ni d'écran.
+- vit : CODÉE (migration 20261019_0083, 2026-10-19) — `wr_docket_items` (DDL spec WR §3.1 + `user_id`), `app/services/wr/docket.py` (dépôt validé, priorité §7 paramétrée par `wr.docket_halflife_days` et `wr.docket_max_defers`, report → décision forcée, rouge → `notify()` sans rien appliquer) ; `GET /api/wr/docket?status=&type=`, `GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision`. Pas encore de producteur branché (W1-W5 et phases WR non codés) ni d'écran. Classes d'auto-acceptation (spec WR §9 P4) codées le 2026-10-19 (migration 0089, `app/services/wr/autoaccept.py`, `wr.spotcheck_pct` = 10) : table vide, activation par l'utilisateur seulement, condition d'agreement lue depuis l'audit des slots (F1-13).
 - consommateurs prévus : WR (walker P4), Daily (§10.2 override_pattern → docket ; §8.2 plan_delta_needed), Vector (§4.8 dérives, §6 rapport fantôme, §4.6 rapport surge — « si l'usine n'est pas posée, table tampon »), Pulse (P6 s'intègre au WR).
 - statut : existe_codé (R3 appliquée — partagée d'emblée, colonne `domain`).
 

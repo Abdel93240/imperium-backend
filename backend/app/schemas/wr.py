@@ -34,6 +34,7 @@ class DocketItemRead(BaseModel):
     created_at: datetime
     decided_at: datetime | None
     decision_note: str | None
+    autoaccept_class_id: UUID | None = None
 
 
 class DocketListResponse(BaseModel):
@@ -131,3 +132,43 @@ class SlotTransitionUpdateRequest(BaseModel):
         if self.audit_sample_pct is None and self.agreement_target_pct is None:
             raise ValueError("Give audit_sample_pct or agreement_target_pct.")
         return self
+
+
+AutoacceptItemType = Literal[
+    "chain_proposal", "pattern_new", "pattern_contradiction", "anomaly", "belief_review_due",
+    "plan_delta_proposal", "investigation_result",
+]
+
+
+class AutoacceptClassCreateRequest(BaseModel):
+    """Activation d'une classe par l'utilisateur (spec WR §9 P4) ; la raison est obligatoire."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_type: AutoacceptItemType
+    domain: Literal["pulse", "wr", "daily", "vector", "path", "vault", "imperium", "system"] | None = None
+    slot_code: str = Field(min_length=1, max_length=128)
+    min_confidence: int = Field(ge=0, le=100)
+    rationale_fr: str = Field(min_length=1, max_length=500)
+
+
+class AutoacceptClassRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    item_type: AutoacceptItemType
+    domain: str | None
+    slot_code: str
+    min_confidence: int
+    rationale_fr: str
+    enabled: bool
+    created_at: datetime
+    disabled_at: datetime | None
+    agreement_holds: bool = False
+    auto_accepted: int = 0
+    spotchecks_validated: int = 0
+    spotchecks_refused: int = 0
+
+
+class AutoacceptClassListResponse(BaseModel):
+    classes: list[AutoacceptClassRead]
