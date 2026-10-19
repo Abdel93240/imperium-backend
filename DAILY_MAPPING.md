@@ -3,8 +3,8 @@
 ## Source
 
 Spécification : `specs/DAILY_ORCHESTRATOR_SPEC_V1.md`. Audit de l'étape 0 (§0), en lecture seule,
-fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Seule l'étape 2
-du §15 (externalisation des barèmes + verrou de parité) est livrée ; le reste du Daily (portes,
+fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Livré : étape 2
+du §15 (externalisation des barèmes + verrou de parité) et le réglage versionné (§4.5) ; le reste du Daily (portes,
 sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'est PAS codé.
 
 ## Réponses aux cinq questions du §0
@@ -53,7 +53,7 @@ sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'e
 | Seuils de bucket 1-10 | **créer** `df.priority_buckets` (hors liste A-E de la spec, mais constantes du même service) | |
 | Maxima par critère | **créer** `df.criterion_max` (bornes des entiers bruts et du breakdown) | |
 | Verrou de parité (§4.4) | **créer** : 83 cas dorés capturés AVANT l'externalisation | `tests/fixtures/df_golden_scores.json` |
-| Réglage (§4.5) | à **créer** (aucun mécanisme existant) | ACT-DLY-02 |
+| Réglage (§4.5) | **créé** : `GET/PUT /api/daily/settings/scoring` derrière `daily.settings_enabled` ; event `decision.scoring.updated` (nom canonique de `df.parameter_updated`) | migration 0102, ACT-DLY-02 |
 | Refresh (§4.6) | à **créer** (aucun mécanisme existant) | ACT-DLY-03 |
 
 ## Écarts signalés (pas de contradiction bloquante)

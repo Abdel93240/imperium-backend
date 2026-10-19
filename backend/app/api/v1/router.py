@@ -5,6 +5,7 @@ from app.api.v1.routes import (
     ai_advanced,
     ai_logs,
     auth,
+    daily,
     devices,
     events,
     imperium_frontend,
@@ -87,4 +88,5 @@ api_router.include_router(imperium_vault_categories.router, prefix="/imperium/va
 api_router.include_router(imperium_vault_receipts.router, prefix="/imperium/vault", tags=["imperium-vault-receipts"])
 api_router.include_router(vault.router, prefix="/vault", tags=["vault"])
 api_router.include_router(wr.router, prefix="/wr", tags=["wr"])
+api_router.include_router(daily.router, prefix="/daily", tags=["daily"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])
