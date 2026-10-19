@@ -1931,6 +1931,12 @@ rien n'est applique par le docket. Routes : `GET /api/wr/docket?status=&type=`,
 contradictions et deltas de plan seulement ; le reste porte sans penalite. Depuis le
 2026-10-19, un refus ou une validation modifiee exige `decision_note` (422 sinon ; spec WR §9 P4 :
 l'explication est le label).
+Notification rouge (migration 20261019_0098, 2026-10-19, spec WR §7, carte ACT-WR-07) : parametre
+seme `wr.red_notify_enabled` = false. Eteint, un item rouge est depose et reste en tete de
+`GET docket/red`, sans notification ni event `planning.docket.red_notified` ; allume, il notifie
+une fois (`notify()`, toutes les voies). `POST /api/wr/docket/{id}/red-ack` : accuse de reception
+idempotent (`notifications.acked_at` et `read_at`, event `planning.docket.red_acked`), 409
+`DOCKET_NOT_RED` ou `RED_NOT_NOTIFIED` ; l'accuse ne decide pas l'item. Pas de DDL.
 
 Marche du docket — `wr_walks` : CODE (migration 20261019_0093, 2026-10-19, spec WR §9 P4 ;
 carte V18 ACT-WR-06). Une marche par session WR (unique, FK cascade) : user_id, mode

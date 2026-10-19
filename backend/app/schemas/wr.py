@@ -41,6 +41,13 @@ class DocketListResponse(BaseModel):
     items: list[DocketItemRead]
 
 
+class RedAckRead(BaseModel):
+    item_id: UUID
+    notification_id: UUID
+    acked_at: datetime
+    item_status: DocketStatus
+
+
 class DocketDecisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
