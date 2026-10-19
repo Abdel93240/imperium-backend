@@ -3,8 +3,12 @@
 Contenu : les items ouverts du docket, groupés par type, chaque type plafonné par
 `wr.digest_caps` (un type sans plafond n'est limité que par le plafond de tokens), puis
 plafond dur `wr.digest_token_cap` : on retire les items les moins prioritaires d'abord,
-jamais au hasard ; rouges et décisions forcées ne sortent qu'en dernier recours. Rollups (W1) et état du plan (plan_versions) ne sont pas encore codés :
-ils figurent dans `unavailable`.
+jamais au hasard ; rouges et décisions forcées ne sortent qu'en dernier recours.
+Section `rollups` : totaux de la semaine par domaine depuis `wr_rollups_daily` (W1). Section
+`anomalies` : journées hors green des signaux W4 de la semaine, |z| décroissant, au plus
+`wr.digest_anomaly_signals_cap`. L'état du plan (plan_versions) n'est pas codé : `unavailable`.
+Le job `wr.digest_on_open` (abonné à `planning.weekly_review.launched`, semé désactivé)
+assemble le digest au lancement du WR.
 
 Whitelist assembleur : seules les sections listées peuvent entrer, et jamais de brut
 device, de contenu conversationnel ni de document médical — les références suffisent.
@@ -13,7 +17,9 @@ Une tentative lève DigestWhitelistError.
 
 import json
 import math
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -22,12 +28,14 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.imperium import ImperiumWeeklyReviewSession
-from app.models.wr import WrDigest
+from app.models.event import Event
+from app.models.toolbox import SignalValue
+from app.models.wr import WrDigest, WrRollupDaily
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
 from app.services.wr import docket
 
-ALLOWED_SECTIONS = frozenset({"window", "docket", "counts", "truncated", "unavailable"})
+ALLOWED_SECTIONS = frozenset({"window", "docket", "counts", "rollups", "anomalies", "truncated", "unavailable"})
 FORBIDDEN_KEYS = frozenset({
     "conversation", "messages", "transcript", "raw", "raw_text", "device_raw", "sensor_samples",
     "document_text", "ocr_text", "medical_document", "medical_text", "file_bytes", "image", "audio",
@@ -37,7 +45,13 @@ ENTRY_FIELDS = (
     "severity", "priority", "force_decision", "consecutive_defers",
 )
 CLOSED_SESSION_STATUSES = ("stored", "cancelled", "failed")
-UNAVAILABLE = ["rollups", "plan_state"]
+UNAVAILABLE = ["plan_state"]
+PARIS = ZoneInfo("Europe/Paris")
+SUMMED = {
+    "finance": ("income_cents", "expense_cents", "net_cents", "transaction_count", "reversal_count"),
+    "rides": ("sessions_ended", "revenue_cents", "expense_cents", "worked_minutes", "drop_zones"),
+    "missions": ("started", "completed", "failed", "cancelled", "completed_late"),
+}
 
 
 class DigestWhitelistError(ValueError):
@@ -88,10 +102,16 @@ def assemble_digest(db: Session, *, current_user: User) -> tuple[WrDigest, bool]
         _check_no_raw(entry["evidence_refs"])
         selected.append(entry)
 
-    content = _build(session, selected, open_counts, truncated=False)
+    extras = {
+        "rollups": _rollups(db, current_user, session.week_start, session.week_end),
+        "anomalies": _anomalies(db, current_user, session.week_start, session.week_end,
+                                cap=int(get_parameter(db, "wr.digest_anomaly_signals_cap", default=20))),
+    }
+    _check_no_raw(extras)
+    content = _build(session, selected, open_counts, extras, truncated=False)
     while selected and _estimate(content) > token_cap:
         selected.remove(_least_priority(selected))
-        content = _build(session, selected, open_counts, truncated=True)
+        content = _build(session, selected, open_counts, extras, truncated=True)
     for name in content:
         check_section(name)
 
@@ -125,8 +145,8 @@ def _open_session(db: Session, current_user: User) -> ImperiumWeeklyReviewSessio
     return session
 
 
-def _build(session: ImperiumWeeklyReviewSession, selected: list[dict], open_counts: dict[str, int], *,
-           truncated: bool) -> dict:
+def _build(session: ImperiumWeeklyReviewSession, selected: list[dict], open_counts: dict[str, int], extras: dict,
+           *, truncated: bool) -> dict:
     sections: dict[str, list[dict]] = {}
     for entry in selected:
         sections.setdefault(entry["item_type"], []).append(entry)
@@ -137,9 +157,75 @@ def _build(session: ImperiumWeeklyReviewSession, selected: list[dict], open_coun
             item_type: {"open": total, "included": len(sections.get(item_type, []))}
             for item_type, total in sorted(open_counts.items())
         },
+        "rollups": extras["rollups"],
+        "anomalies": extras["anomalies"],
         "truncated": truncated,
         "unavailable": list(UNAVAILABLE),
     }
+
+
+def _rollups(db: Session, current_user: User, first: date, last: date) -> dict:
+    rows = db.execute(
+        select(WrRollupDaily.domain, WrRollupDaily.local_date, WrRollupDaily.metrics)
+        .where(WrRollupDaily.user_id == current_user.id, WrRollupDaily.local_date >= first,
+               WrRollupDaily.local_date <= last)
+        .order_by(WrRollupDaily.local_date)
+    ).all()
+    summary: dict[str, dict] = {}
+    for domain, _day, metrics in rows:
+        bucket = summary.setdefault(domain, {"days": 0, **{key: 0 for key in SUMMED.get(domain, ())}})
+        bucket["days"] += 1
+        for key in SUMMED.get(domain, ()):
+            bucket[key] += int(metrics.get(key) or 0)
+        if domain == "finance" and metrics.get("pressure_score") is not None:
+            bucket["pressure_last"] = metrics["pressure_score"]
+            bucket["pressure_max"] = max(bucket.get("pressure_max", 0), metrics["pressure_score"])
+        if domain == "missions":
+            bucket["overdue_open_last_day"] = metrics.get("overdue_open_at_day_end")
+    rides = summary.get("rides")
+    if rides is not None:
+        rides["net_per_hour_cents"] = (
+            round((rides["revenue_cents"] - rides["expense_cents"]) * 60 / rides["worked_minutes"])
+            if rides["worked_minutes"] else None
+        )
+    return summary
+
+
+def _anomalies(db: Session, current_user: User, first: date, last: date, *, cap: int) -> list[dict]:
+    start = datetime.combine(first, time.min, tzinfo=PARIS)
+    end = datetime.combine(last + timedelta(days=1), time.min, tzinfo=PARIS)
+    rows = db.scalars(
+        select(SignalValue).where(
+            SignalValue.signal_code.like("wr.%"), SignalValue.band.is_not(None), SignalValue.band != "green",
+            SignalValue.measured_at >= start, SignalValue.measured_at < end,
+            SignalValue.detail["user_id"].astext == str(current_user.id))
+    ).all()
+    rows = sorted(rows, key=lambda row: (-abs(float(row.detail.get("z") or 0)), row.signal_code))[:cap]
+    return [
+        {"signal_code": row.signal_code, "local_date": row.detail.get("local_date"), "band": row.band,
+         "value": float(row.value) if row.value is not None else None, "baseline": row.detail.get("baseline"),
+         "z": row.detail.get("z"), "unexplained": bool((row.flags or {}).get("unexplained"))}
+        for row in rows
+    ]
+
+
+def digest_on_open_job(ctx, window) -> None:
+    """Job `wr.digest_on_open` : assemble le digest de la session WR qui vient d'être lancée."""
+    ctx.cursor_ts = window.to_ts or datetime.now(UTC)
+    event = ctx.db.scalar(select(Event).where(Event.id == ctx.trigger_ref)) if ctx.trigger_ref else None
+    user = ctx.db.get(User, event.user_id) if event is not None else None
+    if user is None:
+        ctx.items_in = ctx.items_out = 0
+        ctx.detail = {"skipped": "no_launch_event"}
+        return
+    try:
+        row, created = assemble_digest(ctx.db, current_user=user)
+    except DigestStateError as exc:
+        ctx.items_in, ctx.items_out = 1, 0
+        ctx.detail = {"skipped": exc.code}
+        return
+    ctx.items_in, ctx.items_out = 1, int(created)
+    ctx.detail = {"digest_id": str(row.id), "created": created, "token_estimate": row.token_estimate}
 
 
 def _least_priority(selected: list[dict]) -> dict:

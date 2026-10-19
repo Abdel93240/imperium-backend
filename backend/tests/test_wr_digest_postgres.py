@@ -25,7 +25,11 @@ from app.models import ai  # noqa: E402,F401 - FK de la session WR vers ai_tasks
 from app.models.auth import User  # noqa: E402
 from app.models.event import Event  # noqa: E402
 from app.models.imperium import ImperiumWeeklyReviewSession  # noqa: E402
-from app.models.wr import WrDigest  # noqa: E402
+from app.models.toolbox import SignalValue  # noqa: E402
+from app.models.wr import WrDigest, WrRollupDaily  # noqa: E402
+from app.services.imperium import weekly_review_conversation  # noqa: E402
+from app.services.runner.engine import RunContext, Window  # noqa: E402
+from app.services.wr import anomalies  # noqa: E402
 from app.services.params import set_parameter  # noqa: E402
 from app.services.wr import digest as digest_service  # noqa: E402
 from app.services.wr import docket  # noqa: E402
@@ -111,7 +115,7 @@ def test_digest_caps_per_type_and_freezes(db) -> None:
     assert body["digest"]["counts"]["belief_review_due"] == {"open": 7, "included": 6}
     assert [entry["id"] for entry in sections["user_question"]] == [str(question.id)]  # type sans cap
     assert "anomaly" not in sections  # l'item refusé n'est plus ouvert
-    assert body["digest"]["unavailable"] == ["rollups", "plan_state"]
+    assert body["digest"]["unavailable"] == ["plan_state"]
     assert 0 < body["token_estimate"] <= 40000 and body["digest"]["truncated"] is False
     # Instantané figé : un nouvel item n'entre pas, le second appel rend le même digest.
     _item(db, user, item_type="user_question", source_worker="manual")
@@ -176,3 +180,51 @@ def test_light_mode_keeps_only_urgent_types(db) -> None:
     assert light == {str(red.id), str(contradiction.id), str(delta.id), str(forced.id)}
     assert len(client.get("/api/wr/docket", params={"mode": "full"}).json()["items"]) == 5
     assert client.get("/api/wr/docket", params={"mode": "quick"}).status_code == 422
+
+
+def test_digest_carries_week_rollups_and_anomalies(db) -> None:
+    user = _user(db)
+    session = _session(db, user)
+    monday = session.week_start
+    for offset, (income, minutes) in enumerate([(10000, 120), (5000, 0)]):
+        day = monday + timedelta(days=offset)
+        db.add(WrRollupDaily(user_id=user.id, local_date=day, domain="finance",
+                             metrics={"income_cents": income, "expense_cents": 1000, "net_cents": income - 1000,
+                                      "transaction_count": 2, "reversal_count": 0, "pressure_score": 30 + offset}))
+        db.add(WrRollupDaily(user_id=user.id, local_date=day, domain="rides",
+                             metrics={"sessions_ended": 1 if minutes else 0, "revenue_cents": 6000 if minutes else 0,
+                                      "expense_cents": 0, "worked_minutes": minutes, "drop_zones": 2}))
+    db.add(WrRollupDaily(user_id=user.id, local_date=monday - timedelta(days=1), domain="finance",
+                         metrics={"income_cents": 999999}))  # semaine précédente : exclue
+    for code, band, z, day in (("wr.finance.expense", "orange", 3.4, monday), ("wr.missions.failed", "red", 5.0, monday),
+                               ("wr.finance.income", "green", 0.3, monday),
+                               ("wr.finance.expense", "red", 9.0, monday - timedelta(days=2))):
+        db.add(SignalValue(signal_code=code, measured_at=anomalies.measured_at(day), value=1, band=band,
+                           flags={"flag": band != "green", "unexplained": band != "green"},
+                           detail={"user_id": str(user.id), "local_date": day.isoformat(), "baseline": 0, "z": z}))
+    db.commit()
+    row, _ = digest_service.assemble_digest(db, current_user=user)
+    rollups = row.digest["rollups"]
+    assert (rollups["finance"]["days"], rollups["finance"]["income_cents"], rollups["finance"]["pressure_last"],
+            rollups["finance"]["pressure_max"]) == (2, 15000, 31, 31)
+    assert (rollups["rides"]["worked_minutes"], rollups["rides"]["net_per_hour_cents"]) == (120, 3000)
+    assert [(entry["signal_code"], entry["band"]) for entry in row.digest["anomalies"]] == [
+        ("wr.missions.failed", "red"), ("wr.finance.expense", "orange")]  # |z| décroissant, semaine seule
+
+
+def test_launch_emits_once_and_the_job_assembles_the_digest(db) -> None:
+    user = _user(db)
+    week_start = date.today() - timedelta(days=date.today().weekday())
+    for key in (uuid4().hex, uuid4().hex):
+        weekly_review_conversation.launch_weekly_review_session(
+            db, current_user=user, week_start=week_start, idempotency_key=key, request_method="POST", request_path="/x")
+    launched = db.scalars(select(Event).where(Event.user_id == user.id,
+                                              Event.event_type == "planning.weekly_review.launched")).all()
+    assert len(launched) == 1
+    ctx = RunContext(db=db, job=None, run_id=uuid4(), trigger="event", trigger_ref=launched[0].id)
+    digest_service.digest_on_open_job(ctx, Window(from_ts=None, to_ts=datetime.now(UTC)))
+    assert ctx.items_out == 1 and ctx.detail["created"] is True
+    assert db.scalar(select(WrDigest).where(WrDigest.user_id == user.id)) is not None
+    again = RunContext(db=db, job=None, run_id=uuid4(), trigger="event", trigger_ref=launched[0].id)
+    digest_service.digest_on_open_job(again, Window(from_ts=None, to_ts=datetime.now(UTC)))
+    assert (again.items_out, again.detail["created"]) == (0, False)  # déjà figé
