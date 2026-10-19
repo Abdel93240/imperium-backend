@@ -37,9 +37,10 @@ from app.services.wr import autoaccept
 ITEM_TYPES = frozenset({
     "chain_proposal", "pattern_new", "pattern_contradiction", "anomaly", "belief_review_due",
     "user_question", "plan_delta_proposal", "autoaccept_spotcheck", "investigation_result", "red_flag_ref",
+    "ordering_override_pattern",
 })
 DOMAINS = frozenset({"pulse", "wr", "daily", "vector", "path", "vault", "imperium", "system"})
-SOURCE_WORKERS = frozenset({"w1", "w2", "w3", "w4", "phase1", "phase3", "manual"})
+SOURCE_WORKERS = frozenset({"w1", "w2", "w3", "w4", "w5", "phase1", "phase3", "manual"})
 SEVERITY_WEIGHTS = {"normal": 1, "elevated": 2, "red": 4}
 OPEN_STATUSES = ("pending", "presented", "deferred")
 # Mode light du walker (spec WR §9 P4) : rouges, décisions forcées, contradictions, deltas de plan.
