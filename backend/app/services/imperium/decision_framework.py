@@ -578,6 +578,9 @@ def build_mission_score_from_start_request(
             "priority_bucket": priority_bucket,
             "score_status": score_status,
             "source": SOURCE,
+            # Entrées A-E gardées pour le refresh (ACT-DLY-03) : un barème changé se rejoue en entier.
+            "inputs": score_payload.model_dump(
+                mode="json", include={"impact", "mission_type", "dependency", "recurrence"}),
         }
     )
     return {
@@ -591,6 +594,52 @@ def build_mission_score_from_start_request(
         "score_status": score_status,
         "missing_fields": list(explanation.missing_fields),
     }
+
+
+def rescore(
+    score: ImperiumMissionScore,
+    *,
+    deadline_at: date | datetime | None,
+    priorities: list[ImperiumUserPriority] | None,
+    scales: ScoringScales,
+) -> bool:
+    """Refresh d'une ligne du registre (spec Daily §4.6) ; True si elle a changé.
+
+    Avec `explanation.inputs` (lignes écrites depuis ACT-DLY-03) : score rejoué en entier avec les barèmes
+    courants. Sans (lignes plus anciennes) : seul le critère A est recalculé (l'échéance vieillit), les
+    points B-E stockés sont gardés tels quels. Dans les deux cas, coefficient et bucket suivent les
+    barèmes et la hiérarchie courants.
+    """
+    explanation = dict(score.explanation or {})
+    inputs = explanation.get("inputs")
+    if isinstance(inputs, dict):
+        fresh = explain_score({**inputs, "deadline_at": deadline_at}, scales=scales)
+    else:
+        missing = [field for field in explanation.get("missing_fields") or [] if field != "deadline_at"]
+        flags = [flag for flag in explanation.get("flags") or [] if flag != "deadline_past"]
+        new_missing: list[str] = []
+        deadline_points = _deadline_points(deadline_at, new_missing, flags, scales)
+        points = {key: int(explanation.get(f"{key}_points") or 0)
+                  for key in ("impact", "mission_type", "dependency", "recurrence")}
+        fresh = DecisionFrameworkScoreExplanation(
+            deadline_points=deadline_points, **{f"{key}_points": value for key, value in points.items()},
+            missing_fields=new_missing + missing, flags=flags,
+            final_intrinsic_score=_clamp_int(deadline_points + sum(points.values()), 0, 100),
+        )
+    _position, coefficient = _priority_for_domain(score.domain, priorities=priorities, scales=scales)
+    weighted = compute_weighted_score(fresh.final_intrinsic_score, coefficient)
+    payload = fresh.model_dump(mode="json")
+    payload.update({"priority_bucket": _priority_bucket(weighted, scales), "score_status": _score_status(fresh),
+                    "source": SOURCE})
+    if isinstance(inputs, dict):
+        payload["inputs"] = inputs
+    if (int(score.intrinsic_score), score.domain_coefficient, int(score.weighted_score), explanation) == (
+            fresh.final_intrinsic_score, coefficient, weighted, payload):
+        return False
+    score.intrinsic_score, score.domain_coefficient, score.weighted_score = (
+        fresh.final_intrinsic_score, coefficient, weighted)
+    score.explanation = payload
+    return True
 
 
 def mission_decision_score_summary_from_row(

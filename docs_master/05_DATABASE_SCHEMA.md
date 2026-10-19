@@ -1709,7 +1709,15 @@ Coupes (409 `DAILY_SETTINGS_DISABLED`) tant que `daily.settings_enabled` = false
 parametre change = nouvelle version (origin `user`, raison, `valid_from`) + event
 `decision.scoring.updated` ; jeu complet valide avant ecriture (422 `SCORING_INVALID`,
 `SCORING_PARAMETER_UNKNOWN` ; 409 `SCORING_NO_CHANGE`, `SCORING_NOT_SEEDED`). Les tests dores ne
-s'appliquent pas aux reglages volontaires. Refresh du registre : ACT-DLY-03.
+s'appliquent pas aux reglages volontaires ; apres un reglage, le registre est rafraichi.
+Refresh du registre `imperium_mission_scores` (migration 20261019_0103, 2026-10-19, spec Daily §4.6,
+carte ACT-DLY-03) : missions ouvertes (backlog, active, standby), ligne reecrite seulement si elle
+change. Les scores ecrits depuis ce lot gardent leurs entrees B-E (`explanation.inputs`) et sont
+rejoues en entier avec les baremes courants ; les lignes plus anciennes ne recalculent que le
+critere A (les points B-E stockes restent). Coefficient et bucket suivent toujours baremes et
+hierarchie courants. Jobs semes desactives : `daily.scores_refresh` (cron `30 4,5 * * *` UTC, ne
+tourne qu'a 6 h de Paris) et `daily.day_start` (abonne a `planning.day.started` : refresh ; la
+selection du Niveau 1 n'est pas codee, no-op journalise). Aucun des deux ne demarre une journee.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
@@ -1745,11 +1753,8 @@ Contraintes et index :
 - FK : `imperium_user_priorities.user_id -> users.id`
 - Check : `domain IN ('religious', 'business', 'finance', 'health')`
 - Check : `position >= 1 AND position <= 4`
-- Check position/coefficient :
-  - `position = 1` impose `coefficient = 10`
-  - `position = 2` impose `coefficient = 8`
-  - `position = 3` impose `coefficient = 5`
-  - `position = 4` impose `coefficient = 4`
+- Check : `coefficient > 0` (migration 0103, 2026-10-19). Avant : position 1→10, 2→8, 3→5, 4→4
+  impose en base ; les valeurs viennent desormais de `df.coefficient_by_position` (reglable).
 - Index unique partiel :
   `imperium_user_priorities_active_domain_unique_idx` sur `(user_id, domain)`
   WHERE `is_active = true`
@@ -1805,7 +1810,7 @@ Contraintes et index :
   avec `ON DELETE CASCADE`
 - Check : `domain IN ('religious', 'business', 'finance', 'health')`
 - Check : `intrinsic_score >= 0 AND intrinsic_score <= 100`
-- Check : `domain_coefficient IN (10, 8, 5, 4)`
+- Check : `domain_coefficient > 0` (migration 0103, 2026-10-19 ; avant `IN (10, 8, 5, 4)`, incompatible avec un coefficient regle)
 - Check : `weighted_score >= 0`
 - Check : `source IN ('decision_framework_v1')`
 - Index : `imperium_mission_scores_user_weighted_idx` sur
