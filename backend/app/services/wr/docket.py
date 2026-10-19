@@ -36,6 +36,8 @@ DOMAINS = frozenset({"pulse", "wr", "daily", "vector", "path", "vault", "imperiu
 SOURCE_WORKERS = frozenset({"w1", "w2", "w3", "w4", "phase1", "phase3", "manual"})
 SEVERITY_WEIGHTS = {"normal": 1, "elevated": 2, "red": 4}
 OPEN_STATUSES = ("pending", "presented", "deferred")
+# Mode light du walker (spec WR §9 P4) : rouges, décisions forcées, contradictions, deltas de plan.
+LIGHT_ITEM_TYPES = frozenset({"pattern_contradiction", "plan_delta_proposal"})
 
 
 class DocketValidationError(ValueError):
@@ -131,6 +133,7 @@ def list_items(
     status: str | None = None,
     item_type: str | None = None,
     red_only: bool = False,
+    mode: str = "full",
     now: datetime | None = None,
 ) -> list[DocketItemRead]:
     """Items triés : décisions forcées d'abord, puis priorité recalculée à l'instant (lecture seule)."""
@@ -145,6 +148,10 @@ def list_items(
     halflife = _halflife(db)
     reads = []
     for item in db.scalars(query):
+        if mode == "light" and not (
+            item.severity == "red" or item.force_decision or item.item_type in LIGHT_ITEM_TYPES
+        ):
+            continue  # porté sans pénalité au prochain WR complet
         read = DocketItemRead.model_validate(item)
         read.priority = _fresh_priority(item, now, halflife)
         reads.append(read)

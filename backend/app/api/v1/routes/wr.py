@@ -1,14 +1,22 @@
-"""Docket du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`."""
+"""Docket et digest du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`,
+`POST digest`, `GET digest/current`."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.wr import DocketDecisionRequest, DocketItemRead, DocketItemType, DocketListResponse, DocketStatus
-from app.services.wr import docket
+from app.schemas.wr import (
+    DigestRead,
+    DocketDecisionRequest,
+    DocketItemRead,
+    DocketItemType,
+    DocketListResponse,
+    DocketStatus,
+)
+from app.services.wr import digest, docket
 
 router = APIRouter()
 
@@ -19,10 +27,11 @@ def docket_route(
     db: SessionDep,
     status_filter: Annotated[DocketStatus | None, Query(alias="status")] = None,
     item_type: Annotated[DocketItemType | None, Query(alias="type")] = None,
+    mode: Literal["full", "light"] = "full",
 ) -> DocketListResponse:
-    """Items triés : décisions forcées en tête, puis priorité à l'instant."""
+    """Items triés : décisions forcées en tête, puis priorité à l'instant ; `light` = WR court (§9 P4)."""
     return DocketListResponse(
-        items=docket.list_items(db, current_user=current_user, status=status_filter, item_type=item_type)
+        items=docket.list_items(db, current_user=current_user, status=status_filter, item_type=item_type, mode=mode)
     )
 
 
@@ -57,3 +66,28 @@ def docket_decision_route(
     except docket.DocketIdempotencyConflictError as exc:
         db.rollback()
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+@router.post("/digest", response_model=DigestRead, status_code=status.HTTP_201_CREATED)
+def assemble_digest_route(current_user: CurrentUserDep, db: SessionDep) -> DigestRead | JSONResponse:
+    """Assemble le digest de la session WR ouverte (201) ; déjà figé, il est rendu tel quel (200)."""
+    try:
+        row, created = digest.assemble_digest(db, current_user=current_user)
+    except digest.DigestStateError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": exc.code})
+    except digest.DigestWhitelistError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(exc), "code": "DIGEST_WHITELIST"})
+    read = DigestRead.model_validate(row)
+    if created:
+        return read
+    return JSONResponse(status_code=status.HTTP_200_OK, content=read.model_dump(mode="json"))
+
+
+@router.get("/digest/current", response_model=DigestRead)
+def current_digest_route(current_user: CurrentUserDep, db: SessionDep) -> DigestRead:
+    row = digest.current_digest(db, current_user=current_user)
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No digest for the open weekly review.")
+    return DigestRead.model_validate(row)
