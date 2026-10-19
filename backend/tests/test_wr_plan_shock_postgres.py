@@ -152,3 +152,58 @@ def test_shock_route(db, monkeypatch) -> None:
     assert (created.status_code, created.json()["status"], replay.json()["id"]) == (201, "proposed", created.json()["id"])
     again = client.post("/api/wr/plan/shock", json=body, headers={"Idempotency-Key": uuid4().hex})
     assert (again.status_code, again.json()["code"]) == (409, "PLAN_REGEN_PENDING")
+
+
+def _run_monthly(db, now):
+    from app.services.runner.engine import RunContext, Window
+
+    ctx = RunContext(db=db, job=None, run_id=uuid4(), trigger="manual", trigger_ref=None)
+    plan.monthly_regen_job(ctx, Window(from_ts=None, to_ts=now))
+    return ctx
+
+
+def test_monthly_job_is_seeded_disabled(db) -> None:
+    row = db.execute(text("SELECT enabled, schedule, handler_ref FROM job_definitions WHERE code = 'wr.monthly_regen'")).one()
+    assert tuple(row) == (False, "0 5 1 * *", "app.services.wr.plan:monthly_regen_job")
+
+
+def test_monthly_regen_proposes_once_per_month_and_never_activates(db, monkeypatch) -> None:
+    user = _user(db)
+    monkeypatch.setattr("app.services.wr.metrics._job_user", lambda _db: user)
+    monkeypatch.setattr(plan, "plan_enabled", lambda db: False)
+    first_of_month = datetime(2026, 11, 1, 5, 0, tzinfo=UTC)
+    assert _run_monthly(db, first_of_month).detail == {"skip": "plan_disabled"}
+    monkeypatch.setattr(plan, "plan_enabled", lambda db: True)
+    assert _run_monthly(db, first_of_month).detail == {"skip": "no_active_plan"}
+    active = _active_plan(db, user)
+
+    ctx = _run_monthly(db, first_of_month)
+    proposed = db.get(PlanVersion, ctx.detail["plan_version_id"])
+    assert (ctx.items_out, proposed.status, proposed.origin, proposed.origin_ref, proposed.model_used) == (
+        1, "proposed", "monthly_regen", None, "dry_run")
+    assert (proposed.horizon_start, proposed.horizon_end) == (date(2026, 11, 1), date(2026, 11, 28))
+    assert plan.current_plan(db, current_user=user).plan_version_id == active.id  # jamais auto-appliquée
+    regenerated = db.scalar(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.plan.regenerated"))
+    assert (regenerated.payload["origin"], regenerated.payload["dry_run"]) == ("monthly_regen", True)
+    # En attente : ni second mensuel, ni choc.
+    assert _run_monthly(db, first_of_month + timedelta(hours=1)).detail == {"skip": "regeneration_pending"}
+    with pytest.raises(plan.PlanStateError) as pending:
+        _shock(db, user)
+    assert pending.value.code == "PLAN_REGEN_PENDING"
+    db.rollback()
+    # Validée par l'utilisateur, elle ne repart pas avant le mois suivant.
+    plan.activate(db, current_user=user, version_id=proposed.id)
+    assert _run_monthly(db, first_of_month + timedelta(days=3)).detail == {"skip": "already_this_month"}
+    assert _run_monthly(db, datetime(2026, 12, 1, 5, 0, tzinfo=UTC)).items_out == 1
+
+
+def test_monthly_regen_fails_with_real_ai(db, monkeypatch) -> None:
+    user = _user(db)
+    monkeypatch.setattr("app.services.wr.metrics._job_user", lambda _db: user)
+    monkeypatch.setattr(plan, "plan_enabled", lambda db: True)
+    _active_plan(db, user)
+    monkeypatch.setattr(get_settings(), "real_ai_enabled", True)
+    with pytest.raises(plan.PlanStateError) as real:
+        _run_monthly(db, datetime(2026, 11, 1, 5, 0, tzinfo=UTC))
+    assert real.value.code == "PLAN_REGEN_NOT_CODED"
+    db.rollback()
