@@ -25,6 +25,11 @@ from app.services.imperium.decision_framework import (
 )
 
 
+class EmptyResult:
+    def all(self):
+        return []
+
+
 class FakeDb:
     def __init__(self, *, scalars_result=None, scalar_result=None) -> None:
         self.scalars_result = scalars_result or []
@@ -52,6 +57,9 @@ class FakeDb:
 
     def rollback(self) -> None:
         self.rolled_back = True
+
+    def execute(self, _query, _params=None):
+        return EmptyResult()  # aucun paramètre df.* : le service garde les barèmes du code
 
     def scalars(self, _query):
         return self.scalars_result

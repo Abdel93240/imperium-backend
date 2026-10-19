@@ -55,6 +55,7 @@ from app.services.imperium.decision_framework import (
     SOURCE as DECISION_FRAMEWORK_SOURCE,
     build_mission_score_from_start_request,
     get_user_priority_context,
+    load_scales,
     mission_decision_score_summary_from_row,
 )
 
@@ -1304,7 +1305,7 @@ def _maybe_create_decision_score(
         return mission_decision_score_summary_from_row(existing_score)
 
     priorities = get_user_priority_context(db, current_user=current_user)
-    score_payload = build_mission_score_from_start_request(payload, priorities=priorities)
+    score_payload = build_mission_score_from_start_request(payload, priorities=priorities, scales=load_scales(db))
     score = ImperiumMissionScore(
         user_id=current_user.id,
         mission_id=mission.id,

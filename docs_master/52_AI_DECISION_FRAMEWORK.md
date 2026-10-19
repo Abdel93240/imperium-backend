@@ -130,6 +130,10 @@ or automatic memory commit is introduced by this reconciliation patch.
 
 ### 3.2 The coefficients (invisible)
 
+> Code (2026-10-19, carte ACT-DLY-01) : les valeurs ci-dessous et tous les barèmes A-E de ce
+> document vivent dans les paramètres versionnés `df.*` (semés à l'identique, parité prouvée par
+> tests dorés) ; voir `docs_master/05_DATABASE_SCHEMA.md` section DECISION et `DAILY_MAPPING.md`.
+
 Behind each position sits a multiplier:
 
 ```text
