@@ -4,7 +4,7 @@
 
 Spécification : `specs/DAILY_ORCHESTRATOR_SPEC_V1.md`. Audit de l'étape 0 (§0), en lecture seule,
 fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Livré : étape 2
-du §15 (externalisation des barèmes + verrou de parité) et le réglage versionné (§4.5) ; le reste du Daily (portes,
+du §15 (externalisation des barèmes + verrou de parité) le réglage versionné (§4.5) et le refresh du registre (§4.6) ; le reste du Daily (portes,
 sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'est PAS codé.
 
 ## Réponses aux cinq questions du §0
@@ -54,7 +54,7 @@ sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'e
 | Maxima par critère | **créer** `df.criterion_max` (bornes des entiers bruts et du breakdown) | |
 | Verrou de parité (§4.4) | **créer** : 83 cas dorés capturés AVANT l'externalisation | `tests/fixtures/df_golden_scores.json` |
 | Réglage (§4.5) | **créé** : `GET/PUT /api/daily/settings/scoring` derrière `daily.settings_enabled` ; event `decision.scoring.updated` (nom canonique de `df.parameter_updated`) | migration 0102, ACT-DLY-02 |
-| Refresh (§4.6) | à **créer** (aucun mécanisme existant) | ACT-DLY-03 |
+| Refresh (§4.6) | **créé** : `refresh_scores` (cron 6 h Paris, `planning.day.started`, après réglage) ; entrées B-E gardées dans `explanation.inputs` ; CHECK de coefficients figés remplacés par `> 0` | migration 0103, ACT-DLY-03 |
 
 ## Écarts signalés (pas de contradiction bloquante)
 
@@ -64,3 +64,8 @@ sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'e
 - Fallback : si un `df.*` manque ou est invalide, le service reprend `CODE_SCALES` et journalise
   (jamais d'erreur côté utilisateur). Les lignes anciennes de `imperium_mission_scores` sans
   `priority_bucket` dans leur explication gardent le calcul de bucket du code.
+- Les CHECK de la migration 0019 figeaient les coefficients ×10/8/5/4 en base, ce qui contredit un
+  coefficient réglable (§4.1) : remplacés par `coefficient > 0` (migration 0103).
+- Les missions ne stockaient pas leurs entrées B-E (seulement les points) : elles sont gardées
+  depuis 0103 dans `explanation.inputs` ; les scores plus anciens ne suivent un changement de
+  barème B-E qu'à leur prochain recalcul complet (jamais pour l'instant).

@@ -377,11 +377,8 @@ class ImperiumUserPriority(UUIDPrimaryKeyMixin, Base):
         ),
         CheckConstraint("position >= 1 AND position <= 4", name="imperium_user_priorities_position_range"),
         CheckConstraint(
-            "(position = 1 AND coefficient = 10) OR "
-            "(position = 2 AND coefficient = 8) OR "
-            "(position = 3 AND coefficient = 5) OR "
-            "(position = 4 AND coefficient = 4)",
-            name="imperium_user_priorities_position_coefficient_check",
+            "coefficient > 0",
+            name="coefficient_positive",
         ),
         Index(
             "imperium_user_priorities_active_domain_unique_idx",
@@ -520,7 +517,7 @@ class ImperiumMissionScore(UUIDPrimaryKeyMixin, Base):
             name="imperium_mission_scores_domain_check",
         ),
         CheckConstraint("intrinsic_score >= 0 AND intrinsic_score <= 100", name="imperium_mission_scores_intrinsic_range"),
-        CheckConstraint("domain_coefficient IN (10, 8, 5, 4)", name="imperium_mission_scores_coefficient_check"),
+        CheckConstraint("domain_coefficient > 0", name="coefficient_positive"),
         CheckConstraint("weighted_score >= 0", name="imperium_mission_scores_weighted_nonnegative"),
         CheckConstraint("source IN ('decision_framework_v1')", name="imperium_mission_scores_source_check"),
         Index("imperium_mission_scores_user_weighted_idx", "user_id", "weighted_score"),

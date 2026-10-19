@@ -6,7 +6,7 @@ append-only, l'ancienne version reste interrogeable), avec la raison de l'utilis
 la version (`valid_from`), et un event `decision.scoring.updated` par paramètre (`df.parameter_updated`
 de la spec §11). Le jeu complet est validé avant écriture (`scales_from_parameter_values`) : un
 barème incohérent est refusé en entier. Les tests dorés de parité ne s'appliquent pas aux réglages
-volontaires (§10.3). Le refresh du registre `imperium_mission_scores` arrive avec ACT-DLY-03.
+volontaires (§10.3). Après écriture, le registre `imperium_mission_scores` est rafraîchi (ACT-DLY-03).
 """
 
 import hashlib
@@ -20,6 +20,7 @@ from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.toolbox import Parameter
 from app.schemas.daily import ScoringParameterRead, ScoringSettingsRead, ScoringSettingsUpdateRequest
+from app.services.daily.scores_refresh import refresh_scores
 from app.services.events.emitter import build_event
 from app.services.imperium import decision_framework as df
 from app.services.params import get_parameter, set_parameter
@@ -93,6 +94,7 @@ def update_settings(
             privacy_level=PrivacyLevel.low, occurred_at=new.valid_from,
         ))
         db.flush()
+    refresh_scores(db, current_user=current_user)
     read = read_settings(db)
     db.add(IdempotencyKey(
         user_id=current_user.id, idempotency_key=idempotency_key, request_method="PUT", request_path=request_path,
