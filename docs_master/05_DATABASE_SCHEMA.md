@@ -1771,6 +1771,31 @@ sur `daily.override_window_days` (28) → item docket `ordering_override_pattern
 {pattern, count, examples verbatim (5 max), suggested_target domain_coefficient|criterion_c|discussion}.
 Un motif encore ouvert au docket n'est pas redepose ; apres decision, seuls les overrides posterieurs
 comptent. Aucun ajustement automatique des baremes. Le type n'entre pas dans l'auto-acceptation.
+Regles rouges Pulse et porte G5 (migration 20261019_0106, 2026-10-19, spec Pulse §3.5 et §11, spec
+Daily §5 G5, cartes ACT-PLS-09 et ACT-DLY-05) :
+
+```sql
+pulse_red_flag_rules (id, code UNIQUE, description_fr, condition JSONB objet (DSL evaluee en code),
+  severity advise|advise_strong|urgent, action advise_doctor|advise_doctor_and_pause_training|urgent_message,
+  message_fr, version, active BOOLEAN DEFAULT false)  -- globale, 5 regles semees INACTIVES
+pulse_red_flag_events (id, user_id FK users ON DELETE CASCADE, rule_id FK pulse_red_flag_rules,
+  subject_ref TEXT (pain:<id> | weight:<id>), severity, raised_at, evidence JSONB objet (identifiants
+  et valeurs, jamais le texte libre), acknowledged_by_user_at, resolution doctor_consulted|resolved|
+  dismissed_with_reason, resolution_reason (obligatoire pour dismissed_with_reason), resolved_at ;
+  CHECK resolution et resolved_at presents ensemble ; UNIQUE (user_id, rule_id, subject_ref) WHERE
+  resolved_at IS NULL)
+v_pulse_active_blocks (user_id, block_kind 'pause_training', min_physical_load = daily.pulse_block_load,
+  since, source_ref = id du red flag)  -- red flags advise_doctor_and_pause_training non resolus
+```
+
+Bascule ACT-PLS-09 : `UPDATE pulse_red_flag_rules SET active=true` sur les 5 codes EN BLOC ; aucune
+route ne modifie les regles. Evaluation a chaque ecriture de douleur ou de releve corporel :
+RF_severe_pain (douleur ouverte ≥ 8/10), RF_symptom_keywords (type ou notes d'une douleur ouverte,
+sans accents ni casse, liste semee), RF_weight_drop (tendance < -1,5 %/mois sur 28 j, ecart ≥ 14 j) ;
+RF_lab_out_of_range et RF_rhr_sustained ne se levent jamais tant que bilans structures et FC de repos
+n'existent pas. Un sujet n'est leve qu'une fois ; l'acquittement ne leve pas le blocage, seule la
+resolution le fait. Daily G5 lit seulement la vue, derriere `daily.g5_enabled` (seme false ; sinon
+porte passante `g5: stub`) ; `daily.pulse_block_load` 4 (A VALIDER).
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

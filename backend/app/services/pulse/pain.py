@@ -22,7 +22,7 @@ from app.models.imperium import PlanningReplanEvent, PulsePainLog, PulseWorkout
 from app.schemas.imperium import ReplanRead
 from app.schemas.pulse_health import PainLogCreate, PainLogListResponse, PainLogRead, PainReplanResponse
 from app.services.events.emitter import build_event
-from app.services.pulse import food_stock, health_consent
+from app.services.pulse import food_stock, health_consent, red_flags
 
 STRONG = 8
 REPLAN_MESSAGE = "Douleur forte : veux-tu replanifier ta journée ?"
@@ -65,6 +65,7 @@ def create_log(db: Session, *, current_user: User, payload: PainLogCreate, idemp
     db.flush()
     db.refresh(log)
     _emit(db, current_user, "pulse.pain.logged", {"pain_log_id": str(log.id)}, str(log.id))
+    red_flags.evaluate(db, current_user=current_user)
     read = _read(log)
     db.commit()
     return read, False

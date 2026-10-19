@@ -210,3 +210,31 @@ class MedicalRuleRead(BaseModel):
 
 class MedicalRuleListResponse(BaseModel):
     items: list[MedicalRuleRead]
+
+
+class RedFlagRead(BaseModel):
+    """Règle rouge levée (spec Pulse §11) : `message_fr` est présenté tel quel."""
+
+    id: UUID
+    rule_code: str
+    severity: str
+    action: str
+    message_fr: str
+    raised_at: datetime
+    evidence: dict
+    acknowledged_at: datetime | None
+    resolution: str | None
+    resolution_reason: str | None
+    resolved_at: datetime | None
+    blocks_training: bool
+
+
+class RedFlagListResponse(BaseModel):
+    items: list[RedFlagRead]
+
+
+class RedFlagResolveRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    resolution: Literal["doctor_consulted", "resolved", "dismissed_with_reason"]
+    reason: str | None = Field(default=None, max_length=1000)

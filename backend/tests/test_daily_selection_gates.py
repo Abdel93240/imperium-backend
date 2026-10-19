@@ -46,8 +46,11 @@ def test_g4_time_before_next_fixed_commitment() -> None:
     assert not gate_time(travel_min=11, duration_min=20, remaining_min=30)
 
 
-def test_g5_is_a_passing_stub_until_wave_29() -> None:
-    assert gate_pulse(_mission(physical_load=5))
+def test_g5_blocks_heavy_missions_only_while_a_pulse_block_is_active() -> None:
+    assert gate_pulse(_mission(physical_load=5), [])  # aucun blocage (ou flag éteint)
+    assert not gate_pulse(_mission(physical_load=4), [4])
+    assert gate_pulse(_mission(physical_load=3), [4])
+    assert gate_pulse(_mission(physical_load=None), [4])  # charge inconnue : passe
 
 
 def test_cycle_detection_follows_parent_to_child() -> None:
