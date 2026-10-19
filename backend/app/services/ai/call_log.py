@@ -145,3 +145,14 @@ def daily_spend(db: Session, *, days: int) -> AIDailySpendResponse:
         {"days": days},
     ).mappings()
     return AIDailySpendResponse(days=[AIDailySpendRead(**row) for row in rows])
+
+
+class AICallAlertRead(BaseModel):
+    code: str
+    message_fr: str
+    value: float
+    threshold: float
+
+
+class AICallAlertsResponse(BaseModel):
+    alerts: list[AICallAlertRead]

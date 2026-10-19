@@ -431,7 +431,13 @@ vision, embeddings. Jamais de prompt, de reponse ni de texte reconnu. Le dry-run
 Cout : 0 en local ; sinon calcule par le trigger depuis `ai_model_pricing`, NULL sans prix.
 `ai_model_pricing` nait VIDE : le seed historique du doc 43 §17.2 est perime (DV-8), la grille
 reste a fournir. Lecture : `GET /api/ai/call-logs?limit=`, `GET /api/ai/call-logs/daily?days=`.
-Vues 5+ (§17.4 suite), requetes §17.5 et alertes §17.6 : pas encore.
+Vues 5 a 10 du §17.4 (`ai_hallucination_tracker`, `ai_error_analysis`, `ai_latency_profile`,
+`ai_6month_trend`, `ai_fallback_effectiveness`, `ai_vs_estimates`) : CODE (migration
+20261019_0087). Seuils §17.6 en parametres `ai.alert_*` (defauts du doc ; ajout
+`ai.alert_error_min_calls` = 20 et `ai.alert_hallucination_min_checked` = 10, a valider) ;
+`GET /api/ai/call-logs/alerts` (lecture seule) ; job horaire `ai.call_alerts` seme desactive :
+une notification `normal`/`system` par seuil et par jour de Paris, rien n'est coupe ni reroute.
+Requetes manuelles §17.5 : non codees (requetes ad hoc).
 
 ### ai_memories
 

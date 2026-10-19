@@ -381,7 +381,7 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé (doublon latent pulse_/wr_ éteint — R2 appliquée).
 
 ### F2-14 `ai_call_logs` + `ai_model_pricing` — observabilité IA
-- vit : CODÉES (migration 20261019_0086, 2026-10-19) — `ai_call_logs` (doc 43 §17.1), `ai_model_pricing` VIDE (seed historique écarté, DV-8), trigger de coût §17.3, 4 vues §17.4 ; `app/services/ai/call_log.py` journalise l'exécutant local, l'OCR/vision et les embeddings ; `GET /api/ai/call-logs`, `GET /api/ai/call-logs/daily`. Aucun appel cloud branché à journaliser.
+- vit : CODÉES (migration 20261019_0086, 2026-10-19) — `ai_call_logs` (doc 43 §17.1), `ai_model_pricing` VIDE (seed historique écarté, DV-8), trigger de coût §17.3, 10 vues §17.4, seuils §17.6 (`ai.alert_*`, job `ai.call_alerts` semé désactivé, `GET /api/ai/call-logs/alerts`) ; `app/services/ai/call_log.py` journalise l'exécutant local, l'OCR/vision et les embeddings ; `GET /api/ai/call-logs`, `GET /api/ai/call-logs/daily`. Aucun appel cloud branché à journaliser.
 - consommateurs prévus : TOUT appel IA (« ALL STEPS LOGGED », doc 43 §3.2) ; doc 58 patch 5 (vues Vector) ; console coûts.
 - statut : existe_codé (grille de prix à fournir).
 
