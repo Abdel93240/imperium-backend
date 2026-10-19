@@ -21,7 +21,7 @@ les specs le font déjà via leurs seeds. Pas de document séparé.
 > (prières : Hijri, Qibla, mosquées et réglages livrés), F1-17 (pression codée depuis la phase E
 > Vault, 2026-07-16), F2-12 (versions du plan quotidien Imperium, partiel), F2-15 et F2-16
 > (tables présentes) mises à jour ; compteurs recalculés. Les autres fiches gardent l'état du
-> 2026-07-16.
+> 2026-07-16. **2026-10-19** : F2-11 (docket du WR) codée, compteurs F2 recalculés.
 
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
@@ -32,8 +32,8 @@ n8n sur disque (`ops/n8n/workflows/`).
 ## RÉPONSE CHIFFRÉE
 
 **Le système compte 55 outils : 25 en F1 (dont 13 codés — 7 livrés éteints par la passe 0 —,
-11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 14 codées,
-3 spécifiées, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
+11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 15 codées,
+2 spécifiées, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
 plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
 Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
 D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), puis le 2026-10-18
@@ -367,9 +367,9 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé (R2 appliquée — partagé d'emblée, doublon latent éteint).
 
 ### F2-11 `wr_docket_items` — le docket
-- vit : spécifiée (spec WR §3.1). MANQUANTE.
+- vit : CODÉE (migration 20261019_0083, 2026-10-19) — `wr_docket_items` (DDL spec WR §3.1 + `user_id`), `app/services/wr/docket.py` (dépôt validé, priorité §7 paramétrée par `wr.docket_halflife_days` et `wr.docket_max_defers`, report → décision forcée, rouge → `notify()` sans rien appliquer) ; `GET /api/wr/docket?status=&type=`, `GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision`. Pas encore de producteur branché (W1-W5 et phases WR non codés) ni d'écran.
 - consommateurs prévus : WR (walker P4), Daily (§10.2 override_pattern → docket ; §8.2 plan_delta_needed), Vector (§4.8 dérives, §6 rapport fantôme, §4.6 rapport surge — « si l'usine n'est pas posée, table tampon »), Pulse (P6 s'intègre au WR).
-- statut : spécifié. Table partagée de fait → canoniser en F2 dès création (R3).
+- statut : existe_codé (R3 appliquée — partagée d'emblée, colonne `domain`).
 
 ### F2-12 `plan_versions` + `plan_deltas` + vue `v_plan_current`
 - vit : spécifiées (spec WR §3.5). MANQUANTES. Chevauchement avec doc 52 §8 (plan mensuel cron lundi 05:00) et doc 43 — voir FINDINGS DV-5. Partiel (2026-10-18) : `planning_daily_plan_versions` (0080) versionne le plan QUOTIDIEN Imperium à chaque replan accepté (doc 43 §20) ; ni `plan_deltas` ni `v_plan_current` ni plan hebdo/mensuel.
