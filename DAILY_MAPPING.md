@@ -6,8 +6,8 @@ Spécification : `specs/DAILY_ORCHESTRATOR_SPEC_V1.md`. Audit de l'étape 0 (§0
 fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Livré : étape 2
 du §15 (externalisation des barèmes + verrou de parité), le réglage versionné (§4.5), le refresh du
 registre (§4.6) et l'étape 3 (portes, trajet, ensemble obligatoire, sélection, journal, pull-forward ;
-vague 28), les overrides et leur agrégation au docket (§10.1-10.2, vague 29). Pas encore codés :
-porte G5 réelle, prières en engagements fixes, Niveaux 2-3 (§8), préemption (§9),
+vague 28), les overrides et leur agrégation au docket (§10.1-10.2, vague 29), la porte G5 sur la vue
+contractuelle Pulse (vague 29). Pas encore codés : prières en engagements fixes, Niveaux 2-3 (§8), préemption (§9),
 `POST disruption`, `POST arbitrations/{id}/decision`.
 
 ## Réponses aux cinq questions du §0
@@ -64,6 +64,7 @@ porte G5 réelle, prières en engagements fixes, Niveaux 2-3 (§8), préemption 
 | Trajet (§5) | **réutilisé** `toolbox.travel` (plancher 1,3 dur, cache 2 h) + bascule `toolbox.travel_enabled` (semée false) | ACT-SYS-08 |
 | Overrides (§3.4, §10.1) | **créé** `daily_overrides` (+ user_id, une par sélection) ; event `planning.daily.override_recorded` | migration 0105, ACT-DLY-07 |
 | Agrégation (§10.2) | **créé** job `daily.override_aggregation` → item `ordering_override_pattern` (worker `w5` ajouté) | ACT-DLY-08 |
+| G5 Pulse (§5) | **créé** : lecture de `v_pulse_active_blocks` seulement (pas des tables médicales) derrière `daily.g5_enabled` ; `daily.pulse_block_load` 4 | migration 0106, ACT-DLY-05 |
 | Refresh (§4.6) | **créé** : `refresh_scores` (cron 6 h Paris, `planning.day.started`, après réglage) ; entrées B-E gardées dans `explanation.inputs` ; CHECK de coefficients figés remplacés par `> 0` | migration 0103, ACT-DLY-03 |
 
 ## Écarts signalés (pas de contradiction bloquante)
@@ -88,8 +89,10 @@ porte G5 réelle, prières en engagements fixes, Niveaux 2-3 (§8), préemption 
   (Paris) ; la spec borne la journée par démarrage → clôture, sans heure de fin connue.
 - Niveau 2 non codé : C1 (`empty_feasible`) et C2 (`mandatory_conflict`) sont journalisés
   `arbitration_pending` (level 2) avec l'event `planning.daily.arbitration_required`, sans table
-  `daily_arbitrations` ni slot. G5 (Pulse) est une porte passante journalisée (`g5: stub`) jusqu'à la
-  vague 29 ; `daily.pulse_block_load` n'est donc pas semé.
+  `daily_arbitrations` ni slot. G5 (Pulse) : `g5` vaut `stub` (flag
+  éteint), `clear` ou `blocked` dans chaque entrée du journal ; une mission bloquée porte `g5_blocks`
+  (identifiants des red flags). Charge physique inconnue : la porte passe. Une mission obligatoire
+  bloquée par G5 donne `mandatory_conflict` (arbitrage, Niveau 2 non codé).
 - Position courante : lieu de la mission qui vient d'être close (`POST complete/{id}`) ou position
   fournie (`POST next`) ; sans position ou sans lieu de mission, trajet 0 (`travel_source=none`).
 - Le critère D ne lit pas encore les arêtes de `mission_dependencies` (points inchangés).

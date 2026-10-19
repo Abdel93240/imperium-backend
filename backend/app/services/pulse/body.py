@@ -19,7 +19,7 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.imperium import PulseBodySnapshot
 from app.schemas.pulse_health import BodySnapshotCreate, BodySnapshotListResponse, BodySnapshotRead
 from app.services.events.emitter import build_event
-from app.services.pulse import food_stock, health_consent
+from app.services.pulse import food_stock, health_consent, red_flags
 
 MAX_ITEMS = 500
 
@@ -54,6 +54,7 @@ def create_snapshot(
     db.flush()
     db.refresh(snapshot)
     _emit(db, current_user, "pulse.body_snapshot.created", {"snapshot_id": str(snapshot.id)}, str(snapshot.id))
+    red_flags.evaluate(db, current_user=current_user)
     read = BodySnapshotRead.model_validate(snapshot)
     db.commit()
     return read, False

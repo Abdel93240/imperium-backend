@@ -24,7 +24,7 @@ from app.schemas.pulse_dashboard import (
     PulseDashboardRead,
 )
 from app.services.path import fasting
-from app.services.pulse import entries, expiry, hydration, meals, medical, pain, workouts
+from app.services.pulse import entries, expiry, hydration, meals, medical, pain, red_flags, workouts
 
 HEALTH_SCORE_INCOMPLETE = "Score santé masqué : pas encore assez de données pour l'expliquer."
 
@@ -44,7 +44,9 @@ def build_dashboard(db: Session, *, current_user: User, day: date) -> PulseDashb
         today=report.today, level=report.level, to_consume=report.to_consume, message_fr=report.message_fr,
         alerts=[FoodStockExpiryAlertRead(**alert.__dict__) for alert in report.alerts],
     )
-    banners = []
+    # Red flags en tête, message tel quel (spec Pulse §11).
+    banners = [DashboardBannerRead(kind="red_flag", level="error", message=flag.message_fr)
+               for flag in red_flags.list_flags(db, current_user=current_user).items]
     if report.message_fr:
         banners.append(DashboardBannerRead(kind="stock_expiry", level=report.level, message=report.message_fr))
     if fasting_message := fasting.day_message(db, current_user, day):

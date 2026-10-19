@@ -13,8 +13,10 @@ même pipeline sur le reste de la semaine (dates jusqu'à dimanche, plan : semai
 engagement fixe, le temps restant court jusqu'à minuit (Paris).
 
 Niveau 2 non codé : un ensemble faisable vide alors que le jour a des missions (C1) ou un conflit
-d'obligatoires (C2) est journalisé `arbitration_pending` (level 2) sans arbitrage. G5 (Pulse) est
-une porte passante journalisée (`stub`) jusqu'à la vague 29.
+d'obligatoires (C2) est journalisé `arbitration_pending` (level 2) sans arbitrage. G5 (Pulse) lit
+la vue contractuelle `v_pulse_active_blocks` quand `daily.g5_enabled` est vrai (sinon porte passante
+journalisée `stub`) : un red flag `advise_doctor_and_pause_training` ouvert rejette les missions de
+charge physique ≥ `daily.pulse_block_load`, la porte et la source au log.
 """
 
 import logging
@@ -25,7 +27,7 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
@@ -95,6 +97,10 @@ def pullforward_enabled(db: Session) -> bool:
     return bool(get_parameter(db, "daily.pullforward_enabled", default=False))
 
 
+def g5_enabled(db: Session) -> bool:
+    return bool(get_parameter(db, "daily.g5_enabled", default=False))
+
+
 def queue_debug_enabled(db: Session) -> bool:
     return bool(get_parameter(db, "daily.queue_debug_enabled", default=False))
 
@@ -134,9 +140,13 @@ def gate_time(*, travel_min: int, duration_min: int, remaining_min: int) -> bool
     return travel_min + duration_min <= remaining_min
 
 
-def gate_pulse(mission: ImperiumMission) -> bool:
-    """G5 : porte passante (stub journalisé) tant que la lecture Pulse n'est pas branchée (vague 29)."""
-    return True
+def gate_pulse(mission: ImperiumMission, min_loads: list[int]) -> bool:
+    """G5 : un blocage Pulse actif rejette les missions dont la charge physique atteint son seuil.
+
+    Charge inconnue (null) : la porte passe. Sans blocage (ou flag G5 éteint) : porte passante."""
+    if mission.physical_load is None:
+        return True
+    return all(mission.physical_load < minimum for minimum in min_loads)
 
 
 # --- Pipeline -----------------------------------------------------------------------------------
@@ -295,6 +305,7 @@ def _evaluate(db: Session, current_user: User, missions: list[ImperiumMission], 
     ).all():
         open_parents[child_id] = open_parents.get(child_id, 0) + 1
     default_duration = _setting(db, "default_mission_duration")
+    g5_status, blocks = _pulse_blocks(db, current_user)
     candidates = []
     for mission in missions:
         duration = mission.estimated_minutes or default_duration
@@ -303,7 +314,7 @@ def _evaluate(db: Session, current_user: User, missions: list[ImperiumMission], 
         candidate = Candidate(mission=mission, score=float(scores.get(mission.id) or 0), duration_min=duration,
                               travel_min=travel_min, travel_source=travel_source,
                               mandatory=deadline_local is not None and deadline_local <= today,
-                              notes={"g5": "stub"})
+                              notes={"g5": g5_status})
         if not gate_status(mission):
             candidate.blocked_by = "G1"
         elif not gate_dependencies(mission.id, open_parents):
@@ -312,10 +323,24 @@ def _evaluate(db: Session, current_user: User, missions: list[ImperiumMission], 
             candidate.blocked_by = "G3"
         elif not gate_time(travel_min=travel_min, duration_min=duration, remaining_min=remaining_min):
             candidate.blocked_by = "G4"
-        elif not gate_pulse(mission):
+        elif not gate_pulse(mission, [block["min_physical_load"] for block in blocks]):
             candidate.blocked_by = "G5"
+            candidate.notes["g5_blocks"] = [block["source_ref"] for block in blocks]
         candidates.append(candidate)
     return candidates
+
+
+def _pulse_blocks(db: Session, current_user: User) -> tuple[str, list[dict]]:
+    """G5 lit UNIQUEMENT la vue contractuelle `v_pulse_active_blocks` (FINDINGS C-4) ; flag éteint : stub."""
+    if not g5_enabled(db):
+        return "stub", []
+    rows = db.execute(
+        text("SELECT min_physical_load, source_ref FROM v_pulse_active_blocks WHERE user_id = :user_id "
+             "AND block_kind = 'pause_training' ORDER BY since"),
+        {"user_id": current_user.id},
+    ).all()
+    blocks = [{"min_physical_load": int(row.min_physical_load), "source_ref": str(row.source_ref)} for row in rows]
+    return ("blocked" if blocks else "clear"), blocks
 
 
 def _travel(db: Session, origin: LatLng | None, mission: ImperiumMission, now_local: datetime) -> tuple[int, str]:

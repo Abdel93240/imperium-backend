@@ -32,9 +32,12 @@ from app.schemas.pulse_health import (
     PainLogListResponse,
     PainLogRead,
     PainReplanResponse,
+    RedFlagListResponse,
+    RedFlagRead,
+    RedFlagResolveRequest,
 )
 from app.services.imperium import replan
-from app.services.pulse import body, health_consent, medical, pain
+from app.services.pulse import body, health_consent, medical, pain, red_flags
 
 router = APIRouter()
 
@@ -360,3 +363,34 @@ def delete_medical_rule_route(rule_id: UUID, current_user: CurrentUserDep, db: S
     except _MEDICAL_ERRORS as exc:
         return _medical_error(db, exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- règles rouges (spec Pulse §11) ----------
+
+@router.get("/red-flags", response_model=RedFlagListResponse)
+def list_red_flags_route(
+    current_user: CurrentUserDep, db: SessionDep, include_resolved: bool = False
+) -> RedFlagListResponse:
+    """Red flags ouverts (ou tous) ; aucune route ne modifie les règles elles-mêmes."""
+    return red_flags.list_flags(db, current_user=current_user, include_resolved=include_resolved)
+
+
+@router.post("/red-flags/{flag_id}/acknowledge", response_model=RedFlagRead)
+def acknowledge_red_flag_route(flag_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> RedFlagRead:
+    try:
+        return red_flags.acknowledge(db, current_user=current_user, flag_id=flag_id)
+    except red_flags.RedFlagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/red-flags/{flag_id}/resolve", response_model=RedFlagRead)
+def resolve_red_flag_route(
+    flag_id: UUID, payload: RedFlagResolveRequest, current_user: CurrentUserDep, db: SessionDep
+) -> RedFlagRead:
+    try:
+        return red_flags.resolve(db, current_user=current_user, flag_id=flag_id, payload=payload)
+    except red_flags.RedFlagNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except red_flags.RedFlagStateError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
