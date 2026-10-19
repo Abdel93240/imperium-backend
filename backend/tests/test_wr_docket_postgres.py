@@ -107,16 +107,63 @@ def test_create_item_validates_and_emits_an_event(db) -> None:
     db.rollback()
 
 
-def test_red_item_notifies_without_applying_anything(db) -> None:
+def _red_events(db, user) -> list[str]:
+    return db.scalars(select(Event.event_type).where(
+        Event.user_id == user.id, Event.event_type.in_(["planning.docket.red_notified", "planning.docket.red_acked"])
+    ).order_by(Event.occurred_at)).all()
+
+
+def test_red_item_stays_silent_while_the_flag_is_off(db) -> None:
+    assert docket.red_notify_enabled(db) is False  # seed : wr.red_notify_enabled = false
+    user = _user(db)
+    item = _item(db, user, severity="red", item_type="red_flag_ref", title_fr="Choc plan")
+    assert db.scalar(select(Notification).where(Notification.ref_type == "wr_docket_item",
+                                                Notification.ref_id == item.id)) is None
+    assert _red_events(db, user) == []
+    client = _client(db, user)
+    assert [row["id"] for row in client.get(f"{BASE}/red").json()["items"]] == [str(item.id)]  # reste en tête
+    refused = client.post(f"{BASE}/{item.id}/red-ack")
+    assert (refused.status_code, refused.json()["code"]) == (409, "RED_NOT_NOTIFIED")
+
+
+def test_red_item_notifies_once_and_ack_is_traced_without_applying_anything(db, monkeypatch) -> None:
+    monkeypatch.setattr(docket, "red_notify_enabled", lambda db: True)
     user = _user(db)
     item = _item(db, user, severity="red", item_type="red_flag_ref", title_fr="Choc plan")
     note = db.scalar(select(Notification).where(Notification.ref_type == "wr_docket_item", Notification.ref_id == item.id))
-    assert (note.severity, note.domain) == ("red", "wr")
+    assert (note.severity, note.domain, note.acked_at) == ("red", "wr", None)
     red_event = db.scalar(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.docket.red_notified"))
     assert red_event.payload == {"item_id": str(item.id), "severity": "red"}
     assert item.status == "pending"  # le rouge notifie et attend la décision
-    red = _client(db, user).get(f"{BASE}/red").json()
-    assert [row["id"] for row in red["items"]] == [str(item.id)]
+    client = _client(db, user)
+    assert [row["id"] for row in client.get(f"{BASE}/red").json()["items"]] == [str(item.id)]
+
+    first = client.post(f"{BASE}/{item.id}/red-ack")
+    assert first.status_code == 200
+    body = first.json()
+    assert (body["item_id"], body["notification_id"], body["item_status"]) == (str(item.id), str(note.id), "pending")
+    again = client.post(f"{BASE}/{item.id}/red-ack").json()
+    assert again["acked_at"] == body["acked_at"]  # idempotent : un seul accusé
+    db.refresh(note)
+    assert note.acked_at is not None and note.read_at is not None
+    assert _red_events(db, user) == ["planning.docket.red_notified", "planning.docket.red_acked"]
+    acked = db.scalar(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.docket.red_acked"))
+    assert acked.payload["notification_id"] == str(note.id)
+    db.refresh(item)
+    assert item.status == "pending" and item.decided_at is None  # l'accusé ne décide rien
+    assert [row["id"] for row in client.get(f"{BASE}/red").json()["items"]] == [str(item.id)]
+
+
+def test_red_ack_rejects_normal_and_foreign_items(db, monkeypatch) -> None:
+    monkeypatch.setattr(docket, "red_notify_enabled", lambda db: True)
+    user, other = _user(db), _user(db)
+    normal = _item(db, user)
+    foreign = _item(db, other, severity="red", item_type="red_flag_ref")
+    client = _client(db, user)
+    not_red = client.post(f"{BASE}/{normal.id}/red-ack")
+    assert (not_red.status_code, not_red.json()["code"]) == (409, "DOCKET_NOT_RED")
+    assert client.post(f"{BASE}/{foreign.id}/red-ack").status_code == 404
+    assert client.post(f"{BASE}/{uuid4()}/red-ack").status_code == 404
 
 
 def test_list_filters_and_orders_by_priority(db) -> None:

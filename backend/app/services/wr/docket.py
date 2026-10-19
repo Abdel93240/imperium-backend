@@ -7,8 +7,10 @@ Un item sans confidence (dépôt déterministe, pas de verdict de modèle) prend
 Un item qui remplit une classe d'auto-acceptation activée par l'utilisateur (autoaccept.py)
 est validé d'office au dépôt, jamais un rouge. Une décision ne fait qu'enregistrer le choix de
 l'utilisateur : rien n'est appliqué ici
-(les consommateurs — plan, croyances — liront les items validés). Le rouge notifie tout de
-suite et attend la décision, il n'applique rien.
+(les consommateurs — plan, croyances — liront les items validés). Le rouge attend la décision, il
+n'applique rien ; il notifie tout de suite seulement si `wr.red_notify_enabled` est vrai (carte
+ACT-WR-07), sinon il reste en tête de docket. L'utilisateur accuse réception (`red_ack`) : la
+notification est marquée lue et acquittée, l'event `planning.docket.red_acked` trace l'accusé.
 """
 
 import hashlib
@@ -24,8 +26,9 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.enums import IdempotencyStatus, PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
+from app.models.toolbox import Notification
 from app.models.wr import WrDocketItem
-from app.schemas.wr import DocketDecisionRequest, DocketItemRead
+from app.schemas.wr import DocketDecisionRequest, DocketItemRead, RedAckRead
 from app.services.events.emitter import build_event
 from app.services.notifications import notify
 from app.services.params import get_parameter
@@ -115,22 +118,56 @@ def create_item(
     db.flush()
     created = _emit(db, current_user, "planning.docket.item_created", item, occurred_at=now)
     if severity == "red":
-        notify(
-            db, severity="red", domain="wr", message_fr=f"Point rouge à trancher : {title_fr}",
-            ref=("wr_docket_item", item.id),
-        )
-        db.add(build_event(
-            db, user_id=current_user.id, event_type="planning.docket.red_notified",
-            payload={"item_id": str(item.id), "severity": "red"},
-            idempotency_key=f"planning.docket.red_notified.{item.id}", causation_id=created.event_id,
-            privacy_level=PrivacyLevel.medium, occurred_at=now,
-        ))
-        db.flush()
+        if red_notify_enabled(db):
+            _notify_red(db, current_user, item, created, now)
     elif item_type != "autoaccept_spotcheck":
         autoaccept_class = autoaccept.matching_class(db, item, now=now)
         if autoaccept_class is not None:
             _auto_accept(db, current_user, item, autoaccept_class, created, now)
     return item
+
+
+def red_notify_enabled(db: Session) -> bool:
+    return bool(get_parameter(db, "wr.red_notify_enabled", default=False))
+
+
+def _notify_red(db: Session, current_user: User, item: WrDocketItem, created, now: datetime) -> None:
+    notify(
+        db, severity="red", domain="wr", message_fr=f"Point rouge à trancher : {item.title_fr}",
+        ref=("wr_docket_item", item.id),
+    )
+    db.add(build_event(
+        db, user_id=current_user.id, event_type="planning.docket.red_notified",
+        payload={"item_id": str(item.id), "severity": "red"},
+        idempotency_key=f"planning.docket.red_notified.{item.id}", causation_id=created.event_id,
+        privacy_level=PrivacyLevel.medium, occurred_at=now,
+    ))
+    db.flush()
+
+
+def red_ack(db: Session, *, current_user: User, item_id: UUID, now: datetime | None = None) -> RedAckRead:
+    """Accusé de réception d'un rouge notifié : idempotent, n'applique rien et ne décide rien."""
+    item = db.get(WrDocketItem, item_id, with_for_update=True)
+    if item is None or item.user_id != current_user.id:
+        raise DocketItemNotFoundError("Docket item not found.")
+    if item.severity != "red":
+        raise DocketStateError("Only red docket items are acknowledged.", "DOCKET_NOT_RED")
+    note = db.scalar(
+        select(Notification).where(Notification.ref_type == "wr_docket_item", Notification.ref_id == item.id)
+        .order_by(Notification.created_at).limit(1).with_for_update()
+    )
+    if note is None:
+        raise DocketStateError("This red item was never notified (wr.red_notify_enabled was off).",
+                               "RED_NOT_NOTIFIED")
+    if note.acked_at is None:
+        now = now or datetime.now(UTC)
+        note.acked_at = now
+        note.read_at = note.read_at or now
+        db.flush()
+        _emit(db, current_user, "planning.docket.red_acked", item,
+              extra={"notification_id": str(note.id)}, occurred_at=now)
+        db.commit()
+    return RedAckRead(item_id=item.id, notification_id=note.id, acked_at=note.acked_at, item_status=item.status)
 
 
 def _auto_accept(db: Session, current_user: User, item: WrDocketItem, autoaccept_class, created, now: datetime) -> None:

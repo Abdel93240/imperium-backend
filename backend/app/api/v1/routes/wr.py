@@ -1,4 +1,5 @@
 """Docket et digest du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`,
+`POST docket/{id}/red-ack`,
 `POST digest`, `GET digest/current`, `GET metrics/weekly`, `GET plan/current`, `GET plan/versions`,
 `POST plan/initial`, `POST plan/versions/{id}/activate|supersede`."""
 
@@ -24,6 +25,7 @@ from app.schemas.wr import (
     PlanSupersedeRequest,
     PlanVersionListResponse,
     PlanVersionRead,
+    RedAckRead,
     SlotAuditStateRead,
     SlotAuditStatesResponse,
     SlotTransitionUpdateRequest,
@@ -84,6 +86,19 @@ def docket_decision_route(
     except docket.DocketIdempotencyConflictError as exc:
         db.rollback()
         return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+
+
+@router.post("/docket/{item_id}/red-ack", response_model=RedAckRead)
+def docket_red_ack_route(item_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> RedAckRead | JSONResponse:
+    """Accusé de réception d'un rouge notifié (idempotent) : ne décide pas l'item."""
+    try:
+        return docket.red_ack(db, current_user=current_user, item_id=item_id)
+    except docket.DocketItemNotFoundError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
+    except docket.DocketStateError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": exc.code})
 
 
 @router.post("/digest", response_model=DigestRead, status_code=status.HTTP_201_CREATED)
