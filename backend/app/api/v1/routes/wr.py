@@ -1,7 +1,7 @@
 """Docket et digest du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`,
 `POST docket/{id}/red-ack`,
 `POST digest`, `GET digest/current`, `GET metrics/weekly`, `GET plan/current`, `GET plan/versions`,
-`POST plan/initial`, `POST plan/versions/{id}/activate|supersede`."""
+`POST plan/initial`, `POST plan/shock`, `POST plan/versions/{id}/activate|supersede`."""
 
 from typing import Annotated, Literal
 from uuid import UUID
@@ -22,6 +22,7 @@ from app.schemas.wr import (
     DocketStatus,
     PlanCurrentRead,
     PlanInitialRequest,
+    PlanShockRequest,
     PlanSupersedeRequest,
     PlanVersionListResponse,
     PlanVersionRead,
@@ -275,6 +276,32 @@ def create_initial_plan_route(
     try:
         return plan.create_initial(db, current_user=current_user, request=payload,
                                    idempotency_key=idempotency_key, request_path=request.url.path)
+    except plan.PlanStateError as exc:
+        db.rollback()
+        return _plan_conflict(exc)
+
+
+@router.post("/plan/shock", response_model=PlanVersionRead, status_code=status.HTTP_201_CREATED)
+def plan_shock_route(
+    payload: PlanShockRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> PlanVersionRead | JSONResponse:
+    """Choc exogène : régénération complète proposée, jamais activée seule (`wr.plan_shock_enabled`)."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    if not (plan.plan_enabled(db) and plan.shock_enabled(db)):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                            content={"detail": "Shock regeneration is not enabled.", "code": "PLAN_SHOCK_DISABLED"})
+    try:
+        return plan.request_shock(db, current_user=current_user, request=payload,
+                                  idempotency_key=idempotency_key, request_path=request.url.path)
+    except plan.PlanShockReasonError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            content={"detail": str(exc), "code": "SHOCK_REASON_UNKNOWN"})
     except plan.PlanStateError as exc:
         db.rollback()
         return _plan_conflict(exc)

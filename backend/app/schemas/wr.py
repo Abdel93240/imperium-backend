@@ -273,6 +273,8 @@ class PlanVersionRead(BaseModel):
     origin: Literal["initial", "monthly_regen", "shock_regen"]
     status: Literal["proposed", "active", "superseded"]
     rationale_fr: str | None
+    origin_ref: UUID | None = None
+    model_used: str | None = None
     created_at: datetime
     activated_at: datetime | None
     superseded_at: datetime | None
@@ -281,6 +283,14 @@ class PlanVersionRead(BaseModel):
 
 class PlanVersionListResponse(BaseModel):
     versions: list[PlanVersionRead]
+
+
+class PlanShockRequest(BaseModel):
+    """Choc exogène déclaré par l'utilisateur : raison de la taxonomie `wr.shock_taxonomy` (spec WR §8.1)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason_code: str = Field(min_length=1, max_length=64)
 
 
 class PlanSupersedeRequest(BaseModel):

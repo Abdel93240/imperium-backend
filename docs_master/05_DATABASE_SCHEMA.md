@@ -1965,7 +1965,19 @@ Plan initial SAISI par l'utilisateur : `POST /api/wr/plan/initial` (Idempotency-
 l'ancienne active passe superseded ; 409 `PLAN_SUPERSEDED`), `POST …/{id}/supersede` (raison
 obligatoire), `GET /api/wr/plan/versions`, `GET /api/wr/plan/current` (409 `PLAN_DISABLED` tant
 que `wr.plan_enabled` = false, seme ; 404 sans version active). Events `planning.plan.proposed`,
-`.activated`, `.superseded`. Generation (deltas hebdo, regenerations) : V23/V24.
+`.activated`, `.superseded`. Generation (deltas hebdo, regeneration mensuelle) : V23/V24.
+Regeneration choc (migration 20261019_0099, 2026-10-19, spec WR §8.1 et §13.6, carte ACT-WR-20) :
+parametres semes `wr.shock_taxonomy` (6 raisons : vehicle_accident, immobilizing_breakdown,
+major_family_event, income_source_loss, disabling_injury, housing_disaster ; editable, a valider)
+et `wr.plan_shock_enabled` = false. `POST /api/wr/plan/shock` {reason_code} (Idempotency-Key ; 409
+`PLAN_SHOCK_DISABLED` tant que `wr.plan_enabled` ou `wr.plan_shock_enabled` est faux) :
+declenchement MANUEL seulement, aucun abonnement aux replans ordinaires. Cree une version
+`proposed`, origin `shock_regen`, origin_ref = event `planning.plan.shock_requested`, jamais
+activee seule (activate reste la validation). Essai a blanc tant que `real_ai_enabled` est faux :
+copie du plan courant (deltas appliques) recalee sur aujourd'hui, `model_used=dry_run` ; avec
+`real_ai_enabled` vrai, 409 `PLAN_REGEN_NOT_CODED`. Refus : 422 `SHOCK_REASON_UNKNOWN`, 409
+`PLAN_NOT_ACTIVE`, `PLAN_REGEN_PENDING` (une regeneration deja proposee). `PlanVersionRead` expose
+`origin_ref` et `model_used`. Pas de DDL.
 
 Classes d'auto-acceptation — `wr_autoaccept_classes` : CODE (migration 20261019_0089,
 2026-10-19, spec WR §9 P4 et §13.8 : « table vide + mecanique, activation = decision user » ;
