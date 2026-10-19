@@ -1,5 +1,5 @@
 """Docket et digest du WR (spec WR §12) : `GET docket`, `GET docket/red`, `POST docket/{id}/decision`,
-`POST digest`, `GET digest/current`."""
+`POST digest`, `GET digest/current`, `GET metrics/weekly`."""
 
 from typing import Annotated, Literal
 from uuid import UUID
@@ -15,8 +15,10 @@ from app.schemas.wr import (
     DocketItemType,
     DocketListResponse,
     DocketStatus,
+    WrMetricsWeekRead,
+    WrMetricsWeeklyResponse,
 )
-from app.services.wr import digest, docket
+from app.services.wr import digest, docket, metrics
 
 router = APIRouter()
 
@@ -91,3 +93,12 @@ def current_digest_route(current_user: CurrentUserDep, db: SessionDep) -> Digest
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No digest for the open weekly review.")
     return DigestRead.model_validate(row)
+
+
+@router.get("/metrics/weekly", response_model=WrMetricsWeeklyResponse)
+def weekly_metrics_route(
+    current_user: CurrentUserDep, db: SessionDep, weeks: Annotated[int, Query(ge=1, le=12)] = 4
+) -> WrMetricsWeeklyResponse:
+    """Dernières semaines, en cours comprise, calculées à l'instant (lecture seule)."""
+    rows = metrics.recent_weeks(db, current_user=current_user, weeks=weeks)
+    return WrMetricsWeeklyResponse(weeks=[WrMetricsWeekRead.model_validate(row) for row in rows])

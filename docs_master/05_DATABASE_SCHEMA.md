@@ -1908,6 +1908,18 @@ Rollups W1 et etat du plan absents (`unavailable`). Routes : `POST /api/wr/diges
 WR lancee et non fermee, sinon 409 `WR_NOT_OPEN` ; 201 cree, 200 deja fige),
 `GET /api/wr/digest/current`. L'assemblage n'est pas encore branche sur le lancement du WR.
 
+Metriques du WR — `wr_metrics_weekly` : CODE (migration 20261019_0085, 2026-10-19, spec WR §3.8).
+Colonnes de la spec + `user_id` ; une ligne par utilisateur et par lundi (unique), NULL = pas
+encore mesurable (events_processed, patterns_reinforced, cloud_cost_estimate,
+agreement_by_slot : usine W1-W3 et transition IA non codees ; factory_runs = runs `wr.factory*`,
+0 aujourd'hui). Semaine Europe/Paris. Comptes du docket : items crees (et par type :
+chain_proposals, patterns_new, contradictions), decisions et decisions forcees d'apres les
+events `planning.docket.*`. Politique de saut : session de la semaine lancee -> wr_mode `full`
+(le mode court n'est pas encore enregistre sur la session) et duree lancement -> fin ; rien de
+lance au lundi de S+2 -> `skipped` ; avant, NULL. Job `wr.metrics_rollup` (cron 04:30, seme
+desactive) : recalcule et ecrit les deux dernieres semaines closes. Route
+`GET /api/wr/metrics/weekly?weeks=1..12` : calcul a l'instant, lecture seule.
+
 ### review_sessions
 
 Nom actuel : `imperium_weekly_review_sessions`

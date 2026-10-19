@@ -110,7 +110,7 @@ def create_item(
     )
     db.add(item)
     db.flush()
-    created = _emit(db, current_user, "planning.docket.item_created", item)
+    created = _emit(db, current_user, "planning.docket.item_created", item, occurred_at=now)
     if severity == "red":
         notify(
             db, severity="red", domain="wr", message_fr=f"Point rouge à trancher : {title_fr}",
@@ -120,7 +120,7 @@ def create_item(
             db, user_id=current_user.id, event_type="planning.docket.red_notified",
             payload={"item_id": str(item.id), "severity": "red"},
             idempotency_key=f"planning.docket.red_notified.{item.id}", causation_id=created.event_id,
-            privacy_level=PrivacyLevel.medium,
+            privacy_level=PrivacyLevel.medium, occurred_at=now,
         ))
         db.flush()
     return item
@@ -219,9 +219,9 @@ def decide(
             item.force_decision = forced = True
     db.flush()
     decided = _emit(db, current_user, "planning.docket.item_decided", item, suffix=idempotency_key,
-                    extra={"modified": True} if request.modified_payload is not None else None)
+                    extra={"modified": True} if request.modified_payload is not None else None, occurred_at=now)
     if forced:
-        _emit(db, current_user, "planning.docket.item_forced", item, causation_id=decided.event_id)
+        _emit(db, current_user, "planning.docket.item_forced", item, causation_id=decided.event_id, occurred_at=now)
     read = DocketItemRead.model_validate(item)
     db.add(IdempotencyKey(
         user_id=current_user.id, idempotency_key=idempotency_key, request_method="POST", request_path=request_path,
@@ -233,7 +233,7 @@ def decide(
 
 
 def _emit(db: Session, current_user: User, event_type: str, item: WrDocketItem, *, suffix: str | None = None,
-          extra: dict | None = None, causation_id: str | None = None):
+          extra: dict | None = None, causation_id: str | None = None, occurred_at: datetime | None = None):
     # Payload = références seulement (spec WR §11) : jamais le contenu de l'item.
     event = build_event(
         db, user_id=current_user.id, event_type=event_type,
@@ -241,6 +241,7 @@ def _emit(db: Session, current_user: User, event_type: str, item: WrDocketItem, 
                  "defers": item.consecutive_defers, **(extra or {})},
         idempotency_key=f"{event_type}.{item.id}" + (f".{suffix}" if suffix else ""),
         source_app=SourceApp.imperium, privacy_level=PrivacyLevel.medium, causation_id=causation_id,
+        occurred_at=occurred_at,
     )
     db.add(event)
     db.flush()
