@@ -16,6 +16,10 @@ de la taxonomie éditable `wr.shock_taxonomy`, servie seulement si `wr.plan_enab
 `real_ai_enabled` est faux, c'est un essai à blanc : la version proposée est la copie du plan courant
 (deltas appliqués) recalée sur aujourd'hui, `model_used=dry_run`. Toujours `proposed` : elle ne
 devient active que par activate ; une seule régénération proposée en attente à la fois.
+
+Régénération mensuelle (§8.3, carte ACT-WR-21) : job `wr.monthly_regen` (semé désactivé), même
+contrat que le choc avec origin=monthly_regen et sans origin_ref ; une seule par mois (Paris), rien
+si le plan est éteint, sans version active ou si une régénération attend déjà.
 """
 
 import hashlib
@@ -204,15 +208,12 @@ def request_shock(
     active = _active(db, current_user)
     if active is None:
         raise PlanStateError("No active plan to regenerate.", "PLAN_NOT_ACTIVE")
-    pending = db.scalar(select(PlanVersion.id).where(
-        PlanVersion.user_id == current_user.id, PlanVersion.status == "proposed",
-        PlanVersion.origin.in_(("shock_regen", "monthly_regen"))))
+    pending = _pending_regeneration(db, current_user)
     if pending is not None:
         raise PlanStateError(f"A regenerated plan is already waiting for validation ({pending}).",
                              "PLAN_REGEN_PENDING")
 
     now = now or datetime.now(UTC)
-    current = current_plan(db, current_user=current_user)
     shock = build_event(
         db, user_id=current_user.id, event_type="planning.plan.shock_requested",
         payload={"reason_code": request.reason_code, "active_plan_version_id": str(active.id)},
@@ -221,20 +222,81 @@ def request_shock(
     )
     db.add(shock)
     db.flush()
+    row = _propose_regeneration(
+        db, current_user, origin="shock_regen", origin_ref=shock.id, now=now, extra={"reason_code": request.reason_code},
+        causation_id=shock.event_id,
+        rationale_fr=f"[essai] Régénération choc ({taxonomy[request.reason_code]}) : copie du plan courant, "
+                     "aucun modèle appelé.",
+    )
+    return _remember(db, current_user, row, idempotency_key, request_path, fingerprint)
+
+
+def monthly_regen_job(ctx, window) -> None:
+    """Job `wr.monthly_regen` (semé désactivé) : régénération complète PROPOSÉE, jamais activée seule."""
+    from app.services.wr.metrics import _job_user
+
+    now = window.to_ts or datetime.now(UTC)
+    ctx.cursor_ts = now
+    ctx.items_in = ctx.items_out = 0
+    user = _job_user(ctx.db)
+    skip = None
+    if user is None:
+        skip = "no_user"
+    elif not plan_enabled(ctx.db):
+        skip = "plan_disabled"
+    if skip is None:
+        if get_settings().real_ai_enabled:
+            raise PlanStateError("Real monthly regeneration (wr.plan_regen) is not coded yet: card V24.",
+                                 "PLAN_REGEN_NOT_CODED")
+        skip = _monthly_skip(ctx.db, user, now)
+    if skip is not None:
+        ctx.detail = {"skip": skip}
+        ctx.db.rollback()
+        return
+    ctx.items_in = 1
+    row = _propose_regeneration(
+        ctx.db, user, origin="monthly_regen", origin_ref=None, now=now, extra={},
+        rationale_fr="[essai] Régénération mensuelle : copie du plan courant, aucun modèle appelé.",
+    )
+    ctx.db.commit()
+    ctx.items_out = 1
+    ctx.detail = {"plan_version_id": str(row.id), "dry_run": True}
+
+
+def _monthly_skip(db: Session, user: User, now: datetime) -> str | None:
+    if _active(db, user) is None:
+        return "no_active_plan"
+    if _pending_regeneration(db, user) is not None:
+        return "regeneration_pending"
+    local = now.astimezone(PARIS)
+    month_start = datetime(local.year, local.month, 1, tzinfo=PARIS)
+    already = db.scalar(select(PlanVersion.id).where(
+        PlanVersion.user_id == user.id, PlanVersion.origin == "monthly_regen", PlanVersion.created_at >= month_start))
+    return "already_this_month" if already is not None else None
+
+
+def _pending_regeneration(db: Session, current_user: User) -> UUID | None:
+    return db.scalar(select(PlanVersion.id).where(
+        PlanVersion.user_id == current_user.id, PlanVersion.status == "proposed",
+        PlanVersion.origin.in_(("shock_regen", "monthly_regen"))))
+
+
+def _propose_regeneration(db: Session, current_user: User, *, origin: str, origin_ref: UUID | None, now: datetime,
+                          extra: dict, rationale_fr: str, causation_id: str | None = None) -> PlanVersion:
+    """Essai à blanc : copie du plan courant (deltas appliqués) recalée sur aujourd'hui, statut proposed."""
+    current = current_plan(db, current_user=current_user)
     start = now.astimezone(PARIS).date()
     row = PlanVersion(
         user_id=current_user.id, horizon_start=start,
         horizon_end=start + timedelta(days=(current.horizon_end - current.horizon_start).days),
-        plan=current.plan, origin="shock_regen", origin_ref=shock.id, model_used=DRY_RUN,
-        rationale_fr=f"[essai] Régénération choc ({taxonomy[request.reason_code]}) : copie du plan courant, "
-                     "aucun modèle appelé.",
+        plan=current.plan, origin=origin, origin_ref=origin_ref, model_used=DRY_RUN, rationale_fr=rationale_fr,
         status="proposed", created_at=now,
     )
     db.add(row)
     db.flush()
-    _emit(db, current_user, "planning.plan.regenerated", row,
-          {"reason_code": request.reason_code, "dry_run": True}, now, causation_id=shock.event_id)
-    return _remember(db, current_user, row, idempotency_key, request_path, fingerprint)
+    _emit(db, current_user, "planning.plan.regenerated", row, {**extra, "dry_run": True}, now,
+          causation_id=causation_id)
+    return row
 
 
 def activate(db: Session, *, current_user: User, version_id: UUID, now: datetime | None = None) -> PlanVersionRead:

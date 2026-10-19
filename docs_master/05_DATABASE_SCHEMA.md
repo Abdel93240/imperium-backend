@@ -1965,7 +1965,7 @@ Plan initial SAISI par l'utilisateur : `POST /api/wr/plan/initial` (Idempotency-
 l'ancienne active passe superseded ; 409 `PLAN_SUPERSEDED`), `POST …/{id}/supersede` (raison
 obligatoire), `GET /api/wr/plan/versions`, `GET /api/wr/plan/current` (409 `PLAN_DISABLED` tant
 que `wr.plan_enabled` = false, seme ; 404 sans version active). Events `planning.plan.proposed`,
-`.activated`, `.superseded`. Generation (deltas hebdo, regeneration mensuelle) : V23/V24.
+`.activated`, `.superseded`. Generation des deltas hebdo : V23.
 Regeneration choc (migration 20261019_0099, 2026-10-19, spec WR §8.1 et §13.6, carte ACT-WR-20) :
 parametres semes `wr.shock_taxonomy` (6 raisons : vehicle_accident, immobilizing_breakdown,
 major_family_event, income_source_loss, disabling_injury, housing_disaster ; editable, a valider)
@@ -1978,6 +1978,12 @@ copie du plan courant (deltas appliques) recalee sur aujourd'hui, `model_used=dr
 `real_ai_enabled` vrai, 409 `PLAN_REGEN_NOT_CODED`. Refus : 422 `SHOCK_REASON_UNKNOWN`, 409
 `PLAN_NOT_ACTIVE`, `PLAN_REGEN_PENDING` (une regeneration deja proposee). `PlanVersionRead` expose
 `origin_ref` et `model_used`. Pas de DDL.
+Regeneration mensuelle (migration 20261019_0100, 2026-10-19, spec WR §8.3, carte ACT-WR-21) :
+job `wr.monthly_regen` (cron `0 5 1 * *` UTC, le 1er du mois ; a valider face au doc 52 §8 /
+DV-5), seme desactive. Meme contrat que le choc avec origin `monthly_regen`, sans origin_ref :
+version `proposed` jamais activee seule, essai a blanc (copie du plan courant) tant que
+`real_ai_enabled` est faux, echec du run sinon. Saut motive (`detail.skip`) : plan eteint, pas de
+version active, regeneration deja en attente, deja une regeneration mensuelle ce mois (Paris).
 
 Classes d'auto-acceptation — `wr_autoaccept_classes` : CODE (migration 20261019_0089,
 2026-10-19, spec WR §9 P4 et §13.8 : « table vide + mecanique, activation = decision user » ;
