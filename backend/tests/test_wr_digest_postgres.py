@@ -97,7 +97,7 @@ def test_digest_caps_per_type_and_freezes(db) -> None:
     question = _item(db, user, item_type="user_question", source_worker="manual")
     decided = _item(db, user)
     docket.decide(db, current_user=user, item_id=decided.id,
-                  request=docket.DocketDecisionRequest(decision="refused"), idempotency_key=uuid4().hex, request_path="/x")
+                  request=docket.DocketDecisionRequest(decision="refused", decision_note="Faux."), idempotency_key=uuid4().hex, request_path="/x")
     client = _client(db, user)
     assert client.get("/api/wr/digest/current").status_code == 404
     first = client.post("/api/wr/digest")

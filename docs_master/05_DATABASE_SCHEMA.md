@@ -1928,7 +1928,19 @@ x (0,5 + confidence/200, ou 1 sans confidence). Une decision ne fait qu'enregist
 rien n'est applique par le docket. Routes : `GET /api/wr/docket?status=&type=`,
 `GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision` (Idempotency-Key).
 `GET /api/wr/docket?mode=light` = WR court (spec WR §9 P4) : rouges, decisions forcees,
-contradictions et deltas de plan seulement ; le reste porte sans penalite.
+contradictions et deltas de plan seulement ; le reste porte sans penalite. Depuis le
+2026-10-19, un refus ou une validation modifiee exige `decision_note` (422 sinon ; spec WR §9 P4 :
+l'explication est le label).
+
+Marche du docket — `wr_walks` : CODE (migration 20261019_0093, 2026-10-19, spec WR §9 P4 ;
+carte V18 ACT-WR-06). Une marche par session WR (unique, FK cascade) : user_id, mode
+full|light, budget_min fige au depart depuis `wr.budget_min` ({full: 45, light: 15}, a
+valider), started_at, closed_at. `GET /api/wr/walk/next` sert l'item ouvert le plus
+prioritaire du mode (decisions forcees d'abord ; un item reporte pendant la marche n'est pas
+resservi) ; budget epuise -> seuls rouges et decisions forcees. Lecture seule ; les decisions
+passent par `POST /api/wr/docket/{id}/decision`. `POST /api/wr/walk` (201, 200 si deja
+demarree, 409 `WR_NOT_OPEN`), `POST /api/wr/walk/close` (idempotente, les items non tranches
+portent). Events `planning.wr_walk.started` / `.closed`.
 
 Classes d'auto-acceptation — `wr_autoaccept_classes` : CODE (migration 20261019_0089,
 2026-10-19, spec WR §9 P4 et §13.8 : « table vide + mecanique, activation = decision user » ;
@@ -2002,8 +2014,8 @@ agreement_by_slot rempli depuis l'audit des slots (0088) quand il y a des contre
 usine W1-W3 non codee ; factory_runs = passages de l'usine dans `wr_worker_runs`).
 Semaine Europe/Paris. Comptes du docket : items crees (et par type :
 chain_proposals, patterns_new, contradictions), decisions et decisions forcees d'apres les
-events `planning.docket.*`. Politique de saut : session de la semaine lancee -> wr_mode `full`
-(le mode court n'est pas encore enregistre sur la session) et duree lancement -> fin ; rien de
+events `planning.docket.*`. Politique de saut : session de la semaine lancee -> wr_mode = mode
+de sa marche du docket (`full` sans marche) et duree lancement -> fin ; rien de
 lance au lundi de S+2 -> `skipped` ; avant, NULL. Job `wr.metrics_rollup` (cron 04:30, seme
 desactive) : recalcule et ecrit les deux dernieres semaines closes. Route
 `GET /api/wr/metrics/weekly?weeks=1..12` : calcul a l'instant, lecture seule.

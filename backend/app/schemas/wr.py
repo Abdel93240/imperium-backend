@@ -52,6 +52,9 @@ class DocketDecisionRequest(BaseModel):
     def _modification_needs_validation(self) -> "DocketDecisionRequest":
         if self.modified_payload is not None and self.decision != "validated":
             raise ValueError("modified_payload is only allowed with decision 'validated'.")
+        # Spec WR §9 P4 : chaque refus ou modification exige une explication — c'est le label.
+        if (self.decision == "refused" or self.modified_payload is not None) and not (self.decision_note or "").strip():
+            raise ValueError("decision_note is required to refuse or modify an item.")
         return self
 
 
@@ -172,3 +175,32 @@ class AutoacceptClassRead(BaseModel):
 
 class AutoacceptClassListResponse(BaseModel):
     classes: list[AutoacceptClassRead]
+
+
+class WalkStartRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["full", "light"] = "full"
+
+
+class WalkRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    review_session_id: UUID
+    mode: Literal["full", "light"]
+    budget_min: int
+    started_at: datetime
+    closed_at: datetime | None
+
+
+class WalkNextResponse(BaseModel):
+    """Prochain item à trancher ; au-delà du budget, seuls les rouges et décisions forcées sont servis."""
+
+    walk: WalkRead
+    item: DocketItemRead | None
+    elapsed_min: int
+    remaining_min: int
+    budget_exhausted: bool
+    remaining_items: int
+    decided_in_walk: int
