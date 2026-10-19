@@ -69,7 +69,7 @@ def _item(db, user, *, when: datetime, item_type: str = "anomaly"):
 
 
 def _decide(db, user, item, decision: str, when: datetime) -> None:
-    docket.decide(db, current_user=user, item_id=item.id, request=DocketDecisionRequest(decision=decision),
+    docket.decide(db, current_user=user, item_id=item.id, request=DocketDecisionRequest(decision=decision, decision_note="Faux." if decision == "refused" else None),
                   idempotency_key=uuid4().hex, request_path="/x", now=when)
 
 

@@ -21,11 +21,14 @@ from app.schemas.wr import (
     SlotAuditStateRead,
     SlotAuditStatesResponse,
     SlotTransitionUpdateRequest,
+    WalkNextResponse,
+    WalkRead,
+    WalkStartRequest,
     WrMetricsWeekRead,
     WrMetricsWeeklyResponse,
 )
 from app.services.ai import audit_loop
-from app.services.wr import autoaccept, digest, docket, metrics
+from app.services.wr import autoaccept, digest, docket, metrics, walker
 
 router = APIRouter()
 
@@ -178,3 +181,39 @@ def disable_autoaccept_class_route(class_id: UUID, current_user: CurrentUserDep,
     except autoaccept.AutoacceptClassNotFoundError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+def _walk_conflict(exc: walker.WalkStateError) -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": exc.code})
+
+
+@router.post("/walk", response_model=WalkRead, status_code=status.HTTP_201_CREATED)
+def start_walk_route(payload: WalkStartRequest, current_user: CurrentUserDep, db: SessionDep) -> WalkRead | JSONResponse:
+    """Démarre la marche du docket de la session WR ouverte (201) ; déjà démarrée, elle est rendue (200)."""
+    try:
+        walk, created = walker.start_walk(db, current_user=current_user, mode=payload.mode)
+    except walker.WalkStateError as exc:
+        db.rollback()
+        return _walk_conflict(exc)
+    read = WalkRead.model_validate(walk)
+    if created:
+        return read
+    return JSONResponse(status_code=status.HTTP_200_OK, content=read.model_dump(mode="json"))
+
+
+@router.get("/walk/next", response_model=WalkNextResponse)
+def walk_next_route(current_user: CurrentUserDep, db: SessionDep) -> WalkNextResponse | JSONResponse:
+    """Prochain item à trancher sous le budget du mode (lecture seule)."""
+    try:
+        return walker.next_item(db, current_user=current_user)
+    except walker.WalkStateError as exc:
+        return _walk_conflict(exc)
+
+
+@router.post("/walk/close", response_model=WalkRead)
+def close_walk_route(current_user: CurrentUserDep, db: SessionDep) -> WalkRead | JSONResponse:
+    try:
+        return WalkRead.model_validate(walker.close_walk(db, current_user=current_user))
+    except walker.WalkStateError as exc:
+        db.rollback()
+        return _walk_conflict(exc)

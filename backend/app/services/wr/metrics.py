@@ -4,8 +4,8 @@ Semaine = [lundi 00:00, lundi suivant 00:00) en Europe/Paris. Sources :
 - docket : items créés dans la semaine (et par type pour chain_proposals, patterns_new,
   contradictions) ; décisions et décisions forcées = events `planning.docket.*` de la semaine ;
 - usine : passages de l'usine (`wr_worker_runs`, un instant `window_to` par passage) ;
-- WR : session de la semaine. Lancée → wr_mode `full` (le mode court n'est pas encore
-  enregistré sur la session) et durée lancement → fin. Rien de lancé quand la fenêtre est
+- WR : session de la semaine. Lancée → wr_mode = mode de la marche du docket (`full` ou
+  `light`, walker.py), `full` sans marche ; durée lancement → fin. Rien de lancé quand la fenêtre est
   close (lundi de S+2, la revue de S se tenant pendant S+1) → `skipped` ; avant, NULL.
 NULL = non mesurable tant que le worker ou le moteur qui l'alimente n'est pas codé.
 """
@@ -21,6 +21,7 @@ from app.models.auth import User
 from app.models.event import Event
 from app.models.imperium import ImperiumWeeklyReviewSession
 from app.services.ai import audit_loop
+from app.services.wr import walker
 from app.models.wr import WrDocketItem, WrMetricsWeekly, WrWorkerRun
 
 
@@ -77,7 +78,7 @@ def compute_week(
     )
     wr_mode, duration = None, None
     if session is not None and session.launched_at is not None:
-        wr_mode = "full"
+        wr_mode = walker.walk_mode(db, review_session_id=session.id) or "full"
         if session.completed_at is not None:
             duration = int((session.completed_at - session.launched_at).total_seconds() // 60)
     elif now >= datetime.combine(week_start + timedelta(days=WR_WINDOW_DAYS), time.min, tzinfo=PARIS):

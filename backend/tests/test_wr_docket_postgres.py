@@ -168,6 +168,10 @@ def test_decision_rules_and_idempotency(db) -> None:
     assert client.post(url, json={"decision": "validated"}).status_code == 400  # Idempotency-Key requise
     bad = client.post(url, headers=_key(), json={"decision": "deferred", "modified_payload": {"x": 1}})
     assert bad.status_code == 422  # modification réservée à la validation
+    # Spec WR §9 P4 : refus et modification exigent une explication (le label).
+    assert client.post(url, headers=_key(), json={"decision": "refused"}).status_code == 422
+    assert client.post(url, headers=_key(), json={"decision": "validated", "modified_payload": {"x": 1},
+                                                  "decision_note": " "}).status_code == 422
     key = _key()
     payload = {"decision": "validated", "decision_note": "ok mais seuil 50", "modified_payload": {"signal": "vault.fuel", "threshold": 50}}
     first = client.post(url, headers=key, json=payload)
@@ -175,13 +179,13 @@ def test_decision_rules_and_idempotency(db) -> None:
     assert (first.json()["status"], first.json()["payload"]["threshold"], first.json()["decision_note"]) == ("validated", 50, "ok mais seuil 50")
     replay = client.post(url, headers=key, json=payload)
     assert replay.json() == first.json()
-    assert client.post(url, headers=key, json={"decision": "refused"}).status_code == 409  # même clé, autre corps
-    done = client.post(url, headers=_key(), json={"decision": "refused"})
+    assert client.post(url, headers=key, json={"decision": "refused", "decision_note": "Faux."}).status_code == 409  # même clé, autre corps
+    done = client.post(url, headers=_key(), json={"decision": "refused", "decision_note": "Faux."})
     assert (done.status_code, done.json()["code"]) == (409, "DOCKET_ALREADY_DECIDED")
     decided = db.scalars(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.docket.item_decided")).all()
     assert [event.payload["status"] for event in decided] == ["validated"]  # rejeu et refus tardif : rien de plus
-    assert _client(db, _user(db)).post(url, headers=_key(), json={"decision": "refused"}).status_code == 404
-    assert client.post(f"{BASE}/{uuid4()}/decision", headers=_key(), json={"decision": "refused"}).status_code == 404
+    assert _client(db, _user(db)).post(url, headers=_key(), json={"decision": "refused", "decision_note": "Faux."}).status_code == 404
+    assert client.post(f"{BASE}/{uuid4()}/decision", headers=_key(), json={"decision": "refused", "decision_note": "Faux."}).status_code == 404
 
 
 def test_reprioritize_persists_the_fresh_priority(db) -> None:

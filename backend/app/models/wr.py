@@ -159,3 +159,18 @@ class WrRollupDaily(UUIDPrimaryKeyMixin, Base):
     computed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class WrWalk(UUIDPrimaryKeyMixin, Base):
+    """Docket walker session of one WR (migration 0093, spec WR §9 P4)."""
+
+    __tablename__ = "wr_walks"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    review_session_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_weekly_review_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    mode: Mapped[str] = mapped_column(Text, nullable=False)
+    budget_min: Mapped[int] = mapped_column(Integer, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
