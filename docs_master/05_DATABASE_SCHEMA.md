@@ -1700,7 +1700,16 @@ service (`decision_framework.load_scales`) les lit avec un cache par version ; p
 ou invalide → constantes du code, journalise. Parite prouvee par 83 cas dores captures avant
 l'externalisation (`tests/fixtures/df_golden_scores.json`). L'ORDRE des domaines reste dans
 `imperium_user_priorities` ; seuls les VALEURS des coefficients sont des parametres. Pas de
-reglage par API (carte ACT-DLY-02) ni de refresh du registre (ACT-DLY-03). Audit : `DAILY_MAPPING.md`.
+refresh du registre (ACT-DLY-03). Audit : `DAILY_MAPPING.md`.
+Reglage versionne (migration 20261019_0102, 2026-10-19, spec Daily §4.5 et §10.3, carte ACT-DLY-02) :
+`GET /api/daily/settings/scoring` (baremes courants, `source` parameters|code),
+`GET /api/daily/settings/scoring/{code}/versions` (historique, l'ancienne version reste lisible),
+`PUT /api/daily/settings/scoring` {changes: {code: valeur complete}, reason_fr} (Idempotency-Key).
+Coupes (409 `DAILY_SETTINGS_DISABLED`) tant que `daily.settings_enabled` = false (seme). Chaque
+parametre change = nouvelle version (origin `user`, raison, `valid_from`) + event
+`decision.scoring.updated` ; jeu complet valide avant ecriture (422 `SCORING_INVALID`,
+`SCORING_PARAMETER_UNKNOWN` ; 409 `SCORING_NO_CHANGE`, `SCORING_NOT_SEEDED`). Les tests dores ne
+s'appliquent pas aux reglages volontaires. Refresh du registre : ACT-DLY-03.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
