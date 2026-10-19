@@ -182,3 +182,25 @@ class QueueRead(BaseModel):
     chosen_mission_id: UUID | None
     ranking: list[UUID]
     entries: list[QueueEntryRead]
+
+
+class OverrideCreate(BaseModel):
+    """Autre mission que la proposée ; sans raison → 400 OVERRIDE_REASON_REQUIRED (mécanique gravée)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    selection_log_id: UUID
+    chosen_mission_id: UUID
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class OverrideRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    selection_log_id: UUID
+    proposed_mission_id: UUID
+    chosen_mission_id: UUID
+    reason: str
+    context: dict
+    created_at: datetime

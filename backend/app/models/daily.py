@@ -52,3 +52,23 @@ class DailySelectionLog(UUIDPrimaryKeyMixin, Base):
     level: Mapped[int] = mapped_column(Integer, nullable=False)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class DailyOverride(UUIDPrimaryKeyMixin, Base):
+    """L'utilisateur prend une autre mission que la proposée : raison obligatoire, contexte figé (§3.4)."""
+
+    __tablename__ = "daily_overrides"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    selection_log_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("daily_selection_log.id"), nullable=False
+    )
+    proposed_mission_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id"), nullable=False
+    )
+    chosen_mission_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id"), nullable=False
+    )
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    context: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

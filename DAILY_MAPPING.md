@@ -6,7 +6,8 @@ Spécification : `specs/DAILY_ORCHESTRATOR_SPEC_V1.md`. Audit de l'étape 0 (§0
 fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Livré : étape 2
 du §15 (externalisation des barèmes + verrou de parité), le réglage versionné (§4.5), le refresh du
 registre (§4.6) et l'étape 3 (portes, trajet, ensemble obligatoire, sélection, journal, pull-forward ;
-vague 28). Pas encore codés : overrides et agrégation (§10), Niveaux 2-3 (§8), préemption (§9),
+vague 28), les overrides et leur agrégation au docket (§10.1-10.2, vague 29). Pas encore codés :
+porte G5 réelle, prières en engagements fixes, Niveaux 2-3 (§8), préemption (§9),
 `POST disruption`, `POST arbitrations/{id}/decision`.
 
 ## Réponses aux cinq questions du §0
@@ -61,6 +62,8 @@ vague 28). Pas encore codés : overrides et agrégation (§10), Niveaux 2-3 (§8
 | Journal (§3.3) | **créé** `daily_selection_log` + user_id, scope, outcome, condition, pulled_forward | migration 0104 |
 | Sélection (§5-7) | **créé** `app/services/daily/selection.py` derrière `daily.selection_enabled` ; events `planning.daily.*` | ACT-DLY-04, ACT-DLY-06 |
 | Trajet (§5) | **réutilisé** `toolbox.travel` (plancher 1,3 dur, cache 2 h) + bascule `toolbox.travel_enabled` (semée false) | ACT-SYS-08 |
+| Overrides (§3.4, §10.1) | **créé** `daily_overrides` (+ user_id, une par sélection) ; event `planning.daily.override_recorded` | migration 0105, ACT-DLY-07 |
+| Agrégation (§10.2) | **créé** job `daily.override_aggregation` → item `ordering_override_pattern` (worker `w5` ajouté) | ACT-DLY-08 |
 | Refresh (§4.6) | **créé** : `refresh_scores` (cron 6 h Paris, `planning.day.started`, après réglage) ; entrées B-E gardées dans `explanation.inputs` ; CHECK de coefficients figés remplacés par `> 0` | migration 0103, ACT-DLY-03 |
 
 ## Écarts signalés (pas de contradiction bloquante)
@@ -90,3 +93,9 @@ vague 28). Pas encore codés : overrides et agrégation (§10), Niveaux 2-3 (§8
 - Position courante : lieu de la mission qui vient d'être close (`POST complete/{id}`) ou position
   fournie (`POST next`) ; sans position ou sans lieu de mission, trajet 0 (`travel_source=none`).
 - Le critère D ne lit pas encore les arêtes de `mission_dependencies` (points inchangés).
+- Override : la mission choisie doit être en attente (`backlog`) ; l'override ne la démarre pas.
+  Tranches horaires du motif : matin 5-12 h, après-midi 12-18 h, soir 18-23 h, nuit (Paris).
+  `suggested_target` : coefficient de domaine si les domaines diffèrent ; critère C si le domaine est le
+  même et que la catégorie choisie est toujours la même (et jamais celle proposée) ; sinon discussion.
+- W3 ne voit pas encore les overrides : `planning.daily.override_recorded` n'est pas dans
+  `wr.episode_criteria` (réglage à faire par l'utilisateur, aucune écriture de paramètre ici).

@@ -1751,6 +1751,26 @@ Aucun backfill des dependances (aucune arete n'existait). Cycles refuses a l'ecr
 parametre est vrai ET une cle est configuree ; sinon repli local distance/25 km/h ×1,3 marque
 `fallback`) ; reglages `daily.top_band_pct` 15, `daily.pullforward_min_threshold` 45,
 `daily.default_mission_duration` 30, `daily.selection_latency_target_ms` 500 (A VALIDER).
+Overrides (migration 20261019_0105, 2026-10-19, spec Daily §3.4 et §10.1-10.2, cartes ACT-DLY-07 et
+ACT-DLY-08) :
+
+```sql
+daily_overrides (id, user_id FK users, selection_log_id FK daily_selection_log UNIQUE,
+  proposed_mission_id FK imperium_missions, chosen_mission_id FK imperium_missions, reason TEXT NOT NULL
+  CHECK non vide, context JSONB objet {at_local, hour, weekday, time_slot, selection_at, scope, pulled_forward,
+  remaining_min, proposed{...}, chosen{...}, scale_versions{df.*: version}}, created_at ;
+  CHECK proposed <> chosen)
+```
+
+`POST /api/daily/override` {selection_log_id, chosen_mission_id, reason} : 400
+`OVERRIDE_REASON_REQUIRED` sans raison, coupe (409 `DAILY_OVERRIDE_DISABLED`) tant que
+`daily.override_enabled` = false (seme) ; l'override ne demarre rien. Job `daily.override_aggregation`
+(cron `0 17 * * 0` UTC, seme desactive) : motif (domaine propose, domaine choisi, tranche horaire
+morning 5-12 h | afternoon 12-18 h | evening 18-23 h | night, Paris) ≥ `daily.override_pattern_min` (3)
+sur `daily.override_window_days` (28) → item docket `ordering_override_pattern` (worker w5, domaine daily)
+{pattern, count, examples verbatim (5 max), suggested_target domain_coefficient|criterion_c|discussion}.
+Un motif encore ouvert au docket n'est pas redepose ; apres decision, seuls les overrides posterieurs
+comptent. Aucun ajustement automatique des baremes. Le type n'entre pas dans l'auto-acceptation.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
@@ -1975,10 +1995,10 @@ valide par l'utilisateur.
 Docket du WR — `wr_docket_items` : CODE (migration 20261019_0083, 2026-10-19, spec WR §3.1 ;
 doc 78 F2-11). Table partagee d'emblee (R3) : WR, Daily, Vector et Pulse y deposent les points
 a trancher par l'utilisateur. Colonnes du DDL de la spec + `user_id` (FK users) : item_type
-(10 valeurs de la spec), domain, title_fr, payload et evidence_refs JSONB, confidence 0-100
+(10 valeurs de la spec, + `ordering_override_pattern` depuis 20261019_0105, Daily §10.2), domain, title_fr, payload et evidence_refs JSONB, confidence 0-100
 (NULL = depot deterministe), impact_estimate 1-5, severity normal|elevated|red, priority,
 status pending|presented|validated|refused|deferred|archived, consecutive_defers,
-force_decision, source_worker w1|w2|w3|w4|phase1|phase3|manual, created_at, decided_at,
+force_decision, source_worker w1|w2|w3|w4|w5|phase1|phase3|manual (w5 depuis 0105), created_at, decided_at,
 decision_note. Parametres semes (`parameters`, a valider) : `wr.docket_halflife_days` = 14,
 `wr.docket_max_defers` = 3. Priorite = poids severite (1/2/4) x impact x exp(-age/demi-vie)
 x (0,5 + confidence/200, ou 1 sans confidence). Une decision ne fait qu'enregistrer le choix ;

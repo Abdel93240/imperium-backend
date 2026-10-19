@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 DocketItemType = Literal[
     "chain_proposal", "pattern_new", "pattern_contradiction", "anomaly", "belief_review_due",
     "user_question", "plan_delta_proposal", "autoaccept_spotcheck", "investigation_result", "red_flag_ref",
+    "ordering_override_pattern",
 ]
 DocketStatus = Literal["pending", "presented", "validated", "refused", "deferred", "archived"]
 DocketDecision = Literal["validated", "refused", "deferred", "archived"]

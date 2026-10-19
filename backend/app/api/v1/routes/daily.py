@@ -6,6 +6,9 @@ seulement si `daily.settings_enabled` (carte ACT-DLY-02), 409 DAILY_SETTINGS_DIS
 Sélection Niveau 1 (`POST complete/{id}`, `POST next`, `GET current`, `GET selection-log`, contraintes et
 dépendances des missions) : servie seulement si `daily.selection_enabled` (carte ACT-DLY-04), 409
 DAILY_SELECTION_DISABLED sinon. `GET queue` (admin/debug) demande en plus `daily.queue_debug_enabled`.
+
+Override (`POST override`) : servi seulement si `daily.override_enabled` (carte ACT-DLY-07), 409
+DAILY_OVERRIDE_DISABLED sinon ; 400 OVERRIDE_REASON_REQUIRED sans raison.
 """
 
 from datetime import date
@@ -25,6 +28,8 @@ from app.schemas.daily import (
     MissionConstraints,
     MissionDependencyCreate,
     MissionDependencyRead,
+    OverrideCreate,
+    OverrideRead,
     QueueRead,
     ScoringParameterVersionsResponse,
     ScoringSettingsRead,
@@ -35,7 +40,7 @@ from app.schemas.daily import (
     SelectionRequest,
 )
 from app.schemas.imperium import CompleteMissionRequest
-from app.services.daily import constraints, scoring_settings, selection
+from app.services.daily import constraints, overrides, scoring_settings, selection
 from app.services.imperium import missions
 from app.services.travel import LatLng
 
@@ -242,3 +247,21 @@ def dependencies_route(
     except constraints.ConstraintsError as exc:
         return _coded(status.HTTP_404_NOT_FOUND, exc, exc.code)
     return [MissionDependencyRead.model_validate(row) for row in rows]
+
+
+_OVERRIDE_STATUS = {"OVERRIDE_REASON_REQUIRED": status.HTTP_400_BAD_REQUEST,
+                    "SELECTION_NOT_FOUND": status.HTTP_404_NOT_FOUND, "MISSION_NOT_FOUND": status.HTTP_404_NOT_FOUND,
+                    "OVERRIDE_SAME_MISSION": status.HTTP_422_UNPROCESSABLE_ENTITY}
+
+
+@router.post("/override", response_model=OverrideRead, status_code=status.HTTP_201_CREATED)
+def override_route(payload: OverrideCreate, current_user: CurrentUserDep, db: SessionDep) -> OverrideRead | JSONResponse:
+    """L'utilisateur prend une autre mission que la proposée : raison obligatoire, contexte figé, rien ne démarre."""
+    if not overrides.override_enabled(db):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                            content={"detail": "Overrides are not enabled.", "code": "DAILY_OVERRIDE_DISABLED"})
+    try:
+        return OverrideRead.model_validate(overrides.record(db, current_user=current_user, payload=payload))
+    except overrides.OverrideError as exc:
+        db.rollback()
+        return _coded(_OVERRIDE_STATUS.get(exc.code, status.HTTP_409_CONFLICT), exc, exc.code)

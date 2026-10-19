@@ -162,7 +162,7 @@ def test_jobs(db, monkeypatch) -> None:
     scores_refresh.day_start_job(start, Window(from_ts=None, to_ts=None))
     assert start.detail["selection"] == "disabled" and start.items_out == 0
     jobs = db.execute(text("SELECT code, enabled, schedule, event_types FROM job_definitions "
-                           "WHERE code LIKE 'daily.%' ORDER BY code")).all()
+                           "WHERE code IN ('daily.day_start', 'daily.scores_refresh') ORDER BY code")).all()
     assert [tuple(row) for row in jobs] == [("daily.day_start", False, None, ["planning.day.started"]),
                                             ("daily.scores_refresh", False, "30 4,5 * * *", None)]
 
