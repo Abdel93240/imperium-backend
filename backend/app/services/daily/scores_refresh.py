@@ -3,8 +3,8 @@
 Le critère A dépend du temps : le registre est rafraîchi chaque matin (job `daily.scores_refresh`,
 6 h de Paris) et après chaque réglage d'un barème (`scoring_settings.update_settings`). Missions
 ouvertes seulement (backlog, active, standby) ; une ligne n'est réécrite que si elle change.
-`daily.day_start` (abonné à `planning.day.started`) rafraîchit aussi ; la sélection initiale du
-Niveau 1 (§7, vague 28) n'est pas codée : no-op journalisé. Ni l'un ni l'autre ne démarre une journée.
+`daily.day_start` (abonné à `planning.day.started`) rafraîchit aussi, puis lance la sélection initiale
+du Niveau 1 si `daily.selection_enabled` (vague 28). Ni l'un ni l'autre ne démarre une journée.
 """
 
 from dataclasses import asdict, dataclass
@@ -67,9 +67,13 @@ def scores_refresh_job(ctx, window) -> None:
 
 
 def day_start_job(ctx, window) -> None:
-    """Job `daily.day_start` (abonné à `planning.day.started`, semé désactivé) : refresh, sélection non codée."""
+    """Job `daily.day_start` (abonné à `planning.day.started`, semé désactivé) : refresh puis sélection initiale."""
+    from app.services.daily.selection import day_start_selection
+
     ctx.cursor_ts = window.to_ts or datetime.now(UTC)
-    _refresh(ctx, selection="level1_not_coded")
+    _refresh(ctx)
+    if ctx.detail.get("skip") != "no_user":
+        ctx.detail = {**ctx.detail, **day_start_selection(ctx)}
 
 
 def _refresh(ctx, **extra) -> None:

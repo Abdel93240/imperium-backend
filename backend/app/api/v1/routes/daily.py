@@ -1,16 +1,43 @@
-"""Daily (spec Daily §12) : `GET/PUT settings/scoring`, `GET settings/scoring/{code}/versions`.
+"""Daily (spec Daily §12).
 
-Servis seulement si `daily.settings_enabled` (semé false, carte ACT-DLY-02) : 409 DAILY_SETTINGS_DISABLED sinon.
+Réglage des barèmes (`GET/PUT settings/scoring`, `GET settings/scoring/{code}/versions`) : servi
+seulement si `daily.settings_enabled` (carte ACT-DLY-02), 409 DAILY_SETTINGS_DISABLED sinon.
+
+Sélection Niveau 1 (`POST complete/{id}`, `POST next`, `GET current`, `GET selection-log`, contraintes et
+dépendances des missions) : servie seulement si `daily.selection_enabled` (carte ACT-DLY-04), 409
+DAILY_SELECTION_DISABLED sinon. `GET queue` (admin/debug) demande en plus `daily.queue_debug_enabled`.
 """
 
+from datetime import date
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.daily import ScoringParameterVersionsResponse, ScoringSettingsRead, ScoringSettingsUpdateRequest
-from app.services.daily import scoring_settings
+from app.models.event import Event
+from app.models.imperium import ImperiumMission
+from app.schemas.daily import (
+    DailyCompleteResponse,
+    DailyCurrentRead,
+    MissionConstraints,
+    MissionDependencyCreate,
+    MissionDependencyRead,
+    QueueRead,
+    ScoringParameterVersionsResponse,
+    ScoringSettingsRead,
+    ScoringSettingsUpdateRequest,
+    SelectionLogRead,
+    SelectionLogResponse,
+    SelectionRead,
+    SelectionRequest,
+)
+from app.schemas.imperium import CompleteMissionRequest
+from app.services.daily import constraints, scoring_settings, selection
+from app.services.imperium import missions
+from app.services.travel import LatLng
 
 router = APIRouter()
 
@@ -67,3 +94,151 @@ def update_scoring_settings_route(
     except scoring_settings.ScoringSettingsError as exc:
         db.rollback()
         return _error(exc)
+
+
+def _selection_disabled() -> JSONResponse:
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                        content={"detail": "Daily selection is not enabled.", "code": "DAILY_SELECTION_DISABLED"})
+
+
+def _coded(status_code: int, exc: Exception, code: str) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"detail": str(exc), "code": code})
+
+
+_CONSTRAINT_STATUS = {"MISSION_NOT_FOUND": status.HTTP_404_NOT_FOUND, "DEPENDENCY_EXISTS": status.HTTP_409_CONFLICT,
+                      "MISSION_CLOSED": status.HTTP_409_CONFLICT}
+
+
+@router.post("/complete/{mission_id}", response_model=DailyCompleteResponse)
+def complete_route(
+    mission_id: UUID,
+    payload: CompleteMissionRequest,
+    request: Request,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> DailyCompleteResponse | JSONResponse:
+    """Le chemin nominal : clôt la mission active puis propose la suivante (jamais démarrée ici)."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        completion, duplicate = missions.complete_mission(
+            db, current_user=current_user, mission_id=mission_id, payload=payload, idempotency_key=idempotency_key,
+            request_method=request.method, request_path=request.url.path,
+        )
+    except missions.MissionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except missions.AnnexValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    except (missions.MissionStateConflictError, missions.IdempotencyConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Mission or event conflicts with an existing record.") from exc
+    row = selection.last_for_trigger(db, current_user=current_user, trigger="mission_completed",
+                                     trigger_ref=mission_id) if duplicate else None
+    if row is None:
+        mission = db.get(ImperiumMission, mission_id)
+        origin = LatLng(float(mission.location_lat), float(mission.location_lng)) \
+            if mission.location_lat is not None else None
+        cause = db.get(Event, mission.ended_by_event_id) if mission.ended_by_event_id else None
+        try:
+            row = selection.select_next(db, current_user=current_user, trigger="mission_completed",
+                                        trigger_ref=mission_id, origin=origin, causation_event=cause)
+        except selection.SelectionError:
+            db.rollback()
+            return DailyCompleteResponse(completion=completion, selection=None)
+        db.commit()
+    return DailyCompleteResponse(completion=completion, selection=selection.to_read(db, row))
+
+
+@router.post("/next", response_model=SelectionRead)
+def next_route(payload: SelectionRequest, current_user: CurrentUserDep, db: SessionDep) -> SelectionRead | JSONResponse:
+    """Déclenchement manuel (aucune mission active) ; la position sert au départage par trajet."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    origin = LatLng(payload.position.lat, payload.position.lng) if payload.position else None
+    try:
+        row = selection.select_next(db, current_user=current_user, trigger="manual", origin=origin)
+    except selection.SelectionError as exc:
+        db.rollback()
+        return _coded(status.HTTP_409_CONFLICT, exc, exc.code)
+    db.commit()
+    return selection.to_read(db, row)
+
+
+@router.get("/current", response_model=DailyCurrentRead)
+def current_route(current_user: CurrentUserDep, db: SessionDep) -> DailyCurrentRead | JSONResponse:
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    return selection.current(db, current_user=current_user)
+
+
+@router.get("/selection-log", response_model=SelectionLogResponse)
+def selection_log_route(
+    current_user: CurrentUserDep, db: SessionDep, day: Annotated[date, Query(alias="date")]
+) -> SelectionLogResponse | JSONResponse:
+    """Chaque choix du jour (Paris) rejouable : portes passées, porte bloquante, bande, trajets."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    rows = selection.selection_log(db, current_user=current_user, day=day)
+    return SelectionLogResponse(date=day, entries=[SelectionLogRead.model_validate(row) for row in rows])
+
+
+@router.get("/queue", response_model=QueueRead)
+def queue_route(current_user: CurrentUserDep, db: SessionDep) -> QueueRead | JSONResponse:
+    """Admin/debug uniquement : la file reste invisible dans le produit (décision UX gravée)."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    if not selection.queue_debug_enabled(db):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                            content={"detail": "The debug queue is not enabled.", "code": "DAILY_QUEUE_DISABLED"})
+    return selection.queue(db, current_user=current_user)
+
+
+@router.put("/missions/{mission_id}/constraints", response_model=MissionConstraints)
+def constraints_route(
+    mission_id: UUID, payload: MissionConstraints, current_user: CurrentUserDep, db: SessionDep
+) -> MissionConstraints | JSONResponse:
+    """Lieu, fenêtre, engagement fixe et charges : remplacés en entier."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        return constraints.update_constraints(db, current_user=current_user, mission_id=mission_id, payload=payload)
+    except constraints.ConstraintsError as exc:
+        db.rollback()
+        return _coded(_CONSTRAINT_STATUS.get(exc.code, status.HTTP_422_UNPROCESSABLE_ENTITY), exc, exc.code)
+
+
+@router.post("/dependencies", response_model=MissionDependencyRead, status_code=status.HTTP_201_CREATED)
+def dependency_route(
+    payload: MissionDependencyCreate, current_user: CurrentUserDep, db: SessionDep
+) -> MissionDependencyRead | JSONResponse:
+    """Arête parent → enfant ; 422 DEPENDENCY_CYCLE si elle ferme un cycle."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        return MissionDependencyRead.model_validate(
+            constraints.add_dependency(db, current_user=current_user, payload=payload))
+    except constraints.ConstraintsError as exc:
+        db.rollback()
+        return _coded(_CONSTRAINT_STATUS.get(exc.code, status.HTTP_422_UNPROCESSABLE_ENTITY), exc, exc.code)
+
+
+@router.get("/missions/{mission_id}/dependencies", response_model=list[MissionDependencyRead])
+def dependencies_route(
+    mission_id: UUID, current_user: CurrentUserDep, db: SessionDep
+) -> list[MissionDependencyRead] | JSONResponse:
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        rows = constraints.list_dependencies(db, current_user=current_user, mission_id=mission_id)
+    except constraints.ConstraintsError as exc:
+        return _coded(status.HTTP_404_NOT_FOUND, exc, exc.code)
+    return [MissionDependencyRead.model_validate(row) for row in rows]

@@ -133,6 +133,10 @@ or automatic memory commit is introduced by this reconciliation patch.
 > Code (2026-10-19, carte ACT-DLY-01) : les valeurs ci-dessous et tous les barèmes A-E de ce
 > document vivent dans les paramètres versionnés `df.*` (semés à l'identique, parité prouvée par
 > tests dorés) ; voir `docs_master/05_DATABASE_SCHEMA.md` section DECISION et `DAILY_MAPPING.md`.
+>
+> L'ordre journalier n'est pas défini ici : le score ne départage que des missions faisables. Portes,
+> ensemble obligatoire (échéance aujourd'hui ou en retard) et départage par trajet sont définis par
+> `specs/DAILY_ORCHESTRATOR_SPEC_V1.md` §5-7 (code 2026-10-19, vague 28, derrière `daily.selection_enabled`).
 
 Behind each position sits a multiplier:
 

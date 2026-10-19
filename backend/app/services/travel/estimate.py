@@ -4,6 +4,10 @@ Engine v0: Google Directions provider + HARD ×1.3 floor (coded, applied even if
 a parameter tries lower) + (origin H3, dest H3, hour slot) cache with 2 h TTL +
 offline fallback distance_km / 25 km/h × 1.3 marked provider='local_fallback'.
 
+Provider switch (card ACT-SYS-08): the provider is only called when the
+parameter `toolbox.travel_enabled` is true (seeded false) AND a key is
+configured; without a session the flag cannot be read and the fallback serves.
+
 privacy_tier (Q2 GRAVED): 'very_high' (any call coming from The Path) is coded
 so it can NEVER reach an external provider — v0 serves it exclusively from the
 local fallback. Lock-test: a network spy sees ZERO outbound request for a
@@ -72,10 +76,12 @@ def estimate(
     if privacy_tier == "very_high":
         return _local_fallback(origin, dest, floor, db)
 
-    if db is not None:
-        cached = _cache_lookup(db, origin, dest, at, profile)
-        if cached is not None:
-            return cached
+    if not _provider_enabled(db):
+        return _local_fallback(origin, dest, floor, db)
+
+    cached = _cache_lookup(db, origin, dest, at, profile)
+    if cached is not None:
+        return cached
 
     try:
         duration_s, distance_m = _google_directions(origin, dest, at)
@@ -93,9 +99,17 @@ def estimate(
         cached=False,
         computed_at=datetime.now(UTC),
     )
-    if db is not None:
-        _cache_store(db, origin, dest, at, profile, result)
+    _cache_store(db, origin, dest, at, profile, result)
     return result
+
+
+def _provider_enabled(db: Session | None) -> bool:
+    if db is None:
+        return False
+    try:
+        return bool(get_parameter(db, "toolbox.travel_enabled", default=False))
+    except Exception:  # noqa: BLE001 - unreadable switch keeps the provider off
+        return False
 
 
 def _effective_floor(db: Session | None) -> float:

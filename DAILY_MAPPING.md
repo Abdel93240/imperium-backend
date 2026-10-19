@@ -4,8 +4,10 @@
 
 Spécification : `specs/DAILY_ORCHESTRATOR_SPEC_V1.md`. Audit de l'étape 0 (§0), en lecture seule,
 fait le 2026-10-19 avant la première écriture Daily (carte ACT-DLY-01, vague 27). Livré : étape 2
-du §15 (externalisation des barèmes + verrou de parité) le réglage versionné (§4.5) et le refresh du registre (§4.6) ; le reste du Daily (portes,
-sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'est PAS codé.
+du §15 (externalisation des barèmes + verrou de parité), le réglage versionné (§4.5), le refresh du
+registre (§4.6) et l'étape 3 (portes, trajet, ensemble obligatoire, sélection, journal, pull-forward ;
+vague 28). Pas encore codés : overrides et agrégation (§10), Niveaux 2-3 (§8), préemption (§9),
+`POST disruption`, `POST arbitrations/{id}/decision`.
 
 ## Réponses aux cinq questions du §0
 
@@ -54,6 +56,11 @@ sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'e
 | Maxima par critère | **créer** `df.criterion_max` (bornes des entiers bruts et du breakdown) | |
 | Verrou de parité (§4.4) | **créer** : 83 cas dorés capturés AVANT l'externalisation | `tests/fixtures/df_golden_scores.json` |
 | Réglage (§4.5) | **créé** : `GET/PUT /api/daily/settings/scoring` derrière `daily.settings_enabled` ; event `decision.scoring.updated` (nom canonique de `df.parameter_updated`) | migration 0102, ACT-DLY-02 |
+| Dépendances (§3.1) | **créé** `mission_dependencies` (+ user_id), sans backfill ; cycles refusés à l'écriture | migration 0104, `constraints.py` |
+| Attributs de faisabilité (§3.2) | **étendu** `imperium_missions` ; durée = `estimated_minutes` existant (pas de `duration_estimate_min`) | migration 0104, `PUT missions/{id}/constraints` |
+| Journal (§3.3) | **créé** `daily_selection_log` + user_id, scope, outcome, condition, pulled_forward | migration 0104 |
+| Sélection (§5-7) | **créé** `app/services/daily/selection.py` derrière `daily.selection_enabled` ; events `planning.daily.*` | ACT-DLY-04, ACT-DLY-06 |
+| Trajet (§5) | **réutilisé** `toolbox.travel` (plancher 1,3 dur, cache 2 h) + bascule `toolbox.travel_enabled` (semée false) | ACT-SYS-08 |
 | Refresh (§4.6) | **créé** : `refresh_scores` (cron 6 h Paris, `planning.day.started`, après réglage) ; entrées B-E gardées dans `explanation.inputs` ; CHECK de coefficients figés remplacés par `> 0` | migration 0103, ACT-DLY-03 |
 
 ## Écarts signalés (pas de contradiction bloquante)
@@ -69,3 +76,17 @@ sélection, journal, overrides, Niveaux 2-3, préemption, API `/api/daily/`) n'e
 - Les missions ne stockaient pas leurs entrées B-E (seulement les points) : elles sont gardées
   depuis 0103 dans `explanation.inputs` ; les scores plus anciens ne suivent un changement de
   barème B-E qu'à leur prochain recalcul complet (jamais pour l'instant).
+- Périmètre du jour (G1) : le plan WR n'a que des semaines. « Missions du jour » = `backlog` prévues
+  (`planned_start_at`) ou échues (`deadline_at`) au plus tard aujourd'hui (Paris), plus les éléments
+  `mission:<id>` du plan courant dont `params.day` est aujourd'hui (si `wr.plan_enabled`). Semaine
+  (pull-forward) : dates jusqu'à dimanche + éléments de la semaine courante du plan. Les missions sans
+  date ni place dans le plan ne sont jamais proposées. Annexes et engagements fixes sortent par G1.
+- Temps restant : jusqu'au prochain engagement fixe (`is_fixed_commitment`), sinon jusqu'à minuit
+  (Paris) ; la spec borne la journée par démarrage → clôture, sans heure de fin connue.
+- Niveau 2 non codé : C1 (`empty_feasible`) et C2 (`mandatory_conflict`) sont journalisés
+  `arbitration_pending` (level 2) avec l'event `planning.daily.arbitration_required`, sans table
+  `daily_arbitrations` ni slot. G5 (Pulse) est une porte passante journalisée (`g5: stub`) jusqu'à la
+  vague 29 ; `daily.pulse_block_load` n'est donc pas semé.
+- Position courante : lieu de la mission qui vient d'être close (`POST complete/{id}`) ou position
+  fournie (`POST next`) ; sans position ou sans lieu de mission, trajet 0 (`travel_source=none`).
+- Le critère D ne lit pas encore les arêtes de `mission_dependencies` (points inchangés).

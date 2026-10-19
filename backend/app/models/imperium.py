@@ -19,7 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -301,6 +301,17 @@ class ImperiumMission(UUIDPrimaryKeyMixin, Base):
         ForeignKey("planning_replan_events.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Spec Daily §3.2 : attributs lus par les portes de faisabilité (CHECK dans la migration 0104).
+    location_lat: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    location_lng: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    location_label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    window_start: Mapped[time | None] = mapped_column(Time, nullable=True)
+    window_end: Mapped[time | None] = mapped_column(Time, nullable=True)
+    window_days: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
+    is_fixed_commitment: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    fixed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    physical_load: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cognitive_load: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

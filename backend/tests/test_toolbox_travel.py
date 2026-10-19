@@ -118,6 +118,7 @@ def test_cache_hit_and_expiry(engine, monkeypatch) -> None:
         return 600, 4600
 
     monkeypatch.setattr(estimate_module, "_google_directions", fake_directions)
+    monkeypatch.setattr(estimate_module, "_provider_enabled", lambda db: db is not None)
 
     at = datetime.now(UTC).replace(hour=9, minute=5)
     with Session(engine) as db:
@@ -163,3 +164,19 @@ def test_geo_corridor_and_h3_cells_are_deterministic() -> None:
     assert h3_cell(ORIGIN) in corridor_1
     assert h3_cell(DEST) in corridor_1
     assert len(corridor_1) > len(set())  # non-empty widened path
+
+
+def test_provider_stays_off_while_travel_enabled_is_false(engine, network_spy, monkeypatch) -> None:
+    # ACT-SYS-08 : une clé configurée ne suffit pas ; toolbox.travel_enabled (semé false) doit être vrai.
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        estimate_module,
+        "get_settings",
+        lambda: SimpleNamespace(google_directions_api_key="fake-key", travel_request_timeout_seconds=5),
+    )
+    with Session(engine) as db:
+        result = estimate(ORIGIN, DEST, datetime.now(UTC), db=db)
+        db.rollback()
+    assert result.provider == "local_fallback" and result.multiplier_applied == 1.3
+    assert network_spy == []
