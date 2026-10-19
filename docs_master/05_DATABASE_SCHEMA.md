@@ -1880,6 +1880,19 @@ rapport deterministe read-only ; le Weekly Review du doc 32 est la conversation
 interactive IA, backend-owned, qui transforme la semaine en rapport final
 valide par l'utilisateur.
 
+Docket du WR — `wr_docket_items` : CODE (migration 20261019_0083, 2026-10-19, spec WR §3.1 ;
+doc 78 F2-11). Table partagee d'emblee (R3) : WR, Daily, Vector et Pulse y deposent les points
+a trancher par l'utilisateur. Colonnes du DDL de la spec + `user_id` (FK users) : item_type
+(10 valeurs de la spec), domain, title_fr, payload et evidence_refs JSONB, confidence 0-100
+(NULL = depot deterministe), impact_estimate 1-5, severity normal|elevated|red, priority,
+status pending|presented|validated|refused|deferred|archived, consecutive_defers,
+force_decision, source_worker w1|w2|w3|w4|phase1|phase3|manual, created_at, decided_at,
+decision_note. Parametres semes (`parameters`, a valider) : `wr.docket_halflife_days` = 14,
+`wr.docket_max_defers` = 3. Priorite = poids severite (1/2/4) x impact x exp(-age/demi-vie)
+x (0,5 + confidence/200, ou 1 sans confidence). Une decision ne fait qu'enregistrer le choix ;
+rien n'est applique par le docket. Routes : `GET /api/wr/docket?status=&type=`,
+`GET /api/wr/docket/red`, `POST /api/wr/docket/{id}/decision` (Idempotency-Key).
+
 ### review_sessions
 
 Nom actuel : `imperium_weekly_review_sessions`

@@ -42,6 +42,7 @@ from app.api.v1.routes import (
     internal,
     knowledge_inbox,
     vault,
+    wr,
 )
 
 api_router = APIRouter()
@@ -85,4 +86,5 @@ api_router.include_router(imperium_vector.router, prefix="/imperium/vector", tag
 api_router.include_router(imperium_vault_categories.router, prefix="/imperium/vault", tags=["imperium-vault-categories"])
 api_router.include_router(imperium_vault_receipts.router, prefix="/imperium/vault", tags=["imperium-vault-receipts"])
 api_router.include_router(vault.router, prefix="/vault", tags=["vault"])
+api_router.include_router(wr.router, prefix="/wr", tags=["wr"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])

@@ -195,6 +195,17 @@ calculé, pas au journal des faits.
 | `planning.weekly_plan.*` | Futur/non codé. | Non détaillé dans les sources. | Futur | À créer quand les tables existeront. |
 | `planning.monthly_plan.*` | Futur/non codé. | Non détaillé dans les sources. | Futur | À créer quand les tables existeront. |
 
+#### Docket du WR
+
+Spec WR §11 nomme ces types `docket.*` ; ils prennent le domaine générique `planning.*` (règle « Types des passes à venir »).
+
+| Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
+|---|---|---|---|---|
+| `planning.docket.item_created` | CODE (2026-10-19) : dépôt d'un item par un service (`app/services/wr/docket.py`). | `{ item_id, item_type, status, defers }` (privacy medium ; jamais le contenu de l'item). | V1 | Spec WR §3.1. Aucune route de dépôt : les producteurs (W1-W4, phases WR) déposent côté backend. |
+| `planning.docket.item_decided` | CODE (2026-10-19) : `POST /api/wr/docket/{id}/decision`. | `{ item_id, item_type, status, defers, modified? }`. | V1 | Une émission par décision (validated, refused, deferred, archived) ; un rejeu de la même clé n'émet rien. |
+| `planning.docket.item_forced` | CODE (2026-10-19) : report qui atteint `wr.docket_max_defers`. | `{ item_id, item_type, status, defers }`. | V1 | `causation_id` = le `item_decided` du report. Ensuite : trancher ou archiver seulement. |
+| `planning.docket.red_notified` | CODE (2026-10-19) : dépôt d'un item `severity=red`. | `{ item_id, severity }`. | V1 | `causation_id` = `item_created`. Notification rouge via `notify()` ; rien n'est appliqué. |
+
 #### Profit opérationnel
 
 | Event cible | Code actuel / statut | Payload attendu | Tri | Notes |
