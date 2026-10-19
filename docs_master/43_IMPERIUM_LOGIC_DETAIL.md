@@ -974,6 +974,11 @@ SYSTEM HEALTH (V3, doc 54):
 
 > **Critical section.** This is the foundation for all future decisions about model quality, cost control, and architecture evolution. Every AI call in the ecosystem is logged here. Without this data, debugging and optimization are impossible after real usage.
 
+> **État du code (2026-10-19)** : §17.1 à §17.3 et les quatre premières vues du §17.4 sont
+> codés (migration 20261019_0086, doc 05 « ai_call_logs ») ; appels journalisés : exécutant
+> local, OCR et vision, embeddings. La grille de prix naît vide (DV-8). Pas encore : vues
+> suivantes du §17.4, §17.5, alertes §17.6.
+
 ### 17.1 The central AI call log table
 
 > Historical SQL examples in §17 preserve old concrete model identifiers for log

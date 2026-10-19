@@ -21,7 +21,7 @@ les specs le font déjà via leurs seeds. Pas de document séparé.
 > (prières : Hijri, Qibla, mosquées et réglages livrés), F1-17 (pression codée depuis la phase E
 > Vault, 2026-07-16), F2-12 (versions du plan quotidien Imperium, partiel), F2-15 et F2-16
 > (tables présentes) mises à jour ; compteurs recalculés. Les autres fiches gardent l'état du
-> 2026-07-16. **2026-10-19** : F2-11 (docket du WR) codée, compteurs F2 recalculés.
+> 2026-07-16. **2026-10-19** : F2-11 (docket du WR) et F2-14 (journal des appels IA) codées, compteurs F2 recalculés.
 
 Corpus lu : docs_master/ (dont 30, 40, 41, 42, 43, 44, 52, 75, 77, 11, 38, 09, 70, 72, 73, F10),
 gap_analysis_v1/ (PHASE_0, DECISIONS_events, CONCEPTION_chainage_V2, CONCLUSIONS_test_papier,
@@ -32,8 +32,8 @@ n8n sur disque (`ops/n8n/workflows/`).
 ## RÉPONSE CHIFFRÉE
 
 **Le système compte 55 outils : 25 en F1 (dont 13 codés — 7 livrés éteints par la passe 0 —,
-11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 15 codées,
-2 spécifiées, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
+11 spécifiés, 1 manquant ; plus aucun dupliqué franc, DBL-1 tranché), 17 en F2 (dont 16 codées,
+1 spécifiée, 0 manquante), 13 en F3 (dont 1 servi en production, 12 spécifiés non déployés),
 plus 10 dormants** (candidats mono-consommateur, règle du second consommateur : ATTEND).
 Chaque nombre est traçable aux fiches ci-dessous (F1-01…F1-25, F2-01…F2-17, F3-01…F3-13,
 D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), puis le 2026-10-18
@@ -381,9 +381,9 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 - statut : existe_codé (doublon latent pulse_/wr_ éteint — R2 appliquée).
 
 ### F2-14 `ai_call_logs` + `ai_model_pricing` — observabilité IA
-- vit : spécifiées (doc 43 §17, section « critique »). MANQUANTES en code. Seed pricing historique, non normatif (doc 43 §17.2) vs doc 30 canonique.
+- vit : CODÉES (migration 20261019_0086, 2026-10-19) — `ai_call_logs` (doc 43 §17.1), `ai_model_pricing` VIDE (seed historique écarté, DV-8), trigger de coût §17.3, 4 vues §17.4 ; `app/services/ai/call_log.py` journalise l'exécutant local, l'OCR/vision et les embeddings ; `GET /api/ai/call-logs`, `GET /api/ai/call-logs/daily`. Aucun appel cloud branché à journaliser.
 - consommateurs prévus : TOUT appel IA (« ALL STEPS LOGGED », doc 43 §3.2) ; doc 58 patch 5 (vues Vector) ; console coûts.
-- statut : spécifié.
+- statut : existe_codé (grille de prix à fournir).
 
 ### F2-15 `upcoming_expenses` / liste de dépenses récurrentes
 - vit : CODÉE (0040/0041, phase E Vault) — `upcoming_expenses`, `app/services/vault/upcoming.py` ; `GET/POST/PATCH/DELETE /api/vault/upcoming-expenses`, `POST …/{id}/mark-paid` (2026-10-18). Docs 42 §10, 11 §Recurring-Expenses.

@@ -1,8 +1,23 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Computed,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -279,3 +294,59 @@ class KnowledgeInboxDocument(UUIDPrimaryKeyMixin, Base):
     source_retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class AIModelPricing(Base):
+    """Pricing grid (doc 43 §17.2) — born empty: the historical seed is stale (DV-8)."""
+
+    __tablename__ = "ai_model_pricing"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    model_slug: Mapped[str] = mapped_column(String(48), nullable=False, unique=True)
+    input_cost_per_1m: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False, server_default="0")
+    output_cost_per_1m: Mapped[Decimal] = mapped_column(Numeric(10, 4), nullable=False, server_default="0")
+    is_local: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    valid_from: Mapped[date] = mapped_column(Date(), nullable=False, server_default=text("CURRENT_DATE"))
+    valid_until: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AICallLog(Base):
+    """One model call (doc 43 §17.1): origin, model actually used, tokens, cost, outcome — never content.
+
+    cost_eur is filled by the ai_call_logs_auto_cost trigger from ai_model_pricing when the
+    caller leaves it NULL (migration 20261019_0086).
+    """
+
+    __tablename__ = "ai_call_logs"
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    called_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    app_name: Mapped[str] = mapped_column(String(32), nullable=False)
+    task_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    trigger_source: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_used: Mapped[str] = mapped_column(String(48), nullable=False)
+    model_tier: Mapped[str] = mapped_column(String(16), nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(
+        Integer, Computed("COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)", persisted=True)
+    )
+    cost_eur: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
+    was_validated: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    validation_method: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    quality_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    queue_wait_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    success: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retry_attempt: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    fallback_used: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    original_model: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    context_tokens_sent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    related_entity_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    related_entity_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    parent_call_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("ai_call_logs.id"), nullable=True
+    )

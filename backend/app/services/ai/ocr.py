@@ -28,6 +28,7 @@ from pathlib import Path
 from xml.etree import ElementTree  # nosec B405 - expat >= 2.4 protège des expansions d'entités ; XML issu d'un zip plafonné
 
 from app.core.config import Settings, get_settings
+from app.services.ai import call_log
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,9 @@ def ocr_available(settings: Settings | None = None) -> bool:
     return bool(settings.ocr_enabled and settings.ocr_base_url)
 
 
-def recognize(data: bytes, *, filename: str, content_type: str | None, settings: Settings | None = None) -> OcrResult:
+def recognize(
+    data: bytes, *, filename: str, content_type: str | None, settings: Settings | None = None, app_name: str = "imperium"
+) -> OcrResult:
     settings = settings or get_settings()
     if not ocr_available(settings):
         raise OcrServiceUnreachable("OCR désactivé ou OCR_BASE_URL absent.")
@@ -79,15 +82,8 @@ def recognize(data: bytes, *, filename: str, content_type: str | None, settings:
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(  # nosec B310 - URL interne Tailscale configurée
-            request, timeout=settings.ocr_request_timeout_seconds
-        ) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise OcrServiceUnreachable(f"Service OCR injoignable : {exc}") from exc
-    except ValueError as exc:
-        raise OcrError("Réponse OCR illisible.") from exc
+    payload = _logged_post(request, settings, app_name=app_name, task_type="ocr.recognize",
+                           unreachable="Service OCR injoignable", unreadable="Réponse OCR illisible.")
     if not isinstance(payload, dict) or not isinstance(payload.get("text"), str):
         raise OcrError("Réponse OCR mal formée.")
     confidence = payload.get("confidence")
@@ -98,6 +94,8 @@ def recognize(data: bytes, *, filename: str, content_type: str | None, settings:
         pages=pages if isinstance(pages, int) else None,
     )
 
+
+OCR_ROLE = "ocr_service"
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -125,17 +123,37 @@ def analyze_image(
         "mime_type": content_type or "application/octet-stream",
     }).encode("utf-8")
     request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(  # nosec B310 - URL interne Tailscale configurée
-            request, timeout=settings.ocr_request_timeout_seconds
-        ) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise OcrServiceUnreachable(f"Service OCR injoignable : {exc}") from exc
-    except ValueError as exc:
-        raise OcrError("Réponse d'analyse illisible.") from exc
+    payload = _logged_post(request, settings, app_name=_task_app(task), task_type=f"vision.{task}",
+                           unreachable="Service OCR injoignable", unreadable="Réponse d'analyse illisible.")
     if not isinstance(payload, dict):
         raise OcrError("Réponse d'analyse mal formée.")
+    return payload
+
+
+def _task_app(task: str) -> str:
+    """Application d'origine d'une tâche de vision, d'après son préfixe (`pulse.meal_photo_macros`)."""
+    prefix = task.split(".", 1)[0]
+    return prefix if prefix in call_log.APP_NAMES else "imperium"
+
+
+def _logged_post(request, settings: Settings, *, app_name: str, task_type: str, unreachable: str, unreadable: str):
+    """POST au service local, journalisé (doc 43 §17) : issue et durée, jamais le contenu."""
+    with call_log.timed() as elapsed:
+        try:
+            with urllib.request.urlopen(  # nosec B310 - URL interne Tailscale configurée
+                request, timeout=settings.ocr_request_timeout_seconds
+            ) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            call_log.record(app_name=app_name, task_type=task_type, model_role=OCR_ROLE, model_tier="local",
+                            duration_ms=elapsed(), success=False, error_code="unreachable")
+            raise OcrServiceUnreachable(f"{unreachable} : {exc}") from exc
+        except ValueError as exc:
+            call_log.record(app_name=app_name, task_type=task_type, model_role=OCR_ROLE, model_tier="local",
+                            duration_ms=elapsed(), success=False, error_code="parsing_failed")
+            raise OcrError(unreadable) from exc
+    call_log.record(app_name=app_name, task_type=task_type, model_role=OCR_ROLE, model_tier="local",
+                    duration_ms=elapsed())
     return payload
 
 
