@@ -1,21 +1,25 @@
-"""Board Pulse et signalements subjectifs (spec Pulse §3.1, §14 ; cartes ACT-PLS-08, ACT-PLS-05)."""
+"""Board Pulse, signalements subjectifs et journal de la sentinelle (spec Pulse §3.1, §3.2, §14 ;
+cartes ACT-PLS-08, ACT-PLS-05, ACT-PLS-10/13/15)."""
 
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Header, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.pulse_health import DeletedCountRead
 from app.schemas.pulse_signals import (
     BoardRead,
+    DispatchListResponse,
+    DispatchRead,
+    DispatchReactionRequest,
     SubjectiveReportCreate,
     SubjectiveReportListResponse,
     SubjectiveReportRead,
 )
 from app.services.path.fasting import paris_today
-from app.services.pulse import signals
+from app.services.pulse import sentinel, signals
 
 router = APIRouter()
 
@@ -79,3 +83,27 @@ def delete_report_route(report_id: UUID, current_user: CurrentUserDep, db: Sessi
     except signals.ReportNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/sentinel/dispatches", response_model=DispatchListResponse)
+def list_dispatches_route(current_user: CurrentUserDep, db: SessionDep, limit: int = Query(default=50, ge=1, le=200)):
+    """Réveils de la sentinelle, du plus récent au plus ancien (lecture seule, rien n'y est proposé)."""
+    if not signals.board_enabled(db):
+        return _disabled("PULSE_BOARD_DISABLED")
+    return sentinel.list_dispatches(db, current_user=current_user, limit=limit)
+
+
+@router.post("/sentinel/dispatches/{dispatch_id}/reaction", response_model=DispatchRead)
+def react_route(dispatch_id: UUID, payload: DispatchReactionRequest, current_user: CurrentUserDep, db: SessionDep):
+    if not signals.board_enabled(db):
+        return _disabled("PULSE_BOARD_DISABLED")
+    try:
+        return sentinel.react(db, current_user=current_user, dispatch_id=dispatch_id, reaction=payload.reaction)
+    except sentinel.DispatchNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.delete("/sentinel/history", response_model=DeletedCountRead)
+def forget_history_route(current_user: CurrentUserDep, db: SessionDep):
+    """Suppression réelle des réveils et boards figés, toujours possible (même flag éteint)."""
+    return DeletedCountRead(deleted=sentinel.forget_history(db, current_user=current_user))

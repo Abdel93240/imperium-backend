@@ -1823,6 +1823,33 @@ aussi. Job `pulse.signals_refresh` (cron `*/15`, seme desactive) ; refresh immed
 signalement et apres une douleur creee, resolue ou supprimee. `pulse.board_enabled` et
 `pulse.reports_enabled` semes false. Non codes : signaux montre, hydratation et nutrition a cible
 personnalisee, dette de volume et recuperation, medical structure.
+Sentinelle Pulse et dispatch en essai a blanc (migration 20261020_0109, 2026-10-20, spec Pulse §3.1,
+§3.2, §5, §6, cartes ACT-PLS-10, 11, 12, 13, 14, ACT-PLS-15 partielle) :
+
+```sql
+pulse_sentinel_rules (id, code UNIQUE, rule_type flag_count|severity|user_report|scheduled|pre_session|meta,
+  config jsonb, cooldown_minutes NULL|>=0, max_dispatch_per_day, description_fr, version, active DEFAULT false)
+pulse_board_snapshots (id, user_id FK users ON DELETE CASCADE, taken_at, reason (code de regle),
+  board jsonb (valeur, bande, age, etat par signal ; red flags par reference ; jamais de detail),
+  flags_count, max_severity green|yellow|orange|red)
+pulse_dispatch_log (id, user_id FK users ON DELETE CASCADE, triggered_by, subject_ref,
+  board_snapshot_id FK ON DELETE CASCADE, flag_set jsonb {code: bande}, trigger_event_id,
+  status queued|done, model_used, prompt_tokens, output_tokens, latency_ms, output, valid, escalated,
+  procedures_named text[], outcome none_needed|dry_run|procedures_run|invalid_fallback|escalated,
+  user_reaction useful|useless|missed, reacted_at, created_at, completed_at ;
+  CHECK done ssi outcome, model_used et valid presents ; UNIQUE (user_id, triggered_by, subject_ref)
+  quand subject_ref present)
+```
+
+Regles S1-S7 du §5 semees INACTIVES. S4/S5 : une passe par jour a l'heure de Paris du cron de la
+regle (rattrapable `grace_minutes`) ; board sans drapeau = ligne `done`, `none_needed`, `skipped`, sans
+file ni event. S6 : une fois par seance `planned` dans les `lead_minutes`. S3 : juste apres un
+signalement ou une douleur dont le signal est frais et >= `min_band`. Garde S7 toujours appliquee
+(config de S7 meme inactive) : plafond par jour de Paris, dedup des memes drapeaux sans montee de bande
+dans la fenetre. Jobs `pulse.sentinel_tick` (cron `*/15`) et `pulse.dispatch_runner` (cron `*/5`),
+semes desactives ; le runner ecrit une sortie factice `dry_run` validee par le contrat de
+l'interprete et echoue sans rien consommer si `real_ai_enabled` est vrai. Catalogue des procedures
+P1-P10 et runner de procedures non codes. Effacement reel de l'historique par l'utilisateur.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
