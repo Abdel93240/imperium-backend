@@ -1391,6 +1391,10 @@ class PulseWorkout(UUIDPrimaryKeyMixin, Base):
         ),
         CheckConstraint("intensity_score IS NULL OR intensity_score BETWEEN 1 AND 10", name="intensity_score_range"),
         CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint(
+            "session_type IS NULL OR session_type IN ('strength', 'hypertrophy', 'cardio', 'mobility', 'technique', "
+            "'mental')", name="session_type_check"),
+        CheckConstraint("systemic_load IS NULL OR systemic_load BETWEEN 1 AND 10", name="systemic_load_range"),
         Index("pulse_workouts_user_planned_idx", "user_id", "planned_at"),
         Index("pulse_workouts_user_idempotency_idx", "user_id", "idempotency_key", unique=True),
     )
@@ -1403,6 +1407,10 @@ class PulseWorkout(UUIDPrimaryKeyMixin, Base):
     intensity: Mapped[str | None] = mapped_column(Text, nullable=True)
     exercises: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
     equipment: Mapped[list] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    program_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_programs.id", ondelete="SET NULL"), nullable=True)
+    session_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    systemic_load: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     source_mission_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id", ondelete="SET NULL"), nullable=True
     )

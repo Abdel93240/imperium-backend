@@ -8,16 +8,22 @@ faux, le slot `pulse.p1.choose_move` est FACTICE (premier coup légal hors `main
 la proposition est écrite `dry_run`, jamais présentée ; avec `real_ai_enabled` vrai, le runner échoue
 sans rien consommer (slot réel non codé).
 
-P1 sans programme d'entraînement (non codé) : seuls `maintain`, `shift_time` (même jour de Paris, par pas
+P1 sans programme actif rattaché à la séance : seuls `maintain`, `shift_time` (même jour de Paris, par pas
 de 30 min de 06:00 à 21:00) et `reschedule` (J+1 à J+6, même heure) peuvent être légaux. Créneau libre = aucun
 chevauchement avec une autre séance prévue, une mission à heure fixe ou un événement calendrier bloquant ;
-pas de séance `high` dans un jeûne commencé depuis plus de 12 h ; pas deux jours `high` d'affilée. Les coups
-qui exigent un programme (volume, dette, modalité, scission, décharge) sont illégaux (`no_program`). Un
-blocage santé actif (`v_pulse_active_blocks`) arrête P1 : la règle rouge garde la main.
+pas de séance lourde (charge >= 7, à défaut intensité `high`) dans un jeûne commencé depuis plus de 12 h ;
+pas deux jours lourds d'affilée. Les coups qui exigent un programme sont alors illégaux (`no_program`).
+Avec le programme : `reduce_volume` (50 à 80 %, dette résultante <= `pulse.max_debt_sets_group` par groupe),
+`swap_modality` (technique, mobilité ou cardio léger, charge 3, toutes les séries en dette sous le même
+plafond) et `repay_debt` (dette ouverte d'un groupe de la séance, dans cible + tolérance de la semaine) ;
+`split_session` (non codé) et `deload_week` (pas de fiche doctrine) restent illégaux. Un coup désactivé
+dans `pulse_legal_moves` est illégal (`inactive`). Un blocage santé actif (`v_pulse_active_blocks`)
+arrête P1 : la règle rouge garde la main.
 
 Décision (no-override) : seule une proposition présentée se décide. Refus : explication obligatoire, aucun
 changement. Acceptation ou modification : le coup est revalidé sur un menu frais et la version de la séance
-doit être celle de la proposition ; seul alors l'effet s'applique (nouvelle heure de la séance).
+doit être celle de la proposition ; seul alors l'effet s'applique (heure, jour, séries, type de séance,
+dette) et `pulse.program.adapted` est émis pour une séance du programme.
 """
 
 from dataclasses import dataclass
@@ -33,11 +39,20 @@ from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, PulseWorkout
-from app.models.pulse import PulseDispatchLog, PulseProcedure, PulseProcedureRun, PulseProposal
+from app.models.pulse import (
+    PulseDispatchLog,
+    PulseLegalMove,
+    PulseProcedure,
+    PulseProcedureRun,
+    PulseProgram,
+    PulseProposal,
+    PulseVolumeDebt,
+)
 from app.schemas.pulse_signals import ProposalDecisionRequest, ProposalListResponse, ProposalRead
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
 from app.services.path import fasting
+from app.services.pulse import training
 
 PARIS = ZoneInfo("Europe/Paris")
 P1 = "adapt_training_session"
@@ -47,6 +62,10 @@ EARLIEST_START = time(6, 0)
 LATEST_START = time(21, 0)
 DEFAULT_MINUTES = 60
 PROGRAM_MOVES = ("reduce_volume", "swap_modality", "split_session", "repay_debt", "deload_week")
+PARAMETER_KEYS = {"shift_time": "new_time", "reschedule": "target_date", "reduce_volume": "percent",
+                  "swap_modality": "new_session_type", "repay_debt": "debt_id"}
+SWAP_TYPES = ("technique", "mobility", "cardio")
+SWAP_LOAD = 3
 
 
 class RealSlotNotCodedError(RuntimeError):
@@ -215,22 +234,55 @@ def legal_menu(db: Session, *, user: User, workout: PulseWorkout, now: datetime)
                                  tzinfo=PARIS)
         if _day_has_other_workout(db, user, workout, start.date()):
             continue
-        if workout.intensity == "high" and _high_next_door(db, user, workout, start.date()):
+        if training.heavy(workout) and _high_next_door(db, user, workout, start.date()):
             continue
         if _slot_ok(db, user, workout, start, minutes):
             dates.append(start.date().isoformat())
     menu.append({"code": "reschedule", "legal": bool(dates), "reasons": [] if dates else ["no_free_day"],
                  "options": dates})
-    menu += [{"code": code, "legal": False, "reasons": ["no_program"], "options": []} for code in PROGRAM_MOVES]
+    menu += _program_moves(db, workout)
+    inactive = set(db.scalars(select(PulseLegalMove.code).where(PulseLegalMove.active.is_(False))))
+    for move in menu:
+        if move["code"] in inactive and move["code"] != "maintain":
+            move.update(legal=False, reasons=["inactive"], options=[])
     return menu
+
+
+def _program_moves(db: Session, workout: PulseWorkout) -> list[dict]:
+    """Coups qui exigent le programme actif de la séance (réduction, type, dette ; scission et décharge non codées)."""
+    program = training.active_program(db, user_id=workout.user_id)
+    if program is None or workout.program_id != program.id:
+        return [{"code": code, "legal": False, "reasons": ["no_program"], "options": []} for code in PROGRAM_MOVES]
+    groups = training.workout_sets(workout)
+    debt, cap = training.debt_by_group(db, program=program), training.max_debt(db)
+
+    def within_cap(delta: dict[str, int]) -> bool:
+        return all(debt.get(group, 0) + count <= cap for group, count in delta.items())
+
+    percents = [p for p in training.REDUCE_PERCENTS
+                if (delta := training.reduced(workout.exercises, p)[1]) and within_cap(delta)]
+    types = [t for t in SWAP_TYPES if t != workout.session_type] if groups and within_cap(groups) else []
+    debts = [str(d.id) for d in training.open_debts(db, program=program)
+             if d.muscle_group in groups and training.repay_room(db, program=program, workout=workout, debt=d) > 0]
+
+    def entry(code: str, options: list, reason: str) -> dict:
+        return {"code": code, "legal": bool(options), "reasons": [] if options else [reason], "options": options}
+
+    return [
+        entry("reduce_volume", percents, "no_muscle_groups" if not groups else "debt_max"),
+        entry("swap_modality", types, "no_muscle_groups" if not groups else "debt_max"),
+        {"code": "split_session", "legal": False, "reasons": ["not_coded"], "options": []},
+        entry("repay_debt", debts, "no_repayable_debt"),
+        {"code": "deload_week", "legal": False, "reasons": ["no_doctrine"], "options": []},
+    ]
 
 
 def dry_run_choice(menu: list[dict]) -> dict:
     """Choix FACTICE du slot (essai à blanc) : premier coup légal hors `maintain`, première option."""
     for move in menu:
         if move["legal"] and move["code"] != "maintain" and move["options"]:
-            key = "new_time" if move["code"] == "shift_time" else "target_date"
-            return {"move_code": move["code"], "parameters": {key: move["options"][0]}, "fallback_move_code": None,
+            return {"move_code": move["code"], "parameters": {PARAMETER_KEYS[move["code"]]: move["options"][0]},
+                    "fallback_move_code": None,
                     "condition_fr": None, "rationale_fr": "Essai à blanc : coup factice.", "confidence": "low"}
     return {**_maintain(), "rationale_fr": "Aucun coup légal hors maintien."}
 
@@ -243,10 +295,9 @@ def validate_choice(choice: dict, menu: list[dict]) -> list[str]:
     if not move["legal"]:
         return [f"illegal_move:{move['code']}"]
     parameters = choice.get("parameters") or {}
-    if move["code"] == "shift_time" and parameters.get("new_time") not in move["options"]:
-        return ["shift_time:new_time"]
-    if move["code"] == "reschedule" and parameters.get("target_date") not in move["options"]:
-        return ["reschedule:target_date"]
+    key = PARAMETER_KEYS.get(move["code"])
+    if key is not None and parameters.get(key) not in move["options"]:
+        return [f"{move['code']}:{key}"]
     fallback = choice.get("fallback_move_code")
     if fallback is not None and fallback not in [m["code"] for m in menu if m["legal"]]:
         return [f"illegal_fallback:{fallback}"]
@@ -261,6 +312,14 @@ def summary_fr(workout: PulseWorkout, choice: dict) -> str:
         day = date.fromisoformat(parameters["target_date"])
         hour = workout.planned_at.astimezone(PARIS).strftime("%H:%M")
         return f"Reporter la séance « {workout.title} » au {day.strftime('%d/%m')} à {hour}."
+    if choice["move_code"] == "reduce_volume":
+        return (f"Ramener la séance « {workout.title} » à {parameters['percent']} % de ses séries ; "
+                "les séries retirées passent en dette.")
+    if choice["move_code"] == "swap_modality":
+        return (f"Remplacer la séance « {workout.title} » par une séance légère ({parameters['new_session_type']}) ; "
+                "ses séries passent en dette.")
+    if choice["move_code"] == "repay_debt":
+        return f"Ajouter à la séance « {workout.title} » des séries dues d'une séance précédente."
     return f"Garder la séance « {workout.title} » comme prévue."
 
 
@@ -280,7 +339,7 @@ def _slot_ok(db: Session, user: User, workout: PulseWorkout, start: datetime, mi
     for busy_start, busy_end in _busy(db, user, workout, start - timedelta(hours=12), end + timedelta(hours=12)):
         if busy_start < end and start < busy_end:
             return False
-    if workout.intensity == "high":
+    if training.heavy(workout):
         fast = fasting.window_fast(db, user, start)
         if fast is not None and (start - fast.suhoor_at) > timedelta(hours=12):
             return False
@@ -320,10 +379,11 @@ def _day_has_other_workout(db: Session, user: User, workout: PulseWorkout, day: 
 def _high_next_door(db: Session, user: User, workout: PulseWorkout, day: date) -> bool:
     start, _ = _day_bounds(day - timedelta(days=1))
     _, end = _day_bounds(day + timedelta(days=1))
-    return db.scalar(select(PulseWorkout.id).where(
-        PulseWorkout.user_id == user.id, PulseWorkout.id != workout.id, PulseWorkout.intensity == "high",
+    neighbours = db.scalars(select(PulseWorkout).where(
+        PulseWorkout.user_id == user.id, PulseWorkout.id != workout.id,
         PulseWorkout.status.in_(("planned", "completed")), PulseWorkout.planned_at >= start,
-        PulseWorkout.planned_at < end).limit(1)) is not None
+        PulseWorkout.planned_at < end))
+    return any(training.heavy(other) for other in neighbours)
 
 
 # --- Couche propositions (no-override) ------------------------------------------------------------
@@ -386,10 +446,34 @@ def _apply(db: Session, user: User, proposal: PulseProposal, move: dict, now: da
     elif move["move_code"] == "reschedule":
         workout.planned_at = datetime.combine(date.fromisoformat(parameters["target_date"]),
                                               local.timetz().replace(tzinfo=None), tzinfo=PARIS)
+    elif move["move_code"] in ("reduce_volume", "swap_modality", "repay_debt"):
+        _apply_program_move(db, workout, move, proposal, now)
     if move["move_code"] != "maintain":
         workout.version += 1
+        program = db.get(PulseProgram, workout.program_id) if workout.program_id else None
+        if program is not None:
+            training.emit_program(db, program, "pulse.program.adapted", move_code=move["move_code"],
+                                  session_id=str(workout.id))
     db.flush()
     return True
+
+
+def _apply_program_move(db: Session, workout: PulseWorkout, move: dict, proposal: PulseProposal,
+                        now: datetime) -> None:
+    program = db.get(PulseProgram, workout.program_id)
+    parameters = move.get("parameters") or {}
+    if move["move_code"] == "reduce_volume":
+        workout.exercises, delta = training.reduced(workout.exercises, int(parameters["percent"]))
+        training.add_debts(db, program=program, workout=workout, delta=delta, proposal_id=proposal.id, now=now)
+    elif move["move_code"] == "swap_modality":
+        training.add_debts(db, program=program, workout=workout, delta=training.workout_sets(workout),
+                           proposal_id=proposal.id, now=now)
+        workout.session_type, workout.systemic_load, workout.intensity = parameters["new_session_type"], SWAP_LOAD, "low"
+        workout.exercises = []
+    else:
+        debt = db.get(PulseVolumeDebt, UUID(parameters["debt_id"]), with_for_update=True)
+        added = training.repay_room(db, program=program, workout=workout, debt=debt)
+        training.schedule_repayment(db, debt=debt, workout=workout, added=added, proposal_id=proposal.id, now=now)
 
 
 def _close(db: Session, proposal: PulseProposal, decision: str, explanation: str | None, now: datetime) -> None:

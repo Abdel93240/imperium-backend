@@ -1,5 +1,5 @@
 """Règles rouges, signalements subjectifs et sentinelle Pulse (spec Pulse §3.2, §3.5, §5, §11, §14 ;
-CHECK constraints live in migrations 0106, 0108, 0109, 0111 ; métriques 0110)."""
+CHECK constraints live in migrations 0106, 0108, 0109, 0111, 0112 ; métriques 0110)."""
 
 from datetime import date, datetime
 from uuid import UUID
@@ -198,3 +198,72 @@ class PulseProposal(UUIDPrimaryKeyMixin, Base):
     modified_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PulseProgram(UUIDPrimaryKeyMixin, Base):
+    """Programme d'entraînement (spec Pulse §3.6 + user_id) ; un seul `active` par utilisateur."""
+
+    __tablename__ = "pulse_programs"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    objective_weights: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    mesocycle: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    doctrine_sheet_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_run: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_procedure_runs.id", ondelete="SET NULL"), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PulseProgramTarget(UUIDPrimaryKeyMixin, Base):
+    """Séries cibles d'un groupe musculaire pour une semaine (lundi de Paris)."""
+
+    __tablename__ = "pulse_program_targets"
+
+    program_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_programs.id", ondelete="CASCADE"), nullable=False)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    muscle_group: Mapped[str] = mapped_column(Text, nullable=False)
+    target_sets: Mapped[int] = mapped_column(Integer, nullable=False)
+    tolerance_sets: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+
+
+class PulseVolumeDebt(UUIDPrimaryKeyMixin, Base):
+    """Séries dues par groupe : open → scheduled (séance de remboursement) → repaid ; perte = décision WR."""
+
+    __tablename__ = "pulse_volume_debt"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    program_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_programs.id", ondelete="CASCADE"), nullable=False)
+    muscle_group: Mapped[str] = mapped_column(Text, nullable=False)
+    debt_sets: Mapped[int] = mapped_column(Integer, nullable=False)
+    origin_workout_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_workouts.id", ondelete="CASCADE"), nullable=False)
+    repayment_workout_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_workouts.id", ondelete="SET NULL"), nullable=True)
+    created_by_proposal: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_proposals.id", ondelete="SET NULL"), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PulseLegalMove(UUIDPrimaryKeyMixin, Base):
+    """Coup du §8 : préconditions, paramètres et effets documentés ; évalués en code, `active` par SQL."""
+
+    __tablename__ = "pulse_legal_moves"
+
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    preconditions: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    parameters_schema: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    effects: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    doctrine_refs: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
