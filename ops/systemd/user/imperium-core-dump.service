@@ -1,0 +1,6 @@
+[Unit]
+Description=Imperium core nightly pg_dump
+
+[Service]
+Type=oneshot
+ExecStart=/home/abd/bin/imperium-core-dump.sh
