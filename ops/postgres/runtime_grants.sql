@@ -12,9 +12,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO imperium_
 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO imperium_user;
 REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public FROM imperium_user;
 
--- Registres en ajout seul.
+-- Registres en ajout seul (leurs déclencheurs refusent déjà toute modification et suppression).
 REVOKE UPDATE, DELETE ON events, auth_events, imperium_events, imperium_vault_transactions,
-    pressure_snapshots, parameters FROM imperium_user;
+    pressure_snapshots FROM imperium_user;
+-- Paramètres versionnés : une nouvelle version marque l'ancienne `superseded_by` (UPDATE nécessaire ; le
+-- déclencheur parameters_append_only refuse toute modification du contenu) ; jamais de suppression.
+REVOKE DELETE ON parameters FROM imperium_user;
 -- Versions du plan : jamais supprimées.
 REVOKE DELETE ON plan_versions FROM imperium_user;
 -- Version du schéma : migrations seulement.

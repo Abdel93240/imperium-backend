@@ -330,8 +330,9 @@ Le VPS est retiré (F10) : `imperium_core` vit sur le PostgreSQL 16 de la Tower 
    SELECT et INSERT aux nouvelles tables) :
    `psql "postgresql://imperium_admin@127.0.0.1:5432/imperium_core" -v ON_ERROR_STOP=1 -f ops/postgres/runtime_grants.sql`
    L'API lit, insère, modifie et supprime ; jamais de TRUNCATE ; `events`, `auth_events`,
-   `imperium_events`, `imperium_vault_transactions`, `pressure_snapshots`, `parameters` en ajout seul ;
-   `plan_versions` jamais supprimée ; `alembic_version` réservée aux migrations.
+   `imperium_events`, `imperium_vault_transactions`, `pressure_snapshots` en ajout seul ; `parameters` jamais
+   supprimé mais modifiable (seul `superseded_by` passe le déclencheur) ; `plan_versions` jamais supprimée ;
+   `alembic_version` réservée aux migrations.
 4. API : service utilisateur `ops/systemd/user/imperium-api.service` (uvicorn sur 127.0.0.1:8000,
    `EnvironmentFile` = `backend/.env`, mode 600) ; `systemctl --user restart imperium-api`.
 5. Accès des applis : `tailscale serve --bg --https=8443 http://127.0.0.1:8000` (réseau Tailscale
