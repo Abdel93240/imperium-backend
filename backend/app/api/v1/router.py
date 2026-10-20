@@ -34,6 +34,7 @@ from app.api.v1.routes import (
     imperium_pulse_health,
     imperium_pulse_hydration,
     imperium_pulse_meals,
+    imperium_pulse_signals,
     imperium_pulse_stock,
     imperium_pulse_workouts,
     imperium_vault,
@@ -78,6 +79,7 @@ api_router.include_router(imperium_pulse_dashboard.router, prefix="/imperium/pul
 api_router.include_router(imperium_pulse_workouts.router, prefix="/imperium/pulse", tags=["imperium-pulse-workouts"])
 api_router.include_router(imperium_pulse_equipment.router, prefix="/imperium/pulse", tags=["imperium-pulse-equipment"])
 api_router.include_router(imperium_pulse_health.router, prefix="/imperium/pulse", tags=["imperium-pulse-health"])
+api_router.include_router(imperium_pulse_signals.router, prefix="/imperium/pulse", tags=["imperium-pulse-signals"])
 api_router.include_router(imperium.router, prefix="/imperium", tags=["imperium"])
 api_router.include_router(imperium_operations.router, prefix="/imperium", tags=["imperium-operations"])
 api_router.include_router(imperium_settings.router, prefix="/imperium", tags=["imperium-settings"])
