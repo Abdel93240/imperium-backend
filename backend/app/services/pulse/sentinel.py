@@ -14,8 +14,13 @@ Un réveil retenu fige le board (`pulse_board_snapshots`) puis met en file une l
 `pulse.dispatch_runner` la traite : tant que `real_ai_enabled` est faux, sortie factice `dry_run` validée
 par le contrat de l'interprète (§6) contre le catalogue actif ; elle ne nomme que P1, pour un réveil
 pré-séance quand P1 est active (exécution mise en file pour `pulse.procedure_runner`). Rien n'est
-proposé ni notifié. L'interprète réel n'est pas codé : avec `real_ai_enabled` vrai, le runner échoue
-sans rien consommer.
+proposé ni notifié. Avec `real_ai_enabled` vrai (chaînes cloud), le runner échoue sans rien consommer.
+
+Interprète LOCAL (`ai.local_slot_modes["pulse.interpreter"]`) : en `shadow`, l'exécuteur local lit le board
+figé (entrée en liste blanche) et sa sortie est rangée sous `output.local`, l'issue reste celle de l'essai à
+blanc ; en `live`, la sortie validée décide (procédures nommées, `none_needed`, `escalated` si confiance
+basse ou drapeau — sans second regard cloud, rien n'est lancé —, `invalid_fallback` après deux échecs).
+Au plus 3 réveils par passe quand le slot est allumé.
 """
 
 from dataclasses import asdict, dataclass, field
@@ -30,15 +35,18 @@ from app.core.config import get_settings
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.imperium import PulseWorkout
-from app.models.pulse import PulseBoardSnapshot, PulseDispatchLog, PulseSentinelRule
+from app.models.pulse import PulseBoardSnapshot, PulseDispatchLog, PulseProcedure, PulseProposal, PulseSentinelRule
 from app.schemas.pulse_signals import BoardRead, DispatchListResponse, DispatchRead
 from app.services.events.emitter import build_event
-from app.services.pulse import procedures, signals
+from app.services.ai import local_executor
+from app.services.pulse import ai_slots, procedures, signals
 
 PARIS = ZoneInfo("Europe/Paris")
 BAND_ORDER = signals.BAND_ORDER
 DEFAULT_GUARD = {"max_dispatch_per_day": 6, "dedup_window_min": 90}
 SKIPPED = "skipped"
+LOCAL_MODEL = "local_executor"  # rôle, jamais un nom de modèle
+LOCAL_PER_RUN = 3
 DRY_RUN = "dry_run"
 CONFIDENCE = ("high", "medium", "low")
 URGENCY = ("now", "today", "this_week")
@@ -278,6 +286,9 @@ def run_dispatches(db: Session, *, now: datetime | None = None, limit: int = 50)
     queued = db.scalars(select(PulseDispatchLog).where(PulseDispatchLog.status == "queued")
                         .order_by(PulseDispatchLog.created_at).limit(limit).with_for_update(skip_locked=True)).all()
     catalogue = procedures.active_catalogue(db)
+    mode = local_executor.slot_mode(db, ai_slots.INTERPRETER_SLOT)
+    if mode != "off":
+        queued = queued[:LOCAL_PER_RUN]  # un appel local coûte des secondes : la file se vide en plusieurs passes
     for dispatch in queued:
         output = dry_run_output(dispatch.flag_set, subject_ref=dispatch.subject_ref, catalogue=catalogue)
         dispatch.output = {**output, "dry_run": True}
@@ -286,11 +297,16 @@ def run_dispatches(db: Session, *, now: datetime | None = None, limit: int = 50)
         dispatch.model_used, dispatch.procedures_named = DRY_RUN, [item["code"] for item in named]
         dispatch.outcome = "procedures_run" if named else DRY_RUN
         dispatch.escalated, dispatch.status, dispatch.completed_at = False, "done", now
+        if mode != "off":
+            slot = _interpret(db, dispatch, catalogue, mode)
+            dispatch.output = {**dispatch.output, "local": slot.record()}
+            if mode == "live":
+                output, named = _apply_live(db, dispatch, slot, now)
         completed = build_event(
             db, user_id=dispatch.user_id, event_type="pulse.dispatch.completed",
             payload={"dispatch_id": str(dispatch.id), "outcome": dispatch.outcome,
-                     "procedures_named": dispatch.procedures_named, "confidence": output["confidence"],
-                     "escalated": False},
+                     "procedures_named": dispatch.procedures_named, "confidence": output.get("confidence"),
+                     "escalated": dispatch.escalated},
             idempotency_key=f"pulse.dispatch.completed.{dispatch.id}", source_app=SourceApp.pulse,
             privacy_level=PrivacyLevel.high, causation_id=dispatch.trigger_event_id,
         )
@@ -300,6 +316,53 @@ def run_dispatches(db: Session, *, now: datetime | None = None, limit: int = 50)
             procedures.queue_from_dispatch(db, dispatch=dispatch, named=named, trigger=completed, now=now)
     db.flush()
     return len(queued)
+
+
+def _interpret(db: Session, dispatch: PulseDispatchLog, catalogue: set[str], mode: str) -> ai_slots.SlotOutcome:
+    """Appel local de l'interprète sur le board figé du réveil (entrée en liste blanche)."""
+    snapshot = db.get(PulseBoardSnapshot, dispatch.board_snapshot_id)
+    procedures_rows = db.scalars(select(PulseProcedure).where(PulseProcedure.active.is_(True))
+                                 .order_by(PulseProcedure.code)).all()
+    catalogue_text = "\n".join(f"{p.code} — {p.purpose_fr} — déclencheurs : {', '.join(p.trigger_types)}"
+                                for p in procedures_rows)
+    red = [f"{flag['rule_code']} ({flag['severity']})" for flag in snapshot.board.get("red_flags", [])]
+    pending = db.scalar(select(func.count()).select_from(PulseProposal).where(
+        PulseProposal.user_id == dispatch.user_id, PulseProposal.decision.is_(None),
+        PulseProposal.presented_at.is_not(None)))
+    constraints = (f"réveil : {dispatch.triggered_by}" + (" (séance imminente)" if (dispatch.subject_ref or "")
+                   .startswith("workout:") else "") + f"\nalertes santé ouvertes : {', '.join(red) or 'aucune'}"
+                   f"\npropositions en attente : {pending}")
+    user = ai_slots.assemble(board=ai_slots.board_lines(snapshot.board), catalogue=catalogue_text or "vide",
+                             constraints=constraints)
+    codes = sorted(catalogue)
+    return ai_slots.run_slot(slot_code=ai_slots.INTERPRETER_SLOT, mode=mode, system=ai_slots.INTERPRETER_SYSTEM,
+                             user=user, schema=ai_slots.interpreter_schema(codes),
+                             validate=lambda out: validate_output(out, catalogue=catalogue), related_id=dispatch.id)
+
+
+def _apply_live(db: Session, dispatch: PulseDispatchLog, slot: ai_slots.SlotOutcome, now: datetime
+                ) -> tuple[dict, list[dict]]:
+    """Mode live : la sortie validée remplace la factice. Escalade (confiance basse ou drapeau) : le
+    second regard cloud n'est pas autorisé, rien n'est lancé et le réveil est marqué escaladé."""
+    dispatch.model_used = LOCAL_MODEL
+    dispatch.prompt_tokens, dispatch.output_tokens = slot.prompt_tokens, slot.output_tokens
+    dispatch.latency_ms = slot.latency_ms
+    if not slot.valid:
+        dispatch.valid, dispatch.outcome, dispatch.procedures_named = False, "invalid_fallback", []
+        return {}, []
+    output = slot.output
+    dispatch.valid = True
+    if output["escalate"] or output["confidence"] == "low":
+        dispatch.escalated, dispatch.outcome, dispatch.procedures_named = True, "escalated", []
+        return output, []
+    named = []
+    for item in output["procedures"]:
+        inputs = procedures.inputs_for(db, dispatch=dispatch, code=item["code"], now=now)
+        if inputs is not None:
+            named.append({**item, "inputs": inputs})
+    dispatch.procedures_named = [item["code"] for item in named]
+    dispatch.outcome = "procedures_run" if named else "none_needed"
+    return output, named
 
 
 # --- Lecture, annotation, oubli ----------------------------------------------------------------
