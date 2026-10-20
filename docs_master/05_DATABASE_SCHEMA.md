@@ -1926,6 +1926,13 @@ semaine de Paris. Les 8 coups du §8 sont semes actifs (evalues en code ; un cou
 legal). Dette : nee d'un coup accepte, placee par `repay_debt`, remboursee quand la seance est
 terminee, rouverte si elle est sautee ; la perte reste une decision du WR, non codee. Parametres
 `pulse.programs_enabled` false et `pulse.max_debt_sets_group` 10.
+IA locale par slot (migration 20261020_0114, 2026-10-20, decision utilisateur : local seulement) :
+parametre `ai.local_slot_modes` ({slot_code: off|shadow|live}, seme vide). Seul un slot `local_default`
+d'`ai_slot_transition` peut etre servi, et seulement vers une adresse de bouclage. En `shadow`, la sortie
+du modele est rangee a cote du resultat deterministe (`pulse_dispatch_log.output.local`,
+`pulse_procedure_runs.steps_log[].local`) sans servir ; en `live`, elle decide (procedures nommees,
+coup de P1), et une proposition reste soumise a decision. Timeout des jobs `pulse.dispatch_runner` et
+`pulse.procedure_runner` porte a 600 s (3 elements par passe quand un slot local est allume).
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

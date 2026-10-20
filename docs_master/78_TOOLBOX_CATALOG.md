@@ -94,13 +94,13 @@ D-01…D-10). Chiffres recalculés le 2026-07-16 (réconciliation post-socle), p
 ### F1-03 `toolbox.llm` — client LLM local contraint + wrapper de tiers
 - description : appel local_executor temp 0, sortie contrainte GBNF/guided decoding par JSON Schema, retry-avec-erreur, fallback déterministe, dry-run loggé (`real_ai_enabled=False`), tiers `local_default|cloud_forced|routed`.
 - famille : F1
-- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; l'ancien modèle 7B en dur (écarté définitivement par PHASE_0 D6) a été purgé au socle (DV-6) : le modèle se résout via le rôle `local_executor` d'`ai_role_models` (seed historique ; mapping actuel : doc 30 §3.3). Toujours pas de GBNF ni de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8.
+- vit_aujourd_hui : partiel — `backend/app/services/ai/providers/qwen.py` (adapter dry-run, doc 30 Patch 2E) ; l'ancien modèle 7B en dur (écarté définitivement par PHASE_0 D6) a été purgé au socle (DV-6) : le modèle se résout via le rôle `local_executor` d'`ai_role_models` (seed historique ; mapping actuel : doc 30 §3.3). Toujours pas de GBNF ni de wrapper de tiers. Spécifié complet : spec Pulse §6/§13 ; spec WR §15.3 « réutiliser le wrapper Pulse si présent » ; spec Daily §8. **Client local contraint CODÉ (migration 0114, 2026-10-20)** — `app/services/ai/local_executor.py` : chat completions température 0 sans raisonnement, sortie contrainte par le JSON Schema du slot, adresse de bouclage obligatoire, journal central des appels ; interrupteur par slot `ai.local_slot_modes` (off|shadow|live, semé vide, slots `local_default` seulement). Premiers consommateurs : `pulse.interpreter` et `pulse.p1.choose_move` (`app/services/pulse/ai_slots.py` : assembleur en liste blanche, nouvel essai avec rappel des erreurs, repli déterministe). Le routage vers le cloud reste non codé.
 - consommateurs_actuels : WR conversation (dry-run, `weekly_review_conversation.py`), smoke endpoint.
 - consommateurs_prevus_par_specs : tous les slots LLM des specs Pulse (interpreter, p1..p10), WR (wr.probe_gen, wr.pair_verdict, wr.identity…), Daily (daily.disruption_classify, daily.conflict_arbitrate). Vector : AUCUN (zéro LLM, gravé spec §0).
 - consommateurs_probables_non_documentés : chatbot doc 72, conseils quotidiens doc 43 §12.3.
 - doublons : non, mais trois specs re-décrivent le même wrapper — à construire UNE fois (passe Pulse) puis référencer.
 - seconde_regle_consommateur : PASSE.
-- statut : spécifié (embryon codé).
+- statut : partiel codé (client local par slot ; wrapper de tiers cloud non codé).
 
 ### F1-04 `toolbox.router` — routage /200 (doc 30)
 - description : scoring de difficulté /200 (7 critères §5.2), seuils dynamiques, règles statiques §7, mécanique critique 180+ (re-score indépendant par `high_reasoning_safeguard` (doc 30 §3.8quater) → orchestration high_reasoning → circuit breaker), escalade/downgrade auto.

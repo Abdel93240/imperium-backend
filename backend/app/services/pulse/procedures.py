@@ -5,8 +5,10 @@ Runner (`pulse.procedure_runner`, semé désactivé) : une exécution `queued` p
 logge dans `steps_log`, puis `completed` | `waiting_user` | `aborted` | `failed`. Seule P1 a ses étapes code
 écrites ; une autre procédure nommée s'arrête en `aborted` (`not_coded`). Tant que `real_ai_enabled` est
 faux, le slot `pulse.p1.choose_move` est FACTICE (premier coup légal hors `maintain`, sinon `maintain`) et
-la proposition est écrite `dry_run`, jamais présentée ; avec `real_ai_enabled` vrai, le runner échoue
-sans rien consommer (slot réel non codé).
+la proposition est écrite `dry_run`, jamais présentée ; avec `real_ai_enabled` vrai (chaînes cloud), le
+runner échoue sans rien consommer. Slot LOCAL (`ai.local_slot_modes["pulse.p1.choose_move"]`) : en `shadow`,
+le choix du modèle est journalisé à l'étape 3 sans servir ; en `live`, il sert (revalidé, repli `maintain`) et
+les exécutions mises en file sont réelles : la proposition est présentée et attend ta décision.
 
 P1 sans programme actif rattaché à la séance : seuls `maintain`, `shift_time` (même jour de Paris, par pas
 de 30 min de 06:00 à 21:00) et `reschedule` (J+1 à J+6, même heure) peuvent être légaux. Créneau libre = aucun
@@ -40,6 +42,7 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, PulseWorkout
 from app.models.pulse import (
+    PulseBoardSnapshot,
     PulseDispatchLog,
     PulseLegalMove,
     PulseProcedure,
@@ -51,12 +54,15 @@ from app.models.pulse import (
 from app.schemas.pulse_signals import ProposalDecisionRequest, ProposalListResponse, ProposalRead
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
+from app.services.ai import local_executor
 from app.services.path import fasting
-from app.services.pulse import training
+from app.services.pulse import ai_slots, training
 
 PARIS = ZoneInfo("Europe/Paris")
 P1 = "adapt_training_session"
 DRY_RUN = "dry_run"
+LOCAL_MODEL = "local_executor"  # rôle, jamais un nom de modèle
+LOCAL_PER_RUN = 3
 STEP_MINUTES = 30
 EARLIEST_START = time(6, 0)
 LATEST_START = time(21, 0)
@@ -113,7 +119,8 @@ def queue_from_dispatch(db: Session, *, dispatch: PulseDispatchLog, named: list[
         run = PulseProcedureRun(id=uuid4(), user_id=dispatch.user_id, procedure_id=procedure.id,
                                 procedure_version=procedure.version, dispatch_id=dispatch.id,
                                 trigger_event_id=trigger.event_id, correlation_id=trigger.correlation_id,
-                                inputs={**(item.get("inputs") or {}), "urgency": item["urgency"]}, dry_run=True,
+                                inputs={**(item.get("inputs") or {}), "urgency": item["urgency"]},
+                                dry_run=local_executor.slot_mode(db, ai_slots.CHOOSE_MOVE_SLOT) != "live",
                                 status="queued", steps_log=[], created_at=now)
         db.add(run)
         runs.append(run)
@@ -127,6 +134,8 @@ def run_queued(db: Session, *, now: datetime | None = None, limit: int = 20) -> 
         raise RealSlotNotCodedError("Slots IA réels des procédures pas encore codés : cartes V14+.")
     now = now or datetime.now(UTC)
     stats = RunnerStats()
+    if local_executor.slot_mode(db, ai_slots.CHOOSE_MOVE_SLOT) != "off":
+        limit = min(limit, LOCAL_PER_RUN)
     runs = db.scalars(select(PulseProcedureRun).where(PulseProcedureRun.status == "queued")
                       .order_by(PulseProcedureRun.created_at).limit(limit).with_for_update(skip_locked=True)).all()
     for run in runs:
@@ -190,7 +199,16 @@ def _run_p1(db: Session, run: PulseProcedureRun, user: User, now: datetime) -> N
     menu = legal_menu(db, user=user, workout=workout, now=now)
     _log(run, 2, "code", "p1.legal_menu", "ok", legal=[move["code"] for move in menu if move["legal"]])
     choice = dry_run_choice(menu)
-    _log(run, 3, "llm_slot", "pulse.p1.choose_move", "ok", model_used=DRY_RUN, move_code=choice["move_code"])
+    mode = local_executor.slot_mode(db, ai_slots.CHOOSE_MOVE_SLOT)
+    if mode == "off":
+        _log(run, 3, "llm_slot", ai_slots.CHOOSE_MOVE_SLOT, "ok", model_used=DRY_RUN, move_code=choice["move_code"])
+    else:
+        slot = _choose_move(db, run, workout, menu, mode)
+        _log(run, 3, "llm_slot", ai_slots.CHOOSE_MOVE_SLOT, "ok" if slot.valid else "fallback",
+             model_used=LOCAL_MODEL if mode == "live" else DRY_RUN, move_code=choice["move_code"], local=slot.record())
+        if mode == "live":
+            choice = _normalized(slot.output) if slot.valid else {**_maintain(),
+                                                                   "rationale_fr": "Repli : sortie du modèle invalide."}
     errors = validate_choice(choice, menu)
     if errors:  # repli déterministe : sans programme, `reduce_volume` n'est jamais légal → `maintain`
         choice = {**_maintain(), "rationale_fr": "Repli : coup choisi invalide."}
@@ -208,6 +226,51 @@ def _run_p1(db: Session, run: PulseProcedureRun, user: User, now: datetime) -> N
     run.result = {"proposal_id": str(proposal.id), "move_code": choice["move_code"], "dry_run": run.dry_run}
     if not run.dry_run:
         _proposal_event(db, proposal, "pulse.proposal.presented")
+
+
+def _choose_move(db: Session, run: PulseProcedureRun, workout: PulseWorkout, menu: list[dict],
+                 mode: str) -> ai_slots.SlotOutcome:
+    """Slot local `pulse.p1.choose_move` : état résumé + menu légal (liste blanche, pas de texte libre)."""
+    local = workout.planned_at.astimezone(PARIS)
+    sets = training.workout_sets(workout)
+    session = (f"type : {workout.session_type or 'non précisé'} ; intensité : {workout.intensity or 'non précisée'} ; "
+               f"charge : {workout.systemic_load or 'non précisée'} ; durée : {workout.duration_minutes or DEFAULT_MINUTES} "
+               f"min ; prévue le {local.strftime('%d/%m à %H:%M')} ; séries par groupe : "
+               + (", ".join(f"{group}={count}" for group, count in sorted(sets.items())) or "non renseignées"))
+    board = ""
+    dispatch = db.get(PulseDispatchLog, run.dispatch_id) if run.dispatch_id else None
+    if dispatch is not None:
+        snapshot = db.get(PulseBoardSnapshot, dispatch.board_snapshot_id)
+        board = ai_slots.board_lines(snapshot.board) if snapshot is not None else ""
+    legal = [move for move in menu if move["legal"]]
+    menu_text = "\n".join(f"{move['code']} — options : {move['options'] or 'aucun paramètre'}" for move in legal)
+    user_prompt = ai_slots.assemble(session=session, board=board, menu=menu_text)
+    return ai_slots.run_slot(slot_code=ai_slots.CHOOSE_MOVE_SLOT, mode=mode, system=ai_slots.CHOOSE_MOVE_SYSTEM,
+                             user=user_prompt, schema=ai_slots.move_schema([move["code"] for move in legal]),
+                             validate=lambda out: validate_choice(_normalized(out), menu), related_id=run.id)
+
+
+def _normalized(output: dict) -> dict:
+    """Garde seulement le paramètre utile au coup choisi (le schéma les rend tous facultatifs)."""
+    key = PARAMETER_KEYS.get(output.get("move_code"))
+    parameters = output.get("parameters") or {}
+    return {"move_code": output.get("move_code"),
+            "parameters": {key: parameters[key]} if key and key in parameters else {},
+            "fallback_move_code": output.get("fallback_move_code"), "condition_fr": output.get("condition_fr"),
+            "rationale_fr": output.get("rationale_fr"), "confidence": output.get("confidence")}
+
+
+def inputs_for(db: Session, *, dispatch: PulseDispatchLog, code: str, now: datetime) -> dict | None:
+    """Entrées d'une procédure nommée par l'interprète ; None = impossible à lancer (abandonnée)."""
+    if code != P1:
+        return {}
+    if (dispatch.subject_ref or "").startswith("workout:"):
+        return {"workout_id": dispatch.subject_ref.split(":", 1)[1]}
+    end_of_day = datetime.combine(now.astimezone(PARIS).date() + timedelta(days=1), time.min, tzinfo=PARIS)
+    workout_id = db.scalar(select(PulseWorkout.id).where(
+        PulseWorkout.user_id == dispatch.user_id, PulseWorkout.status == "planned", PulseWorkout.planned_at > now,
+        PulseWorkout.planned_at < end_of_day).order_by(PulseWorkout.planned_at).limit(1))
+    return {"workout_id": str(workout_id)} if workout_id else None
 
 
 def legal_menu(db: Session, *, user: User, workout: PulseWorkout, now: datetime) -> list[dict]:

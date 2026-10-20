@@ -55,8 +55,10 @@ class Settings(BaseSettings):
     qwen_request_timeout_seconds: int = 60
     qwen_dry_run: bool = True
 
-    # Local executor serving on Tower. Infrastructure only; does not activate product AI.
+    # Local executor serving on Tower. Infrastructure only; product slots switch on one by one
+    # through the `ai.local_slot_modes` parameter (app/services/ai/local_executor.py).
     local_executor_url: str | None = None
+    local_executor_timeout_seconds: int = 60
 
     # Ported n8n WR bridges (wr_bridge.py): when True, the launch/answer flows run
     # the bridge inline (same behavior the n8n workflows had when reachable and
