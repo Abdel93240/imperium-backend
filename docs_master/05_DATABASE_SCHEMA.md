@@ -1921,6 +1921,8 @@ libelles, `min_description_chars` 15, `min_missions` 1, `max_missions` 10 pour `
 `create_project` porte desormais `params.missions` (liste titre + duree), creees a la validation.
 Migration 20261020_0117 : `chat_sessions.agent` (general|project|mission, defaut general, choisi par le code a
 l'ouverture) ; parametre `chat.agents` (role, libelle, actions, enabled ; project et mission semes false).
+Migration 20261020_0118 : `chat_proposals.action` accepte `switch_agent` (params agent + context_ref) ; sa
+validation change `chat_sessions.agent`, `context_kind` et `context_ref`.
 Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
 
 ```sql

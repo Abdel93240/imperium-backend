@@ -9,7 +9,9 @@ sortie invalide → un nouvel essai avec les erreurs, puis réponse sans proposi
 si le modèle insiste, c'est le code qui pose la question. Un projet naît complet (objectif et premières
 missions), validé en une seule fois. Un agent par situation (`chat.agents`, donnée éditable : rôle, actions
 permises, activation) : le code le choisit à l'ouverture selon le contexte de la session (Général, Projet,
-Mission), et chaque agent reçoit sa propre liste blanche de contexte. La proposition n'est JAMAIS exécutée ici :
+Mission), et chaque agent reçoit sa propre liste blanche de contexte. Quand la discussion change de sujet, le
+modèle peut proposer de changer d'agent (`switch_agent`) : c'est une proposition comme les autres, que
+l'utilisateur valide. La proposition n'est JAMAIS exécutée ici :
 seule `validate_proposal`, appelée par l'utilisateur, écrit (doc 72 §4-5, doc 08), avec une clé d'idempotence
 tirée de la proposition (une validation rejouée ne crée rien de plus).
 
@@ -60,6 +62,11 @@ DEFAULT_AGENTS = {
                 "actions": list(ACTIONS)},
 }
 CONTEXT_AGENT = {"project": "project", "mission": "mission"}  # contexte de session → agent ; le reste → Général
+SWITCH_HELP = {
+    "general": "l'agent Général, pour tout le reste (créer un projet ou une routine, parler de plusieurs projets)",
+    "project": "l'agent Projet, pour travailler sur UN projet précis (project_id = son repère)",
+    "mission": "l'agent Mission, pour la mission en cours (s'y mettre, se débloquer)",
+}
 ACTION_HELP = {
     "create_project": "créer un projet complet, avec ses premières missions",
     "add_project_mission": "ajouter une mission à un projet existant (project_id = son repère dans le contexte, par exemple P1)",
@@ -82,7 +89,7 @@ def requirements(db: Session) -> dict:
     return {**DEFAULT_REQUIREMENTS, **(get_parameter(db, "chat.action_requirements", default={}) or {})}
 
 
-def system_prompt(agent: dict, sheets: dict) -> str:
+def system_prompt(agent: dict, sheets: dict, switches: list[str] | tuple[str, ...] = ()) -> str:
     def needs(action: str) -> str:
         return " ; ".join(label for _, label in sheets.get(action, {}).get("required", []))
     actions = agent["actions"]
@@ -101,6 +108,11 @@ def system_prompt(agent: dict, sheets: dict) -> str:
         "- Quand tu as tout, résume en une phrase dans summary_fr et propose. Une seule proposition par réponse.\n"
         "- Quand l'utilisateur donne une durée, reporte-la dans estimated_minutes (en minutes).\n"
         + (f"Actions possibles et informations à réunir :\n{lines}" if actions else "Tu ne peux proposer aucune action ici : proposal vaut toujours null.\n")
+        + ("Changer d'agent : si l'utilisateur veut travailler sur un sujet qu'un autre agent gère mieux (par exemple avancer "
+           "sur un projet précis), remplis « switch » : une carte lui proposera de changer, tu n'as qu'à le dire en une phrase "
+           "(« on passe sur le projet … ? »). Ne pose jamais cette question sans remplir switch. Sinon switch vaut null ; "
+           "une simple mention ou une action que tu sais faire toi-même ne suffit pas. Possible ici :\n"
+           + "".join(f"- {code} : {SWITCH_HELP[code]}\n" for code in switches) if switches else "")
         + "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas le faire ici. "
         "Appuie-toi seulement sur le contexte fourni et sur ce que l'utilisateur a dit."
     )
@@ -113,7 +125,8 @@ def _variant(action: str, required: list[str], params: dict) -> dict:
                                       "properties": params}}}
 
 
-def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACTIONS) -> dict:
+def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACTIONS,
+                  switches: list[str] | tuple[str, ...] = ()) -> dict:
     """Une variante par action, champs obligatoires compris ; `project_id` ne peut être qu'un repère réel (P1…).
     Une durée est obligatoire mais peut valoir null : le modèle doit la reporter ou dire qu'elle est inconnue."""
     minutes = {"type": ["integer", "null"]}
@@ -133,9 +146,15 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
         variants.insert(1, _variant("add_project_mission", ["project_id", "title", "estimated_minutes", "notes"],
                                     {"project_id": {"enum": aliases}, "title": text, "estimated_minutes": minutes, "notes": notes}))
     variants = [v for v in variants if v["properties"]["action"]["const"] in actions]
-    return {"type": "object", "additionalProperties": False, "required": ["reply_fr", "proposal"],
+    targets = [{"type": "object", "additionalProperties": False, "required": ["agent", "project_id"],
+                "properties": {"agent": {"const": "project"}, "project_id": {"enum": aliases}}}
+               for code in switches if code == "project" and aliases]
+    targets += [{"type": "object", "additionalProperties": False, "required": ["agent"], "properties": {"agent": {"const": code}}}
+                for code in switches if code != "project"]
+    return {"type": "object", "additionalProperties": False, "required": ["reply_fr", "proposal", "switch"],
             "properties": {"reply_fr": {"type": "string", "maxLength": 1500},
-                           "proposal": {"anyOf": [{"type": "null"}, *variants]}}}
+                           "proposal": {"anyOf": [{"type": "null"}, *variants]},
+                           "switch": {"anyOf": [{"type": "null"}, *targets]}}}
 
 
 class ChatNotFoundError(ValueError):
@@ -176,7 +195,8 @@ def send_message(db: Session, *, current_user: User, session_id: UUID, text: str
     db.flush()
     agent = agent_sheet(db, session.agent)
     context, aliases = CONTEXTS[session.agent](db, current_user, session)
-    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases)
+    switches = _switch_options(db, current_user, session, aliases)
+    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases, switches)
     assistant = ChatMessage(id=uuid4(), session_id=session.id, user_id=current_user.id, role="assistant",
                             content=reply[:8000], model_used=model, latency_ms=latency, degraded=degraded,
                             created_at=datetime.now(UTC))
@@ -205,7 +225,10 @@ def validate_proposal(db: Session, *, current_user: User, session_id: UUID, prop
     proposal = _proposal(db, current_user, session_id, proposal_id)
     key = f"chat-proposal-{proposal.id}"
     try:
-        result = _execute(db, current_user, proposal.action, proposal.params, key)
+        if proposal.action == "switch_agent":
+            result = _switch(db, current_user, _get(db, current_user, session_id), proposal.params)
+        else:
+            result = _execute(db, current_user, proposal.action, proposal.params, key)
     except (ValidationError, ValueError, LookupError) as exc:
         db.rollback()
         proposal = _proposal(db, current_user, session_id, proposal_id)
@@ -275,7 +298,63 @@ def _ref(value: str | None) -> UUID | None:
         return None
 
 
-def _converse(db: Session, session: ChatSession, agent: dict, context: str, aliases: dict[str, str]):
+def _switch_options(db: Session, user: User, session: ChatSession, aliases: dict[str, str]) -> list[str]:
+    """Agents vers lesquels on peut proposer de passer : activés, autres que l'actuel, avec une cible réelle."""
+    sheets = agents(db)
+    options = [] if session.agent == "general" else ["general"]
+    if sheets.get("project", {}).get("enabled") and session.agent != "project" and aliases:
+        options.append("project")
+    if (sheets.get("mission", {}).get("enabled") and session.agent != "mission"
+            and get_current_active_mission(db, current_user=user).mission):
+        options.append("mission")
+    return options
+
+
+def _switch_proposal(db: Session, switch: dict | None, options: list[str], aliases: dict[str, str]) -> dict | None:
+    """Changement d'agent proposé par le modèle → proposition `switch_agent` ; résumé écrit par le code (titres réels)."""
+    code = (switch or {}).get("agent")
+    if code not in options:
+        return None
+    if code == "project":
+        project = db.get(ImperiumProject, _ref(aliases.get(str(switch.get("project_id")))))
+        if project is None:
+            return None
+        return {"action": "switch_agent", "params": {"agent": "project", "context_ref": str(project.id)},
+                "summary_fr": f"Passer sur le projet « {project.title} »"}
+    if code == "mission":
+        return {"action": "switch_agent", "params": {"agent": "mission", "context_ref": None},
+                "summary_fr": "Passer sur la mission en cours"}
+    return {"action": "switch_agent", "params": {"agent": "general", "context_ref": None},
+            "summary_fr": "Revenir à l'agent Général"}
+
+
+def _switch(db: Session, user: User, session: ChatSession, params: dict) -> dict:
+    """Validation d'un changement d'agent : revérifie tout (agent activé, cible à l'utilisateur) au moment du clic."""
+    code = params.get("agent")
+    if session.status != "open":
+        raise ValueError("Session fermée.")
+    if code != "general" and not agents(db).get(code, {}).get("enabled"):
+        raise ValueError("Cet agent est désactivé.")
+    ref = None
+    if code == "project":
+        project = db.get(ImperiumProject, _ref(params.get("context_ref")))
+        if project is None or project.user_id != user.id or project.status != "open":
+            raise ValueError("Projet introuvable.")
+        ref = str(project.id)
+    elif code == "mission":
+        active = get_current_active_mission(db, current_user=user).mission
+        if active is None:
+            raise ValueError("Aucune mission en cours.")
+        ref = str(active.id)
+    elif code != "general":
+        raise ValueError(f"Agent inconnu {code}.")
+    session.agent, session.context_kind, session.context_ref = code, code, ref
+    return {"agent": code, "label": agent_sheet(db, code).get("label", code), "context_ref": ref}
+
+
+def _converse(db: Session, session: ChatSession, agent: dict, context: str, aliases: dict[str, str],
+              switches: list[str] | None = None):
+    switches = switches or []
     sheets = requirements(db)
     if local_executor.slot_mode(db, SLOT) != "live":
         return DEGRADED_REPLY, None, None, None, True
@@ -286,8 +365,8 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
     latency = 0
     for attempt in range(2):
         try:
-            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=system_prompt(agent, sheets), user=prompt,
-                                               schema=output_schema(list(aliases), agent["actions"]), max_tokens=900, related_entity_type="chat_session",
+            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=system_prompt(agent, sheets, switches), user=prompt,
+                                               schema=output_schema(list(aliases), agent["actions"], switches), max_tokens=900, related_entity_type="chat_session",
                                                related_entity_id=session.id)
         except local_executor.LocalExecutorError:
             return DEGRADED_REPLY, None, None, latency or None, True
@@ -300,8 +379,12 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
             params["project_id"] = aliases.get(str(params.get("project_id")), "")
             proposal = {**proposal, "params": params}
         errors, missing = _check(proposal, set(aliases.values()), sheets, agent["actions"]) if proposal else ([], [])
-        if not errors:
+        if proposal and not errors:
             return reply, proposal, "local_executor", latency, False
+        # Pas d'action valable : un changement d'agent proposé passe (l'autre agent saura faire l'action).
+        switch = _switch_proposal(db, result.output.get("switch"), switches, aliases)
+        if switch or not errors:
+            return reply, switch, "local_executor", latency, False
         prompt += (f"\n\n## rappel\nProposition refusée : {', '.join(errors)}. "
                    + ("Ne propose rien : pose la question à l'utilisateur." if missing else "Corrige-la ou n'en fais pas."))
     if missing:
