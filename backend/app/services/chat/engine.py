@@ -7,7 +7,9 @@ par le code (action du catalogue, paramètres validés par les schémas d'écrit
 sortie invalide → un nouvel essai avec les erreurs, puis réponse sans proposition. Chaque action a sa fiche
 « ce qu'il faut savoir » (`chat.action_requirements`, donnée éditable) : une proposition incomplète est refusée et,
 si le modèle insiste, c'est le code qui pose la question. Un projet naît complet (objectif et premières
-missions), validé en une seule fois. Elle n'est JAMAIS exécutée ici :
+missions), validé en une seule fois. Un agent par situation (`chat.agents`, donnée éditable : rôle, actions
+permises, activation) : le code le choisit à l'ouverture selon le contexte de la session (Général, Projet,
+Mission), et chaque agent reçoit sa propre liste blanche de contexte. La proposition n'est JAMAIS exécutée ici :
 seule `validate_proposal`, appelée par l'utilisateur, écrit (doc 72 §4-5, doc 08), avec une clé d'idempotence
 tirée de la proposition (une validation rejouée ne crée rien de plus).
 
@@ -25,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.models.chat import ChatMessage, ChatProposal, ChatSession
+from app.models.imperium import ImperiumMission, ImperiumProject
 from app.schemas.chat import ChatMessageRead, ChatProposalRead, ChatSessionCreate, ChatSessionRead, ChatTurnRead
 from app.schemas.operations import ProjectCreate, ProjectMissionCreate, RoutineCreate
 from app.services.ai import local_executor
@@ -50,31 +53,55 @@ DEFAULT_REQUIREMENTS = {
 }
 
 
+DEFAULT_AGENTS = {
+    "general": {"enabled": True, "label": "Général",
+                "role": "Tu es l'assistant général d'Imperium : tu aides l'utilisateur à créer des projets complets, à "
+                        "ajouter des missions à ses projets et à créer des routines.",
+                "actions": list(ACTIONS)},
+}
+CONTEXT_AGENT = {"project": "project", "mission": "mission"}  # contexte de session → agent ; le reste → Général
+ACTION_HELP = {
+    "create_project": "créer un projet complet, avec ses premières missions",
+    "add_project_mission": "ajouter une mission à un projet existant (project_id = son repère dans le contexte, par exemple P1)",
+    "create_routine": "créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high)",
+}
+
+
+def agents(db: Session) -> dict:
+    """Agents du chatbot (paramètre éditable `chat.agents`) ; Général existe toujours."""
+    return {**DEFAULT_AGENTS, **(get_parameter(db, "chat.agents", default={}) or {})}
+
+
+def agent_sheet(db: Session, code: str) -> dict:
+    sheet = agents(db).get(code) or DEFAULT_AGENTS["general"]
+    return {**sheet, "actions": [a for a in sheet.get("actions", []) if a in ACTIONS]}
+
+
 def requirements(db: Session) -> dict:
     """Fiches « ce qu'il faut savoir » par action (paramètre éditable `chat.action_requirements`)."""
     return {**DEFAULT_REQUIREMENTS, **(get_parameter(db, "chat.action_requirements", default={}) or {})}
 
 
-def system_prompt(sheets: dict) -> str:
+def system_prompt(agent: dict, sheets: dict) -> str:
     def needs(action: str) -> str:
         return " ; ".join(label for _, label in sheets.get(action, {}).get("required", []))
+    actions = agent["actions"]
+    lines = "".join(f"- {a} : {ACTION_HELP[a]} ; il faut {needs(a)}.\n" for a in actions)
     return (
-        "Tu es l'assistant d'Imperium, le système personnel qui organise la vie de l'utilisateur. Tu réponds en français, "
+        f"{agent.get('role', '')}\n"
+        "Tu fais partie d'Imperium, le système personnel qui organise la vie de l'utilisateur. Tu réponds en français, "
         "en le tutoyant, clairement et brièvement. Tu ne fais JAMAIS rien toi-même : quand l'utilisateur demande une action "
         "que tu sais faire, tu la proposes dans « proposal » et c'est lui qui la validera.\n"
         "Règles de conduite :\n"
         "- Avant de proposer, réunis TOUTES les informations demandées pour l'action. S'il en manque, ne propose rien : "
         "pose une ou deux questions courtes à la fois.\n"
-        "- N'invente jamais une information que l'utilisateur n'a pas donnée (objectif, mission, durée…).\n"
+        "- N'invente jamais une information que l'utilisateur n'a pas donnée (objectif, mission, durée, notes…) : "
+        "laisse null ce qu'il n'a pas dit.\n"
+        "- Les repères P1, P2… sont internes : dans tes réponses et dans summary_fr, nomme le projet par son titre.\n"
         "- Quand tu as tout, résume en une phrase dans summary_fr et propose. Une seule proposition par réponse.\n"
         "- Quand l'utilisateur donne une durée, reporte-la dans estimated_minutes (en minutes).\n"
-        "Actions possibles et informations à réunir :\n"
-        f"- create_project : créer un projet complet, avec ses premières missions ; il faut {needs('create_project')}.\n"
-        "- add_project_mission : ajouter une mission à un projet existant (project_id = son repère dans le contexte, "
-        f"par exemple P1) ; il faut {needs('add_project_mission')}.\n"
-        f"- create_routine : créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high) ; "
-        f"il faut {needs('create_routine')}.\n"
-        "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas encore le faire. "
+        + (f"Actions possibles et informations à réunir :\n{lines}" if actions else "Tu ne peux proposer aucune action ici : proposal vaut toujours null.\n")
+        + "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas le faire ici. "
         "Appuie-toi seulement sur le contexte fourni et sur ce que l'utilisateur a dit."
     )
 
@@ -86,7 +113,7 @@ def _variant(action: str, required: list[str], params: dict) -> dict:
                                       "properties": params}}}
 
 
-def output_schema(aliases: list[str]) -> dict:
+def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACTIONS) -> dict:
     """Une variante par action, champs obligatoires compris ; `project_id` ne peut être qu'un repère réel (P1…).
     Une durée est obligatoire mais peut valoir null : le modèle doit la reporter ou dire qu'elle est inconnue."""
     minutes = {"type": ["integer", "null"]}
@@ -102,9 +129,10 @@ def output_schema(aliases: list[str]) -> dict:
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
     ]
-    if aliases:
+    if aliases and "add_project_mission" in actions:
         variants.insert(1, _variant("add_project_mission", ["project_id", "title", "estimated_minutes", "notes"],
                                     {"project_id": {"enum": aliases}, "title": text, "estimated_minutes": minutes, "notes": notes}))
+    variants = [v for v in variants if v["properties"]["action"]["const"] in actions]
     return {"type": "object", "additionalProperties": False, "required": ["reply_fr", "proposal"],
             "properties": {"reply_fr": {"type": "string", "maxLength": 1500},
                            "proposal": {"anyOf": [{"type": "null"}, *variants]}}}
@@ -124,7 +152,8 @@ def enabled(db: Session) -> bool:
 
 def start_session(db: Session, *, current_user: User, payload: ChatSessionCreate) -> ChatSessionRead:
     session = ChatSession(id=uuid4(), user_id=current_user.id, context_kind=payload.context_kind,
-                          context_ref=payload.context_ref, status="open", started_at=datetime.now(UTC))
+                          context_ref=payload.context_ref, agent=_choose_agent(db, current_user, payload),
+                          status="open", started_at=datetime.now(UTC))
     db.add(session)
     db.flush()
     read = _session_read(db, session)
@@ -145,8 +174,9 @@ def send_message(db: Session, *, current_user: User, session_id: UUID, text: str
                                created_at=now)
     db.add(user_message)
     db.flush()
-    context, aliases = _context(db, current_user)
-    reply, proposal, model, latency, degraded = _converse(db, session, context, aliases)
+    agent = agent_sheet(db, session.agent)
+    context, aliases = CONTEXTS[session.agent](db, current_user, session)
+    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases)
     assistant = ChatMessage(id=uuid4(), session_id=session.id, user_id=current_user.id, role="assistant",
                             content=reply[:8000], model_used=model, latency_ms=latency, degraded=degraded,
                             created_at=datetime.now(UTC))
@@ -218,7 +248,34 @@ def delete_session(db: Session, *, current_user: User, session_id: UUID) -> None
 
 # --- Moteur -------------------------------------------------------------------------------------
 
-def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str, str]):
+def _choose_agent(db: Session, user: User, payload: ChatSessionCreate) -> str:
+    """Le code choisit l'agent selon l'endroit d'où le terminal est ouvert ; un agent désactivé → Général.
+    Le repère du contexte doit appartenir à l'utilisateur (sinon 404) ; Mission sans repère = mission en cours."""
+    code = CONTEXT_AGENT.get(payload.context_kind, "general")
+    if code == "general" or not agents(db).get(code, {}).get("enabled"):
+        return "general"
+    ref = _ref(payload.context_ref)
+    if code == "project":
+        project = db.get(ImperiumProject, ref) if ref else None
+        if project is None or project.user_id != user.id or project.status != "open":
+            raise ChatNotFoundError("Project not found.")
+        return code
+    if payload.context_ref is not None:
+        mission = db.get(ImperiumMission, ref) if ref else None
+        if mission is None or mission.user_id != user.id:
+            raise ChatNotFoundError("Mission not found.")
+        return code
+    return code if get_current_active_mission(db, current_user=user).mission else "general"
+
+
+def _ref(value: str | None) -> UUID | None:
+    try:
+        return UUID(str(value))
+    except ValueError:
+        return None
+
+
+def _converse(db: Session, session: ChatSession, agent: dict, context: str, aliases: dict[str, str]):
     sheets = requirements(db)
     if local_executor.slot_mode(db, SLOT) != "live":
         return DEGRADED_REPLY, None, None, None, True
@@ -229,8 +286,8 @@ def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str
     latency = 0
     for attempt in range(2):
         try:
-            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=system_prompt(sheets), user=prompt,
-                                               schema=output_schema(list(aliases)), max_tokens=900, related_entity_type="chat_session",
+            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=system_prompt(agent, sheets), user=prompt,
+                                               schema=output_schema(list(aliases), agent["actions"]), max_tokens=900, related_entity_type="chat_session",
                                                related_entity_id=session.id)
         except local_executor.LocalExecutorError:
             return DEGRADED_REPLY, None, None, latency or None, True
@@ -242,7 +299,7 @@ def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str
             params = dict(proposal.get("params") or {})
             params["project_id"] = aliases.get(str(params.get("project_id")), "")
             proposal = {**proposal, "params": params}
-        errors, missing = _check(proposal, set(aliases.values()), sheets) if proposal else ([], [])
+        errors, missing = _check(proposal, set(aliases.values()), sheets, agent["actions"]) if proposal else ([], [])
         if not errors:
             return reply, proposal, "local_executor", latency, False
         prompt += (f"\n\n## rappel\nProposition refusée : {', '.join(errors)}. "
@@ -254,9 +311,12 @@ def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str
     return reply + "\n\n(Je n'ai pas réussi à formuler l'action correctement : reformule ta demande.)", None, "local_executor", latency, False
 
 
-def _check(proposal: dict, projects: set[str], sheets: dict) -> tuple[list[str], list[str]]:
-    """(erreurs, informations manquantes) : fiche de l'action, puis schémas d'écriture existants ; projet ouvert."""
+def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) -> tuple[list[str], list[str]]:
+    """(erreurs, informations manquantes) : action permise à l'agent, fiche de l'action, puis schémas d'écriture
+    existants ; projet ouvert."""
     action, params = proposal.get("action"), proposal.get("params") or {}
+    if action not in allowed:
+        return [f"action {action} non permise ici"], []
     sheet = sheets.get(action, {})
     labels = dict(sheet.get("required", []))
     missing = [label for field, label in sheet.get("required", [])
@@ -319,11 +379,14 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
     raise ValueError(f"Unknown action {action}.")
 
 
-def _context(db: Session, user: User) -> tuple[str, dict[str, str]]:
-    """Contexte en liste blanche : seulement ce qui sert aux actions du catalogue et à situer la journée."""
-    lines = []
+def _day_line(db: Session, user: User) -> str:
     day = get_current_planning_day(db, current_user=user)
-    lines.append(f"Journée : {'en cours depuis ' + day.started_at.isoformat(timespec='minutes') if day and not day.finished_at else 'non démarrée'}")
+    return f"Journée : {'en cours depuis ' + day.started_at.isoformat(timespec='minutes') if day and not day.finished_at else 'non démarrée'}"
+
+
+def _context(db: Session, user: User, session: ChatSession | None = None) -> tuple[str, dict[str, str]]:
+    """Agent Général. Contexte en liste blanche : seulement ce qui sert aux actions du catalogue et à situer la journée."""
+    lines = [_day_line(db, user)]
     active = get_current_active_mission(db, current_user=user).mission
     lines.append(f"Mission active : {active.title if active else 'aucune'}")
     projects = operations.list_projects(db, current_user=user).projects
@@ -337,6 +400,54 @@ def _context(db: Session, user: User) -> tuple[str, dict[str, str]]:
     order = [DOMAIN_LABELS.get(p.domain, p.domain) for p in get_canonical_priority_order(db, current_user=user)]
     lines.append("Priorités : " + " > ".join(order))
     return "\n".join(lines), aliases
+
+
+def _focus_project(db: Session, user: User, project_id: UUID | None, lines: list[str]) -> dict[str, str]:
+    """Un seul projet, repéré P1 : objectif et missions dans l'ordre (faites comprises, pour situer l'avancement)."""
+    project = next((p for p in operations.list_projects(db, current_user=user).projects if p.id == project_id), None)
+    if project is None:
+        lines.append("Projet : aucun (supprimé, terminé ou introuvable).")
+        return {}
+    lines.append(f"P1 : projet{' actif' if project.active else ' en attente'} « {project.title} »")
+    lines.append(f"Objectif : {project.description or 'non précisé'}")
+    for m in sorted(project.missions, key=lambda m: m.project_position or 0)[:30]:
+        done = m.status in ("completed", "cancelled", "failed")
+        lines.append(f"- {'[fait] ' if done else ''}{m.title}"
+                     + (f" ({m.estimated_minutes} min)" if m.estimated_minutes else ""))
+    if not project.missions:
+        lines.append("- aucune mission pour l'instant")
+    return {"P1": str(project.id)}
+
+
+def _project_context(db: Session, user: User, session: ChatSession) -> tuple[str, dict[str, str]]:
+    """Agent Projet : la journée et ce projet seulement ; aucun autre projet, ni routines."""
+    lines = [_day_line(db, user)]
+    aliases = _focus_project(db, user, _ref(session.context_ref), lines)
+    return "\n".join(lines), aliases
+
+
+def _mission_context(db: Session, user: User, session: ChatSession) -> tuple[str, dict[str, str]]:
+    """Agent Mission : la mission (repérée, sinon celle en cours) et son projet éventuel."""
+    lines = [_day_line(db, user)]
+    ref = _ref(session.context_ref)
+    if ref is None:
+        active = get_current_active_mission(db, current_user=user).mission
+        ref = active.id if active else None
+    mission = db.get(ImperiumMission, ref) if ref else None
+    if mission is None or mission.user_id != user.id:
+        lines.append("Mission : aucune en cours.")
+        return "\n".join(lines), {}
+    lines.append(f"Mission : « {mission.title} » ({mission.status})"
+                 + (f", prévue pour {mission.estimated_minutes} min" if mission.estimated_minutes else "")
+                 + (f", démarrée à {mission.started_at.isoformat(timespec='minutes')}" if mission.status == "active" else ""))
+    for label, value in (("Description", mission.description), ("Notes", mission.notes)):
+        if value:
+            lines.append(f"{label} : {value[:600]}")
+    aliases = _focus_project(db, user, mission.project_id, lines) if mission.project_id else {}
+    return "\n".join(lines), aliases
+
+
+CONTEXTS = {"general": _context, "project": _project_context, "mission": _mission_context}
 
 
 def _get(db: Session, user: User, session_id: UUID) -> ChatSession:
@@ -359,6 +470,6 @@ def _session_read(db: Session, session: ChatSession) -> ChatSessionRead:
     messages = db.scalars(select(ChatMessage).where(ChatMessage.session_id == session.id).order_by(ChatMessage.created_at))
     open_proposal = db.scalar(select(ChatProposal).where(ChatProposal.session_id == session.id, ChatProposal.status == "proposed"))
     return ChatSessionRead(id=session.id, status=session.status, context_kind=session.context_kind,
-                           context_ref=session.context_ref, started_at=session.started_at, closed_at=session.closed_at,
+                           context_ref=session.context_ref, agent=session.agent, started_at=session.started_at, closed_at=session.closed_at,
                            messages=[ChatMessageRead.model_validate(m) for m in messages],
                            open_proposal=ChatProposalRead.model_validate(open_proposal) if open_proposal else None)

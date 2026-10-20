@@ -26,7 +26,10 @@ def _http(exc: Exception) -> HTTPException:
 def start_route(payload: ChatSessionCreate, current_user: CurrentUserDep, db: SessionDep):
     if not engine.enabled(db):
         return _disabled()
-    return engine.start_session(db, current_user=current_user, payload=payload)
+    try:
+        return engine.start_session(db, current_user=current_user, payload=payload)
+    except engine.ChatNotFoundError as exc:  # repère de projet ou de mission qui n'est pas à l'utilisateur
+        raise _http(exc) from exc
 
 
 @router.get("/chat/sessions/{session_id}", response_model=ChatSessionRead)

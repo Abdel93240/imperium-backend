@@ -17,6 +17,7 @@ class ChatSession(UUIDPrimaryKeyMixin, Base):
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     context_kind: Mapped[str] = mapped_column(Text, nullable=False, default="general")
     context_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    agent: Mapped[str] = mapped_column(Text, nullable=False, default="general")  # 0117 : choisi par le code
     status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

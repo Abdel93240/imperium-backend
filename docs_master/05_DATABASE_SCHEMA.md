@@ -1919,6 +1919,8 @@ que par la validation explicite de l'utilisateur (cle d'idempotence tiree de la 
 Migration 20261020_0116 : parametre `chat.action_requirements` (fiche par action : champs requis et
 libelles, `min_description_chars` 15, `min_missions` 1, `max_missions` 10 pour `create_project`) ; aucune table.
 `create_project` porte desormais `params.missions` (liste titre + duree), creees a la validation.
+Migration 20261020_0117 : `chat_sessions.agent` (general|project|mission, defaut general, choisi par le code a
+l'ouverture) ; parametre `chat.agents` (role, libelle, actions, enabled ; project et mission semes false).
 Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
 
 ```sql

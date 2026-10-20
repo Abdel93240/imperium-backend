@@ -108,6 +108,20 @@ proposer). Le code applique la fiche : une proposition incomplète est refusée 
 répond lui-même par la question listant ce qui manque, sans proposition. `create_project` crée un projet
 complet (nom, objectif d'au moins 15 caractères, 1 à 10 premières missions avec durée éventuelle) en une seule
 validation ; les missions reçoivent des clés d'idempotence dérivées de celle de la proposition.
+Agents (migration 0117, 2026-10-20) : un agent par situation, décrit dans le paramètre éditable `chat.agents`
+(rôle, libellé, actions permises, activation). C'est le code qui choisit l'agent à l'ouverture de la session,
+selon son contexte, jamais le modèle ; l'agent est enregistré sur la session (`chat_sessions.agent`) et la
+session le garde jusqu'à la fermeture. Agent désactivé ou situation sans agent → Général.
+- Général (Dashboard, terminal sans projet déplié) : tout le catalogue, contexte général (liste blanche ci-dessus).
+- Projet (`context_kind=project`, `context_ref` = le projet ; terminal de « Gérer les projets » avec un projet
+  déplié) : ce projet seul, repéré P1 (objectif, missions dans l'ordre, faites comprises) ; seulement
+  `add_project_mission`. Semé désactivé.
+- Mission (`context_kind=mission`, `context_ref` = la mission, sinon la mission en cours ; sans mission en cours →
+  Général) : la mission et son projet ; seulement `add_project_mission` vers ce projet. Semé désactivé ; pas
+  encore d'entrée dans l'appli.
+Un repère de projet ou de mission qui n'appartient pas à l'utilisateur → 404. Une action hors de l'agent est
+refusée par le code (comme une proposition incomplète). Les repères P1… ne sont jamais montrés à l'utilisateur.
+Vault n'aura pas d'agent (routes sans IA) ; Pulse, Path et Vector auront le leur avec leurs actions de chat.
 
 ---
 
