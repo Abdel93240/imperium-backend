@@ -221,7 +221,7 @@ def request_examples() -> list[dict]:
         ("POST", "/pain-logs", "PainLogCreate",
          {"body_zone": "knee", "side": "left", "severity": 2}),
         ("POST", "/medical-rules", "MedicalRuleCreate",
-         {"rule_type": "training", "rule_text": "Exemple fictif à remplacer après relecture.",
+         {"rule_type": "workout_limit", "rule_text": "Exemple fictif à remplacer après relecture.",
           "severity": "info"}),
         ("POST", "/medical-rules/{rule_id}/activate", "MedicalRuleActivateRequest",
          {"reviewed_source": True, "confirmed_text": True, "still_relevant": True}),

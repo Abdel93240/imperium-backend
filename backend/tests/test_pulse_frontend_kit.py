@@ -85,6 +85,20 @@ def test_examples_validate_against_actual_request_models(kit):
         builder.REQUEST_MODELS[example["schema"]].model_validate(example["body"])
 
 
+def test_medical_rule_example_uses_the_current_workout_constraint_contract():
+    """Un exemple obsolète ne doit pas empêcher la génération de toute la livraison."""
+    builder = _load("build_pulse_frontend_kit")
+
+    examples = builder.request_examples()
+    example = next(row for row in examples if row["schema"] == "MedicalRuleCreate")
+
+    model = builder.REQUEST_MODELS["MedicalRuleCreate"].model_validate(example["body"])
+    assert example["path"] == "/api/imperium/pulse/medical-rules"
+    assert model.rule_type == "workout_limit"
+    assert model.source_document_id is None
+    assert example["synthetic"] is True
+
+
 def test_kit_documents_all_canonical_screens_and_unavailable_features(kit):
     _, output, _ = kit
     screens = (output / "Pulse_Frontend_Kit/03_ECRANS_ET_PARCOURS.md").read_text()
