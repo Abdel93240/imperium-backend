@@ -25,10 +25,10 @@ from app.api.deps import get_current_user, get_db  # noqa: E402
 from app.api.v1.routes import imperium_chat  # noqa: E402
 from app.models.auth import User  # noqa: E402
 from app.models.imperium import ImperiumMission, ImperiumProject  # noqa: E402
-from app.schemas.operations import ProjectCreate  # noqa: E402
+from app.schemas.operations import ProjectCreate, ProjectMissionCreate  # noqa: E402
 from app.services.ai import local_executor  # noqa: E402
 from app.services.imperium import operations  # noqa: E402
-from app.services.params import set_parameter  # noqa: E402
+from app.services.params import get_parameter, set_parameter  # noqa: E402
 
 P = "/api/imperium/chat/sessions"
 LOOPBACK = "http://127.0.0.1:8081"
@@ -253,3 +253,65 @@ def test_incomplete_project_asks_questions_instead_of_proposing(db, fake) -> Non
     proposal = _say(client, sid, "Juste un nom")["proposal"]
     assert proposal["params"]["title"] == "Simple"
     assert client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").json()["result"]["missions"] == 0
+
+
+def _agents(db, **enabled) -> None:
+    seeded = get_parameter(db, "chat.agents")  # la fiche semée par la migration, seule l'activation change
+    set_parameter(db, code="chat.agents", value={k: {**v, "enabled": enabled.get(k, k == "general")} for k, v in seeded.items()},
+                  origin="user", rationale_fr="Test.")
+    db.commit()
+
+
+def test_agents_are_chosen_by_code_with_their_own_context_and_actions(db, fake) -> None:
+    _enable(db)
+    user = _user(db)
+    client = _client(db, user)
+    site = operations.create_project(db, current_user=user, idempotency_key=str(uuid4()),
+                                     payload=ProjectCreate(title="Lancer le site", description="Un site vitrine en ligne"))
+    operations.create_project(db, current_user=user, idempotency_key=str(uuid4()), payload=ProjectCreate(title="Secret voisin"))
+    first = operations.add_project_mission(db, current_user=user, project_id=site.id, idempotency_key=str(uuid4()),
+                                           payload=ProjectMissionCreate(title="Choisir l'hébergeur", estimated_minutes=30))
+    db.commit()
+    project_ref = {"context_kind": "project", "context_ref": str(site.id)}
+
+    # Semés désactivés : le terminal ouvert depuis un projet reste sur l'agent Général.
+    assert client.post(P, json=project_ref).json()["agent"] == "general"
+    _agents(db, project=True, mission=True)
+    response = client.post(P, json=project_ref)
+    assert response.status_code == 201 and response.json()["agent"] == "project"
+    sid = response.json()["id"]
+    assert client.post(P, json={"context_kind": "project", "context_ref": str(uuid4())}).status_code == 404
+    assert client.post(P, json={"context_kind": "project", "context_ref": "pas-un-uuid"}).status_code == 404
+    assert _client(db, _user(db)).post(P, json=project_ref).status_code == 404  # projet d'un autre
+
+    # Agent Projet : son rôle, ce projet seul (P1), et seulement l'ajout de mission.
+    fake.outputs.append({"reply_fr": "Voici.", "proposal": {"action": "add_project_mission", "summary_fr": "Ajouter « Maquette »",
+                                                           "params": {"project_id": "P1", "title": "Maquette", "estimated_minutes": None,
+                                                                      "notes": None}}})
+    proposal = _say(client, sid, "Ajoute une maquette")["proposal"]
+    assert proposal["params"]["project_id"] == str(site.id)
+    assert "UN seul projet, P1" in fake.systems[-1] and "create_routine" not in fake.systems[-1]
+    assert "Objectif : Un site vitrine en ligne" in fake.prompts[-1] and "Choisir l'hébergeur (30 min)" in fake.prompts[-1]
+    assert "Secret voisin" not in fake.prompts[-1] and "Routines" not in fake.prompts[-1]
+    fake.outputs += [_project(), _project()]  # action non permise à cet agent → refusée deux fois
+    turn = _say(client, sid, "Crée un autre projet")
+    assert turn["proposal"] is None and "non permise" in fake.prompts[-1]
+
+    # Agent Mission : mission en cours (sans repère) et son projet ; aucune mission en cours → Général.
+    assert client.post(P, json={"context_kind": "mission"}).json()["agent"] == "general"
+    mission = db.get(ImperiumMission, first.id)
+    mission.status = "active"
+    db.commit()
+    started = client.post(P, json={"context_kind": "mission"}).json()
+    assert started["agent"] == "mission"
+    fake.outputs.append({"reply_fr": "Commence par comparer deux offres.", "proposal": None})
+    _say(client, started["id"], "Je bloque")
+    assert "UNE mission" in fake.systems[-1]
+    assert "Mission : « Choisir l'hébergeur » (active), prévue pour 30 min" in fake.prompts[-1]
+    assert "P1 : projet" in fake.prompts[-1] and "Secret voisin" not in fake.prompts[-1]
+    assert client.post(P, json={"context_kind": "mission", "context_ref": str(uuid4())}).status_code == 404
+
+    # Agent désactivé à nouveau : retour au Général ; la session déjà ouverte garde son agent.
+    _agents(db)
+    assert client.post(P, json=project_ref).json()["agent"] == "general"
+    assert client.get(f"{P}/{sid}").json()["agent"] == "project"

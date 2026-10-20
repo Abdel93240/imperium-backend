@@ -55,6 +55,7 @@ class ChatSessionRead(BaseModel):
     status: str
     context_kind: str
     context_ref: str | None
+    agent: str
     started_at: datetime
     closed_at: datetime | None
     messages: list[ChatMessageRead]
