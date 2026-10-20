@@ -46,6 +46,9 @@ class PathRegisteredMosque(UUIDPrimaryKeyMixin, Base):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     latitude: Mapped[float | None] = mapped_column(Numeric, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    # {prière: minutes} : adhan de la mosquée moins le calcul local à ses coordonnées ; attente adhan → iqama.
+    adhan_offsets: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    iqama_offsets: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     is_default: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )

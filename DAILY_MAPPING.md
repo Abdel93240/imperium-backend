@@ -8,7 +8,8 @@ du §15 (externalisation des barèmes + verrou de parité), le réglage versionn
 registre (§4.6) et l'étape 3 (portes, trajet, ensemble obligatoire, sélection, journal, pull-forward ;
 vague 28), les overrides et leur agrégation au docket (§10.1-10.2, vague 29), la porte G5 sur la vue
 contractuelle Pulse (vague 29), les événements calendrier bloquants comme engagements fixes de G4
-(D-8, hors prières). Pas encore codés : prières en engagements fixes, Niveaux 2-3 (§8), préemption (§9),
+(D-8), et les prières comme engagements fixes de G4 (Q6, ACT-DLY-10). Pas encore codés : la mission
+« jusqu'à la prière » des missions sans fin précise, Niveaux 2-3 (§8), préemption (§9),
 `POST disruption`, `POST arbitrations/{id}/decision`.
 
 ## Réponses aux cinq questions du §0
@@ -66,6 +67,7 @@ contractuelle Pulse (vague 29), les événements calendrier bloquants comme enga
 | Overrides (§3.4, §10.1) | **créé** `daily_overrides` (+ user_id, une par sélection) ; event `planning.daily.override_recorded` | migration 0105, ACT-DLY-07 |
 | Agrégation (§10.2) | **créé** job `daily.override_aggregation` → item `ordering_override_pattern` (worker `w5` ajouté) | ACT-DLY-08 |
 | G5 Pulse (§5) | **créé** : lecture de `v_pulse_active_blocks` seulement (pas des tables médicales) derrière `daily.g5_enabled` ; `daily.pulse_block_load` 4 | migration 0106, ACT-DLY-05 |
+| Prières (§5 G4, Q6, ACT-DLY-10) | **étendu** : départ vers la prochaine prière, `app/services/daily/prayers.py` (lecture seule de Path `mosque_times`), derrière `daily.prayer_commitments_enabled` ; `next_fixed_kind=prayer` ; `GET /api/daily/prayers` | migration 0113 |
 | Engagements calendrier (§5 G4, D-8) | **étendu** : `imperium_calendar_events` à venir, `blocks_time`, non supprimés, derrière `daily.calendar_commitments_enabled` ; `daily_selection_log.next_fixed_kind` | migration 0107 |
 | Refresh (§4.6) | **créé** : `refresh_scores` (cron 6 h Paris, `planning.day.started`, après réglage) ; entrées B-E gardées dans `explanation.inputs` ; CHECK de coefficients figés remplacés par `> 0` | migration 0103, ACT-DLY-03 |
 
@@ -91,6 +93,13 @@ contractuelle Pulse (vague 29), les événements calendrier bloquants comme enga
   bloquant si `daily.calendar_commitments_enabled`), sinon jusqu'à minuit (Paris) ; la spec borne la
   journée par démarrage → clôture, sans heure de fin connue. Un événement calendrier déjà commencé
   n'est pas une borne (l'appel montre que l'utilisateur est disponible).
+- Prières (`daily.prayer_commitments_enabled`) : depuis la position de l'appel, parmi les mosquées
+  enregistrées à au plus `path.mosque_search_travel_min` de trajet (marge `path.mosque_travel_margin_pct`
+  comprise, trajet toujours local), celles où l'on arrive à l'adhan de CETTE mosquée ; retenue celle qui
+  prie le plus tôt. La borne est le départ (adhan − trajet) ; aucune joignable ou position inconnue :
+  l'adhan de référence (prière seul). Horaires par mosquée : cache MAWAQIT, sinon calcul local à ses
+  coordonnées + décalages saisis. Bloc : iqama + `path.prayer_after_iqama_min`, sinon adhan +
+  `path.prayer_solo_block_min`. Le plan du jour part du lieu où finit la mission précédente.
 - Niveau 2 non codé : C1 (`empty_feasible`) et C2 (`mandatory_conflict`) sont journalisés
   `arbitration_pending` (level 2) avec l'event `planning.daily.arbitration_required`, sans table
   `daily_arbitrations` ni slot. G5 (Pulse) : `g5` vaut `stub` (flag
