@@ -315,3 +315,53 @@ def test_agents_are_chosen_by_code_with_their_own_context_and_actions(db, fake) 
     _agents(db)
     assert client.post(P, json=project_ref).json()["agent"] == "general"
     assert client.get(f"{P}/{sid}").json()["agent"] == "project"
+
+
+def test_agent_switch_is_a_proposal_the_user_validates(db, fake) -> None:
+    _enable(db)
+    user = _user(db)
+    client = _client(db, user)
+    site = operations.create_project(db, current_user=user, idempotency_key=str(uuid4()),
+                                     payload=ProjectCreate(title="Lancer le site", description="Un site vitrine en ligne"))
+    db.commit()
+    sid = _session(client)
+
+    # Agents désactivés : aucun changement possible, un « switch » du modèle est ignoré.
+    fake.outputs.append({"reply_fr": "Ok.", "proposal": None, "switch": {"agent": "project", "project_id": "P1"}})
+    assert _say(client, sid, "Parlons du site")["proposal"] is None
+    assert "Changer d'agent" not in fake.systems[-1]
+
+    _agents(db, project=True, mission=True)
+    fake.outputs.append({"reply_fr": "On passe sur le site ?", "proposal": None, "switch": {"agent": "project", "project_id": "P1"}})
+    turn = _say(client, sid, "Parlons du site")
+    assert "Changer d'agent" in fake.systems[-1] and "- project :" in fake.systems[-1] and "- mission :" not in fake.systems[-1]
+    proposal = turn["proposal"]
+    assert proposal["action"] == "switch_agent" and proposal["summary_fr"] == "Passer sur le projet « Lancer le site »"
+    assert proposal["params"] == {"agent": "project", "context_ref": str(site.id)}
+    assert client.get(f"{P}/{sid}").json()["agent"] == "general"  # rien ne change avant validation
+    done = client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").json()
+    assert done["status"] == "validated" and done["result"] == {"agent": "project", "label": "Projet", "context_ref": str(site.id)}
+    session = client.get(f"{P}/{sid}").json()
+    assert (session["agent"], session["context_kind"], session["context_ref"]) == ("project", "project", str(site.id))
+
+    # Désormais l'agent Projet répond (son rôle, son contexte) ; il peut proposer de revenir au Général.
+    fake.outputs.append({"reply_fr": "On revient au général ?", "proposal": None, "switch": {"agent": "general"}})
+    back = _say(client, sid, "Crée-moi une routine de lecture")["proposal"]
+    assert "UN seul projet, P1" in fake.systems[-1] and "- general :" in fake.systems[-1]
+    assert back["summary_fr"] == "Revenir à l'agent Général"
+
+    # Une action valable l'emporte sur un changement ; une cible devenue invalide fait échouer la validation.
+    fake.outputs.append({"reply_fr": "Voici.", "switch": {"agent": "general"},
+                         "proposal": {"action": "add_project_mission", "summary_fr": "Ajouter « Maquette »",
+                                      "params": {"project_id": "P1", "title": "Maquette", "estimated_minutes": None, "notes": None}}})
+    assert _say(client, sid, "Ajoute une maquette")["proposal"]["action"] == "add_project_mission"
+    fake.outputs.append({"reply_fr": "On revient ?", "proposal": None, "switch": {"agent": "general"}})
+    back = _say(client, sid, "Autre chose")["proposal"]
+    assert client.post(f"{P}/{sid}/proposals/{back['id']}/validate").json()["status"] == "validated"
+    assert client.get(f"{P}/{sid}").json()["agent"] == "general"
+    fake.outputs.append({"reply_fr": "Le site ?", "proposal": None, "switch": {"agent": "project", "project_id": "P1"}})
+    again = _say(client, sid, "Le site")["proposal"]
+    operations.delete_project(db, current_user=user, project_id=site.id)
+    db.commit()
+    failed = client.post(f"{P}/{sid}/proposals/{again['id']}/validate").json()
+    assert failed["status"] == "failed" and client.get(f"{P}/{sid}").json()["agent"] == "general"

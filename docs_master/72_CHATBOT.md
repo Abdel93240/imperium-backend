@@ -122,6 +122,15 @@ session le garde jusqu'à la fermeture. Agent désactivé ou situation sans agen
 Un repère de projet ou de mission qui n'appartient pas à l'utilisateur → 404. Une action hors de l'agent est
 refusée par le code (comme une proposition incomplète). Les repères P1… ne sont jamais montrés à l'utilisateur.
 Vault n'aura pas d'agent (routes sans IA) ; Pulse, Path et Vector auront le leur avec leurs actions de chat.
+Changement d'agent en cours de discussion (migration 0118, 2026-10-20) : quand l'utilisateur veut travailler sur
+un sujet qu'un autre agent gère mieux, le modèle remplit `switch` (agent visé, et projet P1… pour l'agent Projet)
+et le dit en une phrase. Le code en fait une proposition `switch_agent` (résumé écrit par le code avec le vrai
+titre), affichée en carte comme une action : rien ne change avant la validation. Seuls les agents activés,
+autres que l'actuel et avec une cible réelle, sont offerts (Mission seulement si une mission est en cours).
+Une action valable l'emporte sur un changement dans le même tour. À la validation, le code revérifie tout
+(agent activé, projet ouvert à l'utilisateur, mission en cours) puis change l'agent et le contexte de la
+session ; la proposition validée reste comme trace. Pas de bascule automatique (suggérer, puis l'utilisateur
+décide).
 
 ---
 
