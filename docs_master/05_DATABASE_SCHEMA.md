@@ -1802,6 +1802,27 @@ present ; lignes anterieures : mission). Quand `daily.calendar_commitments_enabl
 vrai, le temps restant s'arrete au plus proche entre la mission `is_fixed_commitment` a venir et
 l'evenement `imperium_calendar_events` a venir, `blocks_time`, non soft-supprime. Un evenement deja
 commence n'est pas une borne. Les prieres (Q6) restent hors de ce lot.
+Signaux Pulse hors montre et board (migration 20261020_0108, 2026-10-20, spec Pulse §3.1, §4, §14,
+cartes ACT-PLS-08 et ACT-PLS-05 ; familles V8 partielles) :
+
+```sql
+pulse_subjective_reports (id, user_id FK users ON DELETE CASCADE, kind fatigue|mood|stress,
+  level SMALLINT 1 (bien) .. 5 (mal), reported_at, idempotency_key UNIQUE par utilisateur,
+  request_hash, created_at)
+```
+
+Signaux `pulse.*` semes INACTIFS dans la table partagee `signal_definitions` (domain `pulse`, jamais de
+`pulse_signal_definitions`) : pain_active (severite max des douleurs ouvertes ; 1 yellow, 4 orange,
+8 red), fatigue_reported / mood_reported / stress_reported (dernier signalement du jour ; 3 yellow,
+4 orange, 5 red), last_meal_hours (> 18 h orange, neutre pendant un jeune), training_adherence_7d
+(seances faites / prevues ; ≥ 0,8 green, ≥ 0,6 yellow, sinon orange), workload_today_h (lecture du
+planning, informatif). `bands` porte `kind` (high|low|info) et `freshness_minutes`. Valeurs dans
+`signal_values` avec `detail.user_id` ; un refresh sans changement ne fait que rafraichir
+`measured_at`. Suppression reelle d'un signalement ou d'une douleur : ses valeurs de signal partent
+aussi. Job `pulse.signals_refresh` (cron `*/15`, seme desactive) ; refresh immediat apres un
+signalement et apres une douleur creee, resolue ou supprimee. `pulse.board_enabled` et
+`pulse.reports_enabled` semes false. Non codes : signaux montre, hydratation et nutrition a cible
+personnalisee, dette de volume et recuperation, medical structure.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

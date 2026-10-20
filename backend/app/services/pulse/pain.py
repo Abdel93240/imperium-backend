@@ -22,7 +22,7 @@ from app.models.imperium import PlanningReplanEvent, PulsePainLog, PulseWorkout
 from app.schemas.imperium import ReplanRead
 from app.schemas.pulse_health import PainLogCreate, PainLogListResponse, PainLogRead, PainReplanResponse
 from app.services.events.emitter import build_event
-from app.services.pulse import food_stock, health_consent, red_flags
+from app.services.pulse import food_stock, health_consent, red_flags, signals
 
 STRONG = 8
 REPLAN_MESSAGE = "Douleur forte : veux-tu replanifier ta journée ?"
@@ -66,6 +66,7 @@ def create_log(db: Session, *, current_user: User, payload: PainLogCreate, idemp
     db.refresh(log)
     _emit(db, current_user, "pulse.pain.logged", {"pain_log_id": str(log.id)}, str(log.id))
     red_flags.evaluate(db, current_user=current_user)
+    signals.refresh(db, current_user=current_user, codes=("pulse.pain_active",))
     read = _read(log)
     db.commit()
     return read, False
@@ -94,6 +95,7 @@ def resolve_log(db: Session, *, current_user: User, pain_log_id: UUID) -> PainLo
         log.resolved_at = datetime.now(UTC)
         _emit(db, current_user, "pulse.pain.resolved", {"pain_log_id": str(log.id)}, str(log.id))
         db.flush()
+        signals.refresh(db, current_user=current_user, codes=("pulse.pain_active",))
     read = _read(log)
     db.commit()
     return read
@@ -129,6 +131,8 @@ def request_replan(
 def delete_log(db: Session, *, current_user: User, pain_log_id: UUID) -> None:
     db.delete(_get(db, current_user, pain_log_id))
     _emit(db, current_user, "pulse.pain.deleted", {"deleted": 1, "scope": "one"}, str(pain_log_id))
+    db.flush()
+    signals.forget_pain(db, current_user=current_user, pain_log_id=pain_log_id)
     db.commit()
 
 
@@ -136,6 +140,7 @@ def delete_all(db: Session, *, current_user: User) -> int:
     deleted = db.execute(delete(PulsePainLog).where(PulsePainLog.user_id == current_user.id)).rowcount or 0
     if deleted:
         _emit(db, current_user, "pulse.pain.deleted", {"deleted": deleted, "scope": "all"}, None)
+    signals.forget_pain(db, current_user=current_user)
     db.commit()
     return deleted
 
