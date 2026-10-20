@@ -86,3 +86,41 @@ class DispatchReactionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reaction: Literal["useful", "useless", "missed"]
+
+
+class MetricsDayRead(BaseModel):
+    """Compteurs d'un jour de Paris ; null = pas encore mesurable (propositions, solveur)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    metric_date: date
+    dispatches: int
+    skipped_passes: int
+    dispatches_useful: int
+    dispatches_useless: int
+    missed_reports: int
+    escalations: int
+    invalid_fallbacks: int
+    red_flags: int
+    proposals: int | None = None
+    accepted: int | None = None
+    refused: int | None = None
+    modified: int | None = None
+    solver_runs: int | None = None
+    solver_infeasible: int | None = None
+    agreement_by_slot: dict | None = None
+
+
+class MetricsSlotRead(BaseModel):
+    slot_code: str
+    tier: str
+    audit_sample_pct: int
+    agreement_target_pct: int | None
+    last_week_agreement_pct: float | None
+    decay_proposed: bool
+
+
+class MetricsSummaryRead(BaseModel):
+    days: list[MetricsDayRead]  # jours clos enregistrés par le rollup, du plus ancien au plus récent
+    today: MetricsDayRead  # calculé à la volée, jamais enregistré
+    slots: list[MetricsSlotRead]

@@ -1850,6 +1850,23 @@ dans la fenetre. Jobs `pulse.sentinel_tick` (cron `*/15`) et `pulse.dispatch_run
 semes desactives ; le runner ecrit une sortie factice `dry_run` validee par le contrat de
 l'interprete et echoue sans rien consommer si `real_ai_enabled` est vrai. Catalogue des procedures
 P1-P10 et runner de procedures non codes. Effacement reel de l'historique par l'utilisateur.
+Metriques quotidiennes Pulse (migration 20261020_0110, 2026-10-20, spec Pulse §3.9, §13, carte
+ACT-PLS-27) :
+
+```sql
+pulse_metrics_daily (id, user_id FK users ON DELETE CASCADE, metric_date (jour de Paris),
+  dispatches, skipped_passes, dispatches_useful, dispatches_useless, missed_reports, escalations,
+  invalid_fallbacks, red_flags (NOT NULL), proposals, accepted, refused, modified, solver_runs,
+  solver_infeasible (NULL = pas encore mesurable), agreement_by_slot jsonb (slots pulse.* contre-lus ce
+  jour, NULL sinon), computed_at ; UNIQUE (user_id, metric_date))
+```
+
+La spec avait `metric_date` en cle seule ; `user_id` ajoute comme partout. Comptes tires de
+`pulse_dispatch_log` (un reveil retenu compte, une passe verte gratuite va dans `skipped_passes`) et de
+`pulse_red_flag_events`. Slot `pulse.interpreter` seme dans `ai_slot_transition` (local_default, audit
+100 %, cible 92 %) ; pas de job d'audit Pulse dedie, le job partage `wr.audit_weekly` couvre tous les
+slots. Job `pulse.metrics_rollup` (cron `45 0 * * *` UTC, seme desactive) : recalcule les deux derniers
+jours clos.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

@@ -1,5 +1,5 @@
 """Board Pulse, signalements subjectifs et journal de la sentinelle (spec Pulse §3.1, §3.2, §14 ;
-cartes ACT-PLS-08, ACT-PLS-05, ACT-PLS-10/13/15)."""
+cartes ACT-PLS-08, ACT-PLS-05, ACT-PLS-10/13/15, ACT-PLS-27)."""
 
 from datetime import date
 from uuid import UUID
@@ -14,12 +14,13 @@ from app.schemas.pulse_signals import (
     DispatchListResponse,
     DispatchRead,
     DispatchReactionRequest,
+    MetricsSummaryRead,
     SubjectiveReportCreate,
     SubjectiveReportListResponse,
     SubjectiveReportRead,
 )
 from app.services.path.fasting import paris_today
-from app.services.pulse import sentinel, signals
+from app.services.pulse import metrics, sentinel, signals
 
 router = APIRouter()
 
@@ -107,3 +108,11 @@ def react_route(dispatch_id: UUID, payload: DispatchReactionRequest, current_use
 def forget_history_route(current_user: CurrentUserDep, db: SessionDep):
     """Suppression réelle des réveils et boards figés, toujours possible (même flag éteint)."""
     return DeletedCountRead(deleted=sentinel.forget_history(db, current_user=current_user))
+
+
+@router.get("/metrics/summary", response_model=MetricsSummaryRead)
+def metrics_summary_route(current_user: CurrentUserDep, db: SessionDep, days: int = Query(default=7, ge=1, le=90)):
+    """Jours clos enregistrés, aujourd'hui à la volée et état d'audit des slots Pulse (lecture seule)."""
+    if not signals.board_enabled(db):
+        return _disabled("PULSE_BOARD_DISABLED")
+    return metrics.summary(db, current_user=current_user, days=days)

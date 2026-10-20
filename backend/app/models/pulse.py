@@ -1,10 +1,10 @@
 """Règles rouges, signalements subjectifs et sentinelle Pulse (spec Pulse §3.2, §3.5, §5, §11, §14 ;
-CHECK constraints live in migrations 0106, 0108, 0109)."""
+CHECK constraints live in migrations 0106, 0108, 0109 ; métriques 0110)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, SmallInteger, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -113,3 +113,28 @@ class PulseDispatchLog(UUIDPrimaryKeyMixin, Base):
     reacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PulseMetricsDaily(UUIDPrimaryKeyMixin, Base):
+    """Compteurs d'un jour de Paris (spec Pulse §3.9 + user_id) ; NULL = pas encore mesurable."""
+
+    __tablename__ = "pulse_metrics_daily"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    metric_date: Mapped[date] = mapped_column(Date, nullable=False)
+    dispatches: Mapped[int] = mapped_column(Integer, nullable=False)
+    skipped_passes: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatches_useful: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatches_useless: Mapped[int] = mapped_column(Integer, nullable=False)
+    missed_reports: Mapped[int] = mapped_column(Integer, nullable=False)
+    escalations: Mapped[int] = mapped_column(Integer, nullable=False)
+    invalid_fallbacks: Mapped[int] = mapped_column(Integer, nullable=False)
+    red_flags: Mapped[int] = mapped_column(Integer, nullable=False)
+    proposals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    accepted: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    refused: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    modified: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solver_runs: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solver_infeasible: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    agreement_by_slot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
