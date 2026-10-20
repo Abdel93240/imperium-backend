@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.imperium import ImperiumMission, PulseWorkout
+from app.models.pulse import PulseProgram
 from app.schemas.pulse_workouts import (
     WorkoutCompleteRequest,
     WorkoutCreate,
@@ -28,7 +29,7 @@ from app.schemas.pulse_workouts import (
     WorkoutUpdate,
 )
 from app.services.events.emitter import build_event
-from app.services.pulse import food_stock
+from app.services.pulse import food_stock, training
 from app.services.pulse.expiry import PARIS
 
 MAX_RANGE_DAYS = 62
@@ -71,11 +72,16 @@ def create_workout(
         mission = db.get(ImperiumMission, payload.source_mission_id)
         if mission is None or mission.user_id != current_user.id:
             raise WorkoutNotFoundError("Mission not found.")
+    if payload.program_id is not None:
+        program = db.get(PulseProgram, payload.program_id)
+        if program is None or program.user_id != current_user.id:
+            raise WorkoutNotFoundError("Program not found.")
     workout = PulseWorkout(
         user_id=current_user.id, title=payload.title, status="planned", planned_at=payload.planned_at,
         duration_minutes=payload.duration_minutes, intensity=payload.intensity,
         exercises=[exercise.model_dump(mode="json") for exercise in payload.exercises], equipment=payload.equipment,
-        source_mission_id=payload.source_mission_id, version=1, idempotency_key=idempotency_key, request_hash=fingerprint,
+        source_mission_id=payload.source_mission_id, program_id=payload.program_id,
+        session_type=payload.session_type, systemic_load=payload.systemic_load, version=1, idempotency_key=idempotency_key, request_hash=fingerprint,
     )
     db.add(workout)
     db.flush()
@@ -168,6 +174,7 @@ def complete_workout(
     workout.actual_duration_minutes = payload.duration_minutes
     workout.notes_post_workout = (payload.notes or "").strip() or None
     skipped = sum(1 for exercise in exercises if exercise.get("skipped"))
+    training.settle_debts(db, workout=workout)
     return _close(db, current_user, workout, idempotency_key, fingerprint, "pulse.workout.completed", {
         "intensity_score": workout.intensity_score, "duration_minutes": workout.actual_duration_minutes,
         "exercises_done": sum(1 for exercise in exercises if exercise.get("done_sets")), "exercises_skipped": skipped,
@@ -184,6 +191,7 @@ def skip_workout(
         return replay
     workout.status = "skipped"
     workout.skip_reason = payload.reason
+    training.settle_debts(db, workout=workout)
     return _close(db, current_user, workout, idempotency_key, fingerprint, "pulse.workout.skipped", {"reason": payload.reason})
 
 

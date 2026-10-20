@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Intensity = Literal["low", "medium", "high"]
+SessionType = Literal["strength", "hypertrophy", "cardio", "mobility", "technique", "mental"]
 
 
 def _strip(cls, value: object) -> object:  # noqa: ARG001 (validateur partagé)
@@ -23,6 +24,7 @@ class ExerciseIn(BaseModel):
     duration_seconds: int | None = Field(default=None, ge=1, le=36000)
     weight_kg: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("1000"), max_digits=6, decimal_places=2)
     notes: str | None = Field(default=None, max_length=500)
+    muscle_group: str | None = Field(default=None, min_length=1, max_length=40)  # compte le volume du programme
 
     _strip_name = field_validator("name", mode="before")(_strip)
 
@@ -48,6 +50,9 @@ class WorkoutCreate(BaseModel):
     exercises: list[ExerciseIn] = Field(default_factory=list, max_length=50)
     equipment: list[str] = Field(default_factory=list, max_length=30)
     source_mission_id: UUID | None = None
+    program_id: UUID | None = None
+    session_type: SessionType | None = None
+    systemic_load: int | None = Field(default=None, ge=1, le=10)
 
     _strip_title = field_validator("title", mode="before")(_strip)
 
@@ -70,6 +75,8 @@ class WorkoutUpdate(BaseModel):
     intensity: Intensity | None = None
     exercises: list[ExerciseIn] | None = Field(default=None, max_length=50)
     equipment: list[str] | None = Field(default=None, max_length=30)
+    session_type: SessionType | None = None
+    systemic_load: int | None = Field(default=None, ge=1, le=10)
 
     _strip_title = field_validator("title", mode="before")(_strip)
 
@@ -143,6 +150,9 @@ class WorkoutRead(BaseModel):
     exercises: list[ExerciseRead]
     equipment: list[str]
     source_mission_id: UUID | None
+    program_id: UUID | None = None
+    session_type: str | None = None
+    systemic_load: int | None = None
     started_at: datetime | None
     completed_at: datetime | None
     actual_duration_minutes: int | None

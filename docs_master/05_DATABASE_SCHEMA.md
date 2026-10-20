@@ -1893,6 +1893,31 @@ choix factice tant que `real_ai_enabled` est faux, validation avec repli `mainta
 bloquants ; pas de seance high apres 12 h de jeune ni deux jours high d'affilee). Un blocage sante
 actif arrete P1. Les autres procedures s'arretent en `aborted` (`not_coded`). Parametre
 `pulse.proposals_enabled` seme false.
+Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
+
+```sql
+pulse_programs (id, user_id FK users ON DELETE CASCADE, name, objective_weights jsonb, mesocycle jsonb,
+  doctrine_sheet_code NULL (corpus absent), status active|paused|completed|superseded,
+  created_by_run FK pulse_procedure_runs ON DELETE SET NULL, version, idempotency_key UNIQUE par
+  utilisateur, request_hash, created_at, updated_at ; UNIQUE un seul active par utilisateur)
+pulse_program_targets (id, program_id FK ON DELETE CASCADE, week_start (lundi, CHECK), muscle_group,
+  target_sets, tolerance_sets DEFAULT 2 ; UNIQUE (program_id, week_start, muscle_group))
+pulse_workouts + program_id FK pulse_programs ON DELETE SET NULL, session_type
+  strength|hypertrophy|cardio|mobility|technique|mental, systemic_load 1..10
+pulse_volume_debt (id, user_id, program_id FK ON DELETE CASCADE, muscle_group, debt_sets > 0,
+  origin_workout_id FK ON DELETE CASCADE, repayment_workout_id FK ON DELETE SET NULL,
+  created_by_proposal FK ON DELETE SET NULL, status open|scheduled|repaid|written_off, created_at,
+  resolved_at)
+pulse_legal_moves (id, code UNIQUE, name_fr, preconditions, parameters_schema, effects, doctrine_refs,
+  version, active DEFAULT true)
+```
+
+`pulse_workouts` est etendue au lieu d'une table `pulse_sessions` en double ; le groupe musculaire est
+porte par chaque exercice (`exercises[].muscle_group`), le volume se compte en series planifiees par
+semaine de Paris. Les 8 coups du §8 sont semes actifs (evalues en code ; un coup desactive n'est jamais
+legal). Dette : nee d'un coup accepte, placee par `repay_debt`, remboursee quand la seance est
+terminee, rouverte si elle est sautee ; la perte reste une decision du WR, non codee. Parametres
+`pulse.programs_enabled` false et `pulse.max_debt_sets_group` 10.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels
