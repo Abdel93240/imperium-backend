@@ -4,7 +4,10 @@ Un tour = message de l'utilisateur → contexte en LISTE BLANCHE (journée, miss
 missions à faire, routines, priorités ; jamais de santé, de religion ni de finances détaillées) + historique
 récent → modèle local à température 0, sortie contrainte {reply_fr, proposal|null}. La proposition est vérifiée
 par le code (action du catalogue, paramètres validés par les schémas d'écriture existants, projet ouvert) ;
-sortie invalide → un nouvel essai avec les erreurs, puis réponse sans proposition. Elle n'est JAMAIS exécutée ici :
+sortie invalide → un nouvel essai avec les erreurs, puis réponse sans proposition. Chaque action a sa fiche
+« ce qu'il faut savoir » (`chat.action_requirements`, donnée éditable) : une proposition incomplète est refusée et,
+si le modèle insiste, c'est le code qui pose la question. Un projet naît complet (objectif et premières
+missions), validé en une seule fois. Elle n'est JAMAIS exécutée ici :
 seule `validate_proposal`, appelée par l'utilisateur, écrit (doc 72 §4-5, doc 08), avec une clé d'idempotence
 tirée de la proposition (une validation rejouée ne crée rien de plus).
 
@@ -39,21 +42,42 @@ DOMAIN_LABELS = {"religious": "Religion", "business": "Business", "finance": "Fi
 DEGRADED_REPLY = ("Le moteur local est indisponible pour le moment : je ne peux pas te répondre. "
                   "Réessaie dans un instant ; rien n'a été modifié.")
 
-SYSTEM = (
-    "Tu es l'assistant d'Imperium, le système personnel qui organise la vie de l'utilisateur. Tu réponds en français, "
-    "en le tutoyant, clairement et brièvement. Tu ne fais JAMAIS rien toi-même : quand l'utilisateur demande une action que tu sais "
-    "faire, tu la proposes dans « proposal », avec un résumé d'une phrase, et c'est lui qui la validera. Une seule "
-    "proposition par réponse ; aucune si rien n'est demandé. Actions possibles :\n"
-    "- create_project : créer un projet (params : title, description facultative) ;\n"
-    "- add_project_mission : ajouter une mission à un projet existant (params : project_id = le repère du projet "
-    "dans le contexte, par exemple P1, "
-    "title, estimated_minutes facultatif, notes facultatives) ;\n"
-    "- create_routine : créer une routine (params : name, frequency daily|weekly|biweekly|monthly, "
-    "estimated_minutes facultatif, priority low|medium|high, notes facultatives).\n"
-    "Quand l'utilisateur donne une durée, reporte-la toujours dans estimated_minutes (en minutes). "
-    "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas encore le faire. "
-    "N'invente jamais de donnée : appuie-toi seulement sur le contexte fourni."
-)
+DEFAULT_REQUIREMENTS = {
+    "create_project": {"required": [["title", "le nom du projet"], ["description", "le résultat que tu vises avec ce projet"], ["missions", "ses premières étapes (au moins une mission)"]],
+                       "min_description_chars": 15, "min_missions": 1, "max_missions": 10},
+    "add_project_mission": {"required": [["project_id", "le projet concerné"], ["title", "ce que la mission consiste à faire"]]},
+    "create_routine": {"required": [["name", "le nom de la routine"], ["frequency", "sa fréquence (chaque jour, semaine, 2 semaines ou mois)"]]},
+}
+
+
+def requirements(db: Session) -> dict:
+    """Fiches « ce qu'il faut savoir » par action (paramètre éditable `chat.action_requirements`)."""
+    return {**DEFAULT_REQUIREMENTS, **(get_parameter(db, "chat.action_requirements", default={}) or {})}
+
+
+def system_prompt(sheets: dict) -> str:
+    def needs(action: str) -> str:
+        return " ; ".join(label for _, label in sheets.get(action, {}).get("required", []))
+    return (
+        "Tu es l'assistant d'Imperium, le système personnel qui organise la vie de l'utilisateur. Tu réponds en français, "
+        "en le tutoyant, clairement et brièvement. Tu ne fais JAMAIS rien toi-même : quand l'utilisateur demande une action "
+        "que tu sais faire, tu la proposes dans « proposal » et c'est lui qui la validera.\n"
+        "Règles de conduite :\n"
+        "- Avant de proposer, réunis TOUTES les informations demandées pour l'action. S'il en manque, ne propose rien : "
+        "pose une ou deux questions courtes à la fois.\n"
+        "- N'invente jamais une information que l'utilisateur n'a pas donnée (objectif, mission, durée…).\n"
+        "- Quand tu as tout, résume en une phrase dans summary_fr et propose. Une seule proposition par réponse.\n"
+        "- Quand l'utilisateur donne une durée, reporte-la dans estimated_minutes (en minutes).\n"
+        "Actions possibles et informations à réunir :\n"
+        f"- create_project : créer un projet complet, avec ses premières missions ; il faut {needs('create_project')}.\n"
+        "- add_project_mission : ajouter une mission à un projet existant (project_id = son repère dans le contexte, "
+        f"par exemple P1) ; il faut {needs('add_project_mission')}.\n"
+        f"- create_routine : créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high) ; "
+        f"il faut {needs('create_routine')}.\n"
+        "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas encore le faire. "
+        "Appuie-toi seulement sur le contexte fourni et sur ce que l'utilisateur a dit."
+    )
+
 
 def _variant(action: str, required: list[str], params: dict) -> dict:
     return {"type": "object", "additionalProperties": False, "required": ["action", "summary_fr", "params"],
@@ -69,7 +93,11 @@ def output_schema(aliases: list[str]) -> dict:
     text = {"type": "string"}
     notes = {"type": ["string", "null"]}
     variants = [
-        _variant("create_project", ["title", "description"], {"title": text, "description": notes}),
+        _variant("create_project", ["title", "description", "missions"], {
+            "title": text, "description": text,
+            "missions": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                                    "required": ["title", "estimated_minutes"],
+                                                    "properties": {"title": text, "estimated_minutes": minutes}}}}),
         _variant("create_routine", ["name", "frequency", "estimated_minutes", "priority", "notes"],
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
@@ -191,6 +219,7 @@ def delete_session(db: Session, *, current_user: User, session_id: UUID) -> None
 # --- Moteur -------------------------------------------------------------------------------------
 
 def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str, str]):
+    sheets = requirements(db)
     if local_executor.slot_mode(db, SLOT) != "live":
         return DEGRADED_REPLY, None, None, None, True
     history = list(db.scalars(select(ChatMessage).where(ChatMessage.session_id == session.id)
@@ -200,7 +229,7 @@ def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str
     latency = 0
     for attempt in range(2):
         try:
-            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=SYSTEM, user=prompt,
+            result = local_executor.structured(slot_code=SLOT, app_name="imperium", system=system_prompt(sheets), user=prompt,
                                                schema=output_schema(list(aliases)), max_tokens=900, related_entity_type="chat_session",
                                                related_entity_id=session.id)
         except local_executor.LocalExecutorError:
@@ -213,22 +242,44 @@ def _converse(db: Session, session: ChatSession, context: str, aliases: dict[str
             params = dict(proposal.get("params") or {})
             params["project_id"] = aliases.get(str(params.get("project_id")), "")
             proposal = {**proposal, "params": params}
-        errors = _check(proposal, set(aliases.values())) if proposal else []
+        errors, missing = _check(proposal, set(aliases.values()), sheets) if proposal else ([], [])
         if not errors:
             return reply, proposal, "local_executor", latency, False
-        prompt += f"\n\n## rappel\nProposition invalide : {', '.join(errors)}. Corrige-la ou n'en fais pas."
+        prompt += (f"\n\n## rappel\nProposition refusée : {', '.join(errors)}. "
+                   + ("Ne propose rien : pose la question à l'utilisateur." if missing else "Corrige-la ou n'en fais pas."))
+    if missing:
+        # Le modèle a encore proposé une action incomplète : c'est le code qui pose la question (fiche de l'action).
+        return "Avant de te proposer quoi que ce soit, j'ai besoin de savoir : " + " ; ".join(missing) + ".", None, \
+            "local_executor", latency, False
     return reply + "\n\n(Je n'ai pas réussi à formuler l'action correctement : reformule ta demande.)", None, "local_executor", latency, False
 
 
-def _check(proposal: dict, projects: set[str]) -> list[str]:
-    """Paramètres validés par les schémas d'écriture existants ; projet obligatoirement ouvert."""
+def _check(proposal: dict, projects: set[str], sheets: dict) -> tuple[list[str], list[str]]:
+    """(erreurs, informations manquantes) : fiche de l'action, puis schémas d'écriture existants ; projet ouvert."""
     action, params = proposal.get("action"), proposal.get("params") or {}
+    sheet = sheets.get(action, {})
+    labels = dict(sheet.get("required", []))
+    missing = [label for field, label in sheet.get("required", [])
+               if params.get(field) in (None, "", []) or (isinstance(params.get(field), str) and not params[field].strip())]
+    if action == "create_project":
+        description = str(params.get("description") or "").strip()
+        if description and len(description) < int(sheet.get("min_description_chars", 0)):
+            missing.append(labels.get("description", "l'objectif du projet"))
+        missions = [m for m in params.get("missions") or [] if str(m.get("title") or "").strip()]
+        if params.get("missions") and len(missions) < int(sheet.get("min_missions", 0)):
+            missing.append(labels.get("missions", "ses premières étapes"))
+        if len(missions) > int(sheet.get("max_missions", 10)):
+            return [f"au plus {sheet.get('max_missions', 10)} missions"], []
+    if missing:
+        return [f"il manque {', '.join(missing)}"], list(dict.fromkeys(missing))
     try:
         if action == "create_project":
             ProjectCreate(title=params.get("title", ""), description=params.get("description"), source="chatbot")
+            for mission in params.get("missions") or []:
+                ProjectMissionCreate(title=mission.get("title", ""), estimated_minutes=mission.get("estimated_minutes"))
         elif action == "add_project_mission":
             if params.get("project_id") not in projects:
-                return ["project_id inconnu"]
+                return ["project_id inconnu"], []
             ProjectMissionCreate(title=params.get("title", ""), notes=params.get("notes"),
                                  estimated_minutes=params.get("estimated_minutes"))
         elif action == "create_routine":
@@ -236,12 +287,12 @@ def _check(proposal: dict, projects: set[str]) -> list[str]:
                           estimated_minutes=params.get("estimated_minutes"), priority=params.get("priority", "medium"),
                           notes=params.get("notes"))
         else:
-            return [f"action inconnue {action}"]
+            return [f"action inconnue {action}"], []
     except ValidationError as exc:
-        return [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()][:3]
+        return [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()][:3], []
     if not str(proposal.get("summary_fr") or "").strip():
-        return ["summary_fr vide"]
-    return []
+        return ["summary_fr vide"], []
+    return [], []
 
 
 def _execute(db: Session, user: User, action: str, params: dict, key: str) -> dict:
@@ -249,7 +300,12 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
     if action == "create_project":
         project = operations.create_project(db, current_user=user, idempotency_key=key, payload=ProjectCreate(
             title=params["title"], description=params.get("description"), source="chatbot"))
-        return {"project_id": str(project.id), "title": project.title}
+        # Projet complet en une validation (doc 72 §5) ; clés dérivées : une validation rejouée ne duplique rien.
+        missions = [operations.add_project_mission(db, current_user=user, project_id=project.id, idempotency_key=f"{key}-m{i}",
+                                                   payload=ProjectMissionCreate(title=m["title"].strip(),
+                                                                                estimated_minutes=m.get("estimated_minutes")))
+                    for i, m in enumerate(params.get("missions") or []) if str(m.get("title") or "").strip()]
+        return {"project_id": str(project.id), "title": project.title, "missions": len(missions)}
     if action == "add_project_mission":
         mission = operations.add_project_mission(db, current_user=user, project_id=UUID(params["project_id"]), idempotency_key=key,
                                                  payload=ProjectMissionCreate(title=params["title"], notes=params.get("notes"),

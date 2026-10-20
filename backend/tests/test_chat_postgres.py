@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.api.deps import get_current_user, get_db  # noqa: E402
 from app.api.v1.routes import imperium_chat  # noqa: E402
 from app.models.auth import User  # noqa: E402
-from app.models.imperium import ImperiumProject  # noqa: E402
+from app.models.imperium import ImperiumMission, ImperiumProject  # noqa: E402
 from app.schemas.operations import ProjectCreate  # noqa: E402
 from app.services.ai import local_executor  # noqa: E402
 from app.services.imperium import operations  # noqa: E402
@@ -56,8 +56,10 @@ class Fake:
     def __init__(self) -> None:
         self.outputs: list = []
         self.prompts: list[str] = []
+        self.systems: list[str] = []
 
     def post(self, url, payload, timeout):
+        self.systems.append(payload["messages"][0]["content"])
         self.prompts.append(payload["messages"][1]["content"])
         item = self.outputs.pop(0)
         if isinstance(item, Exception):
@@ -110,10 +112,13 @@ def _say(client, sid: str, message: str) -> dict:
     return response.json()
 
 
-def _project(title="Lancer le site", description=None) -> dict:
+MISSIONS = [{"title": "Choisir l'hébergeur", "estimated_minutes": 30}, {"title": "Écrire la page d'accueil", "estimated_minutes": None}]
+
+
+def _project(title="Lancer le site", description="Un site vitrine en ligne pour l'activité", missions=MISSIONS) -> dict:
     return {"reply_fr": "Je te propose de créer ce projet.", "proposal": {
         "action": "create_project", "summary_fr": f"Créer le projet « {title} »",
-        "params": {"title": title} | ({"description": description} if description else {})}}
+        "params": {"title": title, "description": description, "missions": missions}}}
 
 
 def test_disabled_and_degraded_without_live_slot(db, fake) -> None:
@@ -132,7 +137,7 @@ def test_proposal_is_never_executed_until_validated(db, fake) -> None:
     user = _user(db)
     client = _client(db, user)
     sid = _session(client)
-    fake.outputs.append(_project("Lancer le site", "Vitrine de l'activité"))
+    fake.outputs.append(_project("Lancer le site"))
     turn = _say(client, sid, "Crée un projet pour lancer mon site")
     proposal = turn["proposal"]
     assert proposal["status"] == "proposed" and proposal["action"] == "create_project"
@@ -140,7 +145,11 @@ def test_proposal_is_never_executed_until_validated(db, fake) -> None:
     validated = client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").json()
     assert validated["status"] == "validated" and validated["result"]["title"] == "Lancer le site"
     project = db.scalar(select(ImperiumProject).where(ImperiumProject.user_id == user.id))
-    assert (project.title, project.source, project.description) == ("Lancer le site", "chatbot", "Vitrine de l'activité")
+    assert (project.title, project.source, project.description) == ("Lancer le site", "chatbot", "Un site vitrine en ligne pour l'activité")
+    # Projet complet en une seule validation : ses premières missions sont créées avec lui.
+    missions = db.scalars(select(ImperiumMission).where(ImperiumMission.project_id == project.id)).all()
+    assert sorted((m.title, m.estimated_minutes) for m in missions) == [("Choisir l'hébergeur", 30), ("Écrire la page d'accueil", None)]
+    assert validated["result"]["missions"] == 2
     assert client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").status_code == 409
     session = client.get(f"{P}/{sid}").json()
     assert [m["role"] for m in session["messages"]] == ["user", "assistant"] and session["open_proposal"] is None
@@ -167,11 +176,11 @@ def test_invalid_proposals_retry_supersede_reject_and_close(db, fake) -> None:
                                            "params": {"project_id": "P9", "title": "X"}}}
     fake.outputs += [bad, _project("Bon projet")]
     turn = _say(client, sid, "Ajoute X")
-    assert turn["proposal"]["params"] == {"title": "Bon projet"} and "rappel" in fake.prompts[1]
+    assert turn["proposal"]["params"] == _project("Bon projet")["proposal"]["params"] and "rappel" in fake.prompts[1]
     fake.outputs += [bad, bad]
     turn = _say(client, sid, "Ajoute encore X")
-    assert turn["proposal"] is None and "reformule" in turn["assistant_message"]["content"]
-    assert client.get(f"{P}/{sid}").json()["open_proposal"]["params"] == {"title": "Bon projet"}
+    assert turn["proposal"] is None and turn["assistant_message"]["content"].endswith("besoin de savoir : le projet concerné.")
+    assert client.get(f"{P}/{sid}").json()["open_proposal"]["params"] == _project("Bon projet")["proposal"]["params"]
 
     fake.outputs.append(_project("Autre projet"))
     first = client.get(f"{P}/{sid}").json()["open_proposal"]["id"]
@@ -209,3 +218,38 @@ def test_executor_down_failed_action_isolation_and_deletion(db, fake) -> None:
     assert stranger.post(f"{P}/{sid}/proposals/{proposal['id']}/reject").status_code == 404
     assert client.delete(f"{P}/{sid}").status_code == 204
     assert client.get(f"{P}/{sid}").status_code == 404
+
+
+def test_incomplete_project_asks_questions_instead_of_proposing(db, fake) -> None:
+    _enable(db)
+    user = _user(db)
+    client = _client(db, user)
+    sid = _session(client)
+    empty = _project("Nouveau projet", description="", missions=[])
+    # Le modèle insiste deux fois avec un projet vide : rien n'est proposé, le code pose la question (fiche de l'action).
+    fake.outputs += [empty, empty]
+    turn = _say(client, sid, "Crée-moi un nouveau projet")
+    assert turn["proposal"] is None
+    content = turn["assistant_message"]["content"]
+    assert "le résultat que tu vises" in content and "premières étapes" in content and "le nom du projet" not in content
+    assert "pose la question" in fake.prompts[1]
+    assert "il faut le nom du projet ; le résultat que tu vises" in fake.systems[0]  # règles de conduite + fiche
+
+    # Objectif trop court et missions vides → refus, puis le modèle pose sa question lui-même.
+    fake.outputs += [_project("Site", description="site", missions=[{"title": " ", "estimated_minutes": None}]),
+                     {"reply_fr": "Quel résultat vises-tu, et quelles sont les premières étapes ?", "proposal": None}]
+    turn = _say(client, sid, "Un site")
+    assert turn["proposal"] is None and turn["assistant_message"]["content"].startswith("Quel résultat")
+
+    # Trop de missions → refusé ; la fiche est une donnée éditable (paramètre).
+    fake.outputs += [_project(missions=[{"title": f"M{i}", "estimated_minutes": None} for i in range(11)])] * 2
+    turn = _say(client, sid, "Avec onze étapes")
+    assert turn["proposal"] is None and "reformule" in turn["assistant_message"]["content"]
+    set_parameter(db, code="chat.action_requirements", value={"create_project": {
+        "required": [["title", "le nom du projet"]], "min_description_chars": 0, "min_missions": 0, "max_missions": 3}},
+        origin="user", rationale_fr="Test.")
+    db.commit()
+    fake.outputs.append(_project("Simple", description=None, missions=[]))
+    proposal = _say(client, sid, "Juste un nom")["proposal"]
+    assert proposal["params"]["title"] == "Simple"
+    assert client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").json()["result"]["missions"] == 0

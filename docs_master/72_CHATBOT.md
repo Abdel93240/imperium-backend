@@ -101,6 +101,13 @@ mission active, projets ouverts désignés P1, P2… et leurs missions, routines
 `create_project`, `add_project_mission`, `create_routine` ; sortie contrainte par un schéma par action, vérifiée
 par les schémas d'écriture existants (un nouvel essai, puis réponse sans proposition). Moteur local arrêté :
 réponse explicite, aucun repli cloud. Pas encore : escalade (§3), extraction à la fermeture (§6-7), micro.
+Bornage (migration 0116, 2026-10-20) : chaque action a une fiche « ce qu'il faut savoir » dans le paramètre
+éditable `chat.action_requirements` (champs requis et leur libellé, en liste ordonnée ; minimums). Le prompt impose des règles de
+conduite (réunir tout avant de proposer, une ou deux questions courtes à la fois, ne rien inventer, résumer puis
+proposer). Le code applique la fiche : une proposition incomplète est refusée ; si le modèle insiste, le code
+répond lui-même par la question listant ce qui manque, sans proposition. `create_project` crée un projet
+complet (nom, objectif d'au moins 15 caractères, 1 à 10 premières missions avec durée éventuelle) en une seule
+validation ; les missions reçoivent des clés d'idempotence dérivées de celle de la proposition.
 
 ---
 
