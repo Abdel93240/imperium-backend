@@ -256,6 +256,20 @@ livré avec ses états d'activation explicites.
 | Q23 | RÉSOLUE : validé. |
 | Q24 | RÉSOLUE (2026-10-15, remplace Q3+Q18) : push Android = seul canal de notification produit visible dans l'app ; le canal Telegram `telegram_prod` reste dans le code mais n'est jamais activé. Le niveau rouge est désactivable par l'utilisateur. |
 
+## Portes de phase (infrastructure — aucune bascule)
+
+Une porte de phase d'infrastructure ne constitue jamais une activation produit.
+Elle ne se ferme que si chaque critère est **PASS**, **N/A justifié**, ou
+**DIFFÉRÉ avec un propriétaire nommé**. Un critère « non testé » sans propriétaire
+interdit la fermeture de la porte.
+
+La validation humaine est l'acte de fermeture : Codex prépare le diff et s'arrête ;
+le commit n'est autorisé qu'après GO explicite du validateur humain.
+
+| phase | date | commit | critères | verdict | validé par |
+|---|---|---|---|---|---|
+| Phase H — exécuteur local V100 | 2026-09-28 | `bcd4133` | H3.1-H3.6, H3.5-bis, H3.8 : **PASS** ; H3.7 intégration backend `GpuServiceUnreachable`/skip : **DIFFÉRÉ → passe Pulse** ; déterminisme cache/concurrence : **DIFFÉRÉ → passe Pulse** ; MTP : **N/A — optionnel, non activé** | **PRÊTE ET ÉTEINTE** | Abdel |
+
 ## Journal des bascules (append-only — rempli à chaque activation/rollback)
 
 | date | ACT-id | action (ON/OFF/ROLLBACK) | par | observation |
