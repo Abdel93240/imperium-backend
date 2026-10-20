@@ -1,0 +1,14 @@
+[Unit]
+Description=Imperium API (FastAPI) - production, localhost only
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/imperium-backend/backend
+EnvironmentFile=/opt/imperium-backend/backend/.env
+ExecStart=/opt/imperium-backend/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --proxy-headers
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

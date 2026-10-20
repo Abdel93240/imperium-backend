@@ -315,3 +315,29 @@ POST /api/internal/webhook-test
 ```
 
 Do not run these steps against `n8n_db`.
+
+## Déploiement Tower (2026-10-20) — procédure en vigueur
+
+Le VPS est retiré (F10) : `imperium_core` vit sur le PostgreSQL 16 de la Tower (127.0.0.1:5432).
+
+1. Sauvegarde : `systemctl --user start imperium-core-dump.service` (pg_dump du compte `imperium_user`,
+   fichiers privés dans `~/imperium-backups`, 14 jours ; timer de nuit 03:15 UTC,
+   `ops/systemd/user/imperium-core-dump.*`, script `ops/backup/imperium_core_dump_user.sh`).
+2. Migrations en `imperium_admin`, mot de passe lu dans `~/.pgpass` (jamais dans une commande ni un fichier
+   versionné) :
+   `cd backend && DATABASE_URL="postgresql+psycopg://imperium_admin@127.0.0.1:5432/imperium_core" .venv/bin/alembic upgrade head`
+3. Droits de l'API, à relancer après CHAQUE série de migrations (les droits par défaut ne donnent que
+   SELECT et INSERT aux nouvelles tables) :
+   `psql "postgresql://imperium_admin@127.0.0.1:5432/imperium_core" -v ON_ERROR_STOP=1 -f ops/postgres/runtime_grants.sql`
+   L'API lit, insère, modifie et supprime ; jamais de TRUNCATE ; `events`, `auth_events`,
+   `imperium_events`, `imperium_vault_transactions`, `pressure_snapshots`, `parameters` en ajout seul ;
+   `plan_versions` jamais supprimée ; `alembic_version` réservée aux migrations.
+4. API : service utilisateur `ops/systemd/user/imperium-api.service` (uvicorn sur 127.0.0.1:8000,
+   `EnvironmentFile` = `backend/.env`, mode 600) ; `systemctl --user restart imperium-api`.
+5. Accès des applis : `tailscale serve --bg --https=8443 http://127.0.0.1:8000` (réseau Tailscale
+   seulement, HTTPS par certificat Tailscale ; demande `sudo` une fois, ou
+   `sudo tailscale set --operator=$USER`).
+
+Première mise en production le 2026-10-20 : 0041 → 0114, répétée d'abord sur une copie (montée, descente
+complète, remontée, données intactes) ; secrets JWT et webhook interne remplacés (64 caractères, l'ancien
+`.env` faisait 20 caractères et était lisible par tous).
