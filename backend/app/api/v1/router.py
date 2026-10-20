@@ -17,6 +17,7 @@ from app.api.v1.routes import (
     imperium_history,
     imperium_settings,
     imperium,
+    imperium_chat,
     imperium_dashboard,
     imperium_path,
     imperium_path_calendar,
@@ -58,6 +59,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(devices.router, prefix="/auth/devices", tags=["devices"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
 api_router.include_router(imperium_dashboard.router, prefix="/imperium", tags=["imperium-dashboard"])
+api_router.include_router(imperium_chat.router, prefix="/imperium", tags=["imperium-chat"])
 api_router.include_router(imperium_daily_plan.router, prefix="/imperium", tags=["imperium-daily-plan"])
 api_router.include_router(imperium_contracts.router, prefix="/imperium", tags=["imperium-contracts"])
 api_router.include_router(imperium_home.router, prefix="/imperium", tags=["imperium-home"])

@@ -92,7 +92,15 @@ document describes the capability; doc 08 owns the guardrail.
 Première action codée (2026-10-17) : l'ajout au stock Pulse (doc 40 §11.1). La phrase
 passe par `POST /api/imperium/pulse/food-stock/declarations/preview` (proposition, rien
 d'écrit), puis la validation par `POST /api/imperium/pulse/food-stock/declarations`.
-Le moteur de conversation lui-même (§3) n'a pas encore de route.
+Moteur V1 CODÉ le 2026-10-20 (migration 0115, `app/services/chat/engine.py`), sur le modèle LOCAL seulement
+(décision utilisateur) : `POST /api/imperium/chat/sessions`, `POST …/{id}/messages` (un tour : réponse +
+proposition éventuelle), `POST …/proposals/{pid}/validate` (seule écriture, idempotente) et `…/reject`,
+`POST …/{id}/close`, `GET …/{id}`, `DELETE …/{id}` (suppression réelle). Derrière `chat.enabled` (semé false)
+et le slot `chat.converse` en mode `live` dans `ai.local_slot_modes`. Contexte en liste blanche (journée,
+mission active, projets ouverts désignés P1, P2… et leurs missions, routines, priorités). Actions V1 :
+`create_project`, `add_project_mission`, `create_routine` ; sortie contrainte par un schéma par action, vérifiée
+par les schémas d'écriture existants (un nouvel essai, puis réponse sans proposition). Moteur local arrêté :
+réponse explicite, aucun repli cloud. Pas encore : escalade (§3), extraction à la fermeture (§6-7), micro.
 
 ---
 

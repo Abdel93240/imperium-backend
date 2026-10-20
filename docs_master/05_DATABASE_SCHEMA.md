@@ -1901,6 +1901,21 @@ choix factice tant que `real_ai_enabled` est faux, validation avec repli `mainta
 bloquants ; pas de seance high apres 12 h de jeune ni deux jours high d'affilee). Un blocage sante
 actif arrete P1. Les autres procedures s'arretent en `aborted` (`not_coded`). Parametre
 `pulse.proposals_enabled` seme false.
+Chatbot V1 local (migration 20261020_0115, 2026-10-20, doc 72) :
+
+```sql
+chat_sessions (id, user_id FK users ON DELETE CASCADE, context_kind general|project|mission|intervention,
+  context_ref, status open|closed, started_at, closed_at ; CHECK closed ssi closed_at)
+chat_messages (id, session_id FK ON DELETE CASCADE, user_id, role user|assistant, content <= 8000,
+  model_used, latency_ms, degraded, created_at)
+chat_proposals (id, session_id FK ON DELETE CASCADE, message_id FK ON DELETE CASCADE, user_id,
+  action create_project|add_project_mission|create_routine, params jsonb, summary_fr,
+  status proposed|validated|rejected|superseded|failed, result jsonb, created_at, decided_at ;
+  UNIQUE une seule proposition ouverte par session)
+```
+
+Slot `chat.converse` (local_default) ; parametre `chat.enabled` seme false. Une proposition n'est executee
+que par la validation explicite de l'utilisateur (cle d'idempotence tiree de la proposition).
 Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
 
 ```sql
