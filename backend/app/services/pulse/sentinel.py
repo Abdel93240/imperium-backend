@@ -12,7 +12,8 @@ La sentinelle ne comprend rien : elle réveille. Seules les règles `active` (ba
 
 Un réveil retenu fige le board (`pulse_board_snapshots`) puis met en file une ligne `pulse_dispatch_log`.
 `pulse.dispatch_runner` la traite : tant que `real_ai_enabled` est faux, sortie factice `dry_run` validée
-par le contrat de l'interprète (§6), aucune procédure nommée (catalogue P1-P10 non codé), rien n'est
+par le contrat de l'interprète (§6) contre le catalogue actif ; elle ne nomme que P1, pour un réveil
+pré-séance quand P1 est active (exécution mise en file pour `pulse.procedure_runner`). Rien n'est
 proposé ni notifié. L'interprète réel n'est pas codé : avec `real_ai_enabled` vrai, le runner échoue
 sans rien consommer.
 """
@@ -32,7 +33,7 @@ from app.models.imperium import PulseWorkout
 from app.models.pulse import PulseBoardSnapshot, PulseDispatchLog, PulseSentinelRule
 from app.schemas.pulse_signals import BoardRead, DispatchListResponse, DispatchRead
 from app.services.events.emitter import build_event
-from app.services.pulse import signals
+from app.services.pulse import procedures, signals
 
 PARIS = ZoneInfo("Europe/Paris")
 BAND_ORDER = signals.BAND_ORDER
@@ -258,7 +259,13 @@ def validate_output(output: dict, *, catalogue: set[str]) -> list[str]:
     return errors
 
 
-def dry_run_output(flags: dict[str, str]) -> dict:
+def dry_run_output(flags: dict[str, str], *, subject_ref: str | None = None, catalogue: set[str] = frozenset()) -> dict:
+    """Sortie FACTICE : nomme P1 pour un réveil pré-séance quand P1 est active, sinon rien."""
+    if subject_ref and subject_ref.startswith("workout:") and procedures.P1 in catalogue:
+        return {"procedures": [{"code": procedures.P1, "urgency": "today",
+                                "inputs": {"workout_id": subject_ref.split(":", 1)[1]}}],
+                "signals_used": sorted(flags), "confidence": "high", "escalate": False, "none_needed": False,
+                "rationale_fr": "Essai à blanc : séance imminente, adaptation à examiner."}
     return {"procedures": [], "signals_used": sorted(flags), "confidence": "high", "escalate": False,
             "none_needed": not flags, "rationale_fr": "Essai à blanc : aucun modèle appelé, aucune procédure nommée."}
 
@@ -270,19 +277,27 @@ def run_dispatches(db: Session, *, now: datetime | None = None, limit: int = 50)
     now = now or datetime.now(UTC)
     queued = db.scalars(select(PulseDispatchLog).where(PulseDispatchLog.status == "queued")
                         .order_by(PulseDispatchLog.created_at).limit(limit).with_for_update(skip_locked=True)).all()
+    catalogue = procedures.active_catalogue(db)
     for dispatch in queued:
-        output = dry_run_output(dispatch.flag_set)
+        output = dry_run_output(dispatch.flag_set, subject_ref=dispatch.subject_ref, catalogue=catalogue)
         dispatch.output = {**output, "dry_run": True}
-        dispatch.valid = not validate_output(output, catalogue=set())
-        dispatch.model_used, dispatch.outcome, dispatch.procedures_named = DRY_RUN, DRY_RUN, []
+        dispatch.valid = not validate_output(output, catalogue=catalogue)
+        named = output["procedures"] if dispatch.valid else []
+        dispatch.model_used, dispatch.procedures_named = DRY_RUN, [item["code"] for item in named]
+        dispatch.outcome = "procedures_run" if named else DRY_RUN
         dispatch.escalated, dispatch.status, dispatch.completed_at = False, "done", now
-        db.add(build_event(
+        completed = build_event(
             db, user_id=dispatch.user_id, event_type="pulse.dispatch.completed",
-            payload={"dispatch_id": str(dispatch.id), "outcome": dispatch.outcome, "procedures_named": [],
-                     "confidence": output["confidence"], "escalated": False},
+            payload={"dispatch_id": str(dispatch.id), "outcome": dispatch.outcome,
+                     "procedures_named": dispatch.procedures_named, "confidence": output["confidence"],
+                     "escalated": False},
             idempotency_key=f"pulse.dispatch.completed.{dispatch.id}", source_app=SourceApp.pulse,
             privacy_level=PrivacyLevel.high, causation_id=dispatch.trigger_event_id,
-        ))
+        )
+        db.add(completed)
+        db.flush()
+        if named:
+            procedures.queue_from_dispatch(db, dispatch=dispatch, named=named, trigger=completed, now=now)
     db.flush()
     return len(queued)
 

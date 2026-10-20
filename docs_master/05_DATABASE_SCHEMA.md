@@ -1867,6 +1867,32 @@ La spec avait `metric_date` en cle seule ; `user_id` ajoute comme partout. Compt
 100 %, cible 92 %) ; pas de job d'audit Pulse dedie, le job partage `wr.audit_weekly` couvre tous les
 slots. Job `pulse.metrics_rollup` (cron `45 0 * * *` UTC, seme desactive) : recalcule les deux derniers
 jours clos.
+Procedures Pulse et propositions (migration 20261020_0111, 2026-10-20, spec Pulse §3.3, §7, §8, §13) :
+
+```sql
+pulse_procedures (id, code UNIQUE, name_fr, purpose_fr, trigger_types text[], steps jsonb,
+  llm_slots jsonb, version, active DEFAULT false)
+pulse_procedure_runs (id, user_id FK users ON DELETE CASCADE, procedure_id FK, procedure_version,
+  dispatch_id FK pulse_dispatch_log ON DELETE SET NULL, trigger_event_id, correlation_id, inputs jsonb,
+  dry_run, status queued|running|waiting_user|completed|aborted|failed, steps_log jsonb, result jsonb,
+  created_at, started_at, finished_at)
+pulse_proposals (id, user_id FK users ON DELETE CASCADE, procedure_run_id FK ON DELETE CASCADE,
+  kind session_adaptation|diet_change|program|meal_plan|monitoring|corpus_sheet|parameter_update|
+  signal_definition|doctor_advice, payload jsonb, summary_fr, dry_run, created_at, presented_at,
+  expires_at, decision accepted|refused|modified|expired, decided_at, user_explanation,
+  modified_payload, applied, applied_at ; CHECK refus explique, modification avec payload, essai a
+  blanc jamais presente, application seulement apres accepted|modified)
+```
+
+Les 10 cartes P1-P10 du §7 semees INACTIVES ; leurs 12 slots IA semes dans `ai_slot_transition` avec
+les tiers du §7 (domaine pulse). Un seul mecanisme : job `pulse.procedure_runner` (cron `*/5`, seme
+desactive). Seule P1 (`adapt_training_session`) a ses etapes code : seance, menu des coups legaux,
+choix factice tant que `real_ai_enabled` est faux, validation avec repli `maintain`, proposition
+`dry_run` jamais presentee. Sans programme d'entrainement, seuls `maintain`, `shift_time` et
+`reschedule` peuvent etre legaux (creneaux libres de seances, missions a heure fixe et evenements
+bloquants ; pas de seance high apres 12 h de jeune ni deux jours high d'affilee). Un blocage sante
+actif arrete P1. Les autres procedures s'arretent en `aborted` (`not_coded`). Parametre
+`pulse.proposals_enabled` seme false.
 
 Convention D1 : le domaine cible est `decision`. Les noms cibles sont
 documentes ici pour le dictionnaire central, mais le code garde les noms actuels

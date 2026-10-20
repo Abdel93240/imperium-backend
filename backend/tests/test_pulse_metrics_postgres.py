@@ -144,6 +144,6 @@ def test_summary_route(db) -> None:
     body = client.get(f"{P}/metrics/summary", params={"days": 3}).json()
     assert [day["metric_date"] for day in body["days"]] == [yesterday.isoformat()]
     assert body["today"]["dispatches"] == 0 and body["today"]["proposals"] is None
-    assert [slot["slot_code"] for slot in body["slots"]] == ["pulse.interpreter"]
-    assert body["slots"][0]["decay_proposed"] is False
+    slots = {slot["slot_code"]: slot for slot in body["slots"]}
+    assert "pulse.interpreter" in slots and not any(slot["decay_proposed"] for slot in slots.values())
     assert client.get(f"{P}/metrics/summary", params={"days": 0}).status_code == 422
