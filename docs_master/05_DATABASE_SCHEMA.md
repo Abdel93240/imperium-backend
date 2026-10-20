@@ -1801,7 +1801,15 @@ Engagements fixes calendrier (migration 20261019_0107, 2026-10-19, spec Daily §
 present ; lignes anterieures : mission). Quand `daily.calendar_commitments_enabled` (seme false) est
 vrai, le temps restant s'arrete au plus proche entre la mission `is_fixed_commitment` a venir et
 l'evenement `imperium_calendar_events` a venir, `blocks_time`, non soft-supprime. Un evenement deja
-commence n'est pas une borne. Les prieres (Q6) restent hors de ce lot.
+commence n'est pas une borne. Les prieres (Q6) arrivent par la migration 0113 ci-dessous.
+Prieres en engagements fixes de G4 (migration 20261020_0113, 2026-10-20, Q6, carte ACT-DLY-10) :
+`path_registered_mosques` + `adhan_offsets` jsonb {priere: minutes, -120..120} (adhan de la mosquee moins
+le calcul local a ses coordonnees) et `iqama_offsets` jsonb {priere: minutes, 0..90} (attente adhan →
+iqama) ; `daily_selection_log.next_fixed_kind` accepte `prayer` (ref = uuid5 utilisateur + jour +
+priere, sans cle etrangere). Parametres : `daily.prayer_commitments_enabled` false,
+`path.mosque_search_travel_min` 20, `path.mosque_travel_margin_pct` 20, `path.prayer_after_iqama_min`
+15, `path.prayer_solo_block_min` 20. Aucun nouvel appel reseau : le cache MAWAQIT passe devant le calcul
+s'il existe pour la mosquee.
 Signaux Pulse hors montre et board (migration 20261020_0108, 2026-10-20, spec Pulse §3.1, §4, §14,
 cartes ACT-PLS-08 et ACT-PLS-05 ; familles V8 partielles) :
 

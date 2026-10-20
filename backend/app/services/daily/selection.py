@@ -38,6 +38,7 @@ from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
 from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, ImperiumMissionScore
 from app.schemas.daily import DailyCurrentRead, NextMissionRead, QueueEntryRead, QueueRead, SelectionRead
+from app.services.daily import prayers
 from app.services.events.emitter import build_event
 from app.services.imperium import decision_framework as df
 from app.services.params import get_parameter
@@ -78,7 +79,7 @@ class Candidate:
 
 @dataclass
 class FixedCommitment:
-    kind: str  # mission | calendar_event
+    kind: str  # mission | calendar_event | prayer
     ref: UUID
     at: datetime
 
@@ -168,7 +169,7 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
     """Calcule la sélection sans rien écrire (sert aussi GET queue)."""
     now_local = now.astimezone(PARIS)
     today = now_local.date()
-    next_fixed = next_commitment(db, current_user, now)
+    next_fixed = next_commitment(db, current_user, now, origin=origin)
     horizon = next_fixed.at if next_fixed is not None else datetime.combine(
         today + timedelta(days=1), datetime.min.time(), tzinfo=PARIS)
     remaining_min = max(0, int((horizon - now).total_seconds() // 60))
@@ -207,10 +208,13 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
     return result
 
 
-def next_commitment(db: Session, current_user: User, now: datetime) -> FixedCommitment | None:
+def next_commitment(db: Session, current_user: User, now: datetime,
+                    origin: LatLng | None = None) -> FixedCommitment | None:
     """Prochain engagement fixe à venir : mission `is_fixed_commitment`, et, si
     `daily.calendar_commitments_enabled`, événement calendrier `blocks_time` non supprimé. Un événement
-    déjà commencé n'est pas une borne (l'appel montre que l'utilisateur est disponible)."""
+    déjà commencé n'est pas une borne (l'appel montre que l'utilisateur est disponible). Si
+    `daily.prayer_commitments_enabled`, le départ vers la prochaine prière (mosquée choisie depuis
+    `origin`, ou l'adhan pour une prière seul) en est une aussi."""
     anchors = []
     mission = db.execute(
         select(ImperiumMission.id, ImperiumMission.fixed_at).where(
@@ -229,6 +233,12 @@ def next_commitment(db: Session, current_user: User, now: datetime) -> FixedComm
         ).first()
         if event is not None:
             anchors.append(FixedCommitment(kind="calendar_event", ref=event.id, at=event.starts_at))
+    if prayers.enabled(db):
+        plan = prayers.next_prayer(db, user=current_user, now=now, origin=origin)
+        if plan is not None:
+            day = plan.reference_adhan.astimezone(PARIS).date()
+            anchors.append(FixedCommitment(kind="prayer", ref=prayers.commitment_ref(current_user, day, plan.prayer),
+                                           at=plan.bound))
     return min(anchors, key=lambda anchor: anchor.at) if anchors else None
 
 

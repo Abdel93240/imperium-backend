@@ -206,3 +206,25 @@ class OverrideRead(BaseModel):
     reason: str
     context: dict
     created_at: datetime
+
+
+class PrayerPlanRead(BaseModel):
+    """Prière du jour vue par Daily : mosquée retenue, départ, bloc (ou prière seul avec sa raison)."""
+
+    prayer: str
+    reference_adhan: datetime
+    mosque_id: UUID | None
+    mosque_name: str | None
+    travel_min: int | None
+    depart_at: datetime | None
+    adhan: datetime
+    iqama: datetime | None
+    block_end: datetime
+    times_source: str
+    solo_reason: str | None
+    origin_source: str
+
+
+class PrayerDayPlanRead(BaseModel):
+    date: date
+    items: list[PrayerPlanRead]

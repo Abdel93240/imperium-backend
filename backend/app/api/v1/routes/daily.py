@@ -30,6 +30,8 @@ from app.schemas.daily import (
     MissionDependencyRead,
     OverrideCreate,
     OverrideRead,
+    PrayerDayPlanRead,
+    PrayerPlanRead,
     QueueRead,
     ScoringParameterVersionsResponse,
     ScoringSettingsRead,
@@ -40,8 +42,9 @@ from app.schemas.daily import (
     SelectionRequest,
 )
 from app.schemas.imperium import CompleteMissionRequest
-from app.services.daily import constraints, overrides, scoring_settings, selection
+from app.services.daily import constraints, overrides, prayers, scoring_settings, selection
 from app.services.imperium import missions
+from app.services.path.fasting import paris_today
 from app.services.travel import LatLng
 
 router = APIRouter()
@@ -176,6 +179,27 @@ def next_route(payload: SelectionRequest, current_user: CurrentUserDep, db: Sess
         return _coded(status.HTTP_409_CONFLICT, exc, exc.code)
     db.commit()
     return selection.to_read(db, row)
+
+
+@router.get("/prayers", response_model=PrayerDayPlanRead)
+def prayers_route(
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    day: Annotated[date | None, Query(alias="date")] = None,
+    lat: Annotated[float | None, Query(ge=-90, le=90)] = None,
+    lng: Annotated[float | None, Query(ge=-180, le=180)] = None,
+) -> PrayerDayPlanRead | JSONResponse:
+    """Plan des prières du jour : mosquée retenue, départ et bloc, depuis le lieu de la mission précédente
+    (sinon la position donnée). Lecture seule ; aucune mission n'est créée."""
+    if not prayers.enabled(db):
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT,
+                            content={"detail": "Prayer commitments are not enabled.", "code": "DAILY_PRAYERS_DISABLED"})
+    if (lat is None) != (lng is None):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="lat and lng go together.")
+    day = day or paris_today()
+    origin = LatLng(lat, lng) if lat is not None else None
+    plans = prayers.day_plan(db, user=current_user, day=day, origin=origin)
+    return PrayerDayPlanRead(date=day, items=[PrayerPlanRead(**plan.__dict__) for plan in plans])
 
 
 @router.get("/current", response_model=DailyCurrentRead)

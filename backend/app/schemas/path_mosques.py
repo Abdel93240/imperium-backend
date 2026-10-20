@@ -2,10 +2,15 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+Prayer = Literal["fajr", "dhuhr", "asr", "maghrib", "isha"]
+# Décalage de l'adhan de la mosquée par rapport au calcul local (minutes, signé) ; attente adhan → iqama.
+AdhanOffsets = dict[Prayer, Annotated[int, Field(ge=-120, le=120)]]
+IqamaOffsets = dict[Prayer, Annotated[int, Field(ge=0, le=90)]]
 
 
 class MosqueCreate(BaseModel):
@@ -17,6 +22,8 @@ class MosqueCreate(BaseModel):
     longitude: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
     mawaqit_id: str | None = Field(default=None, max_length=128)
     is_default: bool = False
+    adhan_offsets: AdhanOffsets = Field(default_factory=dict)
+    iqama_offsets: IqamaOffsets = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check(self):
@@ -37,6 +44,8 @@ class MosqueUpdate(BaseModel):
     longitude: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
     mawaqit_id: str | None = Field(default=None, max_length=128)
     is_default: bool | None = None
+    adhan_offsets: AdhanOffsets | None = None
+    iqama_offsets: IqamaOffsets | None = None
 
 
 class MosqueRead(BaseModel):
@@ -49,6 +58,8 @@ class MosqueRead(BaseModel):
     longitude: Decimal | None
     mawaqit_id: str | None
     is_default: bool
+    adhan_offsets: dict = Field(default_factory=dict)
+    iqama_offsets: dict = Field(default_factory=dict)
     version: int
     added_at: datetime
 

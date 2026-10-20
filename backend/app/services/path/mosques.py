@@ -128,7 +128,8 @@ def create_mosque(db: Session, *, current_user: User, payload: MosqueCreate, ide
     row = PathRegisteredMosque(
         user_id=current_user.id, name=payload.name.strip(), address=(payload.address or "").strip() or None,
         latitude=payload.latitude, longitude=payload.longitude, mawaqit_id=(payload.mawaqit_id or "").strip() or None,
-        is_default=payload.is_default, version=1, idempotency_key=idempotency_key, request_hash=fingerprint,
+        is_default=payload.is_default, adhan_offsets=payload.adhan_offsets, iqama_offsets=payload.iqama_offsets,
+        version=1, idempotency_key=idempotency_key, request_hash=fingerprint,
     )
     db.add(row)
     db.flush()
@@ -159,8 +160,9 @@ def update_mosque(
         raise MosqueInputError("Latitude et longitude vont ensemble.")
     if changes.get("is_default"):
         _clear_default(db, current_user, keep=row.id)
-    if changes.get("is_default") is None:
-        changes.pop("is_default", None)
+    for field in ("is_default", "adhan_offsets", "iqama_offsets"):
+        if field in changes and changes[field] is None:
+            changes.pop(field)
     for field in ("name", "address", "mawaqit_id"):
         if field in changes:
             changes[field] = (changes[field] or "").strip() or None
