@@ -243,13 +243,18 @@ def create_report(db: Session, *, current_user: User, payload: SubjectiveReportC
     db.add(report)
     db.flush()
     db.refresh(report)
-    db.add(build_event(
+    event = build_event(
         db, user_id=current_user.id, event_type="pulse.report.logged",
         payload={"report_id": str(report.id), "kind": report.kind},
         idempotency_key=f"pulse.report.logged.{report.id}", source_app=SourceApp.pulse,
         privacy_level=PrivacyLevel.high,
-    ))
+    )
+    db.add(event)
     refresh(db, current_user=current_user, now=now, codes=SUBJECTIVE)
+    from app.services.pulse import sentinel  # import tardif : la sentinelle lit ce module
+
+    sentinel.on_user_report(db, current_user=current_user, signal_code=f"pulse.{report.kind}_reported",
+                            subject_ref=f"report:{report.id}", now=now, causation_id=event.event_id)
     read = SubjectiveReportRead.model_validate(report)
     db.commit()
     return read, False

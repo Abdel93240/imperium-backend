@@ -18,11 +18,12 @@ from sqlalchemy.orm import Session
 
 from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
+from app.models.event import Event
 from app.models.imperium import PlanningReplanEvent, PulsePainLog, PulseWorkout
 from app.schemas.imperium import ReplanRead
 from app.schemas.pulse_health import PainLogCreate, PainLogListResponse, PainLogRead, PainReplanResponse
 from app.services.events.emitter import build_event
-from app.services.pulse import food_stock, health_consent, red_flags, signals
+from app.services.pulse import food_stock, health_consent, red_flags, sentinel, signals
 
 STRONG = 8
 REPLAN_MESSAGE = "Douleur forte : veux-tu replanifier ta journée ?"
@@ -64,9 +65,11 @@ def create_log(db: Session, *, current_user: User, payload: PainLogCreate, idemp
     db.add(log)
     db.flush()
     db.refresh(log)
-    _emit(db, current_user, "pulse.pain.logged", {"pain_log_id": str(log.id)}, str(log.id))
+    event = _emit(db, current_user, "pulse.pain.logged", {"pain_log_id": str(log.id)}, str(log.id))
     red_flags.evaluate(db, current_user=current_user)
     signals.refresh(db, current_user=current_user, codes=("pulse.pain_active",))
+    sentinel.on_user_report(db, current_user=current_user, signal_code="pulse.pain_active",
+                            subject_ref=f"pain:{log.id}", causation_id=event.event_id)
     read = _read(log)
     db.commit()
     return read, False
@@ -159,10 +162,10 @@ def _read(log: PulsePainLog) -> PainLogRead:
     )
 
 
-def _emit(db: Session, current_user: User, event_type: str, payload: dict, ref: str | None) -> None:
-    db.add(
-        build_event(
-            db, user_id=current_user.id, event_type=event_type, payload=payload,
-            idempotency_key=f"{event_type}.{ref or uuid4()}", source_app=SourceApp.pulse, privacy_level=PrivacyLevel.high,
-        )
+def _emit(db: Session, current_user: User, event_type: str, payload: dict, ref: str | None) -> Event:
+    event = build_event(
+        db, user_id=current_user.id, event_type=event_type, payload=payload,
+        idempotency_key=f"{event_type}.{ref or uuid4()}", source_app=SourceApp.pulse, privacy_level=PrivacyLevel.high,
     )
+    db.add(event)
+    return event

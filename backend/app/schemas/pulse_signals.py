@@ -53,3 +53,36 @@ class SubjectiveReportRead(BaseModel):
 class SubjectiveReportListResponse(BaseModel):
     day: date | None = None
     items: list[SubjectiveReportRead]
+
+
+class DispatchRead(BaseModel):
+    """Réveil de la sentinelle (spec Pulse §3.2) ; `output` porte `dry_run: true` tant que l'IA est coupée."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    triggered_by: str
+    subject_ref: str | None
+    board_snapshot_id: UUID
+    flag_set: dict
+    status: str
+    model_used: str | None
+    output: dict | None
+    valid: bool | None
+    escalated: bool
+    procedures_named: list[str] | None
+    outcome: str | None
+    user_reaction: str | None
+    reacted_at: datetime | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class DispatchListResponse(BaseModel):
+    items: list[DispatchRead]
+
+
+class DispatchReactionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reaction: Literal["useful", "useless", "missed"]
