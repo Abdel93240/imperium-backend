@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.pulse_health import RedFlagRead
 
@@ -124,3 +124,40 @@ class MetricsSummaryRead(BaseModel):
     days: list[MetricsDayRead]  # jours clos enregistrés par le rollup, du plus ancien au plus récent
     today: MetricsDayRead  # calculé à la volée, jamais enregistré
     slots: list[MetricsSlotRead]
+
+
+class ProposalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    kind: str
+    payload: dict
+    summary_fr: str
+    presented_at: datetime | None
+    expires_at: datetime | None
+    decision: str | None
+    decided_at: datetime | None
+    user_explanation: str | None
+    modified_payload: dict | None
+    applied: bool
+    applied_at: datetime | None
+
+
+class ProposalListResponse(BaseModel):
+    items: list[ProposalRead]
+
+
+class ProposalDecisionRequest(BaseModel):
+    """Refus : explication obligatoire. Modification : `modified_payload` porte le coup et ses paramètres."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["accepted", "refused", "modified"]
+    user_explanation: str | None = Field(default=None, max_length=1000)
+    modified_payload: dict | None = None
+
+    @model_validator(mode="after")
+    def _modified_has_payload(self):
+        if self.decision == "modified" and not self.modified_payload:
+            raise ValueError("modified_payload is required for a modified decision.")
+        return self

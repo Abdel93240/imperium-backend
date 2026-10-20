@@ -1,5 +1,5 @@
 """Règles rouges, signalements subjectifs et sentinelle Pulse (spec Pulse §3.2, §3.5, §5, §11, §14 ;
-CHECK constraints live in migrations 0106, 0108, 0109 ; métriques 0110)."""
+CHECK constraints live in migrations 0106, 0108, 0109, 0111 ; métriques 0110)."""
 
 from datetime import date, datetime
 from uuid import UUID
@@ -138,3 +138,63 @@ class PulseMetricsDaily(UUIDPrimaryKeyMixin, Base):
     solver_infeasible: Mapped[int | None] = mapped_column(Integer, nullable=True)
     agreement_by_slot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PulseProcedure(UUIDPrimaryKeyMixin, Base):
+    """Carte P1-P10 globale semée inactive (spec Pulse §7) ; `active` ne bascule que par SQL."""
+
+    __tablename__ = "pulse_procedures"
+
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    purpose_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger_types: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    steps: Mapped[list] = mapped_column(JSONB, nullable=False)
+    llm_slots: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class PulseProcedureRun(UUIDPrimaryKeyMixin, Base):
+    """Exécution d'une procédure nommée : `queued` puis le runner, une entrée de journal par étape."""
+
+    __tablename__ = "pulse_procedure_runs"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    procedure_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_procedures.id"), nullable=False)
+    procedure_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatch_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_dispatch_log.id", ondelete="SET NULL"), nullable=True)
+    trigger_event_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correlation_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    inputs: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    steps_log: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PulseProposal(UUIDPrimaryKeyMixin, Base):
+    """Proposition refusable ; en essai à blanc elle n'est jamais présentée, rien ne s'applique sans décision."""
+
+    __tablename__ = "pulse_proposals"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    procedure_run_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("pulse_procedure_runs.id", ondelete="CASCADE"), nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    summary_fr: Mapped[str] = mapped_column(Text, nullable=False)
+    dry_run: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    presented_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decision: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    user_explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    modified_payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
