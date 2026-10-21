@@ -3,7 +3,9 @@
 1. Préparation (après le lancement du WR, hors de la requête) : digest figé, passe d'hypothèses P1 par le
    rôle cloud (`wr.hypothesis_pass`), puis message d'ouverture écrit par le CODE (hypothèses + première
    question de l'agenda). Ne fait rien tant que le slot cloud est éteint : le WR garde son déroulé d'avant.
-   Si l'appel cloud échoue, l'ouverture le dit et la conversation reste possible sans agenda.
+   Si l'appel cloud échoue (quota de l'abonnement atteint, avec l'heure de retour quand la CLI la donne, ou
+   autre panne), l'ouverture le dit et la conversation reste possible sans agenda ; tant que l'utilisateur
+   n'a pas répondu, « Relancer l'analyse » refait la préparation (l'ouverture ratée reste dans le fil).
 2. Chaque message de l'utilisateur : le conducteur local (`wr.conversation`, live via `ai.local_slot_modes`)
    répond brièvement, relance si la réponse est floue, puis pose la question restante la plus utile ;
    éteint ou en échec, le code pose simplement la question suivante. Agenda épuisé : invitation à finir.
@@ -32,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 SLOT = "wr.conversation"
 OPENING = "wr_opening"
+FAILED_OPENING = "wr_opening_failed"
 FOLLOWUP = "wr_conductor"
 CLOSING_PROMPT = "As-tu autre chose à ajouter avant que je prépare le rapport final ?"
 TRANSCRIPT_MESSAGES = 12
@@ -98,10 +101,32 @@ def prepare(db: Session, *, session: ImperiumWeeklyReviewSession) -> ImperiumWee
         row, _stats = hypotheses.run_pass(db, user=user, digest=digest_row)
     except cloud.CloudError as exc:
         db.rollback()
-        error = str(exc)[:200]
+        error = {"error": str(exc)[:200], "error_kind": "quota" if isinstance(exc, cloud.CloudQuotaError) else "unavailable",
+                 "retry_hint": getattr(exc, "retry_hint", None)}
     message = _post_opening(db, session, row, error)
     db.commit()
     return message
+
+
+def can_retry(db: Session, session: ImperiumWeeklyReviewSession) -> bool:
+    """Analyse ratée et pas encore de réponse de l'utilisateur : la préparation peut être refaite."""
+    opening = opening_message(db, session)
+    if opening is None or not (opening.payload or {}).get("error") or session.status != "initial_summary_ready":
+        return False
+    return db.scalar(select(ImperiumWeeklyReviewMessage.id).where(
+        ImperiumWeeklyReviewMessage.session_id == session.id, ImperiumWeeklyReviewMessage.role == "user",
+        ImperiumWeeklyReviewMessage.created_at >= opening.created_at).limit(1)) is None
+
+
+def retry(db: Session, *, session: ImperiumWeeklyReviewSession) -> bool:
+    """Écarte l'ouverture ratée (gardée dans le fil) et remet la session en préparation ; False si refusé."""
+    if not can_retry(db, session):
+        return False
+    opening = opening_message(db, session)
+    opening.payload = {**opening.payload, "source": FAILED_OPENING}
+    session.status = "preparing_initial_summary"
+    db.commit()
+    return True
 
 
 def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: str) -> ImperiumWeeklyReviewMessage:
@@ -148,14 +173,18 @@ def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: st
 
 
 def _post_opening(db: Session, session: ImperiumWeeklyReviewSession, row: WrHypothesis | None,
-                  error: str | None) -> ImperiumWeeklyReviewMessage:
+                  error: dict | None) -> ImperiumWeeklyReviewMessage:
     found = (row.output if row is not None else {}) or {}
     items = found.get("systemic_hypotheses") or []
     agenda = [{"question_fr": item["question_fr"], "stake_fr": item.get("stake_fr")}
               for item in found.get("agenda") or []]
     if row is None:
-        content = ("Je n'ai pas pu préparer l'analyse de ta semaine (modèle cloud indisponible). On peut quand "
-                   "même en parler : qu'est-ce qui a le plus compté pour toi cette semaine ?")
+        hint = (error or {}).get("retry_hint")
+        cause = ("Le quota de ton abonnement cloud est atteint" + (f" (retour annoncé : {hint})" if hint else "")
+                 + " : je n'ai pas pu préparer l'analyse de ta semaine." if (error or {}).get("error_kind") == "quota"
+                 else "Je n'ai pas pu préparer l'analyse de ta semaine (modèle cloud indisponible).")
+        content = (f"{cause} Appuie sur « Relancer l'analyse » plus tard, ou commence sans : qu'est-ce qui a le "
+                   "plus compté pour toi cette semaine ?")
     else:
         lines = [f"• {item['statement_fr']} (confiance {item['confidence']} %)" for item in items]
         head = ("Voici ce que je retiens de ta semaine :\n" + "\n".join(lines)) if lines else (
@@ -168,7 +197,7 @@ def _post_opening(db: Session, session: ImperiumWeeklyReviewSession, row: WrHypo
         session_id=session.id, user_id=session.user_id, role="backend", message_type="initial_summary",
         content=content, created_at=datetime.now(UTC),
         payload={"source": OPENING, "hypotheses_id": str(row.id) if row is not None else None,
-                 "agenda": agenda, "agenda_index": 0 if agenda else None, "error": error})
+                 "agenda": agenda, "agenda_index": 0 if agenda else None, "error": None, **(error or {})})
     db.add(message)
     if session.status in ("preparing_initial_summary", "integrating_answers"):
         session.status = "initial_summary_ready"

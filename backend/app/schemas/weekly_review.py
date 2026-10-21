@@ -407,6 +407,8 @@ class WeeklyReviewConversationFlags(BaseModel):
     is_closed: bool = False
     has_initial_summary: bool
     has_final_draft: bool
+    # Analyse de la semaine ratée (quota, panne) et pas encore de réponse : « Relancer l'analyse » (spec WR §9 P1).
+    can_retry_analysis: bool = False
 
 
 class WeeklyReviewAIResultSummary(BaseModel):

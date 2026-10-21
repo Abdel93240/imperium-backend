@@ -1449,7 +1449,11 @@ The conversation now walks the agenda of the hypothesis pass. Owner of the logic
   opening message written by the CODE (hypotheses with their confidence + first agenda question,
   `initial_summary`, `payload.source = wr_opening`). The session moves to `initial_summary_ready`.
   Nothing happens while the cloud slot is off: the WR keeps its previous dry-run flow.
-  If the cloud call fails, the opening says so and the conversation goes on without an agenda.
+  If the cloud call fails, the opening says so (subscription quota reached, with the reset time when the
+  client gives it, or model unavailable) and the conversation goes on without an agenda. Until the user
+  answers, `flags.can_retry_analysis` is true and `POST /weekly-review/{id}/retry-analysis` (202) moves the
+  session back to preparation and redoes it in the background; the failed opening stays in the thread
+  (`payload.source = wr_opening_failed`).
 - Each chat message: the local conductor (slot `wr.conversation`, live via `ai.local_slot_modes`,
   seeded off) acknowledges, may ask one follow-up, then asks the most useful remaining question
   (`payload.agenda_index`). A "why ...?" the hypotheses do not cover is kept in

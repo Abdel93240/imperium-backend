@@ -225,3 +225,31 @@ def test_job_skips_when_the_slot_is_off(db, cli) -> None:
     cli.outputs = [_final(str(digest_row.digest["docket"]["anomaly"][0]["id"]))]
     hypotheses.hypothesis_on_digest_job(ctx, SimpleNamespace(to_ts=None))
     assert ctx.items_out == 1 and ctx.detail["calls"] == 1
+
+
+def test_quota_is_recognised_with_its_retry_time(monkeypatch) -> None:
+    monkeypatch.setattr(cloud, "_run", None)
+    monkeypatch.setattr(cloud, "get_settings", lambda: SimpleNamespace(cloud_cli_timeout_seconds=5))
+    runs = []
+
+    def run(args, **kwargs):
+        return runs.pop(0)
+
+    monkeypatch.setattr(cloud.subprocess, "run", run)
+    runs.append(SimpleNamespace(returncode=1, stdout="", stderr="ERROR: You've hit your usage limit. Try again at 3:45 PM."))
+    with pytest.raises(cloud.CloudQuotaError) as codex_quota:
+        cloud._execute(["codex", "exec", "-"], "x", ".")
+    assert codex_quota.value.retry_hint == "3:45 PM"
+    runs.append(SimpleNamespace(returncode=1, stdout="", stderr="ERROR: model not found"))
+    with pytest.raises(cloud.CloudError) as other:
+        cloud._execute(["codex", "exec", "-"], "x", ".")
+    assert not isinstance(other.value, cloud.CloudQuotaError)
+    # Claude : l'erreur arrive dans la réponse JSON (code de sortie non nul), l'heure en secondes depuis 1970.
+    body = {"type": "result", "subtype": "error_during_execution", "is_error": True,
+            "result": "Claude AI usage limit reached|1792652400"}
+    runs.append(SimpleNamespace(returncode=1, stdout=json.dumps(body), stderr=""))
+    monkeypatch.setattr(cloud, "_binary", lambda name: name)
+    monkeypatch.setattr(cloud, "get_settings", lambda: SimpleNamespace(cloud_cli_timeout_seconds=5, claude_cli_path="claude"))
+    with pytest.raises(cloud.CloudQuotaError) as claude_quota:
+        cloud._claude("m", None, "s", "u", {})
+    assert claude_quota.value.retry_hint == "09:00"  # 1792652400 = 2026-10-22 09:00 à Paris

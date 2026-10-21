@@ -209,3 +209,40 @@ def test_cloud_failure_still_opens_the_conversation(db, fakes) -> None:
     assert opening.payload["error"] and session.status == "initial_summary_ready"
     reply = _chat(db, user, session, "Semaine dure.")
     assert reply.content == f"Noté. {conductor.CLOSING_PROMPT}"
+
+
+def test_quota_opening_then_retry_until_the_user_answers(db, fakes) -> None:
+    user = _user(db)
+    session = _launch(db, user)
+    _cloud_on(db)
+    fakes.cloud = [cloud.CloudQuotaError("Subscription quota reached", "17:00")]
+    failed = conductor.prepare(db, session=session)
+    assert failed.content.startswith("Le quota de ton abonnement cloud est atteint (retour annoncé : 17:00)")
+    assert "Relancer l'analyse" in failed.content
+    assert (failed.payload["error_kind"], failed.payload["retry_hint"]) == ("quota", "17:00")
+    conversation = wrc.get_weekly_review_conversation(db, current_user=user, session_id=session.id)
+    assert conversation.flags.can_retry_analysis and conversation.flags.can_send_message
+
+    read = wrc.retry_weekly_review_analysis(db, session_id=session.id, current_user=user)
+    assert read.status == "preparing_initial_summary" and failed.payload["source"] == conductor.FAILED_OPENING
+    assert not wrc.get_weekly_review_conversation(db, current_user=user, session_id=session.id).flags.can_retry_analysis
+    fakes.cloud = [PASS]
+    opening = conductor.prepare(db, session=session)
+    assert opening.id != failed.id and opening.payload["agenda_index"] == 0 and opening.payload["error"] is None
+    assert session.status == "initial_summary_ready"
+    with pytest.raises(wrc.WeeklyReviewStateConflictError):  # analyse réussie : rien à relancer
+        wrc.retry_weekly_review_analysis(db, session_id=session.id, current_user=user)
+
+
+def test_no_retry_once_the_user_has_answered(db, fakes) -> None:
+    user = _user(db)
+    session = _launch(db, user)
+    _cloud_on(db)
+    fakes.cloud = [cloud.CloudError("Cloud CLI exited with 1.")]
+    failed = conductor.prepare(db, session=session)
+    assert "modèle cloud indisponible" in failed.content and failed.payload["error_kind"] == "unavailable"
+    assert conductor.can_retry(db, session)
+    _chat(db, user, session, "Semaine dure.")
+    assert not conductor.can_retry(db, session)
+    with pytest.raises(wrc.WeeklyReviewStateConflictError):
+        wrc.retry_weekly_review_analysis(db, session_id=session.id, current_user=user)
