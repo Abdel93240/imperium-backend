@@ -157,6 +157,23 @@ mission en cours prolongée de 30 min ; priority_shift → rien ne bouge, questi
 Correction (revise) → local_executor, sortie validée ; sinon proposition conservée avec un
 message explicite. Échec → demande « failed » (ne compte pas dans le délai).
 
+**Journée menée par la sélection (décision utilisateur 2026-10-21, migration 0124).** Aucun plan horaire
+n'est généré tant que le plan du WR ne place pas les journées : le circuit ci-dessus (décalage de blocs) n'a
+rien à décaler. La journée est donc menée par la sélection Niveau 1 (spec Daily, `daily.selection_enabled`) :
+au démarrage de la journée puis après chaque « Fait » (`POST /api/daily/complete/{id}`) ou « Pas fait »
+(`POST /api/daily/next`), la mission suivante est proposée ; l'utilisateur la démarre
+(`POST /api/daily/start/{id}` : active, heures prévues = maintenant + durée estimée). Le « Programme du jour »
+(`GET /api/daily/programme`) montre le fait, l'en-cours et la proposition, jamais la file.
+« Replanifier la journée » = `POST /api/daily/replan` (même fenêtre : raison obligatoire et une phrase,
+délai minimum du §15, journalisée dans `planning_replan_events` au statut `accepted`, event
+`planning.replan.requested` avec `engine = daily_selection`), puis selon la raison :
+`new_event` → la sélection repart de la fin de l'imprévu (`busy_until`, aujourd'hui) ;
+`wrong_estimation` → la mission en cours est prolongée (`extend_minutes`) ;
+`fatigue` → les missions de `daily.fatigue_max_minutes` (30) au plus passent d'abord ;
+`priority_shift` → la mission choisie par l'utilisateur (une mission en attente, de projet ou hors projet)
+devient la proposition (`tiebreak.forced_by = user_replan`) ; `other` → nouvelle proposition.
+Tant qu'une mission est en cours, seule la prolongation est possible. Rien ne démarre sans l'utilisateur.
+
 ---
 
 ## 4. The Morning Popup
