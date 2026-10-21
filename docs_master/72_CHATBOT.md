@@ -131,6 +131,12 @@ Une action valable l'emporte sur un changement dans le même tour. À la validat
 (agent activé, projet ouvert à l'utilisateur, mission en cours) puis change l'agent et le contexte de la
 session ; la proposition validée reste comme trace. Pas de bascule automatique (suggérer, puis l'utilisateur
 décide).
+Compréhension avant réponse (2026-10-21) : la sortie commence par `comprehension`, où le modèle note, à partir de
+toute la conversation, ce qu'il sait déjà pour l'action en cours, en déduisant ce qui peut l'être (« je veux
+créer une machine à remonter le temps » donne le nom et l'objectif). Sa réponse reprend ce qu'il a déduit
+(« Je note : … ») pour que l'utilisateur corrige, et ne demande que ce qui manque. Sans cet espace de
+réflexion, la sortie contrainte faisait répondre le modèle comme un formulaire, champ après champ. Coût : 2 à
+3 s de plus par tour. Le champ n'est ni montré ni stocké dans la conversation.
 
 ---
 
