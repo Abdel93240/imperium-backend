@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # through the `ai.local_slot_modes` parameter (app/services/ai/local_executor.py).
     local_executor_url: str | None = None
     local_executor_timeout_seconds: int = 60
+    # Cloud roles through the user's subscription CLIs (tests before any API key; app/services/ai/cloud.py),
+    # switched by the `ai.cloud_transport` and `ai.cloud_slot_modes` parameters.
+    claude_cli_path: str = "claude"
+    codex_cli_path: str = "codex"
+    cloud_cli_timeout_seconds: int = 300
 
     # Ported n8n WR bridges (wr_bridge.py): when True, the launch/answer flows run
     # the bridge inline (same behavior the n8n workflows had when reachable and

@@ -1923,6 +1923,10 @@ Migration 20261020_0117 : `chat_sessions.agent` (general|project|mission, defaut
 l'ouverture) ; parametre `chat.agents` (role, libelle, actions, enabled ; project et mission semes false).
 Migration 20261020_0118 : `chat_proposals.action` accepte `switch_agent` (params agent + context_ref) ; sa
 validation change `chat_sessions.agent`, `context_kind` et `context_ref`.
+Migration 20261021_0119 : table `wr_hypotheses` (une par digest, `digest_id` unique : `output` du contrat
+hypothesis_pass, `drill_log`, `model_used`, `prompt_tokens`, `output_tokens`) ; parametres semes eteints
+`ai.cloud_transport` (off|subscription|api, "off"), `ai.cloud_slot_modes` ({}), `ai.cloud_subscription_models`
+({}) et `wr.drill_max` (6) ; job `wr.hypothesis_on_digest` (abonne a `planning.wr_digest.assembled`, desactive).
 Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
 
 ```sql
