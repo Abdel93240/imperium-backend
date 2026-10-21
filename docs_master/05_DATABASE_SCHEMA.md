@@ -1927,6 +1927,7 @@ Migration 20261021_0119 : table `wr_hypotheses` (une par digest, `digest_id` uni
 hypothesis_pass, `drill_log`, `model_used`, `prompt_tokens`, `output_tokens`) ; parametres semes eteints
 `ai.cloud_transport` (off|subscription|api, "off"), `ai.cloud_slot_modes` ({}), `ai.cloud_subscription_models`
 ({}) et `wr.drill_max` (6) ; job `wr.hypothesis_on_digest` (abonne a `planning.wr_digest.assembled`, desactive).
+Migration 20261021_0120 : slot `wr.conversation` (local_default, domaine wr) dans `ai_slot_transition` ; aucune table.
 Programme d'entrainement et dette de volume (migration 20261020_0112, 2026-10-20, spec Pulse §3.6, §8) :
 
 ```sql

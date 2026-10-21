@@ -18,6 +18,7 @@ from app.models.imperium import (
     ImperiumWeeklyReviewFinalReport,
     ImperiumWeeklyReviewMessage,
     ImperiumWeeklyReviewSession,
+    ImperiumWeeklyReviewState,
 )
 from app.schemas.weekly_review import (
     WeeklyReviewAnswerRequest,
@@ -190,6 +191,11 @@ def launch_weekly_review_session(
     first_launch = session.launched_at is None
     if first_launch:
         session.launched_at = datetime.now(UTC)
+        # La bannière « Weekly Review en attente » s'éteint : la revue de cette semaine est lancée.
+        state = db.scalar(select(ImperiumWeeklyReviewState).where(
+            ImperiumWeeklyReviewState.user_id == current_user.id, ImperiumWeeklyReviewState.week_start == week_start))
+        if state is not None and not state.launched:
+            state.launched, state.launched_at = True, session.launched_at
     if session.status == "ready":
         session.status = "preparing_initial_summary"
     if session.current_ai_task_id is None:
@@ -403,7 +409,14 @@ def add_weekly_review_chat_message(
         content=content,
         payload=message_payload,
     )
-    _add_assistant_followup_message(db, session=session, user_content=content)
+    from app.services.wr import conductor
+
+    if conductor.opening_message(db, session) is not None:
+        # WR restructuré (spec WR §9 P2) : la conversation marche l'agenda de la passe d'hypothèses.
+        message.created_at = datetime.now(UTC)  # heure réelle : la réponse vient juste après dans le fil
+        conductor.reply(db, session=session, user_content=content)
+    else:
+        _add_assistant_followup_message(db, session=session, user_content=content)
     session.status = "conversation_active"
     db.flush()
     response = WeeklyReviewMessageRead.model_validate(message)
