@@ -71,7 +71,7 @@ def check_services(*, settings, probes: Probes) -> ServiceHealthReport:
             code="cloud_ai",
             label="IA cloud",
             state="grey",
-            detail="Aucun fournisseur cloud n'est branché au backend : non vérifié.",
+            detail="Pas de clé API : rôles cloud éteints ou en test par abonnement (ai.cloud_transport), non vérifié.",
         ),
     ]
     return ServiceHealthReport(checked_at=datetime.now(UTC), overall=_overall(services), services=services)

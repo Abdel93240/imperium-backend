@@ -169,6 +169,30 @@ backend sends a minimized summary, no direct identifiers), the OpenRouter risk d
 sharply, and routing more roles through it becomes defensible. The selection criterion
 on each role is the guide.
 
+### B.4bis Subscription transport (real tests before any API key)
+
+Decision 2026-10-21: before buying API keys, the cloud roles are tested for real through the
+builder's own provider subscriptions. The backend calls the provider's command-line client,
+signed in to that subscription, instead of the HTTP API. Same contract as the API path: the
+code names a SLOT, the slot names a role (`SLOT_ROLES` in `app/services/ai/cloud.py`), the
+role names provider + model (`ai_role_models`); the output is constrained by the slot's JSON
+Schema.
+
+```text
+ai.cloud_transport            off (seed) | subscription | api (not coded yet)
+ai.cloud_slot_modes           {slot_code: off|live}, seeded empty
+ai.cloud_subscription_models  {role model id: model accepted by the subscription}, seeded empty
+                              (a subscription catalog differs from the API catalog; the role
+                              keeps its API identifier for the day the key arrives)
+```
+
+Guards: a slot is served only if it is `cloud_forced` or `routed` in `ai_slot_transition`, outside
+the vault domain, with a non-local role. The client runs with NO tool at all (no files, no shell,
+no web, no MCP, no plugins), from an empty temporary directory, with a reduced environment and a
+hard timeout (`CLOUD_CLI_TIMEOUT_SECONDS`). Every call goes to the AI call log
+(`trigger_source = subscription_cli`), content never. Quotas are shared with the builder's own use
+of the subscription: tests stay short. Switching to keys later changes the transport only.
+
 ### B.5 "Dumb" interface (for now)
 
 The panel lets the builder assign any model to any role without a blocking guard — the

@@ -82,6 +82,25 @@ class WrDigest(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class WrHypothesis(UUIDPrimaryKeyMixin, Base):
+    """WR P1 hypothesis pass of one digest (spec WR §3.6, §9 P1 ; migration 0119)."""
+
+    __tablename__ = "wr_hypotheses"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    digest_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("wr_digests.id", ondelete="CASCADE"), nullable=False
+    )
+    output: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    drill_log: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    model_used: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class WrMetricsWeekly(UUIDPrimaryKeyMixin, Base):
     """Weekly WR metrics (spec WR §3.8 + user_id ; one row per user and week, migration 0085).
 
