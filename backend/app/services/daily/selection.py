@@ -10,7 +10,8 @@ Périmètre (G1) : missions `backlog` (ni annexe, ni engagement fixe) prévues o
 aujourd'hui (Paris), plus celles du plan courant dont `params.day` est aujourd'hui si le plan WR
 est servi. Pull-forward (`daily.pullforward_enabled`) : jour épuisé et temps restant ≥ seuil →
 même pipeline sur le reste de la semaine (dates jusqu'à dimanche, plan : semaine courante). Sans
-engagement fixe, le temps restant court jusqu'à minuit (Paris). Engagements fixes : missions
+engagement fixe, le temps restant court jusqu'à minuit (Paris), ou `daily.day_length_hours` après le
+démarrage d'une journée commencée tard. Engagements fixes : missions
 `is_fixed_commitment`, plus les événements calendrier `blocks_time` à venir si
 `daily.calendar_commitments_enabled` (semé false).
 
@@ -49,7 +50,7 @@ logger = logging.getLogger(__name__)
 PARIS = ZoneInfo("Europe/Paris")
 WEEKDAY_CODES = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 GATES = ("G1", "G2", "G3", "G4", "G5")
-DEFAULTS = {"top_band_pct": 15, "pullforward_min_threshold": 45, "default_mission_duration": 30,
+DEFAULTS = {"top_band_pct": 15, "pullforward_min_threshold": 45, "default_mission_duration": 30, "day_length_hours": 16,
             "selection_latency_target_ms": 500}
 
 
@@ -172,8 +173,7 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
     now_local = now.astimezone(PARIS)
     today = now_local.date()
     next_fixed = next_commitment(db, current_user, now, origin=origin)
-    horizon = next_fixed.at if next_fixed is not None else datetime.combine(
-        today + timedelta(days=1), datetime.min.time(), tzinfo=PARIS)
+    horizon = next_fixed.at if next_fixed is not None else day_end(db, current_user, now)
     remaining_min = max(0, int((horizon - now).total_seconds() // 60))
 
     day_pool = _pool(db, current_user, today=today, scope="day")
@@ -210,6 +210,19 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
             result.pulled_forward = True
             _elect(db, result, week_feasible, pool="week")
     return result
+
+
+def day_end(db: Session, current_user: User, now: datetime) -> datetime:
+    """Fin de la journée sans engagement fixe : minuit (Paris), ou plus tard si la journée opérationnelle ouverte
+    a démarré tard — elle dure au moins `daily.day_length_hours` depuis son démarrage (une journée commencée à
+    23 h 46 ne s'arrête pas 14 minutes plus tard)."""
+    from app.services.imperium.planning_days import get_current_planning_day
+
+    midnight = datetime.combine(now.astimezone(PARIS).date() + timedelta(days=1), datetime.min.time(), tzinfo=PARIS)
+    day = get_current_planning_day(db, current_user=current_user)
+    if day is None or day.finished_at is not None:
+        return midnight
+    return max(midnight, day.started_at + timedelta(hours=_setting(db, "day_length_hours")))
 
 
 def next_commitment(db: Session, current_user: User, now: datetime,

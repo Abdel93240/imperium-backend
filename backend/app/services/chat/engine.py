@@ -20,7 +20,8 @@ injoignable, la réponse dit clairement que le moteur local est indisponible (do
 Escalade invisible (§3, `app.services.ai.escalation`) : chaque réponse locale porte l'auto-évaluation du modèle ;
 le code calcule le score /200 et, pour une réponse sans proposition, peut faire répondre un rôle cloud à la
 question anonyme du modèle (slot `nexus.escalation`, éteint par défaut : la décision est alors seulement
-journalisée dans `chat_messages.routing`). Les propositions d'action restent locales.
+journalisée dans `chat_messages.routing`). Les propositions d'action restent locales ; une proposition
+n'empêche pas l'escalade de la réponse quand le modèle a écrit une question pour l'expert.
 Pas d'extraction d'apprentissages à la fermeture (§6) dans cette V1.
 """
 
@@ -442,6 +443,12 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
             proposal = {**proposal, "params": params}
         errors, missing = _check(proposal, set(aliases.values()), sheets, agent["actions"]) if proposal else ([], [])
         if proposal and not errors:
+            # Une proposition n'empêche pas la vraie réponse : si le message demandait un modèle plus fort (question
+            # pour l'expert écrite), la réponse est escaladée et la proposition reste en carte, à valider ou non.
+            question = (result.output.get("assessment") or {}).get("expert_question")
+            if decision.escalates and question:
+                reply, model, latency, routing = _escalate(db, session, decision, question, reply, latency)
+                return reply, proposal, model, latency, False, {**routing, "with_proposal": True}
             return reply, proposal, "local_executor", latency, False, {**decision.log(), "escalated": False,
                                                                         "skipped": "proposal"}
         # Pas d'action valable : un changement d'agent proposé passe (l'autre agent saura faire l'action).
