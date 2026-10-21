@@ -52,6 +52,18 @@ def message_route(session_id: UUID, payload: ChatMessageCreate, current_user: Cu
         raise _http(exc) from exc
 
 
+@router.post("/chat/sessions/{session_id}/resume", response_model=ChatTurnRead)
+def resume_route(session_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """Après un changement d'agent validé : le nouvel agent répond à la demande d'avant, sans la faire répéter."""
+    if not engine.enabled(db):
+        return _disabled()
+    try:
+        return engine.resume_after_switch(db, current_user=current_user, session_id=session_id)
+    except (engine.ChatNotFoundError, engine.ChatStateError) as exc:
+        db.rollback()
+        raise _http(exc) from exc
+
+
 @router.post("/chat/sessions/{session_id}/proposals/{proposal_id}/validate", response_model=ChatProposalRead)
 def validate_route(session_id: UUID, proposal_id: UUID, current_user: CurrentUserDep, db: SessionDep):
     """Seule écriture du chatbot : exécute l'action proposée (statut `failed` et raison si le serveur la refuse)."""

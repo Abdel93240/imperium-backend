@@ -325,6 +325,7 @@ def test_agent_switch_is_a_proposal_the_user_validates(db, fake) -> None:
                                      payload=ProjectCreate(title="Lancer le site", description="Un site vitrine en ligne"))
     db.commit()
     sid = _session(client)
+    assert client.post(f"{P}/{sid}/resume").status_code == 409  # rien à reprendre sans changement d'agent
 
     # Agents désactivés : aucun changement possible, un « switch » du modèle est ignoré.
     fake.outputs.append({"reply_fr": "Ok.", "proposal": None, "switch": {"agent": "project", "project_id": "P1"}})
@@ -343,6 +344,15 @@ def test_agent_switch_is_a_proposal_the_user_validates(db, fake) -> None:
     assert done["status"] == "validated" and done["result"] == {"agent": "project", "label": "Projet", "context_ref": str(site.id)}
     session = client.get(f"{P}/{sid}").json()
     assert (session["agent"], session["context_kind"], session["context_ref"]) == ("project", "project", str(site.id))
+
+    # Reprise : le nouvel agent répond tout de suite à la demande d'avant, une seule fois par changement.
+    fake.outputs.append({"reply_fr": "Pour le site, commence par la maquette.", "proposal": None, "switch": None})
+    resumed = client.post(f"{P}/{sid}/resume")
+    assert resumed.status_code == 200 and resumed.json()["user_message"] is None
+    assert resumed.json()["assistant_message"]["content"] == "Pour le site, commence par la maquette."
+    assert "vient d'accepter de passer sur toi (agent Projet)" in fake.prompts[-1] and "UN seul projet, P1" in fake.systems[-1]
+    assert "Parlons du site" in fake.prompts[-1]  # la demande d'avant est dans l'historique
+    assert client.post(f"{P}/{sid}/resume").status_code == 409
 
     # Désormais l'agent Projet répond (son rôle, son contexte) ; il peut proposer de revenir au Général.
     fake.outputs.append({"reply_fr": "On revient au général ?", "proposal": None, "switch": {"agent": "general"}})

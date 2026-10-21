@@ -200,10 +200,40 @@ def send_message(db: Session, *, current_user: User, session_id: UUID, text: str
                                created_at=now)
     db.add(user_message)
     db.flush()
+    assistant, stored = _answer(db, current_user, session, now)
+    turn = ChatTurnRead(user_message=ChatMessageRead.model_validate(user_message),
+                        assistant_message=ChatMessageRead.model_validate(assistant),
+                        proposal=ChatProposalRead.model_validate(stored) if stored else None)
+    db.commit()
+    return turn
+
+
+def resume_after_switch(db: Session, *, current_user: User, session_id: UUID) -> ChatTurnRead:
+    """Juste après un changement d'agent validé : le nouvel agent répond à la demande qui l'a amené, sans la faire
+    répéter. Une seule fois par changement (aucun message depuis la validation), sinon 409."""
+    session = _get(db, current_user, session_id)
+    if session.status != "open":
+        raise ChatStateError("Session closed.")
+    switch = db.scalar(select(ChatProposal).where(ChatProposal.session_id == session.id, ChatProposal.status == "validated")
+                       .order_by(ChatProposal.decided_at.desc()).limit(1))
+    last = db.scalar(select(ChatMessage.created_at).where(ChatMessage.session_id == session.id)
+                     .order_by(ChatMessage.created_at.desc()).limit(1))
+    if switch is None or switch.action != "switch_agent" or (last is not None and last > switch.decided_at):
+        raise ChatStateError("Nothing to resume.")
+    assistant, stored = _answer(db, current_user, session, datetime.now(UTC), resume=True)
+    turn = ChatTurnRead(user_message=None, assistant_message=ChatMessageRead.model_validate(assistant),
+                        proposal=ChatProposalRead.model_validate(stored) if stored else None)
+    db.commit()
+    return turn
+
+
+def _answer(db: Session, current_user: User, session: ChatSession, now: datetime,
+            resume: bool = False) -> tuple[ChatMessage, ChatProposal | None]:
+    """Réponse de l'agent de la session (et proposition éventuelle, qui remplace celle encore ouverte)."""
     agent = agent_sheet(db, session.agent)
     context, aliases = CONTEXTS[session.agent](db, current_user, session)
     switches = _switch_options(db, current_user, session, aliases)
-    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases, switches)
+    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases, switches, resume)
     assistant = ChatMessage(id=uuid4(), session_id=session.id, user_id=current_user.id, role="assistant",
                             content=reply[:8000], model_used=model, latency_ms=latency, degraded=degraded,
                             created_at=datetime.now(UTC))
@@ -220,11 +250,7 @@ def send_message(db: Session, *, current_user: User, session_id: UUID, text: str
                               status="proposed", created_at=now)
         db.add(stored)
         db.flush()
-    turn = ChatTurnRead(user_message=ChatMessageRead.model_validate(user_message),
-                        assistant_message=ChatMessageRead.model_validate(assistant),
-                        proposal=ChatProposalRead.model_validate(stored) if stored else None)
-    db.commit()
-    return turn
+    return assistant, stored
 
 
 def validate_proposal(db: Session, *, current_user: User, session_id: UUID, proposal_id: UUID) -> ChatProposalRead:
@@ -360,7 +386,7 @@ def _switch(db: Session, user: User, session: ChatSession, params: dict) -> dict
 
 
 def _converse(db: Session, session: ChatSession, agent: dict, context: str, aliases: dict[str, str],
-              switches: list[str] | None = None):
+              switches: list[str] | None = None, resume: bool = False):
     switches = switches or []
     sheets = requirements(db)
     if local_executor.slot_mode(db, SLOT) != "live":
@@ -368,7 +394,10 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
     history = list(db.scalars(select(ChatMessage).where(ChatMessage.session_id == session.id)
                               .order_by(ChatMessage.created_at.desc()).limit(HISTORY_MESSAGES)))[::-1]
     transcript = "\n".join(f"{'Utilisateur' if m.role == 'user' else 'Assistant'} : {m.content}" for m in history)[-HISTORY_CHARS:]
-    prompt = f"## Contexte\n{context}\n\n## Conversation\n{transcript}\n\nRéponds au dernier message de l'utilisateur."
+    ask = ("Réponds au dernier message de l'utilisateur." if not resume else
+           f"L'utilisateur vient d'accepter de passer sur toi (agent {agent.get('label', '')}). Reprends sa dernière "
+           "demande, celle qui a mené au changement, et réponds-y directement, sans la lui faire répéter.")
+    prompt = f"## Contexte\n{context}\n\n## Conversation\n{transcript}\n\n{ask}"
     latency = 0
     for attempt in range(2):
         try:

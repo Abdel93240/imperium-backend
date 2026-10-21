@@ -137,6 +137,10 @@ créer une machine à remonter le temps » donne le nom et l'objectif). Sa répo
 (« Je note : … ») pour que l'utilisateur corrige, et ne demande que ce qui manque. Sans cet espace de
 réflexion, la sortie contrainte faisait répondre le modèle comme un formulaire, champ après champ. Coût : 2 à
 3 s de plus par tour. Le champ n'est ni montré ni stocké dans la conversation.
+Reprise après un changement d'agent (2026-10-21) : une fois le changement validé, l'appli appelle
+`POST /api/imperium/chat/sessions/{id}/resume`. Le nouvel agent répond alors à la demande qui a mené au
+changement, sans la faire répéter (réponse et proposition éventuelle, `user_message` null). Une seule reprise
+par changement : refusée (409) sans changement validé ou si un message a suivi la validation.
 
 ---
 
