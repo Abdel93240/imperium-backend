@@ -114,6 +114,10 @@ class MissionContentUpdate(_Strict):
     description: str | None = Field(default=None, max_length=4000)
     notes: str | None = Field(default=None, max_length=4000)
     estimated_minutes: int | None = Field(default=None, ge=1, le=1440)
+    # Missions hors projet : domaine et dates (un champ envoyé à null s'efface).
+    domain: Literal["religious", "business", "finance", "health"] | None = None
+    deadline_at: datetime | None = None
+    planned_start_at: datetime | None = None
 
     @field_validator("title")
     @classmethod
@@ -133,6 +137,51 @@ class ProjectMissionRead(BaseModel):
     notes: str | None
     estimated_minutes: int | None
     project_position: int | None
+
+
+# ---------- Missions hors projet ----------
+
+class IntrinsicMissionCreate(_Strict):
+    """Mission sans projet (paperasse, démarches…) : le moteur du jour la propose dès `planned_start_at` ou à
+    son échéance ; sans aucune date, elle attend."""
+    title: str = Field(max_length=200)
+    description: str | None = Field(default=None, max_length=4000)
+    notes: str | None = Field(default=None, max_length=4000)
+    domain: Literal["religious", "business", "finance", "health"] | None = None
+    deadline_at: datetime | None = None
+    planned_start_at: datetime | None = None
+    estimated_minutes: int | None = Field(default=None, ge=1, le=1440)
+    source: Literal["manual", "chatbot"] = "manual"
+
+    @field_validator("title")
+    @classmethod
+    def non_blank_title(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("title cannot be empty.")
+        return value.strip()
+
+    _strip_texts = field_validator("description", "notes")(lambda cls, value: _strip(value))
+
+
+class IntrinsicMissionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    status: str
+    description: str | None
+    notes: str | None
+    domain: str | None
+    deadline_at: datetime | None
+    planned_start_at: datetime | None
+    estimated_minutes: int | None
+    created_at: datetime
+    ended_at: datetime | None = None
+
+
+class IntrinsicMissionListResponse(BaseModel):
+    missions: list[IntrinsicMissionRead]
+    done: list[IntrinsicMissionRead] = Field(default_factory=list)
 
 
 class ProjectRead(BaseModel):

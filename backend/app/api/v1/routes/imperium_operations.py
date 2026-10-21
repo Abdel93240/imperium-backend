@@ -7,6 +7,9 @@ from fastapi import APIRouter, Header, HTTPException, Response, status
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.operations import (
+    IntrinsicMissionCreate,
+    IntrinsicMissionListResponse,
+    IntrinsicMissionRead,
     MissionContentUpdate,
     MissionReorderRequest,
     ProjectCreate,
@@ -138,7 +141,8 @@ def reorder_project_missions_route(
 def update_mission_content_route(
     mission_id: UUID, payload: MissionContentUpdate, current_user: CurrentUserDep, db: SessionDep
 ) -> ProjectMissionRead:
-    """Nom, description, durée estimée, notes ; une mission terminée est en lecture seule."""
+    """Nom, description, durée estimée, notes ; domaine et dates (missions hors projet) ; une mission terminée
+    est en lecture seule."""
     try:
         return ops.update_mission_content(db, current_user=current_user, mission_id=mission_id, payload=payload)
     except _ERRORS as exc:
@@ -152,6 +156,34 @@ def delete_mission_route(mission_id: UUID, current_user: CurrentUserDep, db: Ses
     except _ERRORS as exc:
         raise _http(db, exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- Missions hors projet ----------
+
+@router.get("/intrinsic-missions", response_model=IntrinsicMissionListResponse)
+def list_intrinsic_missions_route(current_user: CurrentUserDep, db: SessionDep) -> IntrinsicMissionListResponse:
+    """Missions sans projet : à faire, puis les dernières faites."""
+    return ops.list_intrinsic_missions(db, current_user=current_user)
+
+
+@router.post("/intrinsic-missions", response_model=IntrinsicMissionRead, status_code=status.HTTP_201_CREATED)
+def create_intrinsic_mission_route(
+    payload: IntrinsicMissionCreate, current_user: CurrentUserDep, db: SessionDep, idempotency_key: IdempotencyHeader = None
+) -> IntrinsicMissionRead:
+    try:
+        return ops.create_intrinsic_mission(db, current_user=current_user, payload=payload,
+                                            idempotency_key=_key(idempotency_key))
+    except _ERRORS as exc:
+        raise _http(db, exc) from exc
+
+
+@router.post("/missions/{mission_id}/done", response_model=IntrinsicMissionRead)
+def mark_mission_done_route(mission_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> IntrinsicMissionRead:
+    """« Faite » hors du plan du jour (mission en attente ou en standby)."""
+    try:
+        return ops.mark_mission_done(db, current_user=current_user, mission_id=mission_id)
+    except _ERRORS as exc:
+        raise _http(db, exc) from exc
 
 
 # ---------- Routines ----------

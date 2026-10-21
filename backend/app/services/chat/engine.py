@@ -20,8 +20,9 @@ injoignable, la réponse dit clairement que le moteur local est indisponible (do
 Pas d'escalade (§3) ni d'extraction d'apprentissages à la fermeture (§6) dans cette V1.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -31,7 +32,7 @@ from app.models.auth import User
 from app.models.chat import ChatMessage, ChatProposal, ChatSession
 from app.models.imperium import ImperiumMission, ImperiumProject
 from app.schemas.chat import ChatMessageRead, ChatProposalRead, ChatSessionCreate, ChatSessionRead, ChatTurnRead
-from app.schemas.operations import ProjectCreate, ProjectMissionCreate, RoutineCreate
+from app.schemas.operations import IntrinsicMissionCreate, ProjectCreate, ProjectMissionCreate, RoutineCreate
 from app.services.ai import local_executor
 from app.services.imperium import operations
 from app.services.imperium.decision_framework import get_canonical_priority_order
@@ -40,17 +41,21 @@ from app.services.imperium.planning_days import get_current_planning_day
 from app.services.params import get_parameter
 
 SLOT = "chat.converse"
-ACTIONS = ("create_project", "add_project_mission", "create_routine")
+ACTIONS = ("create_project", "add_project_mission", "create_mission", "create_routine")
+PARIS = ZoneInfo("Europe/Paris")
+WEEKDAYS_FR = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 HISTORY_MESSAGES = 12
 HISTORY_CHARS = 6000
 DOMAIN_LABELS = {"religious": "Religion", "business": "Business", "finance": "Finances", "health": "Santé"}
 DEGRADED_REPLY = ("Le moteur local est indisponible pour le moment : je ne peux pas te répondre. "
                   "Réessaie dans un instant ; rien n'a été modifié.")
 
+DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 DEFAULT_REQUIREMENTS = {
     "create_project": {"required": [["title", "le nom du projet"], ["description", "le résultat que tu vises avec ce projet"], ["missions", "ses premières étapes (au moins une mission)"]],
                        "min_description_chars": 15, "min_missions": 1, "max_missions": 10},
     "add_project_mission": {"required": [["project_id", "le projet concerné"], ["title", "ce que la mission consiste à faire"]]},
+    "create_mission": {"required": [["title", "ce qu'il faut faire"]]},
     "create_routine": {"required": [["name", "le nom de la routine"], ["frequency", "sa fréquence (chaque jour, semaine, 2 semaines ou mois)"]]},
 }
 
@@ -58,7 +63,8 @@ DEFAULT_REQUIREMENTS = {
 DEFAULT_AGENTS = {
     "general": {"enabled": True, "label": "Général",
                 "role": "Tu es l'assistant général d'Imperium : tu aides l'utilisateur à créer des projets complets, à "
-                        "ajouter des missions à ses projets et à créer des routines.",
+                        "ajouter des missions à ses projets, à noter des missions hors projet (démarches, paperasse…) "
+                        "et à créer des routines.",
                 "actions": list(ACTIONS)},
 }
 CONTEXT_AGENT = {"project": "project", "mission": "mission"}  # contexte de session → agent ; le reste → Général
@@ -70,6 +76,11 @@ SWITCH_HELP = {
 ACTION_HELP = {
     "create_project": "créer un projet complet, avec ses premières missions",
     "add_project_mission": "ajouter une mission à un projet existant (project_id = son repère dans le contexte, par exemple P1)",
+    "create_mission": "créer une mission hors projet, ponctuelle (démarche, paperasse, rendez-vous, course…) ; "
+                      "deadline = échéance et start_date = jour à partir duquel s'y mettre, au format AAAA-MM-JJ, "
+                      "tirés de ce qu'il dit (« avant vendredi », « jeudi ») avec la date du jour du contexte, sinon "
+                      "null ; demande l'échéance s'il n'en a donné aucune et ne l'invente pas ; domain "
+                      "religious|business|finance|health seulement s'il est évident, sinon null",
     "create_routine": "créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high)",
 }
 
@@ -145,6 +156,10 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
             "missions": {"type": "array", "items": {"type": "object", "additionalProperties": False,
                                                     "required": ["title", "estimated_minutes"],
                                                     "properties": {"title": text, "estimated_minutes": minutes}}}}),
+        _variant("create_mission", ["title", "domain", "deadline", "start_date", "estimated_minutes", "notes"], {
+            "title": text, "domain": {"enum": ["religious", "business", "finance", "health", None]},
+            "deadline": {"type": ["string", "null"], "pattern": DATE_PATTERN},
+            "start_date": {"type": ["string", "null"], "pattern": DATE_PATTERN}, "estimated_minutes": minutes, "notes": notes}),
         _variant("create_routine", ["name", "frequency", "estimated_minutes", "priority", "notes"],
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
@@ -462,6 +477,8 @@ def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) ->
                 return ["project_id inconnu"], []
             ProjectMissionCreate(title=params.get("title", ""), notes=params.get("notes"),
                                  estimated_minutes=params.get("estimated_minutes"))
+        elif action == "create_mission":
+            _intrinsic(params)
         elif action == "create_routine":
             RoutineCreate(name=params.get("name", ""), frequency=params.get("frequency", "daily"),
                           estimated_minutes=params.get("estimated_minutes"), priority=params.get("priority", "medium"),
@@ -470,6 +487,8 @@ def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) ->
             return [f"action inconnue {action}"], []
     except ValidationError as exc:
         return [f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors()][:3], []
+    except ValueError as exc:
+        return [str(exc)], []
     if not str(proposal.get("summary_fr") or "").strip():
         return ["summary_fr vide"], []
     return [], []
@@ -491,6 +510,9 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
                                                  payload=ProjectMissionCreate(title=params["title"], notes=params.get("notes"),
                                                                               estimated_minutes=params.get("estimated_minutes")))
         return {"mission_id": str(mission.id), "title": mission.title}
+    if action == "create_mission":
+        mission = operations.create_intrinsic_mission(db, current_user=user, idempotency_key=key, payload=_intrinsic(params))
+        return {"mission_id": str(mission.id), "title": mission.title}
     if action == "create_routine":
         routine = operations.create_routine(db, current_user=user, idempotency_key=key, payload=RoutineCreate(
             name=params["name"], frequency=params.get("frequency", "daily"), estimated_minutes=params.get("estimated_minutes"),
@@ -499,9 +521,28 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
     raise ValueError(f"Unknown action {action}.")
 
 
+def _intrinsic(params: dict) -> IntrinsicMissionCreate:
+    """Paramètres de la proposition → mission hors projet ; échéance le soir (23 h 59 de Paris), début le matin
+    (0 h) ; sans aucune date, elle commence aujourd'hui pour que le moteur du jour la propose."""
+    def day(value) -> date | None:
+        return date.fromisoformat(value) if value else None
+
+    deadline, start = day(params.get("deadline")), day(params.get("start_date"))
+    if deadline and start and start > deadline:
+        raise ValueError("start_date après deadline")
+    if start is None and deadline is None:
+        start = datetime.now(PARIS).date()
+    return IntrinsicMissionCreate(
+        title=str(params.get("title") or ""), domain=params.get("domain"), notes=params.get("notes"),
+        estimated_minutes=params.get("estimated_minutes"), source="chatbot",
+        deadline_at=datetime.combine(deadline, time(23, 59), tzinfo=PARIS) if deadline else None,
+        planned_start_at=datetime.combine(start, time.min, tzinfo=PARIS) if start else None)
+
+
 def _day_line(db: Session, user: User) -> str:
     day = get_current_planning_day(db, current_user=user)
-    return f"Journée : {'en cours depuis ' + day.started_at.isoformat(timespec='minutes') if day and not day.finished_at else 'non démarrée'}"
+    today = datetime.now(PARIS).date()
+    return f"Aujourd'hui : {WEEKDAYS_FR[today.weekday()]} {today.isoformat()}\nJournée : {'en cours depuis ' + day.started_at.isoformat(timespec='minutes') if day and not day.finished_at else 'non démarrée'}"
 
 
 def _context(db: Session, user: User, session: ChatSession | None = None) -> tuple[str, dict[str, str]]:
@@ -515,6 +556,10 @@ def _context(db: Session, user: User, session: ChatSession | None = None) -> tup
         todo = [m.title for m in p.missions if m.status not in ("completed", "cancelled", "failed")][:8]
         lines.append(f"{alias} : projet{' actif' if p.active else ' en attente'} « {p.title} » ; missions à faire : "
                      f"{', '.join(todo) or 'aucune'}")
+    intrinsic = operations.list_intrinsic_missions(db, current_user=user).missions
+    lines.append("Missions hors projet à faire : " + (", ".join(
+        m.title + (f" (échéance {m.deadline_at.astimezone(PARIS).date().isoformat()})" if m.deadline_at else "")
+        for m in intrinsic[:10]) or "aucune"))
     routines = operations.list_routines(db, current_user=user).routines
     lines.append("Routines : " + (", ".join(f"{r.name} ({r.frequency})" for r in routines if r.active) or "aucune"))
     order = [DOMAIN_LABELS.get(p.domain, p.domain) for p in get_canonical_priority_order(db, current_user=user)]
