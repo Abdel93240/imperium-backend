@@ -210,3 +210,24 @@ def test_sensitive_domain_with_an_expert_question_escalates_even_with_a_low_scor
     decision = escalation.decide(db, low_health)
     assert decision.score == 37 and decision.role == "health_specialist" and "sensitive_domain" in decision.reasons
     assert escalation.decide(db, _a(domain="health")).role == "local_executor"  # sans question : il répond seul
+
+
+def test_a_proposal_does_not_block_the_escalated_answer(db, fakes) -> None:
+    set_parameter(db, code="chat.enabled", value=True, origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.local_slot_modes", value={"chat.converse": "live"}, origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.cloud_transport", value="subscription", origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.cloud_slot_modes", value={"nexus.escalation": "live"}, origin="user", rationale_fr="Test.")
+    db.commit()
+    client = _client(db, _user(db))
+    sid = client.post(P, json={}).json()["id"]
+    deep = _a(complexity=9, context_size=8, ambiguity=8, consequences=6, speed_tolerance=9, sensitivity=5,
+              cost_justification=7, confidence=0.6,
+              expert_question="Comment un adulte qui hésite entre plusieurs voies peut-il choisir une direction de vie ?")
+    fakes.local = [{**_turn(deep, "Veux-tu créer un projet pour y réfléchir ?"), "proposal": {
+        "action": "create_project", "summary_fr": "Créer le projet « Ma direction »",
+        "params": {"title": "Ma direction", "description": "Clarifier la direction que je veux donner à ma vie",
+                   "missions": [{"title": "Lister mes valeurs", "estimated_minutes": 30}]}}}]
+    fakes.cloud = [{"answer_fr": "Commence par ce qui te donne de l'énergie, puis teste une piste pendant un mois."}]
+    turn = client.post(f"{P}/{sid}/messages", json={"text": "Je ne sais pas quelle direction prendre dans ma vie"}).json()
+    assert turn["assistant_message"]["content"].startswith("Commence par ce qui te donne de l'énergie")
+    assert turn["proposal"]["action"] == "create_project" and fakes.calls == ["high_reasoning"]
