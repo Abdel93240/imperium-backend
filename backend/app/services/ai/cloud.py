@@ -28,6 +28,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from typing import Any
@@ -46,7 +47,8 @@ TRANSPORTS = ("off", "subscription", "api")
 MODES = ("off", "live")
 CLOUD_TIERS = frozenset({"cloud_forced", "routed"})
 # Rôle de chaque slot cloud branché (spec WR §9-10 ; exit_audit = high_reasoning, gravé).
-SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_reasoning"}
+SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_reasoning",
+              "wr.report_revision": "first_cloud_tier"}
 MODEL_TIERS = {"first_cloud_tier": "cloud_cheap", "high_reasoning": "cloud_premium",
                "high_reasoning_safeguard": "cloud_premium", "sustained_long_context": "cloud_premium"}
 CLAUDE_EFFORT = {"minimal": "low", "low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}
@@ -137,8 +139,10 @@ def structured(db: Session, *, slot_code: str, app_name: str, system: str, user:
             raise CloudError(str(exc)) from exc
     result = CloudResult(output=output, model=model, provider=role.provider, input_tokens=input_tokens,
                          output_tokens=output_tokens, cost_usd=cost, latency_ms=elapsed())
+    rate = get_parameter(db, "ai.usd_eur_rate", default=None)
+    cost_eur = Decimal(str(cost)) * Decimal(str(rate)) if cost is not None and rate else None
     call_log.record(**{**log, "model_used": model}, input_tokens=input_tokens, output_tokens=output_tokens,
-                    duration_ms=result.latency_ms)
+                    duration_ms=result.latency_ms, cost_eur=cost_eur.quantize(Decimal("0.000001")) if cost_eur else None)
     return result
 
 

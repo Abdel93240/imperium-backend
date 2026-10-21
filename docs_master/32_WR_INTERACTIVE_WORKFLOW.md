@@ -1472,6 +1472,45 @@ The conversation now walks the agenda of the hypothesis pass. Owner of the logic
   retries. Slot off: the previous dry-run draft. The CODE part of P5 (applying validations to the causal
   graph, `wr_phase5_write_enabled`) and the `review.completed` event are not coded yet.
 
+## 11H. Guided review, WR v2 (2026-10-21, first real review feedback)
+
+The conversation runs in visible phases, each closed by one server-chosen button (`flags.phase`,
+`flags.next_step`), instead of a permanent "J'ai fini":
+
+1. **Analysis** (`phase = analysis`): the opening presents the hypotheses and how many questions were kept;
+   the user may react (the conductor answers, asks nothing). "Passer aux questions"
+   (`POST /weekly-review/{id}/advance`) asks the first one.
+2. **Questions** (`phase = questions`): one at a time, "Question k sur N". P1 rates each agenda item 0-100
+   (`relevance`: how much the answer would change the understanding of the week or next week's plan);
+   items under `wr.question_relevance_min` (40) are not asked, at most `wr.questions_max` (30), most
+   relevant first. A follow-up is asked only while the conductor rates it at or above the same threshold,
+   at most `wr.followups_max` (6) on one topic. The user may stop early in words ("on arrête là"). Agenda
+   exhausted or stop asked: `phase = ready_for_report`, `next_step = report`, and "Rédiger le rapport"
+   (confirm route) starts the exit audit. When the conductor judges a request beyond it, the message records
+   `needs_bigger_model` (hook for the escalation of doc 72 §3, not wired yet). The conductor receives the
+   reviewed week's dates and never proposes another review or names a weekday the data does not give.
+3. **Report** (`phase = report`): the report asks no question; unsettled points go under
+   "## À reprendre à la prochaine revue". Corrections typed by the user are noted
+   (`wr_revision_note`), the draft stays; "Mettre à jour le rapport" (`POST /weekly-review/{id}/revise-report`,
+   202) rewrites report and learnings once (`wr.report_revisions_max` = 1) through the light slot
+   `wr.report_revision` (role `first_cloud_tier`; the exit-audit slot when it is off). The replaced draft is
+   kept, marked `superseded`. Then only "Valider le rapport".
+4. **Learnings** (`phase = learnings`, `backend/app/services/wr/learnings_talk.py`): after validation, Nexus
+   posts the numbered learnings (at most 7, merged, confidence ≥ 50) and the user answers in free text
+   ("tout est bon", "tout sauf le 3", "le 2, c'est plutôt …"). The local conductor turns the answer into one
+   decision per number (without the model, the code understands only "tout" and "sauf N"); once every number
+   is decided, a recap is posted and "Confirmer" (`POST /weekly-review/{id}/learnings/confirm`) applies the
+   decisions (final, nothing written to memory) and stores the review. A new answer replaces the recap.
+
+The CLI-reported cost of each subscription call is logged in euros (`ai.usd_eur_rate`).
+
+**Week boundaries.** The WR week starts on `wr.week_start_weekday` (0 = Monday; seeded 1, Tuesday: the night
+from Monday to Tuesday is the user's low point) and lasts 7 days. A review covers the week that just ended:
+`GET /weekly-review/weeks` returns it and the previous one (late review); launch and ready refuse a
+`week_start` on another weekday (reads accept any). The hourly job `wr.week_ready` (seeded off) marks the
+ended week ready from 01:00 Paris on the day the next week starts, which raises the "Weekly Review en attente"
+banner. Other weekly rollups (vault, path, WR metrics) keep their Monday weeks.
+
 ## 11G. Background jobs switched on (2026-10-21, cards V18)
 
 User decision: the WR factory runs for real with W1 (daily rollups), W4 (anomalies, `wr.*` signals active)

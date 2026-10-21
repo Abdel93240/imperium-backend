@@ -1,3 +1,11 @@
+"""État de la Weekly Review d'une semaine (prête, lancée) et découpage des semaines.
+
+La semaine du WR commence le jour `wr.week_start_weekday` (0 = lundi … ; mardi pour l'utilisateur, décision
+2026-10-21 : la nuit de lundi à mardi est le creux de sa semaine) et dure 7 jours. La revue porte sur la
+semaine qui vient de finir ; elle est proposée à partir de 1 h de Paris le jour où la suivante commence
+(job `wr.week_ready`, semé désactivé).
+"""
+
 import hashlib
 import json
 from datetime import UTC, date, datetime, timedelta
@@ -15,8 +23,11 @@ from app.schemas.imperium import (
     WeeklyReviewLaunchResponse,
     WeeklyReviewStateResponse,
 )
+from app.services.params import get_parameter
 
 PARIS_TIMEZONE = "Europe/Paris"
+WEEKDAYS_EN = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+READY_LOCAL_HOUR = 1
 
 
 class InvalidWeekStartError(ValueError):
@@ -41,7 +52,7 @@ def get_or_create_weekly_review_state(
     current_user: User,
     week_start: date,
 ) -> ImperiumWeeklyReviewState:
-    _validate_week_start(week_start)
+    validate_week_start(db, week_start)
     state = _get_weekly_review_state(db, current_user=current_user, week_start=week_start)
     if state is not None:
         return state
@@ -67,7 +78,7 @@ def mark_weekly_review_ready(
     request_method: str,
     request_path: str,
 ) -> tuple[WeeklyReviewStateResponse, bool]:
-    _validate_week_start(week_start)
+    validate_week_start(db, week_start)
     request_hash = _hash_request("weekly_review.ready", {"week_start": week_start.isoformat()})
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
@@ -105,7 +116,7 @@ def launch_weekly_review(
     request_method: str,
     request_path: str,
 ) -> tuple[WeeklyReviewLaunchResponse, bool]:
-    _validate_week_start(week_start)
+    validate_week_start(db, week_start)
     request_hash = _hash_request("weekly_review.launched", {"week_start": week_start.isoformat()})
     existing_key = _get_existing_idempotency(db, current_user=current_user, idempotency_key=idempotency_key)
     if existing_key is not None:
@@ -143,8 +154,49 @@ def launch_weekly_review(
     return response, False
 
 
+def week_weekday(db: Session) -> int:
+    """Premier jour de la semaine du WR (0 = lundi)."""
+    return int(get_parameter(db, "wr.week_start_weekday", default=0)) % 7
+
+
+def validate_week_start(db: Session, week_start: date) -> None:
+    weekday = week_weekday(db)
+    if week_start.weekday() != weekday:
+        raise InvalidWeekStartError(f"week_start must be a {WEEKDAYS_EN[weekday]}.")
+
+
+def week_start_on(day: date, weekday: int) -> date:
+    """Début de la semaine du WR qui contient `day`."""
+    return day - timedelta(days=(day.weekday() - weekday) % 7)
+
+
+def reviewable_weeks(db: Session, now: datetime | None = None) -> list[date]:
+    """La semaine qui vient de finir (proposée dès 1 h de Paris), puis la précédente (revue en retard)."""
+    local = (now or datetime.now(UTC)).astimezone(ZoneInfo(PARIS_TIMEZONE)) - timedelta(hours=READY_LOCAL_HOUR)
+    current = week_start_on(local.date(), week_weekday(db))
+    return [current - timedelta(days=7), current - timedelta(days=14)]
+
+
+def week_ready_job(ctx, window) -> None:
+    """Job `wr.week_ready` (horaire) : la semaine qui vient de finir devient prête, une fois."""
+    from app.services.wr.metrics import _job_user
+
+    user = _job_user(ctx.db)
+    if user is None:
+        ctx.items_in = ctx.items_out = 0
+        ctx.detail = {"skipped": "no_user"}
+        return
+    week_start = reviewable_weeks(ctx.db, window.to_ts)[0]
+    state = get_or_create_weekly_review_state(ctx.db, current_user=user, week_start=week_start)
+    ctx.items_in, ctx.items_out = 1, int(not state.ready)
+    if not state.ready:
+        state.ready, state.ready_at = True, datetime.now(UTC)
+    ctx.db.commit()
+    ctx.detail = {"week_start": week_start.isoformat(), "marked_ready": bool(ctx.items_out)}
+
+
 def get_weekly_review_banner(db: Session, *, current_user: User) -> DashboardWeeklyReviewBanner | None:
-    week_start = _current_week_start()
+    week_start = reviewable_weeks(db)[0]
     state = _get_weekly_review_state(db, current_user=current_user, week_start=week_start)
     if state is None:
         return None
@@ -156,16 +208,6 @@ def get_weekly_review_banner(db: Session, *, current_user: User) -> DashboardWee
         analysis_status=state.analysis_status,
         show_banner=state.ready and not state.launched,
     )
-
-
-def _validate_week_start(week_start: date) -> None:
-    if week_start.weekday() != 0:
-        raise InvalidWeekStartError("week_start must be a Monday.")
-
-
-def _current_week_start() -> date:
-    today = datetime.now(UTC).astimezone(ZoneInfo(PARIS_TIMEZONE)).date()
-    return today - timedelta(days=today.weekday())
 
 
 def _get_weekly_review_state(

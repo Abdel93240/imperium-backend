@@ -8,33 +8,45 @@ corrections que les réponses de l'utilisateur ont apportées aux hypothèses, e
 Le rapport devient le brouillon de la revue (même circuit qu'avant : approuver, demander des changements,
 enregistrer) ; les apprentissages deviennent ses candidats mémoire, qui attendent la décision de l'utilisateur
 (la confrontation d'identité §6.2 et l'écriture en mémoire restent éteintes). Échec (quota, panne) : un message
-le dit, la session revient en conversation et « J'ai fini » réessaie. La partie CODE de P5 (appliquer les
+le dit, la session revient en conversation et « Rédiger le rapport » réessaie. Le rapport ne pose aucune
+question : ce qui n'a pas été tranché part en « À reprendre à la prochaine revue ».
+
+Corrections du brouillon : l'utilisateur les écrit (notes `wr_revision_note`), puis « Mettre à jour le
+rapport » (`revise`) le réécrit UNE fois (`wr.report_revisions_max`) par le slot léger `wr.report_revision`
+(rôle `first_cloud_tier`), ou par celui de l'audit s'il est éteint. La partie CODE de P5 (appliquer les
 validations au graphe causal, `wr_phase5_write_enabled`) n'est pas codée ici.
 """
 
 import json
 import logging
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.ai import AIResult, AITask
 from app.models.auth import User
-from app.models.imperium import ImperiumWeeklyReviewMessage, ImperiumWeeklyReviewSession
+from app.models.imperium import (
+    ImperiumWeeklyReviewFinalReport,
+    ImperiumWeeklyReviewMessage,
+    ImperiumWeeklyReviewSession,
+)
 from app.models.wr import WrHypothesis
 from app.services.ai import cloud
+from app.services.params import get_parameter
 from app.services.wr import digest as wr_digest
 
 logger = logging.getLogger(__name__)
 
 SLOT = "wr.exit_audit"
+REVISION_SLOT = "wr.report_revision"
 FAILED = "wr_exit_audit_failed"
+NOTE = "wr_revision_note"
 KINDS = ("behavior_pattern", "blocker", "weekly_commitment", "preference", "operational_signal", "risk",
          "achievement")
-MAX_FACTS = 10
+MAX_FACTS = 7
 MAX_MESSAGES = 60
 _running: set[UUID] = set()
 _lock = threading.Lock()
@@ -46,15 +58,18 @@ SYSTEM = (
     "revue entre l'utilisateur et Nexus. Tu consolides la vérité validée : ce que l'utilisateur a confirmé, "
     "corrigé ou décidé pèse plus que les hypothèses de départ.\n"
     "Rends :\n"
-    "- learning_facts : 10 au plus, chacun UNE affirmation atomique et durable sur l'utilisateur ou son "
-    "fonctionnement (pas un résumé de la semaine), écrite en le tutoyant (« Tu … »), avec son type, ses preuves (ids du digest ou "
-    "« conversation »), une confiance initiale de 0 à 100 et la condition où elle vaut (context_predicate, "
-    "sinon null). Ne garde que ce que la conversation ou les données soutiennent.\n"
+    "- learning_facts : 7 au plus, les plus solides seulement. Chacun est UNE affirmation atomique et durable "
+    "sur l'utilisateur ou son fonctionnement (pas un résumé de la semaine), écrite en le tutoyant (« Tu … »), "
+    "avec son type, ses preuves (ids du digest ou « conversation »), une confiance initiale de 0 à 100 et la "
+    "condition où elle vaut (context_predicate, sinon null). Fusionne ceux qui se recoupent ; écarte ceux "
+    "sous 50 de confiance et ce que la conversation ou les données ne soutiennent pas.\n"
     "- corrections_applied_fr : chaque hypothèse de départ que ses réponses ont corrigée ou écartée, en une "
     "phrase (« H… : … »).\n"
     "- report_md : le rapport de la semaine en markdown, en français, tutoiement, phrases courtes, avec les "
     "sections ## Ce que la semaine a montré, ## Ce que tu as dit, ## Tes décisions et engagements, "
-    "## Pour la semaine prochaine, ## Questions ouvertes. Cite les chiffres du digest quand ils comptent.\n"
+    "## Pour la semaine prochaine, ## À reprendre à la prochaine revue. Cite les chiffres du digest quand ils "
+    "comptent. Le rapport ne pose AUCUNE question à l'utilisateur : ce qui n'a pas été tranché se note comme un "
+    "sujet à reprendre (« Le départ officiel : à la 1re appli branchée ou à toutes ? »).\n"
     "N'invente rien : pas de chiffre, de décision ni d'engagement que les données ou l'utilisateur n'ont pas donnés."
 )
 
@@ -134,6 +149,124 @@ def run(db: Session, *, session: ImperiumWeeklyReviewSession) -> bool:
     return True
 
 
+def revisions_done(db: Session, session: ImperiumWeeklyReviewSession) -> int:
+    """Réécritures déjà faites : rapports de l'audit au-delà du premier."""
+    count = db.scalar(select(func.count()).select_from(ImperiumWeeklyReviewFinalReport).where(
+        ImperiumWeeklyReviewFinalReport.session_id == session.id,
+        ImperiumWeeklyReviewFinalReport.report_payload["source"].astext == "wr_exit_audit"))
+    return max(0, (count or 0) - 1)
+
+
+def can_note_changes(db: Session, session: ImperiumWeeklyReviewSession) -> bool:
+    """Brouillon de l'audit encore réécrivable : les corrections de l'utilisateur sont notées pour la réécriture."""
+    draft = _draft(db, session)
+    return draft is not None and revisions_done(db, session) < int(get_parameter(db, "wr.report_revisions_max",
+                                                                                   default=1))
+
+
+def pending_notes(db: Session, session: ImperiumWeeklyReviewSession) -> list[str]:
+    """Corrections écrites depuis le brouillon actuel (pas encore intégrées)."""
+    draft = _draft(db, session)
+    if draft is None:
+        return []
+    message = db.scalar(select(ImperiumWeeklyReviewMessage).where(
+        ImperiumWeeklyReviewMessage.session_id == session.id,
+        ImperiumWeeklyReviewMessage.message_type == "final_report_draft")
+        .order_by(ImperiumWeeklyReviewMessage.created_at.desc()).limit(1))
+    since = message.created_at if message is not None else draft.created_at
+    return list(db.scalars(select(ImperiumWeeklyReviewMessage.content).where(
+        ImperiumWeeklyReviewMessage.session_id == session.id,
+        ImperiumWeeklyReviewMessage.message_type == "revision_request",
+        ImperiumWeeklyReviewMessage.created_at > since).order_by(ImperiumWeeklyReviewMessage.created_at)))
+
+
+def note_changes(db: Session, *, session: ImperiumWeeklyReviewSession, content: str) -> ImperiumWeeklyReviewMessage:
+    """Correction du brouillon notée (le brouillon reste) ; écrit seulement les deux messages (flush)."""
+    now = datetime.now(UTC)
+    db.add(ImperiumWeeklyReviewMessage(
+        session_id=session.id, user_id=session.user_id, role="user", message_type="revision_request",
+        content=content, payload={"source": "imperium_weekly_review_request_changes"}, created_at=now))
+    note = ImperiumWeeklyReviewMessage(
+        session_id=session.id, user_id=session.user_id, role="backend", message_type="assistant_followup",
+        content="Noté. Ajoute d'autres corrections si tu veux, puis « Mettre à jour le rapport » : je le "
+                "réécris une fois avec tout ça.",
+        payload={"source": NOTE}, created_at=now + timedelta(microseconds=1))
+    db.add(note)
+    db.flush()
+    return note
+
+
+def start_revision(db: Session, *, session: ImperiumWeeklyReviewSession) -> bool:
+    """« Mettre à jour le rapport » : la session attend la réécriture ; False si rien à réécrire."""
+    if not pending_notes(db, session) or revisions_done(db, session) >= int(
+            get_parameter(db, "wr.report_revisions_max", default=1)):
+        return False
+    session.status = "integrating_answers"
+    db.commit()
+    return True
+
+
+def revise_in_background(session_id: UUID) -> None:
+    """Tâche de fond après « Mettre à jour le rapport » : comme `run_in_background`, pour la réécriture."""
+    from app.db.session import SessionLocal
+
+    with _lock:
+        if session_id in _running:
+            return
+        _running.add(session_id)
+    try:
+        with SessionLocal() as db:
+            session = db.get(ImperiumWeeklyReviewSession, session_id)
+            if session is not None:
+                revise(db, session=session)
+    except Exception:  # noqa: BLE001 - la réécriture ne doit jamais casser la revue
+        logger.exception("WR report revision failed.", extra={"session_id": str(session_id)})
+    finally:
+        with _lock:
+            _running.discard(session_id)
+
+
+def revise(db: Session, *, session: ImperiumWeeklyReviewSession) -> bool:
+    """Réécrit le brouillon avec les corrections notées ; True si le nouveau brouillon est posé."""
+    draft = _draft(db, session)
+    notes = pending_notes(db, session)
+    if session.status != "integrating_answers" or draft is None or not notes:
+        return False
+    slot = REVISION_SLOT if cloud.slot_mode(db, REVISION_SLOT) == "live" else SLOT
+    prompt = (
+        f"Semaine du {session.week_start} au {session.week_end}.\n\nRapport actuel :\n{draft.report_markdown}"
+        "\n\nApprentissages actuels :\n" + json.dumps(
+            [{"statement_fr": c.get("content"), "kind": c.get("kind"), "initial_confidence": c.get("confidence"),
+              "evidence_refs": c.get("evidence_refs") or [], "context_predicate": c.get("context_predicate")}
+             for c in draft.memory_candidates or []], ensure_ascii=False)
+        + "\n\nCorrections de l'utilisateur :\n" + "\n".join(f"- {note[:1500]}" for note in notes)
+        + "\n\nRéécris le rapport et les apprentissages en intégrant ces corrections : elles priment. Garde le "
+        "reste tel quel. corrections_applied_fr résume ce que tu as changé."
+    )
+    try:
+        result = cloud.structured(db, slot_code=slot, app_name="imperium", system=SYSTEM, user=prompt,
+                                  schema=output_schema(), related_entity_type="weekly_review_session",
+                                  related_entity_id=session.id)
+    except cloud.CloudError as exc:
+        db.rollback()
+        _fail(db, session, exc, back_to="draft_ready")
+        return False
+    draft.status = "superseded"
+    for message in db.scalars(select(ImperiumWeeklyReviewMessage).where(
+            ImperiumWeeklyReviewMessage.ai_result_id == draft.source_ai_result_id)):
+        message.payload = {**(message.payload or {}), "superseded": True}
+    db.flush()
+    _attach(db, session, result)
+    db.commit()
+    return True
+
+
+def _draft(db: Session, session: ImperiumWeeklyReviewSession) -> ImperiumWeeklyReviewFinalReport | None:
+    return db.scalar(select(ImperiumWeeklyReviewFinalReport).where(
+        ImperiumWeeklyReviewFinalReport.session_id == session.id, ImperiumWeeklyReviewFinalReport.status == "draft",
+        ImperiumWeeklyReviewFinalReport.report_payload["source"].astext == "wr_exit_audit"))
+
+
 def _attach(db: Session, session: ImperiumWeeklyReviewSession, result: cloud.CloudResult) -> None:
     from app.services.imperium import weekly_review_conversation as wrc
 
@@ -167,15 +300,19 @@ def _attach(db: Session, session: ImperiumWeeklyReviewSession, result: cloud.Clo
     draft.created_at = datetime.now(UTC)  # heure réelle : le rapport vient après toute la conversation
 
 
-def _fail(db: Session, session: ImperiumWeeklyReviewSession, exc: cloud.CloudError) -> None:
+def _fail(db: Session, session: ImperiumWeeklyReviewSession, exc: cloud.CloudError,
+          back_to: str = "conversation_active") -> None:
     hint = getattr(exc, "retry_hint", None)
     cause = ("Le quota de ton abonnement cloud est atteint" + (f" (retour annoncé : {hint})" if hint else "")
              if isinstance(exc, cloud.CloudQuotaError) else "Le modèle cloud est indisponible")
     db.add(ImperiumWeeklyReviewMessage(
         session_id=session.id, user_id=session.user_id, role="backend", message_type="assistant_followup",
-        content=f"{cause} : je n'ai pas pu rédiger le rapport. Appuie de nouveau sur « J'ai fini » pour réessayer.",
+        content=f"{cause} : je n'ai pas pu " + ("mettre à jour le rapport. Appuie de nouveau sur « Mettre à jour le "
+                                               "rapport » pour réessayer." if back_to == "draft_ready" else
+                                               "rédiger le rapport. Appuie de nouveau sur « Rédiger le rapport » "
+                                               "pour réessayer."),
         payload={"source": FAILED, "error": str(exc)[:200],
                  "error_kind": "quota" if isinstance(exc, cloud.CloudQuotaError) else "unavailable",
                  "retry_hint": hint}, created_at=datetime.now(UTC)))
-    session.status = "conversation_active"
+    session.status = back_to
     db.commit()

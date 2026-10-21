@@ -17,6 +17,9 @@ class EmptyResult:
     def all(self):
         return []
 
+    def first(self):
+        return None
+
 
 class FakeDb:
     def __init__(self, *, scalar_results=None, scalars_results=None) -> None:

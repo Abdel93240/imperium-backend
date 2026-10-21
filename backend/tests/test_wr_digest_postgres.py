@@ -27,6 +27,7 @@ from app.models.event import Event  # noqa: E402
 from app.models.imperium import ImperiumWeeklyReviewSession  # noqa: E402
 from app.models.toolbox import SignalValue  # noqa: E402
 from app.models.wr import WrDigest, WrRollupDaily  # noqa: E402
+from app.services.imperium.weekly_review_state import week_start_on  # noqa: E402
 from app.services.imperium import weekly_review_conversation  # noqa: E402
 from app.services.runner.engine import RunContext, Window  # noqa: E402
 from app.services.wr import anomalies  # noqa: E402
@@ -68,7 +69,7 @@ def _client(db, user) -> TestClient:
 
 
 def _session(db, user, *, launched: bool = True, status: str = "conversation_active") -> ImperiumWeeklyReviewSession:
-    week_start = date.today() - timedelta(days=date.today().weekday())
+    week_start = week_start_on(date.today(), 1)  # semaine du WR (mardi)
     session = ImperiumWeeklyReviewSession(
         user_id=user.id, week_start=week_start, week_end=week_start + timedelta(days=6), status=status,
     )
@@ -214,7 +215,7 @@ def test_digest_carries_week_rollups_and_anomalies(db) -> None:
 
 def test_launch_emits_once_and_the_job_assembles_the_digest(db) -> None:
     user = _user(db)
-    week_start = date.today() - timedelta(days=date.today().weekday())
+    week_start = week_start_on(date.today(), 1)  # semaine du WR (mardi)
     for key in (uuid4().hex, uuid4().hex):
         weekly_review_conversation.launch_weekly_review_session(
             db, current_user=user, week_start=week_start, idempotency_key=key, request_method="POST", request_path="/x")
