@@ -46,7 +46,7 @@ TRANSPORTS = ("off", "subscription", "api")
 MODES = ("off", "live")
 CLOUD_TIERS = frozenset({"cloud_forced", "routed"})
 # Rôle de chaque slot cloud branché (spec WR §9-10 ; exit_audit = high_reasoning, gravé).
-SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning"}
+SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_reasoning"}
 MODEL_TIERS = {"first_cloud_tier": "cloud_cheap", "high_reasoning": "cloud_premium",
                "high_reasoning_safeguard": "cloud_premium", "sustained_long_context": "cloud_premium"}
 CLAUDE_EFFORT = {"minimal": "low", "low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}

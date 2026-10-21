@@ -216,6 +216,7 @@ from app.services.imperium.weekly_report import (
     get_weekly_report,
 )
 from app.services.wr import conductor as wr_conductor
+from app.services.wr import exit_audit as wr_exit_audit
 from app.services.imperium.weekly_review_conversation import (
     InvalidWeekStartError as WeeklyReviewConversationInvalidWeekStartError,
     WeeklyReviewAIResultConflictError,
@@ -2166,6 +2167,7 @@ def confirm_weekly_review_no_more_input_route(
     payload: WeeklyReviewChatConfirmRequest,
     request: Request,
     response: Response,
+    background_tasks: BackgroundTasks,
     current_user: CurrentUserDep,
     db: SessionDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -2192,6 +2194,9 @@ def confirm_weekly_review_no_more_input_route(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if duplicate:
         response.status_code = status.HTTP_200_OK
+    elif result.status == "integrating_answers":
+        # Audit de sortie (spec WR §9 P5) : le rapport arrive en brouillon, l'écran relit la conversation.
+        background_tasks.add_task(wr_exit_audit.run_in_background, result.id)
     return result
 
 

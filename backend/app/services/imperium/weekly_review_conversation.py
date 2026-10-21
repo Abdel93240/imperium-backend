@@ -479,6 +479,19 @@ def confirm_weekly_review_no_more_input(
     elif not _session_has_user_input(db, session=session):
         raise WeeklyReviewStateConflictError("Cannot prepare a final draft without user-provided input.")
 
+    from app.services.wr import exit_audit
+
+    if exit_audit.live(db):
+        # Spec WR §9 P5 : l'audit de sortie rédige le rapport en arrière-plan (l'appelant le lance).
+        session.status = "integrating_answers"
+        db.flush()
+        response = WeeklyReviewSessionRead.model_validate(session)
+        _store_idempotency(db, user_id=current_user.id, idempotency_key=idempotency_key,
+                           request_method=request_method, request_path=request_path, request_hash=request_hash,
+                           response_status_code=201, response=response)
+        db.commit()
+        return response, False
+
     ai_task, ai_result = _create_chat_final_draft_ai_result(
         db,
         session=session,

@@ -1462,4 +1462,12 @@ The conversation now walks the agenda of the hypothesis pass. Owner of the logic
   is exhausted.
 - Launching the session also marks the week's banner state as launched; the app shows "Reprendre"
   while the session is open.
-- The final report after "J'ai fini" is still the dry-run draft until P5 (exit audit) is coded.
+- P5 exit audit (`backend/app/services/wr/exit_audit.py`, slot `wr.exit_audit`, role `high_reasoning`): with the
+  slot live, "J'ai fini" moves the session to `integrating_answers` and the audit runs in the background on
+  digest + hypotheses + bounded conversation + kept "why" questions. Output (`exit_audit` contract):
+  `learning_facts` (become the draft's memory candidates, awaiting the user's decision; identity
+  confrontation §6.2 and memory writes stay off), `corrections_applied_fr`, `report_md` (the draft report,
+  `report_payload.source = wr_exit_audit`). Then the usual approve / request changes / store circuit.
+  Failure (quota, outage): a message says so, the session returns to `conversation_active`, and "J'ai fini"
+  retries. Slot off: the previous dry-run draft. The CODE part of P5 (applying validations to the causal
+  graph, `wr_phase5_write_enabled`) and the `review.completed` event are not coded yet.
