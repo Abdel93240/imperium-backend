@@ -23,6 +23,9 @@ from app.api.deps import CurrentUserDep, SessionDep
 from app.models.event import Event
 from app.models.imperium import ImperiumMission
 from app.schemas.daily import (
+    DayReplanRead,
+    DayReplanRequest,
+    ProgrammeRead,
     DailyCompleteResponse,
     DailyCurrentRead,
     MissionConstraints,
@@ -42,7 +45,7 @@ from app.schemas.daily import (
     SelectionRequest,
 )
 from app.schemas.imperium import CompleteMissionRequest
-from app.services.daily import constraints, overrides, prayers, scoring_settings, selection
+from app.services.daily import constraints, day_flow, overrides, prayers, scoring_settings, selection
 from app.services.imperium import missions
 from app.services.path.fasting import paris_today
 from app.services.travel import LatLng
@@ -289,3 +292,58 @@ def override_route(payload: OverrideCreate, current_user: CurrentUserDep, db: Se
     except overrides.OverrideError as exc:
         db.rollback()
         return _coded(_OVERRIDE_STATUS.get(exc.code, status.HTTP_409_CONFLICT), exc, exc.code)
+
+
+_DAY_FLOW_STATUS = {"MISSION_NOT_FOUND": status.HTTP_404_NOT_FOUND, "MISSION_NOT_AVAILABLE": status.HTTP_404_NOT_FOUND,
+                    "BAD_BUSY_UNTIL": status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    "REPLAN_COOLDOWN": status.HTTP_429_TOO_MANY_REQUESTS}
+
+
+@router.post("/start/{mission_id}", response_model=DailyCurrentRead)
+def start_route(
+    mission_id: UUID,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> DailyCurrentRead | JSONResponse:
+    """Démarre la mission proposée (ou une autre en attente) : active, heures prévues = maintenant + durée."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        day_flow.start_mission(db, current_user=current_user, mission_id=mission_id, idempotency_key=idempotency_key)
+    except day_flow.DayFlowError as exc:
+        db.rollback()
+        return _coded(_DAY_FLOW_STATUS.get(exc.code, status.HTTP_409_CONFLICT), exc, exc.code)
+    return selection.current(db, current_user=current_user)
+
+
+@router.get("/programme", response_model=ProgrammeRead)
+def programme_route(current_user: CurrentUserDep, db: SessionDep) -> ProgrammeRead | JSONResponse:
+    """Programme du jour : fait, en cours, puis la proposition suivante (jamais la file)."""
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    return day_flow.programme(db, current_user=current_user)
+
+
+@router.post("/replan", response_model=DayReplanRead)
+def replan_route(
+    payload: DayReplanRequest,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> DayReplanRead | JSONResponse:
+    """Replanifier la journée : une raison claire, puis la suite recalculée par la sélection (rien ne démarre)."""
+    if not idempotency_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Idempotency-Key header.")
+    if not selection.selection_enabled(db):
+        return _selection_disabled()
+    try:
+        return day_flow.replan(db, current_user=current_user, payload=payload, idempotency_key=idempotency_key)
+    except day_flow.DayFlowError as exc:
+        db.rollback()
+        return _coded(_DAY_FLOW_STATUS.get(exc.code, status.HTTP_409_CONFLICT), exc, exc.code)
+    except selection.SelectionError as exc:
+        db.rollback()
+        return _coded(status.HTTP_409_CONFLICT, exc, exc.code)

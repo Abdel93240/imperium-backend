@@ -228,3 +228,54 @@ class PrayerPlanRead(BaseModel):
 class PrayerDayPlanRead(BaseModel):
     date: date
     items: list[PrayerPlanRead]
+
+
+# --- Journée vue par l'utilisateur : programme, démarrage, replanification ------------------------
+
+class ProgrammeItemRead(BaseModel):
+    """Une ligne du « Programme du jour » : faite (ou ratée), en cours, ou proposée ensuite."""
+
+    mission_id: UUID
+    title: str
+    state: Literal["done", "failed", "active", "next"]
+    at: datetime | None
+    estimated_minutes: int | None = None
+
+
+class ProgrammeRead(BaseModel):
+    items: list[ProgrammeItemRead]
+    outcome: Literal["next_mission", "arbitration_pending", "day_done"] | None = None
+
+
+class DayReplanRequest(BaseModel):
+    """Replanifier (doc 43 §3.4) : une raison claire, puis ce qui change selon la raison.
+
+    `new_event` : `busy_until` (fin de l'imprévu, aujourd'hui) ; `wrong_estimation` : `extend_minutes` sur la
+    mission en cours ; `priority_shift` : `mission_id`, la mission à faire maintenant ; `fatigue` : missions
+    courtes d'abord ; `other` : `other_reason`, nouvelle proposition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason_category: Literal["new_event", "wrong_estimation", "fatigue", "priority_shift", "other"]
+    reason_detail: str = Field(min_length=3, max_length=2000)
+    other_reason: str | None = Field(default=None, max_length=200)
+    busy_until: datetime | None = None
+    extend_minutes: int | None = Field(default=None, ge=5, le=480)
+    mission_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def check_reason(self) -> "DayReplanRequest":
+        self.reason_detail = self.reason_detail.strip()
+        if len(self.reason_detail) < 3:
+            raise ValueError("reason_detail is required (at least one short sentence).")
+        needs = {"new_event": self.busy_until, "wrong_estimation": self.extend_minutes,
+                 "priority_shift": self.mission_id, "other": (self.other_reason or "").strip() or None}
+        if self.reason_category in needs and needs[self.reason_category] is None:
+            raise ValueError(f"{self.reason_category} needs its detail field.")
+        return self
+
+
+class DayReplanRead(BaseModel):
+    rationale: str
+    selection: SelectionRead | None = None
+    eligible_at: datetime | None = None

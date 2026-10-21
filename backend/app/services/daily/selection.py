@@ -165,8 +165,10 @@ def gate_pulse(mission: ImperiumMission, min_loads: list[int]) -> bool:
 
 # --- Pipeline -----------------------------------------------------------------------------------
 
-def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | None) -> Selection:
-    """Calcule la sélection sans rien écrire (sert aussi GET queue)."""
+def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | None,
+            max_duration: int | None = None) -> Selection:
+    """Calcule la sélection sans rien écrire (sert aussi GET queue). `max_duration` (replanification pour
+    fatigue) : parmi les faisables non obligatoires, les missions courtes passent d'abord s'il y en a."""
     now_local = now.astimezone(PARIS)
     today = now_local.date()
     next_fixed = next_commitment(db, current_user, now, origin=origin)
@@ -190,7 +192,9 @@ def compute(db: Session, *, current_user: User, now: datetime, origin: LatLng | 
         result.outcome, result.level, result.condition = "arbitration_pending", 2, "mandatory_conflict"
         return result
     if feasible:
-        _elect(db, result, feasible_mandatory or feasible, pool="mandatory" if feasible_mandatory else "feasible")
+        short = [c for c in feasible if max_duration is not None and c.duration_min <= max_duration]
+        pool = feasible_mandatory or short or feasible
+        _elect(db, result, pool, pool="mandatory" if feasible_mandatory else ("short" if short else "feasible"))
         return result
     if day_open:
         result.outcome, result.level, result.condition = "arbitration_pending", 2, "empty_feasible"
@@ -251,15 +255,27 @@ def select_next(
     origin: LatLng | None = None,
     causation_event: Event | None = None,
     now: datetime | None = None,
+    max_duration: int | None = None,
+    forced_mission: ImperiumMission | None = None,
 ) -> DailySelectionLog:
-    """Sélectionne, journalise et émet ; flush seulement. Ne touche jamais la mission active."""
+    """Sélectionne, journalise et émet ; flush seulement. Ne touche jamais la mission active.
+    `forced_mission` (replanification « autre priorité ») : le choix de l'utilisateur devient la proposition."""
     started = clock.perf_counter()
     now = now or datetime.now(UTC)
     active = db.scalar(select(ImperiumMission.id).where(ImperiumMission.user_id == current_user.id,
                                                        ImperiumMission.status == "active"))
     if active is not None:
         raise SelectionError("A mission is already active; the selection never touches it.", "MISSION_ACTIVE")
-    result = compute(db, current_user=current_user, now=now, origin=origin)
+    result = compute(db, current_user=current_user, now=now, origin=origin, max_duration=max_duration)
+    if forced_mission is not None:
+        chosen = next((c for c in result.candidates if c.mission.id == forced_mission.id), None)
+        if chosen is None:
+            now_local = now.astimezone(PARIS)
+            chosen = _evaluate(db, current_user, [forced_mission], now_local=now_local, today=now_local.date(),
+                               remaining_min=result.remaining_min, origin=origin)[0]
+            result.candidates.append(chosen)
+        result.outcome, result.level, result.condition, result.chosen = "next_mission", 1, None, chosen
+        result.tiebreak = {"forced_by": "user_replan", "pool": "user_choice"}
     latency_ms = int((clock.perf_counter() - started) * 1000)
     row = DailySelectionLog(
         user_id=current_user.id, trigger=trigger, trigger_ref=trigger_ref, at_ts=now,
