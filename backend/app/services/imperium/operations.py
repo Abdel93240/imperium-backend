@@ -1,4 +1,4 @@
-"""Opérations : projets, missions de projet et routines (doc 71 §3, §4.1, §8 ; doc 01).
+"""Opérations : projets, missions de projet, missions hors projet et routines (doc 71 §3, §4.1, §8 ; doc 01).
 
 Règles V1 (décisions utilisateur 2026-10-15/16/17) :
 - les 2 premiers projets du classement sont actifs ; pas d'activation manuelle ;
@@ -6,7 +6,10 @@ Règles V1 (décisions utilisateur 2026-10-15/16/17) :
 - suppressions : le passé est conservé (missions à venir annulées, coches gardées) ;
 - une mission terminée ne se supprime pas et ses contenus sont en lecture seule ;
 - routines : 4 fréquences fermées ; jour/heure forcés seulement via le chatbot ;
-  le jour liste les quotidiennes actives et les routines placées ce jour-là.
+  le jour liste les quotidiennes actives et les routines placées ce jour-là ;
+- missions hors projet (paperasse, démarches… ; décision utilisateur 2026-10-21) : missions du backlog sans
+  projet, ni annexe, ni engagement fixe ; le moteur du jour les propose dès leur date de début ou à leur
+  échéance. « Faite » les termine hors du plan du jour (comme une mission faite ailleurs).
 """
 
 from datetime import UTC, date, datetime
@@ -20,6 +23,9 @@ from app.models.enums import IdempotencyStatus
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, ImperiumProject, ImperiumRoutine, ImperiumRoutineCheck
 from app.schemas.operations import (
+    IntrinsicMissionCreate,
+    IntrinsicMissionListResponse,
+    IntrinsicMissionRead,
     MissionContentUpdate,
     ProjectCreate,
     ProjectListResponse,
@@ -260,6 +266,81 @@ def delete_mission(db: Session, *, current_user: User, mission_id: UUID, now: da
     _emit(db, current_user, "mission.abandoned", {"mission_id": str(mission.id), "reason": "deleted_by_user"},
           f"mission-delete:{mission.id}")
     db.commit()
+
+
+# ---------- Missions hors projet ----------
+
+INTRINSIC_DONE_SHOWN = 10
+
+
+def list_intrinsic_missions(db: Session, *, current_user: User) -> IntrinsicMissionListResponse:
+    """À faire (échéance la plus proche d'abord, puis date de début, puis ancienneté) et dernières faites."""
+    base = select(ImperiumMission).where(
+        ImperiumMission.user_id == current_user.id, ImperiumMission.project_id.is_(None),
+        ImperiumMission.annex_of_mission_id.is_(None), ImperiumMission.is_fixed_commitment.is_(False))
+    todo = db.scalars(base.where(ImperiumMission.status.in_(UNFINISHED_MISSION_STATUSES)).order_by(
+        ImperiumMission.deadline_at.asc().nulls_last(), ImperiumMission.planned_start_at.asc().nulls_last(),
+        ImperiumMission.created_at.asc()))
+    done = db.scalars(base.where(ImperiumMission.status == "completed")
+                      .order_by(ImperiumMission.ended_at.desc().nulls_last()).limit(INTRINSIC_DONE_SHOWN))
+    return IntrinsicMissionListResponse(missions=[IntrinsicMissionRead.model_validate(m) for m in todo],
+                                        done=[IntrinsicMissionRead.model_validate(m) for m in done])
+
+
+def create_intrinsic_mission(
+    db: Session, *, current_user: User, payload: IntrinsicMissionCreate, idempotency_key: str
+) -> IntrinsicMissionRead:
+    existing = db.scalar(
+        select(IdempotencyKey).where(IdempotencyKey.user_id == current_user.id, IdempotencyKey.idempotency_key == idempotency_key)
+    )
+    if existing is not None and existing.response_body is not None:
+        return IntrinsicMissionRead(**existing.response_body)
+    now = datetime.now(UTC)
+    mission = ImperiumMission(
+        id=uuid4(), user_id=current_user.id, title=payload.title, description=payload.description, notes=payload.notes,
+        domain=payload.domain, deadline_at=payload.deadline_at, planned_start_at=payload.planned_start_at,
+        estimated_minutes=payload.estimated_minutes, status="backlog", started_at=now,
+    )
+    db.add(mission)
+    db.flush()
+    event = _emit(db, current_user, "planning.mission.created",
+                  {"mission_id": str(mission.id), "project_id": None, "created_by": payload.source}, idempotency_key)
+    db.flush()
+    mission.created_by_event_id = event.id
+    read = IntrinsicMissionRead.model_validate(mission)
+    db.add(
+        IdempotencyKey(
+            user_id=current_user.id,
+            idempotency_key=idempotency_key,
+            request_method="POST",
+            request_path="/api/imperium/intrinsic-missions",
+            request_hash=f"intrinsic-mission:{payload.title}",
+            status=IdempotencyStatus.completed,
+            response_status_code=201,
+            response_body=read.model_dump(mode="json"),
+        )
+    )
+    db.commit()
+    return read
+
+
+def mark_mission_done(db: Session, *, current_user: User, mission_id: UUID, now: datetime | None = None
+                      ) -> IntrinsicMissionRead:
+    """« Faite » hors du plan du jour : une mission ouverte et pas en cours se termine (événement de complétion)."""
+    mission = _get_user_mission(db, current_user=current_user, mission_id=mission_id)
+    if mission.status not in ("backlog", "standby"):
+        raise OperationsConflictError("Only a mission waiting in the backlog or in standby can be marked done here.")
+    now = now or datetime.now(UTC)
+    event = _emit(db, current_user, "mission.completed",
+                  {"mission_id": str(mission.id), "outcome": "completed", "reason": "Faite hors du plan du jour."},
+                  f"mission-done:{mission.id}")
+    db.flush()
+    for annex in mission.pending_annexes or []:
+        annex.annex_of_mission_id = None
+    mission.status, mission.ended_at, mission.completion_note = "completed", now, "Faite hors du plan du jour."
+    mission.ended_by_event_id = event.id
+    db.commit()
+    return IntrinsicMissionRead.model_validate(mission)
 
 
 # ---------- Routines ----------

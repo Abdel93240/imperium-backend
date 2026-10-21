@@ -3,8 +3,10 @@ mode dégradé explicite, contexte en liste blanche. Exécuteur simulé."""
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from types import SimpleNamespace
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -383,3 +385,42 @@ def test_model_writes_its_understanding_before_answering() -> None:
     assert list(schema["properties"])[0] == "comprehension" and schema["required"][0] == "comprehension"
     prompt = system_prompt({"role": "", "actions": ["create_project"]}, {})
     assert "DÉDUISANT" in prompt and "Je note" in prompt
+
+
+def _mission(params: dict) -> dict:
+    return {"reply_fr": "Je te propose de la noter.", "proposal": {
+        "action": "create_mission", "summary_fr": f"Noter la mission « {params['title']} »",
+        "params": {"domain": None, "deadline": None, "start_date": None, "estimated_minutes": None, "notes": None, **params}}}
+
+
+def test_project_less_mission_from_the_chat(db, fake) -> None:
+    _enable(db)
+    user = _user(db)
+    client = _client(db, user)
+    sid = _session(client)
+    fake.outputs += [_mission({"title": "Passer à la mairie", "deadline": "2026-10-23", "start_date": "2026-10-24"}),
+                     _mission({"title": "Passer à la mairie", "deadline": "2026-10-23", "domain": "business",
+                               "estimated_minutes": 45, "notes": "Pièce d'identité"})]
+    turn = _say(client, sid, "Je dois passer à la mairie avant vendredi, 45 min, avec ma pièce d'identité")
+    assert "start_date après deadline" in fake.prompts[-1]  # 1re proposition refusée par le code, le modèle corrige
+    assert "Aujourd'hui : " in fake.prompts[0] and "Missions hors projet à faire : aucune" in fake.prompts[0]
+    assert "create_mission : créer une mission hors projet" in fake.systems[0]
+    proposal = turn["proposal"]
+    assert proposal["action"] == "create_mission"
+    assert db.scalar(select(ImperiumMission).where(ImperiumMission.user_id == user.id)) is None  # rien avant validation
+    validated = client.post(f"{P}/{sid}/proposals/{proposal['id']}/validate").json()
+    assert validated["status"] == "validated" and validated["result"]["title"] == "Passer à la mairie"
+    mission = db.scalar(select(ImperiumMission).where(ImperiumMission.user_id == user.id))
+    assert (mission.project_id, mission.status, mission.domain, mission.estimated_minutes, mission.notes) == (
+        None, "backlog", "business", 45, "Pièce d'identité")
+    paris = mission.deadline_at.astimezone(ZoneInfo("Europe/Paris"))
+    assert (paris.date().isoformat(), paris.hour, paris.minute) == ("2026-10-23", 23, 59)
+    assert mission.planned_start_at is None
+
+    fake.outputs.append(_mission({"title": "Renvoyer le formulaire CAF"}))  # aucune date : commence aujourd'hui
+    turn = _say(client, sid, "Note aussi de renvoyer le formulaire CAF")
+    assert "Missions hors projet à faire : Passer à la mairie (échéance 2026-10-23)" in fake.prompts[-1]
+    client.post(f"{P}/{sid}/proposals/{turn['proposal']['id']}/validate")
+    caf = db.scalar(select(ImperiumMission).where(ImperiumMission.title == "Renvoyer le formulaire CAF",
+                                                  ImperiumMission.user_id == user.id))
+    assert caf.planned_start_at.astimezone(ZoneInfo("Europe/Paris")).date() == datetime.now(ZoneInfo("Europe/Paris")).date()

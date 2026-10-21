@@ -292,6 +292,26 @@ routine_checks:
 > À réconcilier avec `05_DATABASE_SCHEMA.md` (vérifier si des tables projects /
 > routines existent déjà avant d'en créer).
 
+### 8bis. Missions hors projet (2026-10-21)
+
+Décision utilisateur : une mission ponctuelle qui n'appartient à aucun projet (paperasse, démarche à la mairie,
+rendez-vous…) doit être visible et gérable. Ce sont des missions du backlog sans projet, ni annexe, ni engagement
+fixe (`imperium_missions`, aucune nouvelle table). Le moteur du jour les propose dès leur date de début
+(`planned_start_at`) ou à leur échéance (`deadline_at`) ; sans aucune date, elles attendent.
+
+- `GET /intrinsic-missions` : celles à faire (échéance la plus proche d'abord, puis date de début, puis
+  ancienneté) et les 10 dernières faites ;
+- `POST /intrinsic-missions` (Idempotency-Key) : titre, description, notes, domaine (religious, business,
+  finance, health ou aucun), date de début, échéance, durée estimée ; événement `planning.mission.created`
+  avec `project_id` nul ;
+- `PATCH /missions/{id}` accepte aussi domaine, échéance et date de début (un champ envoyé à null s'efface) ;
+- `POST /missions/{id}/done` : « Faite » hors du plan du jour (mission en attente ou en standby), événement de
+  complétion ; `DELETE /missions/{id}` l'annule comme toute mission.
+
+Écran : section « Missions hors projet » en haut de la colonne de droite, au-dessus des routines ; « + » ouvre
+la fiche, une ligne ouvre sa fiche (Enregistrer, Faite, Supprimer). Échéance aujourd'hui ou demain par un choix
+rapide, ou une date du calendrier. Le chatbot les crée aussi (doc 72, action `create_mission`).
+
 ---
 
 ## 9. Liens avec le reste du système
