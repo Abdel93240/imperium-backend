@@ -65,6 +65,6 @@ class ChatSessionRead(BaseModel):
 class ChatTurnRead(BaseModel):
     """Un tour : le message de l'utilisateur, la réponse, et la proposition éventuelle (jamais exécutée)."""
 
-    user_message: ChatMessageRead
+    user_message: ChatMessageRead | None  # null : reprise après un changement d'agent (aucun nouveau message)
     assistant_message: ChatMessageRead
     proposal: ChatProposalRead | None
