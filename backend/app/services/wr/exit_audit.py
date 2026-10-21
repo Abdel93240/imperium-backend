@@ -47,7 +47,7 @@ SYSTEM = (
     "corrigé ou décidé pèse plus que les hypothèses de départ.\n"
     "Rends :\n"
     "- learning_facts : 10 au plus, chacun UNE affirmation atomique et durable sur l'utilisateur ou son "
-    "fonctionnement (pas un résumé de la semaine), avec son type, ses preuves (ids du digest ou "
+    "fonctionnement (pas un résumé de la semaine), écrite en le tutoyant (« Tu … »), avec son type, ses preuves (ids du digest ou "
     "« conversation »), une confiance initiale de 0 à 100 et la condition où elle vaut (context_predicate, "
     "sinon null). Ne garde que ce que la conversation ou les données soutiennent.\n"
     "- corrections_applied_fr : chaque hypothèse de départ que ses réponses ont corrigée ou écartée, en une "
