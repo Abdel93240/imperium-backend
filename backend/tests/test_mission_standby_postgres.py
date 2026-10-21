@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.models.auth import User  # noqa: E402
 from app.models.imperium import ImperiumMission, PlanningDay  # noqa: E402
 from app.schemas.imperium import AttachAnnexesRequest, FinishDayRequest, ResolveStandbyRequest  # noqa: E402
-from app.services.imperium.day_finish import finish_day  # noqa: E402
+from app.services.imperium.day_finish import NoOpenPlanningDayError, finish_day  # noqa: E402
 from app.services.imperium.missions import (  # noqa: E402
     MissionStateConflictError,
     attach_annexes,
@@ -244,3 +244,21 @@ def test_resolve_rejects_missions_not_in_standby(db) -> None:
     mission = _mission(db, user, status="backlog")
     with pytest.raises(MissionStateConflictError):
         _resolve(db, user, mission, decision="completed")
+
+
+def test_a_day_restarted_on_the_same_date_can_still_be_finished(db) -> None:
+    user = _user(db)
+    first = _open_day(db, user)
+    done, _duplicate = _finish(db, user)
+    second = _open_day(db, user)  # redémarrée le même jour : la date a déjà son bilan
+    assert second.start_local_date == first.start_local_date
+    again, _duplicate = finish_day(
+        db, current_user=user,
+        payload=FinishDayRequest(local_date=NOW.date(), timezone="Europe/Paris", day_status="partial", main_win="Mairie faite"),
+        idempotency_key=f"finish-{uuid4().hex}", request_method="POST", request_path="/api/imperium/day/finish")
+    assert again.review.id == done.review.id  # un seul bilan pour la date, complété
+    assert (again.review.day_status, again.review.main_win) == ("partial", "Mairie faite")
+    db.refresh(second)
+    assert second.finished_at is not None and second.day_review_id == done.review.id
+    with pytest.raises(NoOpenPlanningDayError):
+        _finish(db, user)

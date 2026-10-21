@@ -67,31 +67,44 @@ def finish_day(
             ImperiumDayReview.local_date == planning_day.start_local_date,
         )
     )
-    if existing_review is not None:
-        raise DayAlreadyFinishedError(
-            "Day review already exists for this local_date. V1 rejects second non-idempotent finishes."
-        )
+    if existing_review is not None and existing_review.id == planning_day.day_review_id:
+        raise DayAlreadyFinishedError("This operational day is already finished.")
 
     event_id = f"evt_{uuid4().hex}"
-    review = ImperiumDayReview(
-        user_id=current_user.id,
-        local_date=planning_day.start_local_date,
-        timezone=planning_day.timezone,
-        day_status=payload.day_status.value,
-        energy_level=payload.energy_level,
-        fatigue_level=payload.fatigue_level,
-        sleep_quality=payload.sleep_quality,
-        stress_level=payload.stress_level,
-        mood=payload.mood,
-        main_win=payload.main_win,
-        main_problem=payload.main_problem,
-        completed_items=[item.model_dump(mode="json", exclude_none=True) for item in payload.completed_items],
-        missed_items=[item.model_dump(mode="json", exclude_none=True) for item in payload.missed_items],
-        notes=payload.notes,
-        free_text=payload.free_text,
-        source_event_id=event_id,
-    )
-    db.add(review)
+    completed = [item.model_dump(mode="json", exclude_none=True) for item in payload.completed_items]
+    missed = [item.model_dump(mode="json", exclude_none=True) for item in payload.missed_items]
+    if existing_review is not None:
+        # Journée redémarrée le même jour (la date avait déjà son bilan) : le bilan du jour est complété par
+        # cette clôture au lieu d'être refusé, sinon la journée resterait ouverte pour toujours.
+        review = existing_review
+        review.day_status = payload.day_status.value
+        for field in ("energy_level", "fatigue_level", "sleep_quality", "stress_level", "mood", "main_win",
+                      "main_problem", "notes", "free_text"):
+            if getattr(payload, field) is not None:
+                setattr(review, field, getattr(payload, field))
+        review.completed_items = [*(review.completed_items or []), *completed]
+        review.missed_items = [*(review.missed_items or []), *missed]
+        review.source_event_id = event_id
+    else:
+        review = ImperiumDayReview(
+            user_id=current_user.id,
+            local_date=planning_day.start_local_date,
+            timezone=planning_day.timezone,
+            day_status=payload.day_status.value,
+            energy_level=payload.energy_level,
+            fatigue_level=payload.fatigue_level,
+            sleep_quality=payload.sleep_quality,
+            stress_level=payload.stress_level,
+            mood=payload.mood,
+            main_win=payload.main_win,
+            main_problem=payload.main_problem,
+            completed_items=completed,
+            missed_items=missed,
+            notes=payload.notes,
+            free_text=payload.free_text,
+            source_event_id=event_id,
+        )
+        db.add(review)
     db.flush()
 
     finished_at = now or datetime.now(UTC)
