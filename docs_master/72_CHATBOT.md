@@ -7,6 +7,9 @@ does, the chatbot can do (replan, create, modify, validate, delete...). It is th
 single conversational surface through which the user drives Imperium by natural
 language (typed or voice-transcribed).
 
+The chatbot is named **Nexus** (user's choice, 2026-10-21): Imperium is the environment, Nexus is its AI. The name
+appears in the terminal (header, speaker label, « Nexus réfléchit… », greeting) and in the system prompt.
+
 It is NOT a generic assistant like a public chatbot. Its reason for being is **access
 to the ecosystem's data and actions** under the user's control. It is generalist, holds
 all authorizations, and **never acts on its own** — every action is proposed and waits
