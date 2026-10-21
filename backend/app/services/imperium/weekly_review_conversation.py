@@ -434,6 +434,16 @@ def add_weekly_review_chat_message(
     return response, False
 
 
+def retry_weekly_review_analysis(db: Session, *, session_id: UUID, current_user: User) -> WeeklyReviewSessionRead:
+    """Remet la revue en préparation après une analyse ratée ; l'appelant relance la préparation en arrière-plan."""
+    from app.services.wr import conductor
+
+    session = _get_session_for_user(db, current_user=current_user, session_id=session_id)
+    if not conductor.retry(db, session=session):
+        raise WeeklyReviewStateConflictError("The weekly review analysis cannot be retried now.")
+    return WeeklyReviewSessionRead.model_validate(session)
+
+
 def confirm_weekly_review_no_more_input(
     db: Session,
     *,
@@ -1292,6 +1302,9 @@ def get_weekly_review_conversation(
         reports=reports,
     )
     flags = _build_conversation_flags(session=session, active_final_report=active_final_report)
+    from app.services.wr import conductor
+
+    flags.can_retry_analysis = conductor.can_retry(db, session)
     ui_state = _conversation_ui_state(session=session, active_final_report=active_final_report)
     allowed_actions = _conversation_allowed_actions(ui_state=ui_state, flags=flags)
     draft_review_state = _draft_review_state(

@@ -191,7 +191,9 @@ the vault domain, with a non-local role. The client runs with NO tool at all (no
 no web, no MCP, no plugins), from an empty temporary directory, with a reduced environment and a
 hard timeout (`CLOUD_CLI_TIMEOUT_SECONDS`). Every call goes to the AI call log
 (`trigger_source = subscription_cli`), content never. Quotas are shared with the builder's own use
-of the subscription: tests stay short. Switching to keys later changes the transport only.
+of the subscription: tests stay short. A reached quota is recognised from the client's message
+(`CloudQuotaError`, with the announced reset time when given) so the caller can say so and offer a retry.
+Switching to keys later changes the transport only.
 
 ### B.5 "Dumb" interface (for now)
 

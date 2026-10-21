@@ -21,12 +21,15 @@ local. Chaque appel, réussi ou non, va au journal central des appels IA (aucun 
 
 import json
 import os
+import re
 import shutil
 import subprocess  # nosec B404 - CLI fournisseur lancée sans shell, arguments en liste
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from typing import Any
 
 from sqlalchemy import select
@@ -53,6 +56,10 @@ CODEX_DISABLED = ("shell_tool", "unified_exec", "apps", "browser_use", "browser_
                   "sleep_tool", "tool_suggest", "skill_search", "code_mode_host", "shell_snapshot",
                   "skill_mcp_dependency_install")
 ENV_KEPT = ("HOME", "PATH", "LANG", "USER", "CODEX_HOME")
+# Quota de l'abonnement atteint (messages des CLI) ; l'heure de retour quand la CLI la donne.
+QUOTA = re.compile(r"usage limit|rate limit|hit your limit|limit reached|quota|too many requests|\b429\b", re.I)
+QUOTA_EPOCH = re.compile(r"limit reached\|(\d{10})")
+QUOTA_WHEN = re.compile(r"(?:resets?|try again)(?: at| in)? ([^.\n|]{1,40})", re.I)
 
 # Remplacé par les tests : (args, stdin, timeout, cwd) -> stdout.
 _run: Callable[[list[str], str, int, str], str] | None = None
@@ -60,6 +67,14 @@ _run: Callable[[list[str], str, int, str], str] | None = None
 
 class CloudError(RuntimeError):
     pass
+
+
+class CloudQuotaError(CloudError):
+    """Quota de l'abonnement atteint ; `retry_hint` = heure de retour annoncée par la CLI (ou None)."""
+
+    def __init__(self, message: str, retry_hint: str | None) -> None:
+        super().__init__(message)
+        self.retry_hint = retry_hint
 
 
 @dataclass(frozen=True)
@@ -117,6 +132,8 @@ def structured(db: Session, *, slot_code: str, app_name: str, system: str, user:
                 raise CloudError("The model output is not a JSON object.")
         except (CloudError, KeyError, IndexError, TypeError, ValueError, OSError) as exc:
             call_log.record(**log, duration_ms=elapsed(), success=False, error_code=type(exc).__name__[:32])
+            if isinstance(exc, CloudError):
+                raise
             raise CloudError(str(exc)) from exc
     result = CloudResult(output=output, model=model, provider=role.provider, input_tokens=input_tokens,
                          output_tokens=output_tokens, cost_usd=cost, latency_ms=elapsed())
@@ -134,7 +151,8 @@ def _claude(model: str, effort: str | None, system: str, user: str, schema: dict
     with tempfile.TemporaryDirectory(prefix="imperium-cloud-") as work:
         body = json.loads(_execute(args, user, work))
     if body.get("is_error") or body.get("subtype") != "success":
-        raise CloudError(f"Claude CLI error: {body.get('subtype')} {body.get('api_error_status')}")
+        raise _failure(f"Claude CLI error: {body.get('subtype')} {body.get('api_error_status')}",
+                       f"{body.get('result')} {body.get('api_error_status')}")
     usage = body.get("usage") or {}
     models = list((body.get("modelUsage") or {}).keys())
     tokens_in = sum(usage.get(key) or 0 for key in ("input_tokens", "cache_creation_input_tokens",
@@ -177,8 +195,22 @@ def _execute(args: list[str], stdin: str, cwd: str) -> str:
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise CloudError(f"Cloud CLI failed: {type(exc).__name__}") from exc
     if done.returncode != 0:
-        raise CloudError(f"Cloud CLI exited with {done.returncode}.")
+        if args[1:2] == ["-p"] and done.stdout.lstrip().startswith("{"):
+            return done.stdout  # Claude : l'erreur est dans la réponse JSON, lue par l'appelant
+        raise _failure(f"Cloud CLI exited with {done.returncode}.", f"{done.stdout[-2000:]} {done.stderr[-2000:]}")
     return done.stdout
+
+
+def _failure(message: str, cli_text: str) -> CloudError:
+    """Erreur de la CLI ; quota atteint reconnu à son message, avec l'heure de retour si elle est donnée."""
+    if not QUOTA.search(cli_text):
+        return CloudError(message)
+    hint = None
+    if epoch := QUOTA_EPOCH.search(cli_text):
+        hint = datetime.fromtimestamp(int(epoch.group(1)), UTC).astimezone(ZoneInfo("Europe/Paris")).strftime("%H:%M")
+    elif when := QUOTA_WHEN.search(cli_text):
+        hint = when.group(1).strip()
+    return CloudQuotaError(f"Subscription quota reached ({message})", hint)
 
 
 def _binary(name: str) -> str:

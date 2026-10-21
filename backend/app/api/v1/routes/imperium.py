@@ -230,6 +230,7 @@ from app.services.imperium.weekly_review_conversation import (
     approve_weekly_review_memory_candidate,
     cancel_weekly_review,
     confirm_weekly_review_no_more_input,
+    retry_weekly_review_analysis,
     commit_weekly_review_memory_candidates,
     create_or_update_final_draft,
     dry_run_weekly_review_memory_commit,
@@ -2128,6 +2129,30 @@ def post_weekly_review_chat_message_route(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if duplicate:
         response.status_code = status.HTTP_200_OK
+    return result
+
+
+@router.post(
+    "/weekly-review/{session_id}/retry-analysis",
+    response_model=WeeklyReviewSessionRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def retry_weekly_review_analysis_route(
+    session_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> WeeklyReviewSessionRead:
+    """« Relancer l'analyse » après un échec (quota, panne), tant que l'utilisateur n'a pas répondu."""
+    try:
+        result = retry_weekly_review_analysis(db, session_id=session_id, current_user=current_user)
+    except WeeklyReviewSessionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except WeeklyReviewStateConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    background_tasks.add_task(wr_conductor.prepare_in_background, result.id)
     return result
 
 
