@@ -195,6 +195,13 @@ of the subscription: tests stay short. A reached quota is recognised from the cl
 (`CloudQuotaError`, with the announced reset time when given) so the caller can say so and offer a retry.
 Switching to keys later changes the transport only.
 
+Switches in the app (CODED 2026-10-22): `GET /api/ai/advanced/slots` lists every slot of
+`ai_slot_transition` with its engine (local for `local_default`, cloud for `cloud_forced` / `routed`), its
+mode and its note; `PUT /api/ai/advanced/slots/{slot}` {mode: live|off} writes a new version of
+`ai.local_slot_modes` or `ai.cloud_slot_modes` (a vault slot never goes live in the cloud; an unknown slot
+is refused); `PUT /api/ai/advanced/transport` {transport: off|subscription}. The Android « Paramètres avancés »
+screen shows these switches, the role models, the /200 bands and the API key status (write-only).
+
 ### B.5 "Dumb" interface (for now)
 
 The panel lets the builder assign any model to any role without a blocking guard — the

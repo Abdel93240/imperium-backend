@@ -13,10 +13,13 @@ from app.schemas.ai_advanced import (
     RoleModelListResponse,
     RoleModelRead,
     RoleModelUpdate,
+    SlotsRead,
+    SlotUpdate,
     ThresholdsRead,
     ThresholdsUpdate,
+    TransportUpdate,
 )
-from app.services.ai import advanced
+from app.services.ai import advanced, slot_settings
 
 router = APIRouter()
 
@@ -84,3 +87,24 @@ def delete_api_key_route(provider: str, current_user: CurrentUserDep) -> Respons
     except _ERRORS as exc:
         raise _http(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------- Traitements IA (slots) et transport cloud ----------
+
+@router.get("/slots", response_model=SlotsRead)
+def list_slots_route(current_user: CurrentUserDep, db: SessionDep) -> SlotsRead:
+    return slot_settings.read(db)
+
+
+@router.put("/slots/{slot_code}", response_model=SlotsRead)
+def update_slot_route(slot_code: str, payload: SlotUpdate, current_user: CurrentUserDep, db: SessionDep) -> SlotsRead:
+    try:
+        return slot_settings.set_mode(db, slot_code=slot_code, mode=payload.mode)
+    except slot_settings.SlotSettingsError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.put("/transport", response_model=SlotsRead)
+def update_transport_route(payload: TransportUpdate, current_user: CurrentUserDep, db: SessionDep) -> SlotsRead:
+    return slot_settings.set_transport(db, transport=payload.transport)

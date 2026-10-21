@@ -266,7 +266,7 @@ have a doubt.
 
 Location: Imperium → Settings → Intelligence Artificielle → Logs.
 
-CODÉ le 2026-10-17 : `GET /api/ai/logs` et `GET /api/ai/logs/{id}` (lecture seule). Les logs sont reconstruits depuis la base (ai_tasks + ai_results, knowledge_inbox_items) : aucun accès au système de fichiers, secrets masqués, confinés à l'utilisateur.
+CODÉ le 2026-10-17 : `GET /api/ai/logs` et `GET /api/ai/logs/{id}` (lecture seule). Les logs sont reconstruits depuis la base (ai_tasks + ai_results, knowledge_inbox_items) : aucun accès au système de fichiers, secrets masqués, confinés à l'utilisateur. Depuis le 2026-10-22, les décisions d'escalade de Nexus (§3.3) y figurent aussi (`routing:<message>` : score, rôle, raisons, escaladé ou non), jamais le message lui-même. Écran Android « Logs de l'IA » : journal à gauche, détail en terminal à droite, onglet « Appels aux modèles » (dépense par jour, alertes, derniers appels).
 
 Layout: a small **sandboxed file browser** on the left (navigate the AI-log folders
 only), a display terminal on the right showing the selected log's contents. Sorted by

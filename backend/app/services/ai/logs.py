@@ -1,7 +1,8 @@
 """Navigateur des logs de l'IA (doc 72 §8) — Réglages → Intelligence artificielle → Logs.
 
 Confiné par construction : les logs sont reconstruits depuis la base (tâches IA et
-leurs résultats, éléments de Nourrir l'IA) ; aucun accès au système de fichiers,
+leurs résultats, éléments de Nourrir l'IA, décisions d'escalade de Nexus quand le score demandait un modèle
+plus fort — la décision seulement, jamais le message) ; aucun accès au système de fichiers,
 aucun chemin accepté. Lecture seule ; la correction passe par le chatbot.
 """
 
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models.ai import AIResult, AITask, KnowledgeInboxItem
 from app.models.auth import User
+from app.models.chat import ChatMessage
 
 LIST_LIMIT = 200
 MASK = "••••"
@@ -62,6 +64,16 @@ def list_logs(db: Session, *, current_user: User) -> AILogListResponse:
             .limit(LIST_LIMIT)
         )
     ]
+    entries += [
+        AILogEntry(id=f"routing:{message.id}", name=_routing_name(message), kind="routing", occurred_at=message.created_at)
+        for message in db.scalars(
+            select(ChatMessage)
+            .where(ChatMessage.user_id == current_user.id, ChatMessage.routing.is_not(None),
+                   ChatMessage.routing["role"].astext != "local_executor")
+            .order_by(ChatMessage.created_at.desc())
+            .limit(LIST_LIMIT)
+        )
+    ]
     entries.sort(key=lambda entry: entry.occurred_at, reverse=True)
     return AILogListResponse(logs=entries[:LIST_LIMIT])
 
@@ -85,10 +97,34 @@ def read_log(db: Session, *, current_user: User, log_id: str) -> AILogRead:
             raise AILogNotFoundError("Log not found.")
         return AILogRead(id=log_id, name=_inbox_name(item), kind="inbox", occurred_at=item.created_at,
                          content=_inbox_content(item))
+    if kind == "routing":
+        message = db.get(ChatMessage, object_id)
+        if message is None or message.user_id != current_user.id or not message.routing:
+            raise AILogNotFoundError("Log not found.")
+        return AILogRead(id=log_id, name=_routing_name(message), kind="routing", occurred_at=message.created_at,
+                         content=_routing_content(message))
     raise AILogNotFoundError("Log not found.")
 
 
 # ---------- rendu ----------
+
+def _routing_name(message: ChatMessage) -> str:
+    routing = message.routing or {}
+    verb = "Escalade" if routing.get("escalated") else "Escalade non faite"
+    return f"{message.created_at:%Y-%m-%d} · {verb} · {routing.get('role')} ({routing.get('score')}/200)"
+
+
+def _routing_content(message: ChatMessage) -> str:
+    routing = message.routing or {}
+    lines = [f"[{_hm(message.created_at)}] réponse de Nexus : score {routing.get('score')}/200 → {routing.get('role')}",
+             f"confiance {routing.get('confidence')} · domaine {routing.get('domain')}",
+             "raisons : " + ", ".join(routing.get("reasons") or [])]
+    lines += _block("critères", routing.get("breakdown"))
+    if routing.get("escalated"):
+        lines.append(f"répondu par {routing.get('model') or message.model_used} ({message.latency_ms} ms au total)")
+    else:
+        lines.append(f"non escaladé : {routing.get('skipped') or 'local'}" + (f" ({routing['error']})" if routing.get("error") else ""))
+    return "\n".join(lines + ["", "Le message lui-même n'est pas journalisé ici."])
 
 def _task_name(task: AITask) -> str:
     return f"{task.created_at:%Y-%m-%d} · {TASK_LABELS.get(task.task_type, task.task_type)}"

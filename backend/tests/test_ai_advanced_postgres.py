@@ -155,3 +155,35 @@ def test_routes_never_expose_a_key_reading_endpoint() -> None:
     for expected in [("/ai/advanced/roles", "GET"), ("/ai/advanced/roles/{role}", "PUT"), ("/ai/advanced/catalog", "GET"),
                      ("/ai/advanced/thresholds", "GET"), ("/ai/advanced/thresholds", "PUT"), ("/ai/advanced/api-keys/{provider}", "DELETE")]:
         assert expected in paths, expected
+
+
+@pytest.fixture()
+def isolated_db(engine):
+    """Les interrupteurs committent : transaction externe annulée, rien ne fuit dans la base de test."""
+    connection = engine.connect()
+    outer = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    yield session
+    session.close()
+    outer.rollback()
+    connection.close()
+
+
+def test_slots_are_switched_on_and_off_with_their_guards(isolated_db) -> None:
+    db = isolated_db
+    from app.services.ai import slot_settings
+    from app.services.params import get_parameter
+
+    read = slot_settings.read(db)
+    by_code = {slot.slot_code: slot for slot in read.slots}
+    assert by_code["chat.converse"].engine == "local" and by_code["wr.exit_audit"].engine == "cloud"
+    assert by_code["nexus.escalation"].engine == "cloud" and by_code["imperium.advice"].engine == "local"
+
+    after = slot_settings.set_mode(db, slot_code="imperium.advice", mode="live")
+    assert {s.slot_code: s.mode for s in after.slots}["imperium.advice"] == "live"
+    assert get_parameter(db, "ai.local_slot_modes")["imperium.advice"] == "live"
+    slot_settings.set_mode(db, slot_code="nexus.escalation", mode="live")
+    assert get_parameter(db, "ai.cloud_slot_modes")["nexus.escalation"] == "live"
+    assert slot_settings.set_transport(db, transport="subscription").transport == "subscription"
+    with pytest.raises(slot_settings.SlotSettingsError):
+        slot_settings.set_mode(db, slot_code="nope.slot", mode="live")

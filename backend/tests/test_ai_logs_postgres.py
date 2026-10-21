@@ -128,3 +128,28 @@ def test_logs_routes_are_registered() -> None:
     paths = {(route.path, method) for route in api_router.routes for method in getattr(route, "methods", set())}
     assert ("/ai/logs", "GET") in paths and ("/ai/logs/{log_id}", "GET") in paths
     assert not any(path.startswith("/ai/logs") and method in {"POST", "PUT", "PATCH", "DELETE"} for path, method in paths)
+
+
+def test_escalation_decisions_are_logged_without_the_message(db) -> None:
+    from app.models.chat import ChatMessage, ChatSession
+
+    user = _user(db)
+    session = ChatSession(id=uuid4(), user_id=user.id, agent="general", status="open", started_at=datetime.now(UTC))
+    db.add(session)
+    db.flush()
+    routing = {"score": 134, "role": "health_specialist", "reasons": ["band:Premier niveau cloud", "domain_specialist"],
+               "breakdown": {"complexity": 10}, "confidence": 0.6, "domain": "health", "escalated": True,
+               "model": "gpt-6-sol"}
+    escalated = ChatMessage(id=uuid4(), session_id=session.id, user_id=user.id, role="assistant",
+                            content="Dors 7 h au moins.", model_used="gpt-6-sol", latency_ms=20000, routing=routing,
+                            created_at=datetime.now(UTC))
+    local = ChatMessage(id=uuid4(), session_id=session.id, user_id=user.id, role="assistant", content="Salut !",
+                        routing={"score": 28, "role": "local_executor", "escalated": False}, created_at=datetime.now(UTC))
+    db.add_all([escalated, local])
+    db.commit()
+    entries = [e for e in ai_logs.list_logs(db, current_user=user).logs if e.kind == "routing"]
+    assert [e.id for e in entries] == [f"routing:{escalated.id}"]  # une réponse locale n'est pas une escalade
+    assert entries[0].name.endswith("Escalade · health_specialist (134/200)")
+    content = ai_logs.read_log(db, current_user=user, log_id=entries[0].id).content
+    assert "score 134/200 → health_specialist" in content and "répondu par gpt-6-sol" in content
+    assert "Dors 7 h" not in content
