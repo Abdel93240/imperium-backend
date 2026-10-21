@@ -48,7 +48,9 @@ MODES = ("off", "live")
 CLOUD_TIERS = frozenset({"cloud_forced", "routed"})
 # Rôle de chaque slot cloud branché (spec WR §9-10 ; exit_audit = high_reasoning, gravé).
 SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_reasoning",
-              "wr.report_revision": "first_cloud_tier"}
+              "wr.report_revision": "first_cloud_tier", "nexus.escalation": "first_cloud_tier"}
+# Slots dont le rôle est choisi à chaque appel par le score /200 (doc 30 §5.6) : le rôle de SLOT_ROLES est le défaut.
+ROUTED_SLOTS = frozenset({"nexus.escalation"})
 MODEL_TIERS = {"first_cloud_tier": "cloud_cheap", "high_reasoning": "cloud_premium",
                "high_reasoning_safeguard": "cloud_premium", "sustained_long_context": "cloud_premium"}
 CLAUDE_EFFORT = {"minimal": "low", "low": "low", "medium": "medium", "high": "high", "xhigh": "xhigh"}
@@ -108,13 +110,19 @@ def slot_mode(db: Session, slot_code: str) -> str:
 
 
 def structured(db: Session, *, slot_code: str, app_name: str, system: str, user: str, schema: dict,
-               related_entity_type: str | None = None, related_entity_id: Any = None) -> CloudResult:
-    """Un appel contraint au schéma ; lève CloudError (slot éteint, transport, CLI, sortie invalide)."""
+               related_entity_type: str | None = None, related_entity_id: Any = None,
+               role_code: str | None = None) -> CloudResult:
+    """Un appel contraint au schéma ; lève CloudError (slot éteint, transport, CLI, sortie invalide).
+    `role_code` : rôle choisi par le routage, permis seulement pour un slot routé (`ROUTED_SLOTS`)."""
     if slot_mode(db, slot_code) != "live":
         raise CloudError(f"Cloud slot '{slot_code}' is off.")
     if transport(db) != "subscription":
         raise CloudError("Only the subscription transport is coded.")
-    role_code = SLOT_ROLES[slot_code]
+    if role_code is not None and slot_code not in ROUTED_SLOTS:
+        raise CloudError(f"Slot '{slot_code}' has a fixed role.")
+    if role_code in LOCAL_ONLY_ROLES:
+        raise CloudError(f"Role '{role_code}' is local only.")
+    role_code = role_code or SLOT_ROLES[slot_code]
     try:
         role = resolve_role(db, role_code)
     except RoleResolutionError as exc:

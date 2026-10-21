@@ -186,9 +186,17 @@ def test_opening_then_the_code_walks_the_agenda_by_relevance(db, fakes) -> None:
     assert [item.role for item in conversation.chat_timeline][-2:] == ["user", "assistant"]
 
 
-def _turn(followup=None, value=0, index=-1, wants_report=False, beyond_me=False, open_question=None) -> dict:
-    return {"comprehension": "Compris.", "ack_fr": "Je note.", "followup_fr": followup, "followup_value": value,
-            "next_index": index, "wants_report": wants_report, "beyond_me": beyond_me, "open_question": open_question}
+EASY = {"complexity": 2, "context_size": 2, "ambiguity": 1, "consequences": 2, "speed_tolerance": 3, "sensitivity": 2,
+        "cost_justification": 1, "confidence": 0.9, "domain": "planning", "expert_question": None}
+HARD = {**EASY, "complexity": 10, "context_size": 8, "ambiguity": 3, "consequences": 5, "speed_tolerance": 8,
+        "sensitivity": 3, "cost_justification": 8, "domain": "health",
+        "expert_question": "Comment estimer une dette de sommeil sur six mois pour un adulte qui se couche vers 2 h ?"}
+
+
+def _turn(followup=None, value=0, index=-1, wants_report=False, hard=False, open_question=None) -> dict:
+    return {"comprehension": "Compris.", "assessment": HARD if hard else EASY, "ack_fr": "Je note.",
+            "followup_fr": followup, "followup_value": value, "next_index": index, "wants_report": wants_report,
+            "open_question": open_question}
 
 
 def test_local_conductor_follows_up_while_it_stays_relevant(db, fakes) -> None:
@@ -204,7 +212,7 @@ def test_local_conductor_follows_up_while_it_stays_relevant(db, fakes) -> None:
     fakes.local = [
         _turn("Des trajets à vide, ou un plein plus cher ?", 80, open_question="Pourquoi je dors mal ?"),
         _turn("Combien de litres ?", 30, index=1),  # relance trop peu pertinente : question suivante
-        _turn("Couché à quelle heure ?", 90, beyond_me=True),
+        _turn("Couché à quelle heure ?", 90, hard=True),
         _turn("Et la veille ?", 90),
         _turn("Et l'avant-veille ?", 90),  # 2 relances déjà sur ce sujet : on passe, l'agenda est fini
         local_executor.LocalExecutorError("down"),
@@ -221,6 +229,9 @@ def test_local_conductor_follows_up_while_it_stays_relevant(db, fakes) -> None:
     assert nxt.content == f"Je note. Question 2 sur 2 : {MERCREDI}" and nxt.payload["agenda_index"] == 1
     hard = _chat(db, user, session, "Calcule ma dette de sommeil sur 6 mois.")
     assert hard.payload["needs_bigger_model"] is True and hard.content.endswith("Couché à quelle heure ?")
+    # Slot d'escalade éteint : la décision est seulement notée (score 134/200 → premier niveau, santé → spécialiste).
+    assert (hard.payload["routing"]["score"], hard.payload["routing"]["role"]) == (134, "health_specialist")
+    assert hard.payload["routing"]["escalated"] is False
     _chat(db, user, session, "Tard.")
     done = _chat(db, user, session, "Vers 2 h.")
     assert done.content == f"Je note. {conductor.READY_TEXT}" and done.payload["phase"] == "ready_for_report"
@@ -296,3 +307,25 @@ def test_no_retry_once_the_user_has_answered(db, fakes) -> None:
     assert not conductor.can_retry(db, session)
     with pytest.raises(wrc.WeeklyReviewStateConflictError):
         wrc.retry_weekly_review_analysis(db, session_id=session.id, current_user=user)
+
+
+def test_hard_question_is_answered_by_the_routed_role(db, fakes, monkeypatch) -> None:
+    user = _user(db)
+    session = _launch(db, user)
+    set_parameter(db, code="ai.cloud_transport", value="subscription", origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.cloud_slot_modes", value={"wr.hypothesis_pass": "live", "nexus.escalation": "live"},
+                  origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.local_slot_modes", value={"wr.conversation": "live"}, origin="user", rationale_fr="Test.")
+    db.commit()
+    roles = []
+    monkeypatch.setattr(cloud, "resolve_role", lambda db, code: roles.append(code) or SimpleNamespace(
+        provider="anthropic", model_id=f"model-{code}", effort=None))
+    fakes.cloud = [PASS]
+    conductor.prepare(db, session=session)
+    wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
+    fakes.local = [_turn(index=1, hard=True)]
+    fakes.cloud = [{"answer_fr": "Compte les heures manquantes chaque nuit par rapport à 8 h et additionne-les."}]
+    reply = _chat(db, user, session, "Calcule ma dette de sommeil sur 6 mois.")
+    assert reply.content == ("Compte les heures manquantes chaque nuit par rapport à 8 h et additionne-les. "
+                             f"Question 2 sur 2 : {MERCREDI}")
+    assert roles[-1] == "health_specialist" and reply.payload["routing"]["escalated"] is True
