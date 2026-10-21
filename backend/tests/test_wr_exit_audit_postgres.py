@@ -4,7 +4,7 @@ unique et le tri des apprentissages en conversation. CLI cloud simulée : aucun 
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -30,6 +30,7 @@ from app.models.imperium import (  # noqa: E402
 from app.schemas.weekly_review import WeeklyReviewAnswerRequest  # noqa: E402
 from app.services.ai import cloud, local_executor  # noqa: E402
 from app.services.imperium import weekly_review_conversation as wrc  # noqa: E402
+from app.services.imperium.weekly_review_state import week_start_on  # noqa: E402
 from app.services.params import set_parameter  # noqa: E402
 from app.services.wr import conductor, docket, exit_audit  # noqa: E402
 from app.schemas.weekly_review import WeeklyReviewChatConfirmRequest  # noqa: E402
@@ -103,7 +104,8 @@ def _user(db) -> User:
 
 
 def _monday() -> date:
-    return date.today() - timedelta(days=date.today().weekday())
+    """Début de la semaine du WR qui contient aujourd'hui (mardi, `wr.week_start_weekday` semé à 1)."""
+    return week_start_on(date.today(), 1)
 
 
 def _launch(db, user) -> ImperiumWeeklyReviewSession:

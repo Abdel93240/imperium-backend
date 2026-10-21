@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -215,6 +215,7 @@ from app.services.imperium.weekly_report import (
     InvalidWeekStartError,
     get_weekly_report,
 )
+from app.services.imperium.weekly_review_state import reviewable_weeks, week_weekday
 from app.services.wr import conductor as wr_conductor
 from app.services.wr import exit_audit as wr_exit_audit
 from app.services.imperium.weekly_review_conversation import (
@@ -1589,17 +1590,20 @@ def replace_priorities_route(
     )
 
 
+@router.get("/weekly-review/weeks")
+def weekly_review_weeks_route(current_user: CurrentUserDep, db: SessionDep) -> dict:
+    """Semaines à revoir : celle qui vient de finir puis la précédente (jour de début `wr.week_start_weekday`)."""
+    weeks = reviewable_weeks(db)
+    return {"weekday": week_weekday(db), "weeks": [week.isoformat() for week in weeks],
+            "week_ends": [(week + timedelta(days=6)).isoformat() for week in weeks]}
+
+
 @router.get("/weekly-review/state", response_model=WeeklyReviewStateResponse | None)
 def weekly_review_state_route(
     week_start: date,
     current_user: CurrentUserDep,
     db: SessionDep,
 ) -> WeeklyReviewStateResponse | None:
-    if week_start.weekday() != 0:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="week_start must be a Monday.",
-        )
     state = db.scalar(
         select(ImperiumWeeklyReviewState).where(
             ImperiumWeeklyReviewState.user_id == current_user.id,

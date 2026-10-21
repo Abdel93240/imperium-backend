@@ -1504,6 +1504,13 @@ The conversation runs in visible phases, each closed by one server-chosen button
 
 The CLI-reported cost of each subscription call is logged in euros (`ai.usd_eur_rate`).
 
+**Week boundaries.** The WR week starts on `wr.week_start_weekday` (0 = Monday; seeded 1, Tuesday: the night
+from Monday to Tuesday is the user's low point) and lasts 7 days. A review covers the week that just ended:
+`GET /weekly-review/weeks` returns it and the previous one (late review); launch and ready refuse a
+`week_start` on another weekday (reads accept any). The hourly job `wr.week_ready` (seeded off) marks the
+ended week ready from 01:00 Paris on the day the next week starts, which raises the "Weekly Review en attente"
+banner. Other weekly rollups (vault, path, WR metrics) keep their Monday weeks.
+
 ## 11G. Background jobs switched on (2026-10-21, cards V18)
 
 User decision: the WR factory runs for real with W1 (daily rollups), W4 (anomalies, `wr.*` signals active)

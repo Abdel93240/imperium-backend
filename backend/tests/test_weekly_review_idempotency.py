@@ -21,6 +21,9 @@ class FakeSession:
     def commit(self) -> None:
         self.committed = True
 
+    def execute(self, _query, _params=None):
+        return SimpleNamespace(first=lambda: None)  # aucun paramètre : semaine du lundi par défaut
+
 
 def _current_user() -> SimpleNamespace:
     return SimpleNamespace(id=uuid4())

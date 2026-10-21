@@ -3,7 +3,7 @@ CLI cloud et exécuteur local simulés : aucun appel réel."""
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -30,6 +30,7 @@ from app.models.wr import WrHypothesis  # noqa: E402
 from app.schemas.weekly_review import WeeklyReviewAnswerRequest  # noqa: E402
 from app.services.ai import cloud, local_executor  # noqa: E402
 from app.services.imperium import weekly_review_conversation as wrc  # noqa: E402
+from app.services.imperium.weekly_review_state import week_start_on  # noqa: E402
 from app.services.params import set_parameter  # noqa: E402
 from app.services.wr import conductor, docket  # noqa: E402
 
@@ -103,7 +104,8 @@ def _user(db) -> User:
 
 
 def _monday() -> date:
-    return date.today() - timedelta(days=date.today().weekday())
+    """Début de la semaine du WR qui contient aujourd'hui (mardi, `wr.week_start_weekday` semé à 1)."""
+    return week_start_on(date.today(), 1)
 
 
 def _launch(db, user) -> ImperiumWeeklyReviewSession:
@@ -236,9 +238,14 @@ def test_the_user_can_ask_for_the_report_early(db, fakes) -> None:
     fakes.cloud = [PASS]
     conductor.prepare(db, session=session)
     wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
-    fakes.local = [_turn(index=1, wants_report=True)]
+    fakes.local = [_turn("Tu saisis tes courses dans l'outil, ou le système reste vide ?", 80),
+                   _turn("As-tu saisi tes courses dans l'outil, ou le système reste-t-il vide ?", 80, index=1),
+                   {**_turn(wants_report=True), "ack_fr": "Je note : passage au rapport."}]
+    _chat(db, user, session, "Bof.")
+    repeated = _chat(db, user, session, "La clim est réparée.")  # relance déjà posée : question suivante
+    assert repeated.content == f"Je note. Question 2 sur 2 : {MERCREDI}"
     stop = _chat(db, user, session, "On arrête là, fais le rapport.")
-    assert stop.content == f"Je note. {conductor.READY_TEXT}" and _flags(db, user, session).next_step == "report"
+    assert stop.content == conductor.READY_TEXT and _flags(db, user, session).next_step == "report"
 
 
 def test_cloud_failure_still_opens_the_conversation(db, fakes) -> None:

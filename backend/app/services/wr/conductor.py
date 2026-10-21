@@ -23,6 +23,7 @@ rien d'autre que ses messages.
 
 import json
 import logging
+import re
 import threading
 from datetime import UTC, date, datetime
 from uuid import UUID
@@ -62,7 +63,8 @@ SYSTEM = (
     "et sans annoncer la suite (c'est l'utilisateur qui lance le rapport, par un bouton).\n"
     "- followup_fr : si sa réponse est floue ou contredit une hypothèse, UNE relance sur le même sujet, sinon "
     "null ; followup_value dit de 0 à 100 combien la réponse à cette relance changerait le rapport (0 sans "
-    "relance). Ne relance pas pour un détail.\n"
+    "relance). Ne relance pas pour un détail, et ne repose jamais une relance déjà posée : si sa réponse ne "
+    "l'a pas éclairée, passe à la suite.\n"
     "- next_index : le numéro de la question restante la plus utile maintenant, -1 s'il n'en reste pas.\n"
     "- wants_report : true seulement s'il demande d'arrêter les questions ou de passer au rapport.\n"
     "- beyond_me : true si sa demande dépasse ce que tu peux faire de façon fiable (calcul lourd, analyse "
@@ -222,10 +224,12 @@ def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: st
         threshold = int(get_parameter(db, "wr.question_relevance_min", default=40))
         followups = _followups_since_question(conducted)
         followup = (output.get("followup_fr") or "").strip()
+        if followup and _already_asked(followup, conducted):
+            followup = ""  # le modèle répète une relance : on passe à la suite
         index = output.get("next_index")
         index = index if isinstance(index, int) and index in remaining else (remaining[0] if remaining else None)
         if output.get("wants_report"):
-            text, payload["phase"] = f"{text} {READY_TEXT}", READY
+            text, payload["phase"] = _ready_text(text), READY
         elif followup and int(output.get("followup_value") or 0) >= threshold \
                 and followups < int(get_parameter(db, "wr.followups_max", default=6)):
             text = f"{text} {followup}"
@@ -234,10 +238,24 @@ def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: st
             text = f"{text} Question {len(asked) + 1} sur {len(agenda)} : {agenda[index]['question_fr']}"
             payload["agenda_index"] = index
         else:
-            text, payload["phase"] = f"{text} {READY_TEXT}", READY
+            text, payload["phase"] = _ready_text(text), READY
     message = _post(db, session, text, payload, role="qwen" if mode == "live" else "backend")
     db.flush()
     return message
+
+
+def _ready_text(ack: str) -> str:
+    """Fin des questions : l'accusé de réception du modèle, sauf s'il annonce lui-même le rapport (c'est un bouton)."""
+    return READY_TEXT if "rapport" in ack.lower() else f"{ack} {READY_TEXT}"
+
+
+def _already_asked(followup: str, conducted: list[ImperiumWeeklyReviewMessage]) -> bool:
+    """La relance ressemble à une question déjà posée par le conducteur (mots communs, 60 % au moins)."""
+    def words(value: str) -> set[str]:
+        return {word for word in re.findall(r"\w{4,}", value.lower())}
+
+    asked = words(followup)
+    return bool(asked) and any(len(asked & words(m.content or "")) >= 0.6 * len(asked) for m in conducted[-6:])
 
 
 def _agenda(opening: ImperiumWeeklyReviewMessage | None) -> list[dict]:

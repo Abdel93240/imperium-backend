@@ -49,6 +49,9 @@ class QueueFakeDb:
     def rollback(self) -> None:
         self.rolled_back = True
 
+    def execute(self, _query, _params=None):
+        return SimpleNamespace(first=lambda: None)  # aucun paramètre : valeurs par défaut du code
+
     def scalar(self, _query):
         if self.scalar_results:
             return self.scalar_results.pop(0)

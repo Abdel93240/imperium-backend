@@ -142,7 +142,7 @@ def get_or_create_weekly_review_session(
     current_user: User,
     week_start: date,
 ) -> ImperiumWeeklyReviewSession:
-    _validate_week_start(week_start)
+    _validate_week_start(db, week_start)
     session = _get_session_by_week(db, current_user=current_user, week_start=week_start)
     if session is not None:
         return session
@@ -164,7 +164,6 @@ def get_weekly_review_session(
     current_user: User,
     week_start: date,
 ) -> ImperiumWeeklyReviewSession | None:
-    _validate_week_start(week_start)
     return _get_session_by_week(db, current_user=current_user, week_start=week_start)
 
 
@@ -177,7 +176,7 @@ def launch_weekly_review_session(
     request_method: str,
     request_path: str,
 ) -> tuple[WeeklyReviewSessionRead, bool]:
-    _validate_week_start(week_start)
+    _validate_week_start(db, week_start)
     request_hash = _hash_payload({"action": "weekly_review.launch", "week_start": week_start.isoformat()})
     existing_key = _get_existing_idempotency(db, user_id=current_user.id, idempotency_key=idempotency_key)
     if existing_key is not None:
@@ -1443,7 +1442,6 @@ def get_current_weekly_review(
     final_reports_limit: int = 5,
 ) -> WeeklyReviewCurrentResponse:
     if week_start is not None:
-        _validate_week_start(week_start)
         session = _get_session_by_week(db, current_user=current_user, week_start=week_start)
     else:
         session = db.scalar(
@@ -3716,9 +3714,12 @@ def _ai_result_debug_summary(result: AIResult) -> WeeklyReviewAIResultDebugSumma
     )
 
 
-def _validate_week_start(week_start: date) -> None:
-    if week_start.weekday() != 0:
-        raise InvalidWeekStartError("week_start must be a Monday.")
+def _validate_week_start(db: Session, week_start: date) -> None:
+    from app.services.imperium.weekly_review_state import WEEKDAYS_EN, week_weekday
+
+    weekday = week_weekday(db)
+    if week_start.weekday() != weekday:
+        raise InvalidWeekStartError(f"week_start must be a {WEEKDAYS_EN[weekday]}.")
 
 
 def _role_for_ai_result(ai_result: AIResult) -> str:
