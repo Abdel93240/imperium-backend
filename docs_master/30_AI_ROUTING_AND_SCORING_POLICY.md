@@ -162,12 +162,12 @@ Current logical mapping (summary; the subsections below are normative):
 | Role | Current model | API identifier | Subsection |
 |---|---|---|---|
 | `local_executor` | `Qwen3.6-27B-Q6_K` (unchanged) | local, see F10 §5-ter | §3.3 |
-| `first_cloud_tier` | Claude Sonnet 5 | `claude-sonnet-5` | §3.5 |
+| `first_cloud_tier` | Claude Sonnet 5.5 | `claude-sonnet-5-5` | §3.5 |
 | `high_reasoning` | Claude Opus 5.5 | `claude-opus-5-5` | §3.6 |
-| `sustained_long_context` | Claude Fable 5.1 | `claude-fable-5-1` | §3.7 |
-| `health_specialist` | GPT-5.6 Sol | — | §3.8 |
-| `finance_specialist` | GPT-5.6 Sol | — | §3.8bis |
-| `web_fresh_data` | GPT-5.6 Sol | — | §3.8ter |
+| `sustained_long_context` | GPT-6 Astra | `gpt-6-astra` | §3.7 |
+| `health_specialist` | GPT-6 Sol | `gpt-6-sol` | §3.8 |
+| `finance_specialist` | GPT-6 Sol | `gpt-6-sol` | §3.8bis |
+| `web_fresh_data` | GPT-6 Luna | `gpt-6-luna` | §3.8ter |
 | `high_reasoning_safeguard` | GPT-6 Astra | `gpt-6-astra` | §3.8quater |
 | `ocr_service` | not yet adopted | — | §3.9 |
 | `transcription_service` | faster-whisper large-v3 (planned) | — | §3.10 |
@@ -216,7 +216,7 @@ Optional, not deployed by default. Future possible uses: A/B challenger to the `
 
 ### 3.5 First cloud tier — `first_cloud_tier`
 
-- Current model: Claude Sonnet 5 (API identifier `claude-sonnet-5`). Previous assignment: Sonnet 4.6 (superseded 2026-09-17).
+- Current model: Claude Sonnet 5.5 (API identifier `claude-sonnet-5-5`, user decision 2026-10-21). Previous assignments: Sonnet 5 (superseded 2026-10-21), Sonnet 4.6 (superseded 2026-09-17).
 - Role: balanced cloud model, the first step above the local model.
 - Selection criteria: balanced cost/quality.
 - Use for: structured reasoning, daily reorganization (multi-factor), logic correction, medium-complexity code, decisions with moderate context, document transformation, detailed financial advice (Vault Level 2), weekly nutrition / recovery plans, structuring projects (project module).
@@ -234,7 +234,7 @@ Opus must never be called by reflex.
 
 ### 3.7 Sustained long-context model — `sustained_long_context`
 
-- Current model: Claude Fable 5.1 (API identifier `claude-fable-5-1`). Availability fallback: Gemini Pro 3.1. Provider-native content-safeguard redirection target: Claude Opus 5.5 (the `high_reasoning` model). Previous assignment: Fable 5 (superseded 2026-09-17).
+- Current model: GPT-6 Astra (API identifier `gpt-6-astra`, user decision 2026-10-21: OpenAI's frontier model; context 272K standard, up to 872K; Fable needs extra usage credits outside the subscription used for tests). Previous assignment: Claude Fable 5.1 (`claude-fable-5-1`, superseded 2026-10-21). Former availability fallback: Gemini Pro 3.1. Provider-native content-safeguard redirection target: Claude Opus 5.5 (the `high_reasoning` model). Previous assignment: Fable 5 (superseded 2026-09-17).
 - Role: the most capable long-context model (Mythos-class, above Opus). Reserved strictly for tasks that are **simultaneously long, complex, and high-stakes/durable**. On a moderately complex task, Opus and Fable perform comparably, so paying for Fable is only justified when task length and complexity let its endurance advantage materialize.
 - Selection criteria: endurance on long tasks.
 - Use for: the Weekly Review 4-week re-planning step (see §6) and other durable, long-horizon reasoning tasks where sustained coherence matters more than raw intelligence; consultable by `high_reasoning` in §5.6 Step 2.
@@ -260,14 +260,14 @@ Canonical V1 use: the Weekly Review 4-week re-planning step (see §6). It is the
 
 ### 3.8 Health specialist — `health_specialist`
 
-- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
+- Current model: GPT-6 Sol (API identifier `gpt-6-sol`, user decision 2026-10-21: error cost too high for the cheap tier). Previous assignments: GPT-5.6 Sol (superseded 2026-10-21), GPT-5.5 (superseded 2026-09-17).
 - Role: specialist for health/Pulse.
 - Selection criteria: GDPR/EU guarantees for health data.
 - Use for: health/ Pulse (weight/nutrition/recovery calculations and medical-feed analysis). `health_specialist` is the de facto "owner" of Pulse reasoning.
 
 ### 3.8bis Finance specialist — `finance_specialist`
 
-- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
+- Current model: GPT-6 Sol (API identifier `gpt-6-sol`, user decision 2026-10-21: error cost too high for the cheap tier). Previous assignments: GPT-5.6 Sol (superseded 2026-10-21), GPT-5.5 (superseded 2026-09-17).
 - Role: specialist for financial reasoning over Vault data, fresh data / web research, verification of financial figures, and complex multimodal analysis.
 - Selection criteria: hallucination resistance — must show reasoning and flag uncertainty, never invent a figure.
 - Use for: financial reasoning over Vault data (budgets, cash-flow, financial pressure, project cost reasoning), invoked by the chatbot and the Weekly Review, not by the Vault app; fresh data / web research / multimodal analysis; generating actionable rules from sensitive or complex documents.
@@ -276,7 +276,7 @@ This reasoning lives in the Imperium brain and is invoked by the chatbot and the
 
 ### 3.8ter Web / fresh-data specialist — `web_fresh_data`
 
-- Current model: GPT-5.6 Sol. Previous assignment: GPT-5.5 (superseded 2026-09-17).
+- Current model: GPT-6 Luna (API identifier `gpt-6-luna`, user decision 2026-10-21: high-volume retrieval and summarizing, about 20x cheaper than Sol). Previous assignments: GPT-5.6 Sol (superseded 2026-10-21), GPT-5.5 (superseded 2026-09-17).
 - Role: real-time / fresh information specialist.
 - Selection criteria: must have web access / real-time retrieval.
 - Use for: fresh data (recent events around Paris for Vector — concerts, salons, sports), web retrieval, market/price comparison, regulatory research, real-time verification of facts against current sources.
