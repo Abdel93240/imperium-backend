@@ -178,6 +178,13 @@ Ordre telephone, une seule colonne :
 | Weekly Progress | `ImperiumMetricCard` + `ImperiumProgressBar` | missions done, failures, weekly completion percent. |
 | Imperium Status | `ImperiumCard` + `SyncStateChip` | mock sync, cache age, next backend wiring phase. |
 
+> **Conseils IA** (CODÉ 2026-10-21, migration 0126) : bloc en bas du Dashboard, journée démarrée, avec « Ouvrir
+> le chatbot ». `GET /api/imperium/dashboard/advice` (null sans journée ouverte) rend le conseil du jour rangé
+> sur la journée (`planning_days.advice`) : recalculé quand l'état de la journée change (mission en cours,
+> proposition suivante, faites ou ratées, échéances à 2 jours, Weekly Review en attente), d'abord par des
+> règles (immédiat), puis réécrit par le modèle local en arrière-plan (slot `imperium.advice`, live via
+> `ai.local_slot_modes`) ; l'appli relit une fois 25 s plus tard. Contexte en liste blanche, rien inventé.
+
 ### 3.6 Actions utilisateur
 
 | Action | UI | Effet Phase 1/2 | Backend Phase 3 future |
