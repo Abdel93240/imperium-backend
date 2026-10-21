@@ -472,8 +472,19 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
 
 def _escalate(db: Session, session: ChatSession, decision, question: str | None, reply: str,
               latency: int) -> tuple[str, str, int, dict]:
-    """Escalade invisible d'une réponse sans proposition : le rôle choisi répond à la question anonyme ; la
-    décision est toujours journalisée, même slot éteint (mode ombre) ou en échec (la réponse locale reste)."""
+    """Escalade invisible : le rôle choisi répond à la question anonyme ; la décision est toujours journalisée,
+    même slot éteint (mode ombre) ou en échec (la réponse locale reste). Urgence vitale : la réponse, d'où qu'elle
+    vienne, commence par la ligne d'appel aux secours écrite par le code."""
+    answer, model, latency, routing = _ask(db, session, decision, question, reply, latency)
+    if question:
+        routing["expert_question"] = escalation.scrub(question)[:1500]  # anonyme : vérifiable dans les logs de l'IA
+    if decision.emergency:
+        answer = f"{escalation.EMERGENCY_LINE}\n\n{answer}"
+    return answer, model, latency, routing
+
+
+def _ask(db: Session, session: ChatSession, decision, question: str | None, reply: str,
+         latency: int) -> tuple[str, str, int, dict]:
     routing = {**decision.log(), "escalated": False}
     if not decision.escalates:
         return reply, "local_executor", latency, routing

@@ -272,7 +272,10 @@ def test_pullforward_threshold_flag_and_day_done(db) -> None:
     proposed = db.scalar(select(Event).where(Event.user_id == user.id, Event.event_type == "planning.daily.next_proposed",
                                              Event.payload["selection_log_id"].astext == str(row.id)))
     assert applied.causation_id == proposed.event_id
-    late = _select(db, user, now=datetime(2026, 10, 21, 21, 30, tzinfo=UTC))  # 23 h 30 : 30 min < 45
+    # Plus de fin d'horloge : seul un engagement fixe borne la journée ; 30 min avant lui, < 45, pas d'avance.
+    late_now = datetime(2026, 10, 21, 21, 30, tzinfo=UTC)
+    _mission(db, user, "Rendez-vous", planned=None, is_fixed_commitment=True, fixed_at=late_now + timedelta(minutes=30))
+    late = _select(db, user, now=late_now)
     assert late.outcome == "day_done" and late.pulled_forward is False
 
 
