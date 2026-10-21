@@ -1438,3 +1438,24 @@ cease to be a non-goal. The following remain firm V1 non-goals:
 - unapproved medical interpretation inside WR;
 - automatic (non-user-triggered) memory commit;
 - pgvector/embedding writes and vector search (deferred milestone, see 6P).
+
+## 11F. Restructured WR, P1 + P2 (2026-10-21, spec WR §9)
+
+The conversation now walks the agenda of the hypothesis pass. Owner of the logic:
+`backend/app/services/wr/conductor.py`; P1 itself: `backend/app/services/wr/hypotheses.py`.
+
+- Launch (`POST /weekly-review/launch`) schedules a background preparation after the response:
+  frozen digest, hypothesis pass by the cloud role (`wr.hypothesis_pass`, doc 73 §B.4bis), then an
+  opening message written by the CODE (hypotheses with their confidence + first agenda question,
+  `initial_summary`, `payload.source = wr_opening`). The session moves to `initial_summary_ready`.
+  Nothing happens while the cloud slot is off: the WR keeps its previous dry-run flow.
+  If the cloud call fails, the opening says so and the conversation goes on without an agenda.
+- Each chat message: the local conductor (slot `wr.conversation`, live via `ai.local_slot_modes`,
+  seeded off) acknowledges, may ask one follow-up, then asks the most useful remaining question
+  (`payload.agenda_index`). A "why ...?" the hypotheses do not cover is kept in
+  `payload.open_question` (input of the future P3 investigations). Off or failing: the code asks the
+  next question. The invitation to finish (`final_confirmation_prompt`) only appears once the agenda
+  is exhausted.
+- Launching the session also marks the week's banner state as launched; the app shows "Reprendre"
+  while the session is open.
+- The final report after "J'ai fini" is still the dry-run draft until P5 (exit audit) is coded.

@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -215,6 +215,7 @@ from app.services.imperium.weekly_report import (
     InvalidWeekStartError,
     get_weekly_report,
 )
+from app.services.wr import conductor as wr_conductor
 from app.services.imperium.weekly_review_conversation import (
     InvalidWeekStartError as WeeklyReviewConversationInvalidWeekStartError,
     WeeklyReviewAIResultConflictError,
@@ -1614,6 +1615,7 @@ def launch_weekly_review_route(
     week_start: date,
     request: Request,
     response: Response,
+    background_tasks: BackgroundTasks,
     current_user: CurrentUserDep,
     db: SessionDep,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -1642,6 +1644,8 @@ def launch_weekly_review_route(
 
     if duplicate:
         response.status_code = status.HTTP_200_OK
+    # Digest + passe d'hypothèses + ouverture (spec WR §9 P1-P2), après la réponse ; rien si le slot est éteint.
+    background_tasks.add_task(wr_conductor.prepare_in_background, result.id)
     return result
 
 

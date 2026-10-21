@@ -13,6 +13,9 @@ old names for traceability, everything else must stay role-based.
 plus the new role `high_reasoning_safeguard` (§3.8quater) that owns the §5.6
 independent re-scoring. The Anthropic-native Fable content safeguard (§3.7) must stay
 a distinct mechanism and never be relabelled as that role.
+
+2026-10-21 mapping update (user decision): Sonnet 5.5, Opus 5.5, GPT-6 Astra for long
+context, GPT-6 Sol for health and finance, GPT-6 Luna for fresh data.
 """
 
 from __future__ import annotations
@@ -34,12 +37,12 @@ LOCAL_EXECUTOR_MODEL = "Qwen3.6-27B-Q6_K"
 # Canonical ROLE -> (concrete model, API identifier or None) — doc 30 §3 (2026-09-17).
 CANONICAL_MAPPING: dict[str, tuple[str, str | None]] = {
     "local_executor": (LOCAL_EXECUTOR_MODEL, None),
-    "first_cloud_tier": ("Claude Sonnet 5", "claude-sonnet-5"),
+    "first_cloud_tier": ("Claude Sonnet 5.5", "claude-sonnet-5-5"),
     "high_reasoning": ("Claude Opus 5.5", "claude-opus-5-5"),
-    "sustained_long_context": ("Claude Fable 5.1", "claude-fable-5-1"),
-    "health_specialist": ("GPT-5.6 Sol", None),
-    "finance_specialist": ("GPT-5.6 Sol", None),
-    "web_fresh_data": ("GPT-5.6 Sol", None),
+    "sustained_long_context": ("GPT-6 Astra", "gpt-6-astra"),
+    "health_specialist": ("GPT-6 Sol", "gpt-6-sol"),
+    "finance_specialist": ("GPT-6 Sol", "gpt-6-sol"),
+    "web_fresh_data": ("GPT-6 Luna", "gpt-6-luna"),
     "high_reasoning_safeguard": ("GPT-6 Astra", "gpt-6-astra"),
 }
 
@@ -75,7 +78,7 @@ LEGACY_7B_ALLOWED = HISTORICAL_FILES | {
 CONCRETE_CLOUD = re.compile(
     r"Sonnet 4\.6|Opus 4\.8|GPT-5\.5|Fable 5\b"
     r"|Sonnet 5\b|Opus 5\b|Fable 5\.1|GPT-5\.6|GPT-6\b|\bAstra\b"
-    r"|claude-sonnet-5|claude-opus-5|claude-fable-5-1|gpt-6-astra"
+    r"|claude-sonnet-5|claude-opus-5|claude-fable-5-1|gpt-6-astra|gpt-6-sol|gpt-6-luna"
 )
 CONCRETE_CLOUD_ALLOWED = HISTORICAL_FILES | {
     DOC_30,  # §3 canonical mapping
