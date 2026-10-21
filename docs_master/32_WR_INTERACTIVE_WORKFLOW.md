@@ -1471,3 +1471,16 @@ The conversation now walks the agenda of the hypothesis pass. Owner of the logic
   Failure (quota, outage): a message says so, the session returns to `conversation_active`, and "J'ai fini"
   retries. Slot off: the previous dry-run draft. The CODE part of P5 (applying validations to the causal
   graph, `wr_phase5_write_enabled`) and the `review.completed` event are not coded yet.
+
+## 11G. Background jobs switched on (2026-10-21, cards V18)
+
+User decision: the WR factory runs for real with W1 (daily rollups), W4 (anomalies, `wr.*` signals active)
+and W5 (anomaly items + docket priorities): `wr.factory_workers_enabled = [w1_rollups, w4_anomalies,
+w5_docket]`. W2 (causal) and W3 (learnings) stay off: they only produce trial outputs until their real
+versions are coded, and trial chain proposals must not reach the digest. Enabled jobs:
+`wr.factory_fallback` (23:30 Paris, if the factory has not run that day), `wr.factory_on_session_end`,
+`wr.metrics_rollup`. `wr.digest_on_open` and `wr.hypothesis_on_digest` stay off: the launch preparation
+(§11F) already assembles the digest and runs P1. Switching on is a one-off user gesture that also runs
+`factory.backfill` (56 days of rollups, anomalies and docket, then the cursors take over). The runner itself
+is switched on by `RUNNER_ENABLED` and `RUNNER_SCHEDULER_AUTOSTART` in the API environment; disabled cron
+jobs keep logging a `skipped` run at each tick (CF-4 dry-run journal).

@@ -14,7 +14,7 @@ _TEST_DB_URL = require_test_database_url("wr anomalies DB tests")
 
 pytestmark = pytest.mark.postgres
 
-from sqlalchemy import create_engine, delete, select, text, update  # noqa: E402
+from sqlalchemy import create_engine, delete, func, select, text, update  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.models import ai  # noqa: E402,F401 - FK de la session WR vers ai_tasks
@@ -125,3 +125,35 @@ def test_yellow_stays_a_signal(db, monkeypatch) -> None:
     assert db.scalar(select(SignalValue.band).where(SignalValue.signal_code == SIGNAL,
                                                     SignalValue.measured_at == anomalies.measured_at(DAY))) == "yellow"
     assert db.scalar(select(WrDocketItem).where(WrDocketItem.user_id == user.id)) is None
+
+
+def test_backfill_fills_history_then_hands_over_to_the_cursors(db, monkeypatch) -> None:
+    user = _user(db)
+    now = datetime(2026, 10, 14, 20, 0, tzinfo=UTC)  # 22:00 à Paris, jour = DAY
+
+    def day_metrics(_db, *, user, day):
+        expense = 30000 if day == DAY else 5000 + (day.toordinal() % 2) * 1000
+        return {"finance": {"expense_cents": expense, "income_cents": 0}, "rides": {}, "missions": {}}
+
+    monkeypatch.setattr(factory.rollups, "compute_day", day_metrics)
+    summary = factory.backfill(db, user=user, days=30, now=now)
+    db.commit()
+    assert summary["rollups"] == 90 and summary["anomaly_items"] == 1
+    days = db.scalars(select(WrRollupDaily.local_date).where(WrRollupDaily.user_id == user.id,
+                                                             WrRollupDaily.domain == "finance")).all()
+    assert min(days) == DAY - timedelta(days=29) and max(days) == DAY
+    red = db.scalars(select(SignalValue).where(SignalValue.signal_code == SIGNAL, SignalValue.band == "red",
+                                               SignalValue.detail["user_id"].astext == str(user.id))).all()
+    assert [value.detail["local_date"] for value in red] == [DAY.isoformat()]
+    item = db.scalar(select(WrDocketItem).where(WrDocketItem.user_id == user.id, WrDocketItem.item_type == "anomaly"))
+    assert item.payload["signal_code"] == SIGNAL and item.payload["local_date"] == DAY.isoformat()
+    cursors = {row.worker: row.last_processed_event_ts for row in db.scalars(select(WrWorkerCursor))}
+    assert cursors == {worker: now for worker in factory.BACKFILL_WORKERS}
+    runs = db.scalars(select(WrWorkerRun).order_by(WrWorkerRun.worker)).all()
+    assert [(run.worker, run.trigger, run.status) for run in runs] == [
+        ("w1_rollups", "manual", "completed"), ("w4_anomalies", "manual", "completed"),
+        ("w5_docket", "manual", "completed")]
+    again = factory.backfill(db, user=user, days=30, now=now)  # rejouable : rien n'est doublé
+    db.commit()
+    assert again["anomaly_items"] == 0 and db.scalar(select(func.count()).select_from(WrDocketItem).where(
+        WrDocketItem.user_id == user.id)) == 1

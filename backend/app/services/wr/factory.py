@@ -181,6 +181,43 @@ def run_factory(
     return summary
 
 
+BACKFILL_WORKERS = ("w1_rollups", "w4_anomalies", "w5_docket")
+
+
+def backfill(db: Session, *, user: User, days: int, now: datetime) -> dict:
+    """Rattrapage à l'allumage de l'usine (geste de l'utilisateur, rejouable).
+
+    W1 recalcule les `days` derniers jours de Paris, W4 les évalue dans l'ordre (la baseline de chaque jour
+    s'appuie sur les jours d'avant), W5 dépose les anomalies des 7 derniers jours au docket ; puis les
+    curseurs de W1, W4 et W5 passent à `now` : les passages suivants ne traitent que la suite.
+    """
+    today = now.astimezone(PARIS).date()
+    span = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
+    started = time.monotonic()
+    written = rollups.rollup_days(db, user=user, days=span, now=now)
+    values = anomalies.evaluate_days(db, user=user, days=span)
+    created = _anomaly_items(db, user, now)
+    reprioritized = docket.reprioritize(db, current_user=user, now=now)
+    outcomes = {
+        "w1_rollups": WorkerOutcome(items_in=len(span), items_out=written, detail={"backfill_days": days}),
+        "w4_anomalies": WorkerOutcome(items_in=len(span), items_out=len(values),
+                                      detail={"flagged": sum(value.band != "green" for value in values)}),
+        "w5_docket": WorkerOutcome(items_in=reprioritized, items_out=reprioritized + created,
+                                   detail={"anomaly_items": created}),
+    }
+    window_from = datetime.combine(span[0], datetime.min.time(), tzinfo=PARIS)
+    for worker in BACKFILL_WORKERS:
+        _record(db, worker, "manual", None, None, window_from, now, started, "completed", outcomes[worker])
+        cursor = db.get(WrWorkerCursor, worker)
+        if cursor is None:
+            db.add(WrWorkerCursor(worker=worker, last_processed_event_ts=now, updated_at=now))
+        else:
+            cursor.last_processed_event_ts, cursor.last_processed_event_id, cursor.updated_at = now, None, now
+    db.flush()
+    return {"days": days, "rollups": written, "signal_values": len(values),
+            "flagged": outcomes["w4_anomalies"].detail["flagged"], "anomaly_items": created}
+
+
 def factory_on_session_end_job(ctx, window) -> None:
     """Job `wr.factory_on_session_end` (abonné à `rides.session.ended`, semé désactivé)."""
     now = window.to_ts or datetime.now(UTC)
