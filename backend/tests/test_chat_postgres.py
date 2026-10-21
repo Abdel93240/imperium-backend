@@ -365,3 +365,11 @@ def test_agent_switch_is_a_proposal_the_user_validates(db, fake) -> None:
     db.commit()
     failed = client.post(f"{P}/{sid}/proposals/{again['id']}/validate").json()
     assert failed["status"] == "failed" and client.get(f"{P}/{sid}").json()["agent"] == "general"
+
+
+def test_model_writes_its_understanding_before_answering() -> None:
+    from app.services.chat.engine import output_schema, system_prompt
+    schema = output_schema(["P1"])
+    assert list(schema["properties"])[0] == "comprehension" and schema["required"][0] == "comprehension"
+    prompt = system_prompt({"role": "", "actions": ["create_project"]}, {})
+    assert "DÉDUISANT" in prompt and "Je note" in prompt

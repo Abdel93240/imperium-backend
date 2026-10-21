@@ -100,6 +100,12 @@ def system_prompt(agent: dict, sheets: dict, switches: list[str] | tuple[str, ..
         "en le tutoyant, clairement et brièvement. Tu ne fais JAMAIS rien toi-même : quand l'utilisateur demande une action "
         "que tu sais faire, tu la proposes dans « proposal » et c'est lui qui la validera.\n"
         "Règles de conduite :\n"
+        "- Commence par « comprehension » : relis toute la conversation et note ce que tu sais déjà pour l'action en cours, "
+        "information par information, en DÉDUISANT tout ce qui peut l'être. Par exemple « je veux créer une machine à remonter "
+        "le temps » donne à la fois le nom (Machine à remonter le temps) et l'objectif (construire une machine qui permet de "
+        "voyager dans le temps). Ne redemande jamais ce qui est déjà dit ou déductible. Quand tu as déduit quelque chose, "
+        "reprends-le au début de ta réponse (« Je note : … ») pour qu'il puisse corriger, puis ne demande que ce qui manque "
+        "vraiment.\n"
         "- Avant de proposer, réunis TOUTES les informations demandées pour l'action. S'il en manque, ne propose rien : "
         "pose une ou deux questions courtes à la fois.\n"
         "- N'invente jamais une information que l'utilisateur n'a pas donnée (objectif, mission, durée, notes…) : "
@@ -151,8 +157,9 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
                for code in switches if code == "project" and aliases]
     targets += [{"type": "object", "additionalProperties": False, "required": ["agent"], "properties": {"agent": {"const": code}}}
                 for code in switches if code != "project"]
-    return {"type": "object", "additionalProperties": False, "required": ["reply_fr", "proposal", "switch"],
-            "properties": {"reply_fr": {"type": "string", "maxLength": 1500},
+    return {"type": "object", "additionalProperties": False, "required": ["comprehension", "reply_fr", "proposal", "switch"],
+            "properties": {"comprehension": {"type": "string", "maxLength": 800},  # réfléchir avant de répondre
+                           "reply_fr": {"type": "string", "maxLength": 1500},
                            "proposal": {"anyOf": [{"type": "null"}, *variants]},
                            "switch": {"anyOf": [{"type": "null"}, *targets]}}}
 
