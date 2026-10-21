@@ -89,7 +89,7 @@ def _state(db, now: datetime = NOW):
 def test_seeded_slots_and_disabled_job(db) -> None:
     seeded = {row.slot_code: row for row in db.scalars(
         select(AISlotTransition).where(AISlotTransition.domain.in_(("wr", "daily")), AISlotTransition.slot_code != SLOT))}
-    assert len(seeded) == 13  # + wr.conversation (migration 0120)
+    assert len(seeded) == 14  # + wr.conversation (migration 0120), wr.report_revision (0121)
     assert {code for code, row in seeded.items() if row.tier == "local_default"} == {
         "wr.probe_gen", "wr.pair_verdict", "wr.pattern_extract", "wr.identity", "wr.conversation",
         "daily.disruption_classify", "daily.conflict_arbitrate"}

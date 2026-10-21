@@ -33,9 +33,10 @@ from app.services.imperium import weekly_review_conversation as wrc  # noqa: E40
 from app.services.params import set_parameter  # noqa: E402
 from app.services.wr import conductor, docket  # noqa: E402
 
-AGENDA = [{"question_fr": "Qu'est-ce qui a changé mercredi ?", "stake_fr": "La rupture.", "refs": []},
-          {"question_fr": "Pourquoi le carburant a-t-il monté ?", "stake_fr": "Le net.", "refs": []},
-          {"question_fr": "Tu veux une heure limite pour le VTC ?", "stake_fr": "Le sommeil.", "refs": []}]
+AGENDA = [{"question_fr": "Qu'est-ce qui a changé mercredi ?", "stake_fr": "La rupture.", "refs": [], "relevance": 60},
+          {"question_fr": "Pourquoi le carburant a-t-il monté ?", "stake_fr": "Le net.", "refs": [], "relevance": 90},
+          {"question_fr": "Tu veux une couleur de thème ?", "stake_fr": "Rien.", "refs": [], "relevance": 20}]
+CARBURANT, MERCREDI = AGENDA[1]["question_fr"], AGENDA[0]["question_fr"]
 PASS = {"systemic_hypotheses": [{"statement_fr": "La fatigue pèse sur le VTC.", "domains": ["pulse", "vector"],
                                  "evidence_refs": [], "confidence": 55}],
         "agenda": AGENDA, "drill_requests": []}
@@ -141,7 +142,11 @@ def test_launch_marks_the_week_and_preparation_waits_for_the_cloud_slot(db, fake
     assert session.status == "preparing_initial_summary"
 
 
-def test_opening_then_the_code_walks_the_agenda(db, fakes) -> None:
+def _flags(db, user, session):
+    return wrc.get_weekly_review_conversation(db, current_user=user, session_id=session.id).flags
+
+
+def test_opening_then_the_code_walks_the_agenda_by_relevance(db, fakes) -> None:
     user = _user(db)
     session = _launch(db, user)
     _cloud_on(db)
@@ -149,23 +154,80 @@ def test_opening_then_the_code_walks_the_agenda(db, fakes) -> None:
     opening = conductor.prepare(db, session=session)
     assert opening.message_type == "initial_summary" and opening.role == "backend"
     assert "La fatigue pèse sur le VTC. (confiance 55 %)" in opening.content
-    assert "J'ai 3 questions pour toi. Première : Qu'est-ce qui a changé mercredi ?" in opening.content
-    assert session.status == "initial_summary_ready" and opening.payload["agenda_index"] == 0
+    assert "J'ai retenu 2 questions pour toi." in opening.content and "passe aux questions" in opening.content
+    assert [item["question_fr"] for item in opening.payload["agenda"]] == [CARBURANT, MERCREDI]  # plus pertinente d'abord
+    assert opening.payload["questions_dropped"] == 1 and opening.payload["phase"] == "analysis"
+    assert session.status == "initial_summary_ready"
     assert db.scalar(select(WrHypothesis).where(WrHypothesis.user_id == user.id)) is not None
     assert conductor.prepare(db, session=session).id == opening.id  # une seule ouverture
+    flags = _flags(db, user, session)
+    assert (flags.phase, flags.next_step, flags.can_confirm_no_more_input) == ("analysis", "questions", False)
 
-    first = _chat(db, user, session, "Je me suis couché tard mardi.")
-    assert first.content == "Noté. Pourquoi le carburant a-t-il monté ?" and first.payload["agenda_index"] == 1
-    assert first.payload["mode"] == "deterministic" and first.role == "backend"
-    _chat(db, user, session, "Des trajets à vide.")
-    last = _chat(db, user, session, "Oui, 22 h.")
-    assert last.payload["agenda_index"] is None and last.payload["final_confirmation_prompt"] == conductor.CLOSING_PROMPT
+    remark = _chat(db, user, session, "L'analyse me parle.")  # réaction à l'analyse : pas encore de question
+    assert remark.content == "Noté." and remark.payload["phase"] == "analysis"
+    wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
+    first = db.scalars(select(ImperiumWeeklyReviewMessage).where(ImperiumWeeklyReviewMessage.session_id == session.id)
+                       .order_by(ImperiumWeeklyReviewMessage.created_at.desc())).first()
+    assert first.content == f"Question 1 sur 2 : {CARBURANT}" and first.payload["agenda_index"] == 0
+    assert (_flags(db, user, session).phase, _flags(db, user, session).next_step) == ("questions", None)
+    with pytest.raises(wrc.WeeklyReviewStateConflictError):
+        wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
+
+    second = _chat(db, user, session, "Des trajets à vide.")
+    assert second.content == f"Noté. Question 2 sur 2 : {MERCREDI}" and second.payload["agenda_index"] == 1
+    assert second.payload["mode"] == "deterministic" and second.role == "backend"
+    last = _chat(db, user, session, "Je me suis couché tard.")
+    assert last.content == f"Noté. {conductor.READY_TEXT}" and last.payload["phase"] == "ready_for_report"
+    flags = _flags(db, user, session)
+    assert (flags.next_step, flags.can_confirm_no_more_input, flags.can_send_message) == ("report", True, True)
     conversation = wrc.get_weekly_review_conversation(db, current_user=user, session_id=session.id)
-    assert conversation.flags.can_send_message and conversation.latest_assistant_prompt == conductor.CLOSING_PROMPT
     assert [item.role for item in conversation.chat_timeline][-2:] == ["user", "assistant"]
 
 
-def test_local_conductor_picks_the_next_question(db, fakes) -> None:
+def _turn(followup=None, value=0, index=-1, wants_report=False, beyond_me=False, open_question=None) -> dict:
+    return {"comprehension": "Compris.", "ack_fr": "Je note.", "followup_fr": followup, "followup_value": value,
+            "next_index": index, "wants_report": wants_report, "beyond_me": beyond_me, "open_question": open_question}
+
+
+def test_local_conductor_follows_up_while_it_stays_relevant(db, fakes) -> None:
+    user = _user(db)
+    session = _launch(db, user)
+    _cloud_on(db)
+    set_parameter(db, code="ai.local_slot_modes", value={"wr.conversation": "live"}, origin="user", rationale_fr="Test.")
+    set_parameter(db, code="wr.followups_max", value=2, origin="user", rationale_fr="Test.")
+    db.commit()
+    fakes.cloud = [PASS]
+    conductor.prepare(db, session=session)
+    wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
+    fakes.local = [
+        _turn("Des trajets à vide, ou un plein plus cher ?", 80, open_question="Pourquoi je dors mal ?"),
+        _turn("Combien de litres ?", 30, index=1),  # relance trop peu pertinente : question suivante
+        _turn("Couché à quelle heure ?", 90, beyond_me=True),
+        _turn("Et la veille ?", 90),
+        _turn("Et l'avant-veille ?", 90),  # 2 relances déjà sur ce sujet : on passe, l'agenda est fini
+        local_executor.LocalExecutorError("down"),
+    ]
+    relance = _chat(db, user, session, "Le carburant, bof.")
+    assert relance.role == "qwen" and relance.content == "Je note. Des trajets à vide, ou un plein plus cher ?"
+    assert relance.payload["agenda_index"] is None and relance.payload["open_question"] == "Pourquoi je dors mal ?"
+    prompt = fakes.prompts[0]
+    assert f"Semaine revue : du {session.week_start.isoformat()} au {session.week_end.isoformat()}." in prompt
+    assert "Phase des questions" in prompt and "La fatigue pèse sur le VTC." in prompt
+    assert f"0 : {CARBURANT} (déjà posée ou hors phase)" in prompt and f"1 : {MERCREDI} (à poser)" in prompt
+    assert "Carburant +60 %" in prompt
+    nxt = _chat(db, user, session, "Un plein plus cher.")
+    assert nxt.content == f"Je note. Question 2 sur 2 : {MERCREDI}" and nxt.payload["agenda_index"] == 1
+    hard = _chat(db, user, session, "Calcule ma dette de sommeil sur 6 mois.")
+    assert hard.payload["needs_bigger_model"] is True and hard.content.endswith("Couché à quelle heure ?")
+    _chat(db, user, session, "Tard.")
+    done = _chat(db, user, session, "Vers 2 h.")
+    assert done.content == f"Je note. {conductor.READY_TEXT}" and done.payload["phase"] == "ready_for_report"
+    fallback = _chat(db, user, session, "Autre chose.")  # modèle en panne après les questions : le code accuse réception
+    assert fallback.payload["mode"] == "deterministic" and fallback.content == "Noté."
+    assert _flags(db, user, session).next_step == "report"
+
+
+def test_the_user_can_ask_for_the_report_early(db, fakes) -> None:
     user = _user(db)
     session = _launch(db, user)
     _cloud_on(db)
@@ -173,30 +235,10 @@ def test_local_conductor_picks_the_next_question(db, fakes) -> None:
     db.commit()
     fakes.cloud = [PASS]
     conductor.prepare(db, session=session)
-    fakes.local = [
-        {"comprehension": "Rupture mardi soir.", "reply_fr": "Je note : coucher tard. On garde l'heure limite ?",
-         "next_index": 2, "open_question": None},
-        {"comprehension": "Flou.", "reply_fr": "Tu veux dire quoi par « bof » ?", "next_index": -1,
-         "open_question": "Pourquoi je dors mal ?"},
-        {"comprehension": "Rien.", "reply_fr": f"Je note. {conductor.CLOSING_PROMPT}", "next_index": -1,
-         "open_question": None},
-        local_executor.LocalExecutorError("down"),
-    ]
-    reply = _chat(db, user, session, "Je me suis couché tard mardi.")
-    assert reply.role == "qwen" and reply.payload == {"source": "wr_conductor", "mode": "live", "agenda_index": 2,
-                                                      "open_question": None}
-    prompt = fakes.prompts[0]
-    assert "La fatigue pèse sur le VTC." in prompt and "0 : Qu'est-ce qui a changé mercredi ? (déjà posée)" in prompt
-    assert "1 : Pourquoi le carburant a-t-il monté ? (à poser)" in prompt and "Carburant +60 %" in prompt
-    relance = _chat(db, user, session, "bof")
-    assert relance.payload["agenda_index"] is None and relance.payload["open_question"] == "Pourquoi je dors mal ?"
-    assert "final_confirmation_prompt" not in relance.payload
-    early = _chat(db, user, session, "Rien d'autre.")  # agenda pas fini : pas d'invitation à conclure
-    assert early.content == "Je note. Pourquoi le carburant a-t-il monté ?" and early.payload["agenda_index"] == 1
-    assert "final_confirmation_prompt" not in early.payload
-    fallback = _chat(db, user, session, "Je sais pas.")  # modèle en panne, agenda fini : le code conclut
-    assert fallback.payload["mode"] == "deterministic" and fallback.content == f"Noté. {conductor.CLOSING_PROMPT}"
-    assert fallback.payload["final_confirmation_prompt"] == conductor.CLOSING_PROMPT
+    wrc.advance_weekly_review(db, session_id=session.id, current_user=user)
+    fakes.local = [_turn(index=1, wants_report=True)]
+    stop = _chat(db, user, session, "On arrête là, fais le rapport.")
+    assert stop.content == f"Je note. {conductor.READY_TEXT}" and _flags(db, user, session).next_step == "report"
 
 
 def test_cloud_failure_still_opens_the_conversation(db, fakes) -> None:
@@ -207,8 +249,9 @@ def test_cloud_failure_still_opens_the_conversation(db, fakes) -> None:
     opening = conductor.prepare(db, session=session)
     assert "modèle cloud indisponible" in opening.content and opening.payload["agenda"] == []
     assert opening.payload["error"] and session.status == "initial_summary_ready"
+    assert _flags(db, user, session).next_step is None  # rien à rédiger tant qu'il n'a rien dit
     reply = _chat(db, user, session, "Semaine dure.")
-    assert reply.content == f"Noté. {conductor.CLOSING_PROMPT}"
+    assert reply.content == "Noté." and _flags(db, user, session).next_step == "report"
 
 
 def test_quota_opening_then_retry_until_the_user_answers(db, fakes) -> None:
@@ -228,7 +271,7 @@ def test_quota_opening_then_retry_until_the_user_answers(db, fakes) -> None:
     assert not wrc.get_weekly_review_conversation(db, current_user=user, session_id=session.id).flags.can_retry_analysis
     fakes.cloud = [PASS]
     opening = conductor.prepare(db, session=session)
-    assert opening.id != failed.id and opening.payload["agenda_index"] == 0 and opening.payload["error"] is None
+    assert opening.id != failed.id and opening.payload["phase"] == "analysis" and opening.payload["error"] is None
     assert session.status == "initial_summary_ready"
     with pytest.raises(wrc.WeeklyReviewStateConflictError):  # analyse réussie : rien à relancer
         wrc.retry_weekly_review_analysis(db, session_id=session.id, current_user=user)

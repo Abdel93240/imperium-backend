@@ -409,6 +409,12 @@ class WeeklyReviewConversationFlags(BaseModel):
     has_final_draft: bool
     # Analyse de la semaine ratée (quota, panne) et pas encore de réponse : « Relancer l'analyse » (spec WR §9 P1).
     can_retry_analysis: bool = False
+    # Revue guidée (spec WR §9 P2-P5) : phase (analysis, questions, ready_for_report, free, report, learnings),
+    # bouton de passage (`questions` | `report`), réécriture du rapport, récap du tri à confirmer.
+    phase: str | None = None
+    next_step: str | None = None
+    can_revise_report: bool = False
+    can_confirm_learnings: bool = False
 
 
 class WeeklyReviewAIResultSummary(BaseModel):

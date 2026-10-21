@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,7 +75,7 @@ class FakeCli:
 def cli(monkeypatch) -> FakeCli:
     fake = FakeCli()
     monkeypatch.setattr(cloud, "_run", fake.run)
-    monkeypatch.setattr(cloud, "_binary", lambda name: name)
+    monkeypatch.setattr(cloud, "_binary", lambda name: Path(name).name)  # .env peut donner un chemin complet
     monkeypatch.setattr(cloud.call_log, "record", lambda **row: fake.logs.append(row))
     return fake
 
@@ -175,6 +176,8 @@ def test_claude_cli_runs_without_tools_and_pass_drills(db, cli) -> None:
     assert [log["trigger_source"] for log in cli.logs] == ["subscription_cli"] * 2
     assert all(log.get("success", True) for log in cli.logs) and cli.logs[0]["model_tier"] == "cloud_premium"
     assert stats.cost_usd == pytest.approx(0.24)
+    assert cli.logs[0]["cost_eur"] == Decimal("0.103200")  # coût de la CLI (USD) au taux `ai.usd_eur_rate`
+    assert row.output["agenda"][0]["relevance"] == 50  # pertinence absente : valeur médiane
     again, again_stats = hypotheses.run_pass(db, user=user, digest=digest_row)  # une passe par digest
     assert again.id == row.id and again_stats.calls == 0 and len(cli.calls) == 2
 
@@ -200,6 +203,7 @@ def test_codex_cli_for_openai_roles(db, cli, monkeypatch) -> None:
     cloud.structured(db, slot_code=hypotheses.SLOT, app_name="imperium", system="s", user="u", schema={})
     assert cli.calls[-1][0][:4] == ["codex", "exec", "-m", "gpt-sub"] and cli.logs[-1]["model_used"] == "gpt-sub"
     assert stats.calls == 1 and row.drill_log == []
+    assert cli.logs[0]["cost_eur"] is None  # Codex n'annonce pas de coût
 
 
 def test_cli_failure_is_logged_and_nothing_is_stored(db, cli) -> None:

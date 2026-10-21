@@ -232,6 +232,9 @@ from app.services.imperium.weekly_review_conversation import (
     cancel_weekly_review,
     confirm_weekly_review_no_more_input,
     retry_weekly_review_analysis,
+    advance_weekly_review,
+    confirm_weekly_review_learnings,
+    revise_weekly_review_report,
     commit_weekly_review_memory_candidates,
     create_or_update_final_draft,
     dry_run_weekly_review_memory_commit,
@@ -2155,6 +2158,44 @@ def retry_weekly_review_analysis_route(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     background_tasks.add_task(wr_conductor.prepare_in_background, result.id)
     return result
+
+
+def _wr_step(action, db, **kwargs) -> WeeklyReviewSessionRead:
+    try:
+        return action(db, **kwargs)
+    except WeeklyReviewSessionNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except WeeklyReviewStateConflictError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/weekly-review/{session_id}/advance", response_model=WeeklyReviewSessionRead)
+def advance_weekly_review_route(session_id: UUID, current_user: CurrentUserDep, db: SessionDep) -> WeeklyReviewSessionRead:
+    """« Passer aux questions » : la revue guidée pose sa première question."""
+    return _wr_step(advance_weekly_review, db, session_id=session_id, current_user=current_user)
+
+
+@router.post("/weekly-review/{session_id}/revise-report", response_model=WeeklyReviewSessionRead,
+             status_code=status.HTTP_202_ACCEPTED)
+def revise_weekly_review_report_route(
+    session_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+) -> WeeklyReviewSessionRead:
+    """« Mettre à jour le rapport » : une réécriture avec les corrections notées, en arrière-plan."""
+    result = _wr_step(revise_weekly_review_report, db, session_id=session_id, current_user=current_user)
+    background_tasks.add_task(wr_exit_audit.revise_in_background, result.id)
+    return result
+
+
+@router.post("/weekly-review/{session_id}/learnings/confirm", response_model=WeeklyReviewSessionRead)
+def confirm_weekly_review_learnings_route(session_id: UUID, current_user: CurrentUserDep,
+                                          db: SessionDep) -> WeeklyReviewSessionRead:
+    """« Confirmer » le récap du tri des apprentissages : décisions appliquées, revue enregistrée."""
+    return _wr_step(confirm_weekly_review_learnings, db, session_id=session_id, current_user=current_user)
 
 
 @router.post(

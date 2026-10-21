@@ -1,9 +1,9 @@
 """WR P1 — passe d'hypothèses (spec WR §3.6, §9 P1 ; carte V22 ACT-WR-12), slot cloud `wr.hypothesis_pass`.
 
 Entrée : le digest figé de la session (déjà filtré par sa whitelist : jamais de brut, de conversation ni de
-document médical). Le modèle rend des hypothèses systémiques cross-domaines, un agenda de 8 questions au
-plus et des demandes de forage. Le CODE sert les forages, au plus `wr.drill_max`, chacun noté dans
-`drill_log`, sur des vues prédéfinies seulement :
+document médical). Le modèle rend des hypothèses systémiques cross-domaines, un agenda de 30 questions au
+plus, chacune notée de 0 à 100 pour sa pertinence, et des demandes de forage. Le CODE sert les forages, au
+plus `wr.drill_max`, chacun noté dans `drill_log`, sur des vues prédéfinies seulement :
 
 - `rollups` : agrégats W1 par jour sur 4 semaines, domaines nommés dans la requête (tous sinon) ;
 - `events` : nombre d'events par type sur 4 semaines, types contenant un mot de la requête (jamais le
@@ -36,7 +36,7 @@ SCOPES = ("rollups", "events", "memories")
 DRILL_DAYS = 28
 PARIS = ZoneInfo("Europe/Paris")
 DRILL_ROWS = 60
-MAX_AGENDA = 8
+MAX_AGENDA = 30  # plafond de sécurité : la pertinence (seuil de la conversation) fait le tri
 MAX_HYPOTHESES = 8
 
 SYSTEM = (
@@ -48,8 +48,11 @@ SYSTEM = (
     "- systemic_hypotheses : des hypothèses qui RELIENT plusieurs domaines (par exemple une fatigue qui pèse "
     "sur le chiffre VTC puis sur la pression financière). Chacune cite ses preuves dans evidence_refs et porte "
     "une confiance de 0 à 100. Une hypothèse sur un seul domaine n'a d'intérêt que si elle est forte.\n"
-    "- agenda : 8 questions au plus, les plus utiles à poser à l'utilisateur pendant la revue, chacune avec "
-    "l'enjeu (stake_fr) et ses références.\n"
+    "- agenda : les questions utiles à poser à l'utilisateur pendant la revue (30 au plus), chacune avec "
+    "l'enjeu (stake_fr), ses références et sa pertinence (relevance, 0 à 100 : combien la réponse changerait "
+    "ta compréhension de la semaine ou le plan de la suivante ; une curiosité vaut peu). Ne gonfle pas les "
+    "notes : seules les questions assez pertinentes seront posées, une à une. Pas de question dont la "
+    "réponse est déjà dans le digest.\n"
     "- drill_requests : ce que tu veux vérifier avant de conclure (scope rollups = agrégats par jour sur 4 "
     "semaines ; events = nombre d'events par type ; memories = mémoire de long terme).\n"
     "Règles :\n"
@@ -85,8 +88,9 @@ def output_schema(drill_max: int) -> dict:
                                "domains": {"type": "array", "items": {"type": "string", "enum": list(DOMAINS)}},
                                "evidence_refs": refs, "confidence": {"type": "integer"}}}},
             "agenda": {"type": "array", "maxItems": MAX_AGENDA, "items": {
-                "type": "object", "additionalProperties": False, "required": ["question_fr", "stake_fr", "refs"],
-                "properties": {"question_fr": {"type": "string"}, "stake_fr": {"type": "string"}, "refs": refs}}},
+                "type": "object", "additionalProperties": False, "required": ["question_fr", "stake_fr", "refs", "relevance"],
+                "properties": {"question_fr": {"type": "string"}, "stake_fr": {"type": "string"}, "refs": refs,
+                               "relevance": {"type": "integer"}}}},
             "drill_requests": {"type": "array", "maxItems": drill_max, "items": {
                 "type": "object", "additionalProperties": False, "required": ["query", "scope", "reason_fr"],
                 "properties": {"query": {"type": "string"}, "scope": {"type": "string", "enum": list(SCOPES)},
@@ -210,5 +214,6 @@ def _clean(output: dict, known: set[str], stats: PassStats) -> dict:
     hypotheses = [{**item, "evidence_refs": keep(item.get("evidence_refs", [])),
                    "confidence": max(0, min(100, int(item.get("confidence", 0))))}
                   for item in output.get("systemic_hypotheses", [])[:MAX_HYPOTHESES]]
-    agenda = [{**item, "refs": keep(item.get("refs", []))} for item in output.get("agenda", [])[:MAX_AGENDA]]
+    agenda = [{**item, "refs": keep(item.get("refs", [])), "relevance": max(0, min(100, int(item.get("relevance", 50))))}
+              for item in output.get("agenda", [])[:MAX_AGENDA]]
     return {"systemic_hypotheses": hypotheses, "agenda": agenda, "drill_requests": []}

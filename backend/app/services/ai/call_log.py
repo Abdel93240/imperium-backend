@@ -5,7 +5,8 @@ dans sa propre session : la ligne survit au rollback de l'appelant (un appel rat
 appel) et un échec d'écriture n'interrompt jamais l'appelant (journalisé en warning).
 
 Rien du contenu ne sort ici : ni prompt, ni réponse, ni texte reconnu. Coût : 0 pour un
-appel local ; sinon le trigger SQL le calcule depuis `ai_model_pricing`, NULL sans prix connu.
+appel local ; le coût donné par l'appelant (estimation de la CLI d'abonnement) ; sinon le trigger SQL le
+calcule depuis `ai_model_pricing`, NULL sans prix connu.
 """
 
 import logging
@@ -47,6 +48,7 @@ def record(
     trigger_source: str | None = None,
     related_entity_type: str | None = None,
     related_entity_id: Any = None,
+    cost_eur: Decimal | None = None,
 ) -> None:
     if app_name not in APP_NAMES:
         raise ValueError(f"Unknown app_name '{app_name}'.")
@@ -63,7 +65,7 @@ def record(
                 input_tokens=input_tokens, output_tokens=output_tokens, duration_ms=duration_ms, success=success,
                 error_code=error_code, trigger_source=trigger_source, related_entity_type=related_entity_type,
                 related_entity_id=related_entity_id,
-                cost_eur=Decimal("0") if model_tier == "local" else None,
+                cost_eur=Decimal("0") if model_tier == "local" else cost_eur,
             ))
             session.commit()
     except Exception:  # noqa: BLE001 - le journal ne casse jamais l'appel journalisé

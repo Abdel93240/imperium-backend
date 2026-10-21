@@ -394,10 +394,24 @@ def add_weekly_review_chat_message(
         return _handle_idempotency(existing_key, request_hash, WeeklyReviewMessageRead, request_path=request_path), True
 
     session = _get_session_for_user(db, current_user=current_user, session_id=session_id)
+    content = payload.content.strip()
+    from app.services.wr import learnings_talk
+
+    if content and learnings_talk.active(db, session):
+        # Rapport validé : la conversation trie les apprentissages (réponse libre, récap à confirmer).
+        message = _add_message(db, session=session, role="user", message_type="chat_message", content=content,
+                               payload=_chat_message_payload(payload.payload, source="imperium_weekly_review_learnings"))
+        message.created_at = datetime.now(UTC)
+        learnings_talk.reply(db, session=session, user_content=content)
+        response = WeeklyReviewMessageRead.model_validate(message)
+        _store_idempotency(db, user_id=current_user.id, idempotency_key=idempotency_key,
+                           request_method=request_method, request_path=request_path, request_hash=request_hash,
+                           response_status_code=201, response=response)
+        db.commit()
+        return response, False
     _ensure_session_open(session)
     if session.status in {"draft_ready", "final_ready"}:
         raise WeeklyReviewStateConflictError("Request changes before adding more chat messages to a draft-ready weekly review.")
-    content = payload.content.strip()
     if not content:
         raise WeeklyReviewStateConflictError("Weekly review chat message content is required.")
     message_payload = _chat_message_payload(payload.payload, source="imperium_weekly_review_chat")
@@ -442,6 +456,46 @@ def retry_weekly_review_analysis(db: Session, *, session_id: UUID, current_user:
     if not conductor.retry(db, session=session):
         raise WeeklyReviewStateConflictError("The weekly review analysis cannot be retried now.")
     return WeeklyReviewSessionRead.model_validate(session)
+
+
+def advance_weekly_review(db: Session, *, session_id: UUID, current_user: User) -> WeeklyReviewSessionRead:
+    """« Passer aux questions » : la conversation guidée pose sa première question."""
+    from app.services.wr import conductor
+
+    session = _get_session_for_user(db, current_user=current_user, session_id=session_id)
+    _ensure_session_open(session)
+    if conductor.advance(db, session=session) is None:
+        raise WeeklyReviewStateConflictError("The weekly review cannot move to the questions now.")
+    db.commit()
+    return WeeklyReviewSessionRead.model_validate(session)
+
+
+def revise_weekly_review_report(db: Session, *, session_id: UUID, current_user: User) -> WeeklyReviewSessionRead:
+    """« Mettre à jour le rapport » : la session attend la réécriture ; l'appelant la lance en arrière-plan."""
+    from app.services.wr import exit_audit
+
+    session = _get_session_for_user(db, current_user=current_user, session_id=session_id)
+    _ensure_session_open(session)
+    if not exit_audit.start_revision(db, session=session):
+        raise WeeklyReviewStateConflictError("The weekly review report cannot be rewritten now.")
+    return WeeklyReviewSessionRead.model_validate(session)
+
+
+def confirm_weekly_review_learnings(db: Session, *, session_id: UUID, current_user: User) -> WeeklyReviewSessionRead:
+    """« Confirmer » le récap du tri : décisions appliquées, revue enregistrée."""
+    from app.services.wr import learnings_talk
+
+    session = _get_session_for_user(db, current_user=current_user, session_id=session_id)
+    if not learnings_talk.confirm(db, session=session, user=current_user):
+        raise WeeklyReviewStateConflictError("There is no learnings recap to confirm.")
+    return WeeklyReviewSessionRead.model_validate(session)
+
+
+def _post_learnings_list(db: Session, *, session: ImperiumWeeklyReviewSession) -> None:
+    from app.services.wr import learnings_talk
+
+    if learnings_talk.post_list(db, session=session) is not None:
+        db.flush()
 
 
 def confirm_weekly_review_no_more_input(
@@ -543,6 +597,19 @@ def request_draft_changes(
     latest_report = _get_latest_mutable_report_for_changes(db, session=session, user_id=current_user.id)
     if latest_report is None:
         raise WeeklyReviewFinalReportNotFoundError("Weekly review draft or approved candidate not found.")
+    from app.services.wr import exit_audit
+
+    if (latest_report.report_payload or {}).get("source") == "wr_exit_audit":
+        # Rapport de l'audit : la correction est notée, le brouillon reste ; une réécriture au plus.
+        if not exit_audit.can_note_changes(db, session):
+            raise WeeklyReviewStateConflictError("This weekly review report can no longer be rewritten.")
+        note = exit_audit.note_changes(db, session=session, content=payload.content)
+        response = WeeklyReviewMessageRead.model_validate(note)
+        _store_idempotency(db, user_id=current_user.id, idempotency_key=idempotency_key,
+                           request_method=request_method, request_path=request_path, request_hash=request_hash,
+                           response_status_code=201, response=response)
+        db.commit()
+        return response, False
 
     latest_report.status = "superseded"
     latest_report.report_payload = {
@@ -1019,6 +1086,8 @@ def approve_final_report(
         report.approved_at = now
         session.status = "approved"
         session.completed_at = now
+        db.flush()
+        _post_learnings_list(db, session=session)
     elif report.status == "stored":
         raise WeeklyReviewStateConflictError("Stored final report cannot be approved again.")
     elif report.status != "approved":
@@ -1066,6 +1135,7 @@ def approve_latest_draft_report(
     session.status = "approved"
     session.completed_at = now
     db.flush()
+    _post_learnings_list(db, session=session)
     response = WeeklyReviewFinalReportRead.model_validate(report)
     _store_idempotency(
         db,
@@ -1318,6 +1388,7 @@ def get_weekly_review_conversation(
     from app.services.wr import conductor
 
     flags.can_retry_analysis = conductor.can_retry(db, session)
+    _guided_flags(db, session=session, flags=flags, active_final_report=active_final_report)
     ui_state = _conversation_ui_state(session=session, active_final_report=active_final_report)
     allowed_actions = _conversation_allowed_actions(ui_state=ui_state, flags=flags)
     draft_review_state = _draft_review_state(
@@ -2601,6 +2672,35 @@ def _build_conversation_flags(
         has_initial_summary=session.initial_ai_result_id is not None,
         has_final_draft=has_final_draft,
     )
+
+
+def _guided_flags(
+    db: Session,
+    *,
+    session: ImperiumWeeklyReviewSession,
+    flags: WeeklyReviewConversationFlags,
+    active_final_report: ImperiumWeeklyReviewFinalReport | None,
+) -> None:
+    """Phases de la revue guidée (conducteur, réécriture, tri des apprentissages) : quels boutons montrer."""
+    from app.services.wr import conductor, exit_audit, learnings_talk
+
+    current = conductor.phase(db, session)
+    if current is not None and flags.can_send_message:
+        flags.phase = current
+        flags.next_step = conductor.next_step(db, session)
+        flags.can_confirm_no_more_input = flags.next_step == "report"
+    audited = active_final_report is not None and (active_final_report.report_payload or {}).get("source") == "wr_exit_audit"
+    if audited and flags.can_approve:
+        flags.phase = "report"
+        flags.can_request_changes = exit_audit.can_note_changes(db, session)
+        flags.can_revise_report = flags.can_request_changes and bool(exit_audit.pending_notes(db, session))
+    if audited and session.status in {"approved", "stored"}:
+        flags.can_request_changes = False
+        if learnings_talk.active(db, session):
+            flags.phase = "learnings"
+            flags.can_send_message = flags.can_answer = True
+            flags.can_confirm_learnings = learnings_talk.can_confirm(db, session)
+            flags.can_store = False  # « Confirmer » enregistre la revue
 
 
 def _conversation_ui_state(
