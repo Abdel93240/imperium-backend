@@ -76,3 +76,30 @@ class ApiKeyReplace(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     key: str = Field(max_length=4096)
+
+
+class SlotRead(BaseModel):
+    """Un traitement IA (slot) : où il tourne (local ou cloud), s'il est servi, et pourquoi il existe."""
+
+    slot_code: str
+    domain: str
+    engine: Literal["local", "cloud"]
+    mode: Literal["live", "off"]
+    note: str | None = None
+
+
+class SlotsRead(BaseModel):
+    transport: Literal["off", "subscription", "api"]
+    slots: list[SlotRead]
+
+
+class SlotUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["live", "off"]
+
+
+class TransportUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    transport: Literal["off", "subscription"]
