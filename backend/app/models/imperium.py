@@ -100,6 +100,9 @@ class PlanningDay(UUIDPrimaryKeyMixin, Base):
         nullable=True,
     )
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # Conseil du jour du Dashboard (« Conseils IA ») : {title, body, source, signature, at} ; recalculé quand
+    # l'état de la journée change (app.services.imperium.advice).
+    advice: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

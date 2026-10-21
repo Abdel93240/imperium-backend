@@ -136,10 +136,19 @@ def test_replan_reasons_change_the_next_proposal(db) -> None:
     assert db.scalar(select(PlanningReplanEvent.id).where(PlanningReplanEvent.user_id == user.id).limit(1)) is not None
 
 
-def test_routes_cooldown_and_validation(db) -> None:
+class _TenAm(datetime):
+    """Les routes lisent l'heure réelle : on la fige à 10 h de Paris, le test ne dépend pas de l'heure du jour."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW if tz is None else NOW.astimezone(tz)
+
+
+def test_routes_cooldown_and_validation(db, monkeypatch) -> None:
+    monkeypatch.setattr(day_flow, "datetime", _TenAm)
     user = _user(db)
     _day(db, user)
-    first = _mission(db, user, "Courses", minutes=30, planned=datetime.now(UTC) - timedelta(hours=1))
+    first = _mission(db, user, "Courses", minutes=30, planned=NOW - timedelta(hours=1))
     app = FastAPI()
     app.include_router(daily.router, prefix="/api/daily")
     app.dependency_overrides[get_current_user] = lambda: user
