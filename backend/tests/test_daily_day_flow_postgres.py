@@ -171,7 +171,7 @@ def test_routes_cooldown_and_validation(db, monkeypatch) -> None:
     assert client.post(f"/api/daily/start/{first.id}", headers={"Idempotency-Key": "s2"}).json()["code"] == "MISSION_STATE"
 
 
-def test_a_day_started_late_does_not_end_at_midnight(db) -> None:
+def test_the_day_has_no_clock_end(db) -> None:
     from app.models.imperium import PlanningDay
 
     user = _user(db)
@@ -182,6 +182,6 @@ def test_a_day_started_late_does_not_end_at_midnight(db) -> None:
     db.commit()
     insurance = _mission(db, user, "Payer l'assurance moto", minutes=30, planned=started - timedelta(hours=1))
     now = started + timedelta(minutes=7)  # 23 h 53 : avant, 7 minutes restaient et rien ne tenait
-    assert selection.day_end(db, user, now) == started + timedelta(hours=16)
+    assert selection.day_end(db, user, now) == now + timedelta(hours=24)  # pas de fin d'horloge
     row = selection.select_next(db, current_user=user, trigger="manual", now=now)
     assert row.outcome == "next_mission" and row.chosen_mission_id == insurance.id and row.remaining_min > 800

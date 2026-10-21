@@ -120,6 +120,10 @@ def _routing_content(message: ChatMessage) -> str:
              f"confiance {routing.get('confidence')} · domaine {routing.get('domain')}",
              "raisons : " + ", ".join(routing.get("reasons") or [])]
     lines += _block("critères", routing.get("breakdown"))
+    if routing.get("vital_emergency"):
+        lines.append("urgence vitale : palier critique, ligne d'appel aux secours affichée en tête")
+    if routing.get("expert_question"):
+        lines.append(f"question transmise (anonyme) : {routing['expert_question']}")
     if routing.get("escalated"):
         lines.append(f"répondu par {routing.get('model') or message.model_used} ({message.latency_ms} ms au total)")
     else:

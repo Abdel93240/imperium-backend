@@ -231,3 +231,38 @@ def test_a_proposal_does_not_block_the_escalated_answer(db, fakes) -> None:
     turn = client.post(f"{P}/{sid}/messages", json={"text": "Je ne sais pas quelle direction prendre dans ma vie"}).json()
     assert turn["assistant_message"]["content"].startswith("Commence par ce qui te donne de l'énergie")
     assert turn["proposal"]["action"] == "create_project" and fakes.calls == ["high_reasoning"]
+
+
+def test_vital_emergency_goes_critical_and_always_starts_with_the_fixed_line(db, fakes, monkeypatch) -> None:
+    # Le cas réel du 2026-10-21 : urgent et simple, le score sortait à 83 et partait au seul spécialiste santé.
+    real = {"complexity": 2, "context_size": 1, "ambiguity": 0, "consequences": 10, "speed_tolerance": 0,
+            "sensitivity": 10, "cost_justification": 10, "confidence": 0.1, "domain": "health",
+            "expert_question": "J'ai des palpitations et je ne sens plus mon bras gauche, que dois-je faire ?"}
+    assert escalation.decide(db, real).score == 83
+    decision = escalation.decide(db, {**real, "vital_emergency": True})
+    assert (decision.score, decision.role, decision.emergency) == (180, "high_reasoning", True)
+    assert "vital_emergency" in decision.reasons
+
+    set_parameter(db, code="chat.enabled", value=True, origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.local_slot_modes", value={"chat.converse": "live"}, origin="user", rationale_fr="Test.")
+    db.commit()
+    client = _client(db, _user(db))
+    sid = client.post(P, json={}).json()["id"]
+    fakes.local = [_turn({**real, "vital_emergency": True}, "Je regarde.")]  # cloud éteint : la ligne reste
+    turn = client.post(f"{P}/{sid}/messages", json={"text": "J'ai des palpitations et je ne sens plus mon bras"}).json()
+    assert turn["assistant_message"]["content"].startswith(escalation.EMERGENCY_LINE)
+
+    set_parameter(db, code="ai.cloud_transport", value="subscription", origin="user", rationale_fr="Test.")
+    set_parameter(db, code="ai.cloud_slot_modes", value={"nexus.escalation": "live"}, origin="user", rationale_fr="Test.")
+    db.commit()
+    systems = []
+    original = cloud.structured
+    monkeypatch.setattr(cloud, "structured", lambda db, **kw: systems.append(kw["system"]) or original(db, **kw))
+    fakes.local = [_turn({**real, "vital_emergency": True}, "Je regarde.")]
+    fakes.cloud = [{"answer_fr": "Assieds-toi tout de suite et dis au SAMU : palpitations et bras gauche engourdi."}]
+    turn = client.post(f"{P}/{sid}/messages", json={"text": "Ça continue"}).json()
+    content = turn["assistant_message"]["content"]
+    assert content.startswith(escalation.EMERGENCY_LINE) and content.endswith("bras gauche engourdi.")
+    assert fakes.calls[-1] == "high_reasoning" and "réponds-LUI directement" in systems[-1] and "URGENCE VITALE" in systems[-1]
+    last = db.scalars(select(ChatMessage).where(ChatMessage.session_id == sid).order_by(ChatMessage.created_at.desc())).first()
+    assert last.routing["vital_emergency"] is True and last.routing["expert_question"].startswith("J'ai des palpitations")

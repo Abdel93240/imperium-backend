@@ -9,6 +9,13 @@ les règles d'escalade automatique (§5.8) et choisit le rôle. Tant que le slot
 question anonyme, en français, au nom de Nexus ; l'utilisateur ne change jamais d'interlocuteur. En échec
 (quota, panne), la réponse locale reste.
 
+Urgence vitale (règle fixe, au-dessus du score, doc 30 §7) : le score /200 mesure la DIFFICULTÉ ; une urgence
+vitale est simple mais grave, elle sortait autour de 80 (urgente, donc « rapide »). Quand le modèle local la
+signale (`vital_emergency`), le code la porte au palier critique (score ≥ 180, raisonnement poussé, jamais le
+seul spécialiste de domaine), et la réponse commence par une ligne écrite par le CODE (`EMERGENCY_LINE`), qui ne
+dépend d'aucun modèle. La question de l'expert est écrite à la première personne : l'expert répond à la personne
+concernée elle-même, jamais comme à un témoin.
+
 Pas encore : la vérification indépendante d'un score ≥ 180 (§5.6 étape 1, rôle `high_reasoning_safeguard`) ;
 un tel score va au raisonnement poussé et le note. Le domaine finances détaillé (Vault) ne part jamais : la
 question est générique, et le slot refuse le domaine vault.
@@ -31,6 +38,9 @@ SPECIALISTS = {"health": "health_specialist", "finance": "finance_specialist"}
 SENSITIVE_DOMAINS = frozenset({"health", "finance", "legal"})
 DOMAINS = ("general", "planning", "health", "finance", "religion", "business", "legal", "tech")
 LOW_CONFIDENCE = 0.65
+EMERGENCY_FLOOR = 180
+EMERGENCY_LINE = ("Si c'est en train de t'arriver : appelle le 15 (SAMU) ou le 112 maintenant, ne conduis pas, "
+                  "installe-toi assis ou allongé et laisse ta porte ouverte.")
 # Anonymisation de dernier recours : adresses, numéros longs (téléphone, compte), liens.
 _SCRUB = (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), re.compile(r"\+?\d[\d .-]{6,}\d"), re.compile(r"https?://\S+"))
 
@@ -41,8 +51,12 @@ SELF_ASSESSMENT_RULES = (
     "attendre), sensitivity (données sensibles), cost_justification (une réponse plus solide vaut-elle un coût). "
     "confidence : ta confiance (0 à 1) dans ta propre réponse. domain : le domaine du message. Si un modèle plus "
     "fort ferait nettement mieux (savoir spécialisé, calcul, raisonnement long, santé, argent, droit), écris "
-    "expert_question : la question à lui poser, complète et compréhensible seule, GÉNÉRIQUE ET ANONYME (aucun "
-    "nom, lieu, date précise, montant exact ni identifiant ; « un homme de 35 ans qui… ») ; sinon null. Si tu ne "
+    "expert_question : la question à lui poser, complète et compréhensible seule, à la PREMIÈRE PERSONNE, comme "
+    "si l'utilisateur la posait lui-même (« J'ai 35 ans, je ressens… que dois-je faire ? »), et ANONYME (aucun "
+    "nom, lieu, date précise, montant exact ni identifiant) ; sinon null. vital_emergency : true seulement si sa "
+    "vie ou sa santé peut être en danger MAINTENANT (douleur ou oppression thoracique, palpitations avec malaise, "
+    "membre qui ne répond plus, difficulté à respirer, perte de connaissance, idées suicidaires, accident en "
+    "cours…) : consequences et sensitivity valent alors 10. Si tu ne "
     "peux pas répondre toi-même de façon fiable, ne refuse pas : ta confidence est basse (0,5 au plus), tu "
     "écris expert_question, et reply_fr dit simplement que tu regardes. Ne surévalue pas pour autant : la "
     "plupart des messages se traitent seul.")
@@ -56,6 +70,7 @@ class Decision:
     breakdown: dict = field(default_factory=dict)
     confidence: float = 1.0
     domain: str | None = None
+    emergency: bool = False
 
     @property
     def escalates(self) -> bool:
@@ -63,15 +78,15 @@ class Decision:
 
     def log(self) -> dict:
         return {"score": self.score, "role": self.role, "reasons": self.reasons, "breakdown": self.breakdown,
-                "confidence": self.confidence, "domain": self.domain}
+                "confidence": self.confidence, "domain": self.domain, "vital_emergency": self.emergency}
 
 
 def assessment_schema() -> dict:
     """Bloc à ajouter à la sortie du conducteur local."""
     note = {"type": "integer", "minimum": 0, "maximum": 10}
     return {"type": "object", "additionalProperties": False,
-            "required": [*CRITERIA, "confidence", "domain", "expert_question"],
-            "properties": {**{name: note for name in CRITERIA},
+            "required": ["vital_emergency", *CRITERIA, "confidence", "domain", "expert_question"],
+            "properties": {"vital_emergency": {"type": "boolean"}, **{name: note for name in CRITERIA},
                            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                            "domain": {"type": "string", "enum": list(DOMAINS)},
                            "expert_question": {"type": ["string", "null"], "maxLength": 1500}}}
@@ -112,7 +127,11 @@ def decide(db: Session, assessment: dict | None) -> Decision:
     elif role != "local_executor" and domain in SPECIALISTS:
         role = SPECIALISTS[domain]
         reasons.append("domain_specialist")
-    return Decision(score=total, role=role, reasons=reasons, breakdown=breakdown, confidence=confidence,
+    emergency = bool(assessment.get("vital_emergency"))
+    if emergency:  # règle fixe : la gravité prime sur la difficulté
+        total, role = max(total, EMERGENCY_FLOOR), "high_reasoning"
+        reasons.append("vital_emergency")
+    return Decision(score=total, role=role, reasons=reasons, breakdown=breakdown, confidence=confidence, emergency=emergency,
                     domain=domain)
 
 
@@ -129,11 +148,17 @@ def scrub(text: str) -> str:
 def ask_expert(db: Session, decision: Decision, question: str, *, app_name: str = "imperium",
                related_entity_type: str | None = None, related_entity_id=None) -> cloud.CloudResult:
     """La question anonyme au rôle choisi ; réponse prête à être dite par Nexus. Lève cloud.CloudError."""
-    system = ("Tu réponds à la place de Nexus, l'assistant personnel d'un utilisateur, qui te transmet une question "
-              "générique et anonyme. Réponds en français, en tutoyant, clairement et brièvement (dix phrases au "
-              "plus), comme Nexus lui-même : ne dis jamais que tu es un autre modèle. Sois concret ; si une "
-              "information manque, dis ce qu'il faudrait savoir. Santé : rappelle de consulter un professionnel "
-              "quand c'est nécessaire.")
+    system = ("Tu réponds à la place de Nexus, l'assistant personnel d'un utilisateur, qui te transmet la question "
+              "anonymisée de l'utilisateur. La question vient de la personne concernée elle-même : réponds-LUI "
+              "directement, jamais comme à un témoin ou à un proche. Réponds en français, en tutoyant, clairement et "
+              "brièvement (dix phrases au plus), comme Nexus lui-même : ne dis jamais que tu es un autre modèle. Sois "
+              "concret ; si une information manque, dis ce qu'il faudrait savoir. Santé : rappelle de consulter un "
+              "professionnel quand c'est nécessaire.")
+    if decision.emergency:
+        system += (" URGENCE VITALE POSSIBLE : la personne est peut-être seule. Commence par ce qu'elle doit faire "
+                   "elle-même tout de suite (appeler le 15 ou le 112, ne pas conduire, s'asseoir ou s'allonger, "
+                   "déverrouiller sa porte), puis ce qu'il faut dire aux secours. Une ligne d'appel aux secours est "
+                   "déjà affichée avant ta réponse : ne la répète pas mot pour mot.")
     schema = {"type": "object", "additionalProperties": False, "required": ["answer_fr"],
               "properties": {"answer_fr": {"type": "string", "maxLength": 4000}}}
     return cloud.structured(db, slot_code=SLOT, app_name=app_name, system=system, user=scrub(question)[:1500],
