@@ -33,6 +33,8 @@ class ChatMessage(UUIDPrimaryKeyMixin, Base):
     model_used: Mapped[str | None] = mapped_column(Text, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     degraded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Décision d'escalade (doc 72 §3) : score /200, rôle, raisons, escaladé ou non ; jamais montrée à l'écran.
+    routing: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 

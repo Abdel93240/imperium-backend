@@ -13,9 +13,10 @@
    encore pertinente (même seuil), `wr.followups_max` au plus par sujet. Agenda épuisé, ou l'utilisateur
    veut s'arrêter : `ready_for_report`, et « Rédiger le rapport » lance l'audit de sortie (P5).
 3. Chaque message : le conducteur local (`wr.conversation`, live via `ai.local_slot_modes`) accuse
-   réception ; éteint ou en échec, le code pose simplement la question suivante. Quand il se juge dépassé
-   (`beyond_me`), le message le note (`needs_bigger_model`) : point d'accroche de l'escalade, pas encore
-   branchée.
+   réception ; éteint ou en échec, le code pose simplement la question suivante. Il s'auto-évalue à chaque
+   message (doc 30 §5) : quand le score l'exige, la question anonyme qu'il a écrite part au rôle choisi
+   (`app.services.ai.escalation`, slot `nexus.escalation`) et la réponse remplace son accusé de réception ;
+   slot éteint ou échec, sa réponse reste et la décision est notée (`routing`, `needs_bigger_model`).
 
 Le conducteur n'affirme rien qui ne vienne des hypothèses, du digest ou de la conversation, et n'écrit
 rien d'autre que ses messages.
@@ -34,7 +35,7 @@ from sqlalchemy.orm import Session
 from app.models.auth import User
 from app.models.imperium import ImperiumWeeklyReviewMessage, ImperiumWeeklyReviewSession
 from app.models.wr import WrHypothesis
-from app.services.ai import cloud, local_executor
+from app.services.ai import cloud, escalation, local_executor
 from app.services.params import get_parameter
 from app.services.wr import digest as wr_digest
 from app.services.wr import hypotheses
@@ -67,12 +68,12 @@ SYSTEM = (
     "l'a pas éclairée, passe à la suite.\n"
     "- next_index : le numéro de la question restante la plus utile maintenant, -1 s'il n'en reste pas.\n"
     "- wants_report : true seulement s'il demande d'arrêter les questions ou de passer au rapport.\n"
-    "- beyond_me : true si sa demande dépasse ce que tu peux faire de façon fiable (calcul lourd, analyse "
-    "longue, savoir que tu n'as pas).\n"
+
     "- open_question : s'il pose une question « pourquoi … ? » que les hypothèses ne couvrent pas, recopie-la "
     "(sinon null) et dis dans ack_fr que tu la gardes pour l'analyse.\n"
     "- N'invente aucun fait : appuie-toi seulement sur les hypothèses, le digest et ce qu'il a dit. Ne propose "
-    "jamais une autre revue ni une date, et ne nomme aucun jour de la semaine qui ne vienne pas des données."
+    "jamais une autre revue ni une date, et ne nomme aucun jour de la semaine qui ne vienne pas des données.\n"
+    + escalation.SELF_ASSESSMENT_RULES
 )
 MODE_RULES = {
     ANALYSIS: "Phase d'analyse : il réagit à l'analyse présentée. Réponds à sa remarque dans ack_fr (tu peux "
@@ -213,13 +214,14 @@ def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: st
             output = None
     if output is None:
         output = {"ack_fr": "Noté.", "followup_fr": None, "followup_value": 0,
-                  "next_index": remaining[0] if remaining else -1, "wants_report": False, "beyond_me": False,
-                  "open_question": None}
+                  "next_index": remaining[0] if remaining else -1, "wants_report": False, "open_question": None}
     text = (output.get("ack_fr") or "Noté.").strip()
     payload = {"source": FOLLOWUP, "mode": mode, "phase": current, "agenda_index": None,
                "open_question": output.get("open_question")}
-    if output.get("beyond_me"):
-        payload["needs_bigger_model"] = True  # escalade (doc 72 §3) pas encore branchée : seulement notée
+    if mode == "live":
+        text, payload["routing"] = _escalate(db, session, output.get("assessment"), text)
+        if payload["routing"]["role"] != "local_executor":
+            payload["needs_bigger_model"] = True
     if current == QUESTIONS:
         threshold = int(get_parameter(db, "wr.question_relevance_min", default=40))
         followups = _followups_since_question(conducted)
@@ -242,6 +244,23 @@ def reply(db: Session, *, session: ImperiumWeeklyReviewSession, user_content: st
     message = _post(db, session, text, payload, role="qwen" if mode == "live" else "backend")
     db.flush()
     return message
+
+
+def _escalate(db: Session, session: ImperiumWeeklyReviewSession, assessment: dict | None,
+              ack: str) -> tuple[str, dict]:
+    """Escalade invisible (doc 72 §3) : la réponse du rôle choisi remplace l'accusé de réception ; sinon il reste."""
+    decision = escalation.decide(db, assessment)
+    routing = {**decision.log(), "escalated": False}
+    question = (assessment or {}).get("expert_question")
+    if not decision.escalates or not question or not escalation.live(db):
+        return ack, routing
+    try:
+        expert = escalation.ask_expert(db, decision, question, related_entity_type="weekly_review_session",
+                                       related_entity_id=session.id)
+    except cloud.CloudError as exc:
+        return ack, {**routing, "skipped": "cloud_error", "error": str(exc)[:200]}
+    answer = str(expert.output.get("answer_fr") or "").strip()
+    return (answer, {**routing, "escalated": True, "model": expert.model}) if answer else (ack, routing)
 
 
 def _ready_text(ack: str) -> str:
@@ -352,14 +371,15 @@ def _converse(db: Session, session: ImperiumWeeklyReviewSession, opening: Imperi
         + f"\n\nDernier message de l'utilisateur : {user_content[:1500]}\nRéponds-lui."
     )
     schema = {"type": "object", "additionalProperties": False,
-              "required": ["comprehension", "ack_fr", "followup_fr", "followup_value", "next_index", "wants_report",
-                           "beyond_me", "open_question"],
+              "required": ["comprehension", "assessment", "ack_fr", "followup_fr", "followup_value", "next_index",
+                           "wants_report", "open_question"],
               "properties": {"comprehension": {"type": "string", "maxLength": 400},
+                             "assessment": escalation.assessment_schema(),
                              "ack_fr": {"type": "string", "maxLength": 700},
                              "followup_fr": {"type": ["string", "null"], "maxLength": 300},
                              "followup_value": {"type": "integer", "minimum": 0, "maximum": 100},
                              "next_index": {"type": "integer", "enum": [*remaining, -1]},
-                             "wants_report": {"type": "boolean"}, "beyond_me": {"type": "boolean"},
+                             "wants_report": {"type": "boolean"},
                              "open_question": {"type": ["string", "null"], "maxLength": 300}}}
     return local_executor.structured(slot_code=SLOT, app_name="imperium", system=SYSTEM, user=prompt, schema=schema,
                                      max_tokens=900, related_entity_type="weekly_review_session",

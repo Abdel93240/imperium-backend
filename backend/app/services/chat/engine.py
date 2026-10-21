@@ -17,7 +17,11 @@ tirée de la proposition (une validation rejouée ne crée rien de plus).
 
 Le slot `chat.converse` doit être en mode `live` dans `ai.local_slot_modes` ; sinon, ou si l'exécuteur est
 injoignable, la réponse dit clairement que le moteur local est indisponible (doc 72 §10), sans repli cloud.
-Pas d'escalade (§3) ni d'extraction d'apprentissages à la fermeture (§6) dans cette V1.
+Escalade invisible (§3, `app.services.ai.escalation`) : chaque réponse locale porte l'auto-évaluation du modèle ;
+le code calcule le score /200 et, pour une réponse sans proposition, peut faire répondre un rôle cloud à la
+question anonyme du modèle (slot `nexus.escalation`, éteint par défaut : la décision est alors seulement
+journalisée dans `chat_messages.routing`). Les propositions d'action restent locales.
+Pas d'extraction d'apprentissages à la fermeture (§6) dans cette V1.
 """
 
 from datetime import UTC, date, datetime, time
@@ -33,7 +37,7 @@ from app.models.chat import ChatMessage, ChatProposal, ChatSession
 from app.models.imperium import ImperiumMission, ImperiumProject
 from app.schemas.chat import ChatMessageRead, ChatProposalRead, ChatSessionCreate, ChatSessionRead, ChatTurnRead
 from app.schemas.operations import IntrinsicMissionCreate, ProjectCreate, ProjectMissionCreate, RoutineCreate
-from app.services.ai import local_executor
+from app.services.ai import cloud, escalation, local_executor
 from app.services.imperium import operations
 from app.services.imperium.decision_framework import get_canonical_priority_order
 from app.services.imperium.missions import get_current_active_mission
@@ -131,8 +135,10 @@ def system_prompt(agent: dict, sheets: dict, switches: list[str] | tuple[str, ..
            "(« on passe sur le projet … ? »). Ne pose jamais cette question sans remplir switch. Sinon switch vaut null ; "
            "une simple mention ou une action que tu sais faire toi-même ne suffit pas. Possible ici :\n"
            + "".join(f"- {code} : {SWITCH_HELP[code]}\n" for code in switches) if switches else "")
-        + "Pour tout le reste, réponds sans proposition et dis simplement que tu ne sais pas le faire ici. "
-        "Appuie-toi seulement sur le contexte fourni et sur ce que l'utilisateur a dit."
+        + "Pour tout le reste (questions, conseils), réponds sans proposition : toi-même si tu sais le faire de façon "
+        "fiable, sinon en remplissant expert_question (voir l'auto-évaluation). "
+        "Appuie-toi seulement sur le contexte fourni et sur ce que l'utilisateur a dit.\n"
+        + escalation.SELF_ASSESSMENT_RULES
     )
 
 
@@ -173,8 +179,10 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
                for code in switches if code == "project" and aliases]
     targets += [{"type": "object", "additionalProperties": False, "required": ["agent"], "properties": {"agent": {"const": code}}}
                 for code in switches if code != "project"]
-    return {"type": "object", "additionalProperties": False, "required": ["comprehension", "reply_fr", "proposal", "switch"],
+    return {"type": "object", "additionalProperties": False,
+            "required": ["comprehension", "assessment", "reply_fr", "proposal", "switch"],
             "properties": {"comprehension": {"type": "string", "maxLength": 800},  # réfléchir avant de répondre
+                           "assessment": escalation.assessment_schema(),  # s'évaluer avant de répondre (doc 72 §3.1)
                            "reply_fr": {"type": "string", "maxLength": 1500},
                            "proposal": {"anyOf": [{"type": "null"}, *variants]},
                            "switch": {"anyOf": [{"type": "null"}, *targets]}}}
@@ -249,10 +257,11 @@ def _answer(db: Session, current_user: User, session: ChatSession, now: datetime
     agent = agent_sheet(db, session.agent)
     context, aliases = CONTEXTS[session.agent](db, current_user, session)
     switches = _switch_options(db, current_user, session, aliases)
-    reply, proposal, model, latency, degraded = _converse(db, session, agent, context, aliases, switches, resume)
+    reply, proposal, model, latency, degraded, routing = _converse(db, session, agent, context, aliases, switches,
+                                                                   resume)
     assistant = ChatMessage(id=uuid4(), session_id=session.id, user_id=current_user.id, role="assistant",
                             content=reply[:8000], model_used=model, latency_ms=latency, degraded=degraded,
-                            created_at=datetime.now(UTC))
+                            routing=routing, created_at=datetime.now(UTC))
     db.add(assistant)
     db.flush()
     stored = None
@@ -406,7 +415,7 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
     switches = switches or []
     sheets = requirements(db)
     if local_executor.slot_mode(db, SLOT) != "live":
-        return DEGRADED_REPLY, None, None, None, True
+        return DEGRADED_REPLY, None, None, None, True, None
     history = list(db.scalars(select(ChatMessage).where(ChatMessage.session_id == session.id)
                               .order_by(ChatMessage.created_at.desc()).limit(HISTORY_MESSAGES)))[::-1]
     transcript = "\n".join(f"{'Utilisateur' if m.role == 'user' else 'Assistant'} : {m.content}" for m in history)[-HISTORY_CHARS:]
@@ -421,8 +430,9 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
                                                schema=output_schema(list(aliases), agent["actions"], switches), max_tokens=900, related_entity_type="chat_session",
                                                related_entity_id=session.id)
         except local_executor.LocalExecutorError:
-            return DEGRADED_REPLY, None, None, latency or None, True
+            return DEGRADED_REPLY, None, None, latency or None, True, None
         latency += result.latency_ms
+        decision = escalation.decide(db, result.output.get("assessment"))
         reply = str(result.output.get("reply_fr") or "").strip() or "…"
         proposal = result.output.get("proposal")
         if proposal and proposal.get("action") == "add_project_mission":
@@ -432,18 +442,48 @@ def _converse(db: Session, session: ChatSession, agent: dict, context: str, alia
             proposal = {**proposal, "params": params}
         errors, missing = _check(proposal, set(aliases.values()), sheets, agent["actions"]) if proposal else ([], [])
         if proposal and not errors:
-            return reply, proposal, "local_executor", latency, False
+            return reply, proposal, "local_executor", latency, False, {**decision.log(), "escalated": False,
+                                                                        "skipped": "proposal"}
         # Pas d'action valable : un changement d'agent proposé passe (l'autre agent saura faire l'action).
         switch = _switch_proposal(db, result.output.get("switch"), switches, aliases)
-        if switch or not errors:
-            return reply, switch, "local_executor", latency, False
+        if switch:
+            return reply, switch, "local_executor", latency, False, {**decision.log(), "escalated": False,
+                                                                      "skipped": "switch"}
+        if not errors:
+            question = (result.output.get("assessment") or {}).get("expert_question")
+            reply, model, latency, routing = _escalate(db, session, decision, question, reply, latency)
+            return reply, None, model, latency, False, routing
         prompt += (f"\n\n## rappel\nProposition refusée : {', '.join(errors)}. "
                    + ("Ne propose rien : pose la question à l'utilisateur." if missing else "Corrige-la ou n'en fais pas."))
     if missing:
         # Le modèle a encore proposé une action incomplète : c'est le code qui pose la question (fiche de l'action).
         return "Avant de te proposer quoi que ce soit, j'ai besoin de savoir : " + " ; ".join(missing) + ".", None, \
-            "local_executor", latency, False
-    return reply + "\n\n(Je n'ai pas réussi à formuler l'action correctement : reformule ta demande.)", None, "local_executor", latency, False
+            "local_executor", latency, False, None
+    return reply + "\n\n(Je n'ai pas réussi à formuler l'action correctement : reformule ta demande.)", None, \
+        "local_executor", latency, False, None
+
+
+def _escalate(db: Session, session: ChatSession, decision, question: str | None, reply: str,
+              latency: int) -> tuple[str, str, int, dict]:
+    """Escalade invisible d'une réponse sans proposition : le rôle choisi répond à la question anonyme ; la
+    décision est toujours journalisée, même slot éteint (mode ombre) ou en échec (la réponse locale reste)."""
+    routing = {**decision.log(), "escalated": False}
+    if not decision.escalates:
+        return reply, "local_executor", latency, routing
+    if not question or not question.strip():
+        return reply, "local_executor", latency, {**routing, "skipped": "no_expert_question"}
+    if not escalation.live(db):
+        return reply, "local_executor", latency, {**routing, "skipped": "slot_off"}
+    try:
+        expert = escalation.ask_expert(db, decision, question, related_entity_type="chat_session",
+                                       related_entity_id=session.id)
+    except cloud.CloudError as exc:
+        return reply, "local_executor", latency, {**routing, "skipped": "cloud_error", "error": str(exc)[:200]}
+    answer = str(expert.output.get("answer_fr") or "").strip()
+    if not answer:
+        return reply, "local_executor", latency, {**routing, "skipped": "empty_answer"}
+    return answer, expert.model[:48], latency + expert.latency_ms, {**routing, "escalated": True,
+                                                                     "model": expert.model}
 
 
 def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) -> tuple[list[str], list[str]]:

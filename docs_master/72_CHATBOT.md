@@ -73,6 +73,24 @@ model never ships the raw identified dossier to the cloud; it reformulates into 
 generic case. See doc 52 §9A (access-regime principle) and doc 37 for the same logic
 applied to the OCR service.
 
+### 3.3 Implementation (CODED 2026-10-21, migration 0125)
+
+`backend/app/services/ai/escalation.py`. Every local answer (chatbot and Weekly Review conductor) carries a
+self-assessment: the seven doc 30 §5.2 criteria (0-10), a confidence (0-1), a domain, and an optional
+`expert_question` written by the local model, generic and anonymous (no name, place, exact date, amount or
+identifier; a last-resort scrub also removes e-mails, long numbers and links). The CODE computes the /200 score
+(doc 30 §5.3), reads the bands (`ai.routing_thresholds`), applies doc 30 §5.8 (confidence < 0.65 → one tier up;
+consequences ≥ 8 and ambiguity ≥ 7 → at least the first cloud tier; health, finance or legal with an expert
+question → at least the first cloud tier; consequences ≥ 9 and sensitivity ≥ 8 → the domain specialist or deep
+reasoning) and routes health and finance to their specialist. A score ≥ 180 goes to deep reasoning; the
+independent re-check of §5.6 step 1 is not wired yet. Action proposals and agent switches always stay local.
+
+When the decision leaves the local model and the routed slot `nexus.escalation` is live (`ai.cloud_slot_modes`,
+seeded off), the chosen role answers the anonymous question in French, as Nexus, and that answer is the reply:
+the user never changes interlocutor. Slot off, quota or outage: the local reply stays. Every decision is logged
+on the message (`chat_messages.routing`: score, role, reasons, escalated or why not) and never shown on screen;
+in the Weekly Review it is in the conductor message payload (`routing`, `needs_bigger_model`).
+
 ---
 
 ## 4. Write Authority (3 levels, always under user validation)
