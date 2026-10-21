@@ -67,6 +67,10 @@ class FakeDb:
     def rollback(self) -> None:
         self.rolled_back = True
 
+    def execute(self, *args, **kwargs):
+        # Lecture d'un paramètre (get_parameter) : aucun n'est posé, les valeurs par défaut s'appliquent.
+        return SimpleNamespace(first=lambda: None)
+
     def refresh(self, obj) -> None:
         self._prepare(obj)
 
