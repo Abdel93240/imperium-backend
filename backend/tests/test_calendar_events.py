@@ -76,7 +76,7 @@ def _client(db: FakeDb, current_user: SimpleNamespace) -> TestClient:
 
 
 def _payload(**overrides) -> dict:
-    starts_at = datetime(2026, 6, 1, 9, 0, tzinfo=UTC)
+    starts_at = datetime(2030, 6, 1, 9, 0, tzinfo=UTC)
     payload = {
         "event_type": "event",
         "title": "Doctor appointment",
@@ -92,7 +92,7 @@ def _payload(**overrides) -> dict:
 
 def _calendar_event(user_id, **overrides) -> ImperiumCalendarEvent:
     now = datetime.now(UTC)
-    starts_at = datetime(2026, 6, 1, 9, 0, tzinfo=UTC)
+    starts_at = datetime(2030, 6, 1, 9, 0, tzinfo=UTC)
     event = ImperiumCalendarEvent(
         id=overrides.pop("id", uuid4()),
         user_id=user_id,
@@ -142,7 +142,7 @@ def test_create_calendar_event_requires_idempotency() -> None:
 
 
 def test_calendar_event_validation_invalid_dates() -> None:
-    starts_at = datetime(2026, 6, 1, 9, 0, tzinfo=UTC)
+    starts_at = datetime(2030, 6, 1, 9, 0, tzinfo=UTC)
     response = _client(FakeDb(), _user()).post(
         "/imperium/calendar/events",
         json=_payload(

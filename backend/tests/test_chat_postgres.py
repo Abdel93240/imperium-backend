@@ -424,3 +424,30 @@ def test_project_less_mission_from_the_chat(db, fake) -> None:
     caf = db.scalar(select(ImperiumMission).where(ImperiumMission.title == "Renvoyer le formulaire CAF",
                                                   ImperiumMission.user_id == user.id))
     assert caf.planned_start_at.astimezone(ZoneInfo("Europe/Paris")).date() == datetime.now(ZoneInfo("Europe/Paris")).date()
+
+
+def test_calendar_event_from_the_chat(db, fake) -> None:
+    from datetime import date as day_type
+    from datetime import timedelta as delta
+
+    from app.models.imperium import ImperiumCalendarEvent
+
+    _enable(db)
+    user = _user(db)
+    client = _client(db, user)
+    sid = _session(client)
+    tuesday = (datetime.now(ZoneInfo("Europe/Paris")).date() + delta(days=5)).isoformat()
+    fake.outputs.append({"reply_fr": "Je l'ajoute.", "proposal": {
+        "action": "add_event", "summary_fr": "Ajouter « Médecin »",
+        "params": {"title": "Médecin", "event_type": "event", "date": tuesday, "time": "15:00", "end_date": None,
+                   "end_time": None, "location": "Cabinet", "notes": None, "task": None, "prep_minutes": None,
+                   "urgency": "normal", "repeat": "none"}}})
+    turn = _say(client, sid, "J'ai le médecin mardi à 15 h")
+    assert "Calendrier, 7 prochains jours : rien" in fake.prompts[-1]
+    done = client.post(f"{P}/{sid}/proposals/{turn['proposal']['id']}/validate").json()
+    assert done["status"] == "validated"
+    event = db.scalar(select(ImperiumCalendarEvent).where(ImperiumCalendarEvent.user_id == user.id))
+    paris = event.starts_at.astimezone(ZoneInfo("Europe/Paris"))
+    assert (event.title, paris.date(), paris.hour, event.location, event.all_day) == (
+        "Médecin", day_type.fromisoformat(tuesday), 15, "Cabinet", False)
+    assert event.ends_at - event.starts_at == delta(hours=1)

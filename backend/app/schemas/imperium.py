@@ -826,6 +826,7 @@ class CalendarEventType(StrEnum):
     event = "event"
     deadline = "deadline"
     vacation = "vacation"
+    blocked_period = "blocked_period"
 
 
 class CalendarEventCreate(BaseModel):
@@ -838,6 +839,15 @@ class CalendarEventCreate(BaseModel):
     blocks_time: bool = True
     location: str | None = None
     notes: str | None = None
+    # Calendrier V1 (doc 51 §4-§8).
+    all_day: bool = False
+    urgency: Literal["low", "normal", "high", "critical"] = "normal"
+    task: str | None = Field(default=None, max_length=500)
+    prep_minutes: int | None = Field(default=None, ge=5, le=6000)
+    pause_vtc: bool = False
+    pause_pulse: bool = False
+    pause_path: bool = False
+    recurrence_rrule: str | None = Field(default=None, max_length=300)
 
     @field_validator("title")
     @classmethod
@@ -876,6 +886,18 @@ class CalendarEventRead(BaseModel):
     blocks_time: bool
     location: str | None
     notes: str | None
+    all_day: bool = False
+    urgency: str = "normal"
+    task: str | None = None
+    prep_minutes: int | None = None
+    pause_vtc: bool = False
+    pause_pulse: bool = False
+    pause_path: bool = False
+    recurrence_rrule: str | None = None
+    recurrence_text: str | None = None
+    status: str = "active"
+    prep_proposal: dict | None = None
+    prep_mission_id: UUID | None = None
     deleted_at: datetime | None = None
     deleted_by: str | None = None
     deletion_reason: str | None = None
@@ -883,6 +905,78 @@ class CalendarEventRead(BaseModel):
     updated_by: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class CalendarEventUpdate(BaseModel):
+    """Modification d'un événement : seuls les champs envoyés changent (un champ envoyé à null s'efface)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_type: CalendarEventType | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    blocks_time: bool | None = None
+    location: str | None = Field(default=None, max_length=300)
+    notes: str | None = Field(default=None, max_length=4000)
+    all_day: bool | None = None
+    urgency: Literal["low", "normal", "high", "critical"] | None = None
+    task: str | None = Field(default=None, max_length=500)
+    prep_minutes: int | None = Field(default=None, ge=5, le=6000)
+    pause_vtc: bool | None = None
+    pause_pulse: bool | None = None
+    pause_path: bool | None = None
+    recurrence_rrule: str | None = Field(default=None, max_length=300)
+    status: Literal["active", "cancelled", "completed"] | None = None
+
+
+class CalendarOccurrenceRead(BaseModel):
+    """Une occurrence à afficher (événement simple ou occurrence d'une série, sautée ou déplacée)."""
+
+    event_id: UUID
+    occurrence_at: datetime  # début prévu par la série (identifiant de l'occurrence)
+    starts_at: datetime
+    ends_at: datetime | None
+    moved: bool = False
+    title: str
+    event_type: str
+    all_day: bool
+    urgency: str
+    location: str | None
+    blocks_time: bool
+    recurring: bool
+    status: str
+
+
+class CalendarConflictCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    starts_at: datetime
+    ends_at: datetime | None = None
+    exclude_event_id: UUID | None = None
+
+
+class CalendarOccurrenceOverride(BaseModel):
+    """« Cette occurrence uniquement » : la sauter, ou la déplacer (doc 51 §7.2)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    occurrence_at: datetime
+    action: Literal["skip", "move"]
+    new_starts_at: datetime | None = None
+    new_ends_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def move_needs_a_date(self) -> "CalendarOccurrenceOverride":
+        if self.action == "move" and self.new_starts_at is None:
+            raise ValueError("new_starts_at is required to move an occurrence.")
+        return self
+
+
+class CalendarPrepDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    accept: bool
 
 
 class CalendarEventDeleteResponse(BaseModel):

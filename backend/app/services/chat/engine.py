@@ -25,7 +25,7 @@ n'empêche pas l'escalade de la réponse quand le modèle a écrit une question 
 Pas d'extraction d'apprentissages à la fermeture (§6) dans cette V1.
 """
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
@@ -37,16 +37,17 @@ from app.models.auth import User
 from app.models.chat import ChatMessage, ChatProposal, ChatSession
 from app.models.imperium import ImperiumMission, ImperiumProject
 from app.schemas.chat import ChatMessageRead, ChatProposalRead, ChatSessionCreate, ChatSessionRead, ChatTurnRead
+from app.schemas.imperium import CalendarEventCreate
 from app.schemas.operations import IntrinsicMissionCreate, ProjectCreate, ProjectMissionCreate, RoutineCreate
 from app.services.ai import cloud, escalation, local_executor
-from app.services.imperium import operations
+from app.services.imperium import calendar, calendar_recurrence, operations
 from app.services.imperium.decision_framework import get_canonical_priority_order
 from app.services.imperium.missions import get_current_active_mission
 from app.services.imperium.planning_days import get_current_planning_day
 from app.services.params import get_parameter
 
 SLOT = "chat.converse"
-ACTIONS = ("create_project", "add_project_mission", "create_mission", "create_routine")
+ACTIONS = ("create_project", "add_project_mission", "create_mission", "create_routine", "add_event")
 PARIS = ZoneInfo("Europe/Paris")
 WEEKDAYS_FR = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 HISTORY_MESSAGES = 12
@@ -56,11 +57,13 @@ DEGRADED_REPLY = ("Le moteur local est indisponible pour le moment : je ne peux 
                   "Réessaie dans un instant ; rien n'a été modifié.")
 
 DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+TIME_PATTERN = r"^\d{2}:\d{2}$"
 DEFAULT_REQUIREMENTS = {
     "create_project": {"required": [["title", "le nom du projet"], ["description", "le résultat que tu vises avec ce projet"], ["missions", "ses premières étapes (au moins une mission)"]],
                        "min_description_chars": 15, "min_missions": 1, "max_missions": 10},
     "add_project_mission": {"required": [["project_id", "le projet concerné"], ["title", "ce que la mission consiste à faire"]]},
     "create_mission": {"required": [["title", "ce qu'il faut faire"]]},
+    "add_event": {"required": [["title", "ce que c'est"], ["date", "le jour"]]},
     "create_routine": {"required": [["name", "le nom de la routine"], ["frequency", "sa fréquence (chaque jour, semaine, 2 semaines ou mois)"]]},
 }
 
@@ -68,8 +71,8 @@ DEFAULT_REQUIREMENTS = {
 DEFAULT_AGENTS = {
     "general": {"enabled": True, "label": "Général",
                 "role": "Tu es l'assistant général d'Imperium : tu aides l'utilisateur à créer des projets complets, à "
-                        "ajouter des missions à ses projets, à noter des missions hors projet (démarches, paperasse…) "
-                        "et à créer des routines.",
+                        "ajouter des missions à ses projets, à noter des missions hors projet (démarches, paperasse…), "
+                        "à créer des routines et à remplir son calendrier (rendez-vous, échéances, vacances).",
                 "actions": list(ACTIONS)},
 }
 CONTEXT_AGENT = {"project": "project", "mission": "mission"}  # contexte de session → agent ; le reste → Général
@@ -87,6 +90,12 @@ ACTION_HELP = {
                       "null ; demande l'échéance s'il n'en a donné aucune et ne l'invente pas ; domain "
                       "religious|business|finance|health seulement s'il est évident, sinon null",
     "create_routine": "créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high)",
+    "add_event": "ajouter un événement au calendrier : event_type event (rendez-vous qui bloque un créneau), "
+                 "deadline (échéance : date et heure limite, task = ce qu'il faut avoir fait, prep_minutes = temps "
+                 "estimé), vacation (vacances ou voyage, date et end_date), blocked_period (période où une activité "
+                 "est impossible) ; date et end_date au format AAAA-MM-JJ, time et end_time HH:MM (null = journée "
+                 "entière), tirés de ce qu'il dit avec la date du jour ; repeat none|daily|weekly|monthly|yearly "
+                 "(« tous les vendredis » = weekly le jour de date) ; rien dans le passé",
 }
 
 
@@ -167,6 +176,14 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
             "title": text, "domain": {"enum": ["religious", "business", "finance", "health", None]},
             "deadline": {"type": ["string", "null"], "pattern": DATE_PATTERN},
             "start_date": {"type": ["string", "null"], "pattern": DATE_PATTERN}, "estimated_minutes": minutes, "notes": notes}),
+        _variant("add_event", ["title", "event_type", "date", "time", "end_date", "end_time", "location", "notes",
+                               "task", "prep_minutes", "urgency", "repeat"], {
+            "title": text, "event_type": {"enum": ["event", "deadline", "vacation", "blocked_period"]},
+            "date": {"type": "string", "pattern": DATE_PATTERN}, "time": {"type": ["string", "null"], "pattern": TIME_PATTERN},
+            "end_date": {"type": ["string", "null"], "pattern": DATE_PATTERN},
+            "end_time": {"type": ["string", "null"], "pattern": TIME_PATTERN}, "location": notes, "notes": notes,
+            "task": notes, "prep_minutes": minutes, "urgency": {"enum": ["low", "normal", "high", "critical"]},
+            "repeat": {"enum": ["none", "daily", "weekly", "monthly", "yearly"]}}),
         _variant("create_routine", ["name", "frequency", "estimated_minutes", "priority", "notes"],
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
@@ -537,6 +554,8 @@ def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) ->
                                  estimated_minutes=params.get("estimated_minutes"))
         elif action == "create_mission":
             _intrinsic(params)
+        elif action == "add_event":
+            _event(params)
         elif action == "create_routine":
             RoutineCreate(name=params.get("name", ""), frequency=params.get("frequency", "daily"),
                           estimated_minutes=params.get("estimated_minutes"), priority=params.get("priority", "medium"),
@@ -568,6 +587,11 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
                                                  payload=ProjectMissionCreate(title=params["title"], notes=params.get("notes"),
                                                                               estimated_minutes=params.get("estimated_minutes")))
         return {"mission_id": str(mission.id), "title": mission.title}
+    if action == "add_event":
+        event, _duplicate = calendar.create_calendar_event(db, current_user=user, payload=_event(params),
+                                                           idempotency_key=key, request_method="POST",
+                                                           request_path="/api/imperium/chat/add_event")
+        return {"calendar_event_id": str(event.id), "title": event.title}
     if action == "create_mission":
         mission = operations.create_intrinsic_mission(db, current_user=user, idempotency_key=key, payload=_intrinsic(params))
         return {"mission_id": str(mission.id), "title": mission.title}
@@ -577,6 +601,38 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
             priority=params.get("priority", "medium"), notes=params.get("notes")))
         return {"routine_id": str(routine.id), "name": routine.name}
     raise ValueError(f"Unknown action {action}.")
+
+
+def _event(params: dict) -> CalendarEventCreate:
+    """Paramètres de la proposition → événement du calendrier ; sans heure, journée entière ; refuse le passé."""
+    day = date.fromisoformat(params["date"])
+    end_day = date.fromisoformat(params["end_date"]) if params.get("end_date") else None
+    kind = params.get("event_type") or "event"
+    clock = time.fromisoformat(params["time"]) if params.get("time") else None
+    if kind == "deadline":
+        starts = datetime.combine(day, clock or time(23, 59), tzinfo=PARIS)
+        ends = None
+    else:
+        starts = datetime.combine(day, clock or time.min, tzinfo=PARIS)
+        if params.get("end_time"):
+            ends = datetime.combine(end_day or day, time.fromisoformat(params["end_time"]), tzinfo=PARIS)
+        elif end_day or clock is None:
+            ends = datetime.combine(end_day or day, time(23, 59), tzinfo=PARIS)
+        else:
+            ends = starts + timedelta(hours=1)
+    repeat = params.get("repeat") or "none"
+    rrule = None if repeat == "none" else f"FREQ={repeat.upper()}" + (
+        f";BYDAY={calendar_recurrence.DAYS[day.weekday()]}" if repeat == "weekly" else "")
+    payload = CalendarEventCreate(
+        event_type=kind, title=str(params.get("title") or ""), starts_at=starts, ends_at=ends,
+        location=params.get("location"), notes=params.get("notes"), all_day=clock is None and kind != "deadline",
+        urgency=params.get("urgency") or "normal", task=params.get("task"), prep_minutes=params.get("prep_minutes"),
+        recurrence_rrule=rrule)
+    try:
+        calendar._validate(kind, starts, ends, payload.all_day, rrule)
+    except calendar.CalendarEventValidationError as exc:
+        raise ValueError(str(exc)) from exc
+    return payload
 
 
 def _intrinsic(params: dict) -> IntrinsicMissionCreate:
@@ -618,6 +674,11 @@ def _context(db: Session, user: User, session: ChatSession | None = None) -> tup
     lines.append("Missions hors projet à faire : " + (", ".join(
         m.title + (f" (échéance {m.deadline_at.astimezone(PARIS).date().isoformat()})" if m.deadline_at else "")
         for m in intrinsic[:10]) or "aucune"))
+    now = datetime.now(UTC)
+    upcoming = calendar.list_occurrences(db, current_user=user, starts_from=now, starts_to=now + timedelta(days=7))[:10]
+    lines.append("Calendrier, 7 prochains jours : " + (", ".join(
+        f"{o.title} ({o.starts_at.astimezone(PARIS):%a %d/%m}" + ("" if o.all_day else f" {o.starts_at.astimezone(PARIS):%H:%M}") + ")"
+        for o in upcoming) or "rien"))
     routines = operations.list_routines(db, current_user=user).routines
     lines.append("Routines : " + (", ".join(f"{r.name} ({r.frequency})" for r in routines if r.active) or "aucune"))
     order = [DOMAIN_LABELS.get(p.domain, p.domain) for p in get_canonical_priority_order(db, current_user=user)]

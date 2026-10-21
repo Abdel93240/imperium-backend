@@ -7,8 +7,8 @@ aucun appel réseau tant que `toolbox.travel_enabled` est faux (repli local marq
 proposée n'est jamais démarrée ici : l'utilisateur la démarre.
 
 Périmètre (G1) : missions `backlog` (ni annexe, ni engagement fixe) prévues ou échues au plus tard
-aujourd'hui (Paris), plus celles du plan courant dont `params.day` est aujourd'hui si le plan WR
-est servi. Pull-forward (`daily.pullforward_enabled`) : jour épuisé et temps restant ≥ seuil →
+aujourd'hui (Paris), la prochaine mission de chaque projet actif, plus celles du plan courant dont
+`params.day` est aujourd'hui si le plan WR est servi. Pull-forward (`daily.pullforward_enabled`) : jour épuisé et temps restant ≥ seuil →
 même pipeline sur le reste de la semaine (dates jusqu'à dimanche, plan : semaine courante). Sans
 engagement fixe, la journée n'a pas de fin d'horloge (les 24 h qui viennent). Engagements fixes : missions
 `is_fixed_commitment`, plus les événements calendrier `blocks_time` à venir si
@@ -36,7 +36,7 @@ from app.models.auth import User
 from app.models.daily import DailySelectionLog, MissionDependency
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.event import Event
-from app.models.imperium import ImperiumCalendarEvent, ImperiumMission, ImperiumMissionScore
+from app.models.imperium import ImperiumMission, ImperiumMissionScore
 from app.schemas.daily import DailyCurrentRead, NextMissionRead, QueueEntryRead, QueueRead, SelectionRead
 from app.services.daily import prayers
 from app.services.events.emitter import build_event
@@ -237,14 +237,17 @@ def next_commitment(db: Session, current_user: User, now: datetime,
     if mission is not None:
         anchors.append(FixedCommitment(kind="mission", ref=mission.id, at=mission.fixed_at))
     if calendar_commitments_enabled(db):
-        event = db.execute(
-            select(ImperiumCalendarEvent.id, ImperiumCalendarEvent.starts_at).where(
-                ImperiumCalendarEvent.user_id == current_user.id, ImperiumCalendarEvent.blocks_time.is_(True),
-                ImperiumCalendarEvent.deleted_at.is_(None), ImperiumCalendarEvent.starts_at > now,
-            ).order_by(ImperiumCalendarEvent.starts_at, ImperiumCalendarEvent.id).limit(1)
-        ).first()
-        if event is not None:
-            anchors.append(FixedCommitment(kind="calendar_event", ref=event.id, at=event.starts_at))
+        # Calendrier (doc 51) : séries dépliées et occurrences déplacées ; marge avant (trajet pas encore calculé).
+        from app.services.imperium import calendar
+
+        buffer = timedelta(minutes=int(get_parameter(db, "calendar.event_buffer_minutes", default=15)))
+        upcoming = [o for o in calendar.list_occurrences(db, current_user=current_user, starts_from=now,
+                                                         starts_to=now + timedelta(days=2), blocking_only=True)
+                    if o.starts_at > now]
+        if upcoming:
+            first = upcoming[0]
+            anchors.append(FixedCommitment(kind="calendar_event", ref=first.event_id,
+                                           at=max(now, first.starts_at - buffer)))
     if prayers.enabled(db):
         plan = prayers.next_prayer(db, user=current_user, now=now, origin=origin)
         if plan is not None:
@@ -318,6 +321,11 @@ def _pool(db: Session, current_user: User, *, today: date, scope: str) -> list[I
                                       ImperiumMission.status == "backlog", dated[0] | dated[1])
     ).all()
     missions = {mission.id: mission for mission in rows}
+    if scope == "day":
+        # Décision utilisateur 2026-10-22 : la prochaine mission de chaque projet actif entre dans la journée (le
+        # plan de la Weekly Review, quand il placera les journées, passera devant : ses missions sont datées).
+        for mission in _active_project_next(db, current_user):
+            missions.setdefault(mission.id, mission)
     for mission_id in _plan_mission_ids(db, current_user, today=today, scope=scope):
         if mission_id not in missions:
             mission = db.get(ImperiumMission, mission_id)
@@ -328,6 +336,23 @@ def _pool(db: Session, current_user: User, *, today: date, scope: str) -> list[I
         missions = {key: m for key, m in missions.items()
                     if not any(value is not None and value < end_of_today for value in (m.planned_start_at, m.deadline_at))}
     return sorted(missions.values(), key=lambda m: (m.created_at, str(m.id)))
+
+
+def _active_project_next(db: Session, current_user: User) -> list[ImperiumMission]:
+    """La première mission en attente (dans l'ordre du projet) de chacun des projets actifs."""
+    from app.services.imperium import operations
+
+    found = []
+    for project in operations.list_projects(db, current_user=current_user).projects:
+        if not project.active:
+            continue
+        waiting = sorted((m for m in project.missions if m.status == "backlog"),
+                         key=lambda m: (m.project_position is None, m.project_position or 0))
+        if waiting:
+            mission = db.get(ImperiumMission, waiting[0].id)
+            if mission is not None and mission.annex_of_mission_id is None and not mission.is_fixed_commitment:
+                found.append(mission)
+    return found
 
 
 def _plan_mission_ids(db: Session, current_user: User, *, today: date, scope: str) -> list[UUID]:

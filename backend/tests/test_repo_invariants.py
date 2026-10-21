@@ -1494,15 +1494,13 @@ def test_patch_7h_calendar_foundation_stays_minimal_and_backend_owned() -> None:
     assert 'get("/calendar/events"' in route_text.lower()
     assert 'delete("/calendar/events/{event_id}"' in route_text.lower()
 
+    # Calendrier V1 avancé à la demande de l'utilisateur (2026-10-22, doc 51) : récurrences permises ; toujours
+    # aucune synchronisation externe, notification ni mémoire vectorielle.
     for forbidden in (
-        "recurrence",
-        "rrule",
-        "repeat",
         "google",
         "apple",
         "sync_token",
         "notification",
-        "reminder",
         "ai_metadata",
         "ai_schedule",
         "embedding",
