@@ -600,6 +600,25 @@ TBD POST /api/pulse/workouts
 Headers: Idempotency-Key
 ```
 
+> CODÉ (2026-10-22, migration 20261022_0133, mode 1 « création », spec Pulse P3) — routes fermées tant que
+> `pulse.programs_enabled` est éteint :
+> - `POST /programs/requests` (Idempotency-Key) `{goal, level beginner|intermediate|advanced, days [MO…SU],
+>   session_minutes, preferred_time HH:MM, note?}` → `generating` + événement `pulse.program.requested` ; une seule
+>   demande en cours. Job `pulse.program_designer` : spécialiste santé (slot `pulse.program_design`), sinon modèle
+>   local (`pulse.program_design_local`), sinon `failed` avec la raison. Contexte : la demande, le matériel possédé,
+>   les douleurs en cours (lieu, intensité, gêne au sport), les règles médicales actives, les analyses hors norme.
+> - Écart assumé à la spec P3 : pas de catalogue d'exercices validé (jamais semé) ; le spécialiste compose les
+>   exercices à partir du matériel (§13.1), le code relit tout : jours demandés, une séance par jour, durée ≤ celle
+>   demandée, groupes musculaires connus, matériel possédé (ou poids du corps, noms ramenés à ceux de
+>   l'utilisateur), répétitions OU durée, repos 0–300 s, séries par groupe et par semaine ≤
+>   `pulse.max_weekly_sets_group` (25). Invalide → un nouvel essai avec les erreurs, puis échec.
+> - `GET /programs/requests/latest` → `{request}` (en cours, proposée ou échouée, sinon null) ;
+>   `POST …/{id}/accept` : le programme remplace l'actif (ses séances futures non faites sont retirées), cibles
+>   hebdomadaires = séries prévues par groupe (calculées par le code), séances créées pour toutes les semaines à
+>   partir de maintenant, à l'heure demandée, avec `rest_seconds` par exercice (l'appli l'utilise pour le repos) ;
+>   `POST …/{id}/reject`.
+> - Pas encore : révision mensuelle (mode 3, P7), adaptation quotidienne par le cerveau (P1 reste au menu des coups).
+
 ### 13.2 Log Workout (PUL-06)
 
 ```text

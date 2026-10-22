@@ -25,6 +25,7 @@ class ExerciseIn(BaseModel):
     weight_kg: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("1000"), max_digits=6, decimal_places=2)
     notes: str | None = Field(default=None, max_length=500)
     muscle_group: str | None = Field(default=None, min_length=1, max_length=40)  # compte le volume du programme
+    rest_seconds: int | None = Field(default=None, ge=0, le=600)  # repos entre séries prévu par le programme
 
     _strip_name = field_validator("name", mode="before")(_strip)
 
