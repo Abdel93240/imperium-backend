@@ -179,6 +179,17 @@ class EquipmentCreate(BaseModel):
     _strip_name = field_validator("name", mode="before")(_strip)
 
 
+class EquipmentUpdate(BaseModel):
+    """Modifier le nom ou la note d'un matériel (réglages de l'appli Pulse)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=120)
+    notes: str | None = Field(default=None, max_length=300)
+
+    _strip_name = field_validator("name", mode="before")(_strip)
+
+
 class EquipmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

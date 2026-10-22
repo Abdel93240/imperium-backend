@@ -13,6 +13,7 @@ class HydrationLogCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     amount_ml: int = Field(gt=0, le=5000, strict=True)
+    drink: str | None = Field(default=None, max_length=80)  # absent : de l'eau ; sinon « Autre » en texte libre
     logged_at: datetime | None = None  # absent : maintenant ; une heure passée est acceptée (saisie après coup)
     source: Literal["quick", "manual", "chatbot"] = "quick"
     decrement_stock: bool = True
@@ -23,6 +24,7 @@ class HydrationLogRead(BaseModel):
 
     id: UUID
     amount_ml: int
+    drink: str | None = None
     logged_at: datetime
     source: str
     stock_decrement_applied: bool

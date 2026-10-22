@@ -58,10 +58,13 @@ def log_hydration(
     if blocked := fasting.hydration_blocked(db, current_user, logged_at):
         raise HydrationFastingError(blocked)
     log = PulseHydrationLog(
-        user_id=current_user.id, amount_ml=payload.amount_ml, logged_at=logged_at,
+        user_id=current_user.id, amount_ml=payload.amount_ml, drink=(payload.drink or "").strip() or None, logged_at=logged_at,
         source=payload.source, idempotency_key=idempotency_key, request_hash=fingerprint,
     )
-    touched, warnings = _decrement_water(db, current_user, payload.amount_ml) if payload.decrement_stock else ([], [])
+    # une autre boisson ne décompte jamais l'eau du stock
+    touched, warnings = (
+        _decrement_water(db, current_user, payload.amount_ml) if payload.decrement_stock and log.drink is None else ([], [])
+    )
     log.stock_decrement_applied = bool(touched)
     db.add(log)
     db.flush()

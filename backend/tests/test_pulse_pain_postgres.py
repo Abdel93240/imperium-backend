@@ -169,3 +169,12 @@ def test_dashboard_shows_open_pain_without_details(db) -> None:
     _log(client, severity=3)
     banners = {b["kind"]: b for b in client.get(f"{P}/dashboard", params={"day": "2026-10-17"}).json()["banners"]}
     assert banners["pain_open"] == {"kind": "pain_open", "level": "warning", "message": "2 douleurs en cours, dont 1 forte."}
+
+
+def test_free_text_location_without_a_zone(db) -> None:
+    client = _client(db, _user(db))
+    _consent(client)
+    response = client.post(PAIN, headers=_key(), json={"location": "  Bas du dos, côté droit ", "severity": 3})
+    assert response.status_code == 201, response.text
+    assert (response.json()["body_zone"], response.json()["location"]) == ("other", "Bas du dos, côté droit")
+    assert client.get(PAIN).json()["items"][0]["location"] == "Bas du dos, côté droit"

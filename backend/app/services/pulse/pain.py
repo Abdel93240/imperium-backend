@@ -57,7 +57,8 @@ def create_log(db: Session, *, current_user: User, payload: PainLogCreate, idemp
         if workout is None or workout.user_id != current_user.id:
             raise PainLogNotFoundError("Workout not found.")
     log = PulsePainLog(
-        user_id=current_user.id, body_zone=payload.body_zone, side=payload.side, severity=payload.severity,
+        user_id=current_user.id, body_zone=payload.body_zone,
+        location=(payload.location or "").strip() or None, side=payload.side, severity=payload.severity,
         pain_type=(payload.pain_type or "").strip() or None, limitation_notes=(payload.limitation_notes or "").strip() or None,
         workout_impact=payload.workout_impact, workout_id=payload.workout_id, noted_at=payload.noted_at or datetime.now(UTC),
         idempotency_key=idempotency_key, request_hash=fingerprint,

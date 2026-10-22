@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.deps import CurrentUserDep, SessionDep
-from app.schemas.pulse_workouts import EquipmentCreate, EquipmentListResponse, EquipmentRead
+from app.schemas.pulse_workouts import EquipmentCreate, EquipmentListResponse, EquipmentRead, EquipmentUpdate
 from app.services.pulse import equipment
 
 router = APIRouter()
@@ -26,6 +26,19 @@ def add_equipment_route(
     if existing:
         response.status_code = status.HTTP_200_OK
     return read
+
+
+@router.patch("/equipment/{equipment_id}", response_model=EquipmentRead)
+def update_equipment_route(
+    equipment_id: UUID, payload: EquipmentUpdate, current_user: CurrentUserDep, db: SessionDep
+) -> EquipmentRead:
+    """Renommer ou changer la note ; nom déjà pris → 409."""
+    try:
+        return equipment.update_equipment(db, current_user=current_user, equipment_id=equipment_id, payload=payload)
+    except equipment.EquipmentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except equipment.EquipmentNameTakenError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.delete("/equipment/{equipment_id}", response_model=EquipmentRead)

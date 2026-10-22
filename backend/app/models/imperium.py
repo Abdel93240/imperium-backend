@@ -1405,6 +1405,7 @@ class PulseHydrationLog(UUIDPrimaryKeyMixin, Base):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     amount_ml: Mapped[int] = mapped_column(Integer, nullable=False)
+    drink: Mapped[str | None] = mapped_column(Text, nullable=True)  # null : de l'eau ; sinon la boisson en texte libre
     logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source: Mapped[str] = mapped_column(Text, nullable=False)
     stock_decrement_applied: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
@@ -1560,6 +1561,7 @@ class PulsePainLog(UUIDPrimaryKeyMixin, Base):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     body_zone: Mapped[str] = mapped_column(Text, nullable=False)
+    location: Mapped[str | None] = mapped_column(Text, nullable=True)  # « Où ressens-tu la gêne ? » en texte libre
     side: Mapped[str | None] = mapped_column(Text, nullable=True)
     severity: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     pain_type: Mapped[str | None] = mapped_column(Text, nullable=True)
