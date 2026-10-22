@@ -771,11 +771,18 @@ Navigation :
 >   séances de la semaine, détail, déroulé local (brouillon gardé sur l'appareil, résultats envoyés
 >   en un bloc à la fin), santé (valeurs sourcées, inconnu = tiret), douleurs, relevés, accords
 >   demandés au moment du parcours, matériel, connexion, autorisations, bulle.
-> - Indisponible et affiché comme tel (pas de route inventée) : plan de diète, recettes,
->   préparation → portions, liste de courses calculée (lot B côté serveur) ; programme
->   d'entraînement et signaux calculés tant que `pulse.programs_enabled` / `pulse.board_enabled`
->   sont éteints (409 `…_DISABLED` lu comme « pas encore activé ») ; Nourrir l'IA s'ouvre dans
->   Imperium (même boîte, même serveur).
+> - Diète (2026-10-22, appli 0.19.0-diet, serveur doc 40 §10 CODÉ) : Repas montre le prévu du jour,
+>   la semaine proposée par le cerveau (Valider / Refuser, consigne facultative à la demande) et
+>   les préparations ; Préparer (P05 : ingrédients comparés au stock, étapes, conditionnement et
+>   conservation, Démarrer → manque = attention requise) ; Terminer (P06 : portions et poids
+>   préremplis, une seule mutation) ; Courses (P08 : liste calculée par le serveur, cocher ne
+>   crédite rien, les lignes cochées passent dans Enregistrer les achats) ; J'ai mangé propose
+>   d'abord le repas prévu et prend sa portion préparée dans le stock. Imperium affiche la bannière
+>   « Attention requise : préparation bloquée » (`GET /imperium/pulse/diet/attention`) qui ouvre
+>   Nexus. Tant que `pulse.diet_enabled` est éteint, ces blocs disent « pas encore activée ».
+> - Programme d'entraînement et signaux calculés indisponibles tant que `pulse.programs_enabled` /
+>   `pulse.board_enabled` sont éteints (409 `…_DISABLED` lu comme « pas encore activé ») ; Nourrir
+>   l'IA s'ouvre dans Imperium (même boîte, même serveur).
 > - Pas encore : file d'actions hors ligne (aujourd'hui : clé d'idempotence stable par fenêtre,
 >   saisie gardée en cas d'échec), dictée vocale.
 
