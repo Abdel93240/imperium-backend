@@ -84,7 +84,8 @@ SWITCH_HELP = {
 ACTION_HELP = {
     "create_project": "créer un projet complet, avec ses premières missions",
     "add_project_mission": "ajouter une mission à un projet existant (project_id = son repère dans le contexte, par exemple P1)",
-    "create_mission": "créer une mission hors projet, ponctuelle (démarche, paperasse, rendez-vous, course…) ; "
+    "create_mission": "créer une mission hors projet, ponctuelle (démarche, paperasse, course…), sans heure limite "
+                      "précise (sinon c'est une échéance du calendrier : add_event deadline) ; "
                       "deadline = échéance et start_date = jour à partir duquel s'y mettre, au format AAAA-MM-JJ, "
                       "tirés de ce qu'il dit (« avant vendredi », « jeudi ») avec la date du jour du contexte, sinon "
                       "null ; demande l'échéance s'il n'en a donné aucune et ne l'invente pas ; domain "
@@ -94,8 +95,10 @@ ACTION_HELP = {
                  "deadline (échéance : date et heure limite, task = ce qu'il faut avoir fait, prep_minutes = temps "
                  "estimé), vacation (vacances ou voyage, date et end_date), blocked_period (période où une activité "
                  "est impossible) ; date et end_date au format AAAA-MM-JJ, time et end_time HH:MM (null = journée "
-                 "entière), tirés de ce qu'il dit avec la date du jour ; repeat none|daily|weekly|monthly|yearly "
-                 "(« tous les vendredis » = weekly le jour de date) ; rien dans le passé",
+                 "entière), tirés de ce qu'il dit avec la date du jour ; repeat none|daily|weekly|monthly|yearly ; "
+                 "weekdays = les jours d'une répétition hebdomadaire (« tous les vendredis » = [\"FR\"], sinon []) ; "
+                 "une échéance (« avant le … », « à rendre le … ») est un add_event deadline, pas une mission ; rien "
+                 "dans le passé",
 }
 
 
@@ -177,13 +180,14 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
             "deadline": {"type": ["string", "null"], "pattern": DATE_PATTERN},
             "start_date": {"type": ["string", "null"], "pattern": DATE_PATTERN}, "estimated_minutes": minutes, "notes": notes}),
         _variant("add_event", ["title", "event_type", "date", "time", "end_date", "end_time", "location", "notes",
-                               "task", "prep_minutes", "urgency", "repeat"], {
+                               "task", "prep_minutes", "urgency", "repeat", "weekdays"], {
             "title": text, "event_type": {"enum": ["event", "deadline", "vacation", "blocked_period"]},
             "date": {"type": "string", "pattern": DATE_PATTERN}, "time": {"type": ["string", "null"], "pattern": TIME_PATTERN},
             "end_date": {"type": ["string", "null"], "pattern": DATE_PATTERN},
             "end_time": {"type": ["string", "null"], "pattern": TIME_PATTERN}, "location": notes, "notes": notes,
             "task": notes, "prep_minutes": minutes, "urgency": {"enum": ["low", "normal", "high", "critical"]},
-            "repeat": {"enum": ["none", "daily", "weekly", "monthly", "yearly"]}}),
+            "repeat": {"enum": ["none", "daily", "weekly", "monthly", "yearly"]},
+            "weekdays": {"type": "array", "items": {"enum": list(calendar_recurrence.DAYS)}, "maxItems": 7}}),
         _variant("create_routine", ["name", "frequency", "estimated_minutes", "priority", "notes"],
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
@@ -607,6 +611,11 @@ def _event(params: dict) -> CalendarEventCreate:
     """Paramètres de la proposition → événement du calendrier ; sans heure, journée entière ; refuse le passé."""
     day = date.fromisoformat(params["date"])
     end_day = date.fromisoformat(params["end_date"]) if params.get("end_date") else None
+    repeat = params.get("repeat") or "none"
+    weekdays = [d for d in (params.get("weekdays") or []) if d in calendar_recurrence.DAYS] if repeat == "weekly" else []
+    if weekdays:  # la première occurrence tombe sur un des jours demandés (le modèle se trompe parfois de date)
+        shift = min((calendar_recurrence.DAYS.index(d) - day.weekday()) % 7 for d in weekdays)
+        day, end_day = day + timedelta(days=shift), (end_day + timedelta(days=shift) if end_day else None)
     kind = params.get("event_type") or "event"
     clock = time.fromisoformat(params["time"]) if params.get("time") else None
     if kind == "deadline":
@@ -620,9 +629,9 @@ def _event(params: dict) -> CalendarEventCreate:
             ends = datetime.combine(end_day or day, time(23, 59), tzinfo=PARIS)
         else:
             ends = starts + timedelta(hours=1)
-    repeat = params.get("repeat") or "none"
     rrule = None if repeat == "none" else f"FREQ={repeat.upper()}" + (
-        f";BYDAY={calendar_recurrence.DAYS[day.weekday()]}" if repeat == "weekly" else "")
+        ";BYDAY=" + ",".join(sorted(weekdays or [calendar_recurrence.DAYS[day.weekday()]], key=calendar_recurrence.DAYS.index))
+        if repeat == "weekly" else "")
     payload = CalendarEventCreate(
         event_type=kind, title=str(params.get("title") or ""), starts_at=starts, ends_at=ends,
         location=params.get("location"), notes=params.get("notes"), all_day=clock is None and kind != "deadline",
