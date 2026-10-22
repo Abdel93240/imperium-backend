@@ -50,7 +50,8 @@ CLOUD_TIERS = frozenset({"cloud_forced", "routed"})
 SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_reasoning",
               "wr.report_revision": "first_cloud_tier", "nexus.escalation": "first_cloud_tier",
               "calendar.deadline_plan": "first_cloud_tier", "pulse.diet_weekly_program": "health_specialist",
-              "pulse.lab_results_extract": "health_specialist", "pulse.program_design": "health_specialist"}
+              "pulse.lab_results_extract": "health_specialist", "pulse.program_design": "health_specialist",
+              "pulse.lab_rules": "health_specialist"}
 # Slots dont le rôle est choisi à chaque appel par le score /200 (doc 30 §5.6) : le rôle de SLOT_ROLES est le défaut.
 ROUTED_SLOTS = frozenset({"nexus.escalation"})
 MODEL_TIERS = {"first_cloud_tier": "cloud_cheap", "high_reasoning": "cloud_premium",

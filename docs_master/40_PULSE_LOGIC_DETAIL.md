@@ -433,6 +433,12 @@ Cross-module links:
 >   fenêtre, destination `recipe`, source `inbox`). Les apports par portion ne sont jamais devinés.
 > - Missions Imperium « Faire les courses » (avant la première préparation) et « Cuisiner : … » (par jour)
 >   créées à la validation si `pulse.diet_missions_enabled`.
+> - CODÉ (2026-10-22, bloc 2, migration 0136) : fenêtre glissante de 7 jours à partir du jour demandé (plus de
+>   semaine lundi → dimanche) ; un plan validé remplace ceux dont la fenêtre chevauche la sienne. Job
+>   `pulse.daily_cycle` (6 h de Paris, semé éteint) : le jour de la Weekly Review (`pulse.diet_auto_weekday`, mardi —
+>   décision utilisateur) il demande 7 jours de repas à partir d'aujourd'hui (la semaine de mardi couvre le lundi
+>   suivant) et dépose dans le docket de la revue (domaine pulse) les courses jamais achetées sur au moins deux
+>   semaines (question) et les séances du programme suivies à moins de 60 % sur 7 jours (anomalie).
 
 ---
 
@@ -731,6 +737,13 @@ blocks (user decides).
 ### 13-REVISION. Global monthly revision (Mode 3)
 
 ```text
+> CODÉ (2026-10-22, bloc 2, migration 0136) : `pulse.daily_cycle` crée une demande `kind = revision` quand le
+> programme actif a `pulse.program_revision_days` (28) jours : réglages de la demande d'origine, objectifs classés
+> et bilan réel calculé par le code (séances passées, faites, sautées et leurs raisons, effort ressenti moyen) ; même
+> relecture et même validation que la création. Le spécialiste donne aussi, avec chaque programme, la fourchette
+> d'eau personnalisée (`pulse_programs.hydration_target` : min, bien, très bien) que `hydration-logs` et le tableau du
+> jour renvoient comme `target` (§12) ; vide tant qu'aucun programme ne la donne.
+
 Independently of daily adaptation, the health specialist returns AUTOMATICALLY every ~4 weeks
 (monthly) for a deep review:
   - progression (muscle, level), are sessions actually being followed?

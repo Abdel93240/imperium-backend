@@ -98,7 +98,7 @@ class RecipeListRead(BaseModel):
 
 
 class PlanRequest(BaseModel):
-    """Demande au cerveau la semaine du `week_start` (lundi ; défaut : semaine en cours) ; consigne facultative."""
+    """Demande au cerveau 7 jours à partir de `week_start` (défaut : aujourd'hui) ; consigne facultative."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -175,7 +175,7 @@ class PlanRead(BaseModel):
 
 
 class WeekRead(BaseModel):
-    """Semaine (lundi → dimanche) : plan validé et, à côté, la dernière demande pas encore tranchée."""
+    """Fenêtre de 7 jours autour du jour demandé : plan validé et la dernière demande pas encore tranchée."""
 
     week_start: date
     active: PlanRead | None

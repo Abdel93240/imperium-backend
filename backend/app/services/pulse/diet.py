@@ -275,8 +275,9 @@ def archive_recipe(db: Session, *, current_user: User, recipe_id: UUID) -> None:
 
 def request_plan(db: Session, *, current_user: User, payload: PlanRequest, idempotency_key: str
                  ) -> tuple[PlanRead, bool]:
-    """Demande au cerveau la semaine ; le job `pulse.diet_planner` dépose la proposition."""
-    week = week_start_of(payload.week_start or today())
+    """Demande au cerveau 7 jours à partir de `week_start` (défaut : aujourd'hui) ; le job `pulse.diet_planner`
+    dépose la proposition. Fenêtre glissante : la semaine préparée le mardi (Weekly Review) va jusqu'au lundi."""
+    week = payload.week_start or today()
     fingerprint = food_stock.request_hash("pulse.diet.plan", {"week_start": week.isoformat(), "note": payload.note})
     existing = db.scalar(select(PulseDietPlan).where(PulseDietPlan.user_id == current_user.id,
                                                      PulseDietPlan.idempotency_key == idempotency_key))
@@ -287,7 +288,6 @@ def request_plan(db: Session, *, current_user: User, payload: PlanRequest, idemp
     if week + timedelta(days=6) < today():
         raise DietStateError("This week is over.")
     running = db.scalar(select(PulseDietPlan).where(PulseDietPlan.user_id == current_user.id,
-                                                    PulseDietPlan.week_start == week,
                                                     PulseDietPlan.status == "generating"))
     if running is not None:
         raise DietStateError("A plan is already being prepared for this week.")
@@ -308,15 +308,17 @@ def request_plan(db: Session, *, current_user: User, payload: PlanRequest, idemp
 
 
 def week(db: Session, *, current_user: User, day: date) -> WeekRead:
-    start = week_start_of(day)
+    """Plan validé qui couvre ce jour (fenêtre de 7 jours) et dernière demande pas encore tranchée qui le touche."""
     plans = list(db.scalars(select(PulseDietPlan).where(
-        PulseDietPlan.user_id == current_user.id, PulseDietPlan.week_start == start,
+        PulseDietPlan.user_id == current_user.id, PulseDietPlan.week_start > day - timedelta(days=7),
+        PulseDietPlan.week_start <= day + timedelta(days=6),
         PulseDietPlan.status.in_(("active", "generating", "proposed", "failed"))).order_by(PulseDietPlan.created_at)))
-    active = next((plan for plan in plans if plan.status == "active"), None)
+    covering = [plan for plan in plans if plan.status == "active" and plan.week_start <= day]
+    active = max(covering, key=lambda plan: plan.activated_at or plan.created_at) if covering else None
     pending = [plan for plan in plans if plan.status != "active"
                and (active is None or plan.created_at > (active.activated_at or active.created_at))]
     shopping = shopping_list(db, current_user=current_user)
-    return WeekRead(week_start=start, active=plan_read(db, active) if active else None,
+    return WeekRead(week_start=active.week_start if active else day, active=plan_read(db, active) if active else None,
                     pending=plan_read(db, pending[-1]) if pending else None, shopping_open=len(shopping.items))
 
 
@@ -332,12 +334,15 @@ def activate_plan(db: Session, *, current_user: User, plan_id: UUID) -> PlanRead
     if plan.status != "proposed":
         raise DietStateError("Only a proposed plan can be validated.")
     now = datetime.now(UTC)
-    previous = db.scalar(select(PulseDietPlan).where(PulseDietPlan.user_id == current_user.id,
-                                                     PulseDietPlan.week_start == plan.week_start,
-                                                     PulseDietPlan.status == "active").with_for_update())
-    if previous is not None:
-        _retire(db, previous)
-        db.flush()
+    # Plans validés dont la fenêtre chevauche la nouvelle : remplacés (préparations restantes annulées).
+    overlapping = list(db.scalars(select(PulseDietPlan).where(
+        PulseDietPlan.user_id == current_user.id, PulseDietPlan.status == "active",
+        PulseDietPlan.week_start > plan.week_start - timedelta(days=7),
+        PulseDietPlan.week_start <= plan.week_start + timedelta(days=6)).with_for_update()))
+    previous = overlapping[0] if overlapping else None
+    for old in overlapping:
+        _retire(db, old)
+    db.flush()
     plan.status, plan.activated_at = "active", now
     for recipe in db.scalars(select(PulseRecipe).where(PulseRecipe.plan_id == plan.id, PulseRecipe.status == "proposed")):
         recipe.status = "active"
@@ -419,10 +424,10 @@ def _create_missions(db: Session, user: User, plan: PulseDietPlan, *, shopping: 
 # --- Courses --------------------------------------------------------------------------------------------------
 
 def _active_plans(db: Session, user: User) -> list[PulseDietPlan]:
-    """Plans validés dont la semaine n'est pas finie, la plus ancienne d'abord (elle se sert la première)."""
+    """Plans validés dont la fenêtre n'est pas finie, le plus ancien d'abord (il se sert le premier)."""
     return list(db.scalars(select(PulseDietPlan).where(
         PulseDietPlan.user_id == user.id, PulseDietPlan.status == "active",
-        PulseDietPlan.week_start >= week_start_of(today())).order_by(PulseDietPlan.week_start)))
+        PulseDietPlan.week_start > today() - timedelta(days=7)).order_by(PulseDietPlan.week_start)))
 
 
 def _plan_needs(db: Session, plan_id: UUID) -> list[Need]:

@@ -24,7 +24,7 @@ from app.schemas.pulse import FoodStockItemRead
 from app.schemas.pulse_hydration import HydrationDayRead, HydrationLogCreate, HydrationLogRead, HydrationLogResult
 from app.services.events.emitter import build_event
 from app.services.path import fasting
-from app.services.pulse import food_stock
+from app.services.pulse import food_stock, training
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.meals import convert
 from app.services.pulse.pantry_scan import normalize_name
@@ -109,9 +109,11 @@ def day_view(db: Session, *, current_user: User, day: date) -> HydrationDayRead:
             .order_by(PulseHydrationLog.logged_at.asc())
         )
     )
+    program = training.active_program(db, user_id=current_user.id)
+    target = program.hydration_target if program is not None else None  # fixée par le spécialiste santé (doc 40 §12)
     return HydrationDayRead(
         day=day, total_ml=sum(log.amount_ml for log in logs), logs=[HydrationLogRead.model_validate(log) for log in logs],
-        target=None, target_message=NO_TARGET,
+        target=target, target_message=None if target else NO_TARGET,
     )
 
 

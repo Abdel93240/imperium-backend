@@ -57,7 +57,10 @@ SYSTEM = (
     "douleurs et règles médicales signalées déconseillent. muscle_group parmi la liste fournie, ou null pour le "
     "cardio et la mobilité. Le programme sert les objectifs de l'utilisateur dans l'ordre de priorité qu'il a fixé "
     "(le premier pèse le plus) ; rationale_fr dit comment chaque objectif est servi. Pas de diagnostic ni de "
-    "promesse de résultat. Réponds en français, en tutoyant, "
+    "promesse de résultat. Donne aussi une fourchette d'eau quotidienne personnalisée (hydration : min, bien, très "
+    "bien en ml, avec la raison) selon l'objectif, l'activité et les longues heures au volant, ou null si tu ne peux "
+    "pas l'établir. En révision, pars du bilan fourni (suivi réel, séances sautées) : garde ce qui marche, ajuste le "
+    "reste, change de phase seulement si c'est justifié. Réponds en français, en tutoyant, "
     "uniquement selon le schéma JSON."
 )
 
@@ -166,6 +169,7 @@ def accept(db: Session, *, current_user: User, request_id: UUID, now: datetime |
                 continue
             db.add(_workout(current_user.id, program.id, session, planned, f"program:{program.id}:{day}:{index}"))
             created += 1
+    program.hydration_target = design.hydration.model_dump() if design.hydration else None
     row.status, row.program_id = "accepted", program.id
     training.emit_program(db, program, "pulse.program.created", source="design", request_id=str(row.id),
                           workouts=created)
@@ -194,6 +198,53 @@ def weekly_sets(design: ProgramDesign) -> dict[str, int]:
             if exercise.muscle_group:
                 totals[exercise.muscle_group] = totals.get(exercise.muscle_group, 0) + exercise.sets
     return dict(sorted(totals.items()))
+
+
+# --- Révision toutes les 4 semaines (doc 40 §13-REVISION, spec P7) ------------------------------------------------
+
+def revision_due(db: Session, user: User, now: datetime) -> PulseProgram | None:
+    """Programme actif arrivé à `pulse.program_revision_days` depuis sa création, sans demande en cours."""
+    program = training.active_program(db, user_id=user.id)
+    if program is None:
+        return None
+    days = int(get_parameter(db, "pulse.program_revision_days", default=28))
+    if now - program.created_at < timedelta(days=days):
+        return None
+    if db.scalar(select(PulseProgramRequest.id).where(PulseProgramRequest.user_id == user.id,
+                                                      PulseProgramRequest.status.in_(("generating", "proposed")))):
+        return None
+    return program
+
+
+def request_revision(db: Session, user: User, now: datetime) -> PulseProgramRequest | None:
+    """Demande de révision : réglages de la dernière demande acceptée + bilan réel du programme (code, pas modèle)."""
+    program = revision_due(db, user, now)
+    if program is None:
+        return None
+    source = db.scalar(select(PulseProgramRequest).where(PulseProgramRequest.program_id == program.id))
+    if source is None:  # programme saisi à la main : rien à réviser automatiquement
+        return None
+    workouts = list(db.scalars(select(PulseWorkout).where(PulseWorkout.program_id == program.id,
+                                                          PulseWorkout.planned_at <= now)))
+    done = [w for w in workouts if w.status == "completed"]
+    skipped = [w for w in workouts if w.status == "skipped"]
+    efforts = [w.intensity_score for w in done if w.intensity_score]
+    summary = (f"Programme « {program.name} », phase {program.mesocycle.get('phase')}, semaine "
+               f"{program.mesocycle.get('week_current')} sur {program.mesocycle.get('weeks_total')}. "
+               f"Séances passées : {len(workouts)}, faites : {len(done)}, sautées : {len(skipped)}"
+               + (f" (raisons : {', '.join(sorted({w.skip_reason for w in skipped if w.skip_reason})[:6])})" if skipped else "")
+               + (f". Effort ressenti moyen : {sum(efforts) / len(efforts):.1f}/10" if efforts else "") + ".")
+    inputs = {key: source.inputs.get(key) for key in ("goal", "level", "days", "session_minutes", "preferred_time", "note")}
+    inputs = {**inputs, "goals": goals.ranked_lines(db, user), "revision": summary}
+    row = PulseProgramRequest(user_id=user.id, status="generating", kind="revision", inputs=inputs,
+                              idempotency_key=f"revision:{program.id}:{now.date().isoformat()}",
+                              request_hash=food_stock.request_hash("pulse.program.revision", inputs))
+    db.add(row)
+    db.flush()
+    db.add(build_event(db, user_id=user.id, event_type=REQUESTED, payload={"request_id": str(row.id), "kind": "revision"},
+                       idempotency_key=f"{REQUESTED}.{row.id}", source_app=SourceApp.pulse, privacy_level=PrivacyLevel.high))
+    db.flush()
+    return row
 
 
 # --- Job -------------------------------------------------------------------------------------------------------
@@ -270,6 +321,7 @@ def build_prompt(db: Session, user: User, inputs: dict, owned: list[str]) -> str
         f"## Règles médicales actives\n{rules}\n\n## Analyses de sang hors norme du labo\n{blood}\n\n"
         f"Plafond : {max_sets(db)} séries par groupe musculaire et par semaine. Une séance au plus par jour, "
         "seulement les jours disponibles."
+        + (f"\n\n## Révision du programme en cours\n{inputs['revision']}" if inputs.get("revision") else "")
     )
 
 
@@ -293,10 +345,16 @@ def output_schema(days: list[str]) -> dict:
                        "exercises": {"type": "array", "minItems": 1, "maxItems": 12, "items": exercise}}}
     text = {"type": "string"}
     return {"type": "object", "additionalProperties": False,
-            "required": ["name", "phase", "weeks_total", "progression_fr", "recovery_fr", "rationale_fr", "sessions"],
+            "required": ["name", "phase", "weeks_total", "progression_fr", "recovery_fr", "rationale_fr", "sessions",
+                         "hydration"],
             "properties": {"name": text, "phase": text, "weeks_total": {"type": "integer"}, "progression_fr": text,
                            "recovery_fr": text, "rationale_fr": text,
-                           "sessions": {"type": "array", "minItems": 1, "maxItems": 7, "items": session}}}
+                           "sessions": {"type": "array", "minItems": 1, "maxItems": 7, "items": session},
+                           "hydration": {"anyOf": [{"type": "null"}, {
+                               "type": "object", "additionalProperties": False,
+                               "required": ["min_ml", "good_ml", "very_good_ml", "rationale_fr"],
+                               "properties": {"min_ml": {"type": "integer"}, "good_ml": {"type": "integer"},
+                                              "very_good_ml": {"type": "integer"}, "rationale_fr": text}}]}}}
 
 
 def max_sets(db: Session) -> int:
@@ -341,7 +399,7 @@ def check(db: Session, output: dict | None, inputs: dict, owned: list[str]) -> t
 
 def read(row: PulseProgramRequest) -> ProgramRequestRead:
     design = ProgramDesign(**row.design) if row.design else None
-    return ProgramRequestRead(id=row.id, status=row.status, inputs=row.inputs, design=design,
+    return ProgramRequestRead(id=row.id, status=row.status, kind=row.kind, inputs=row.inputs, design=design,
                               weekly_sets=weekly_sets(design) if design else {}, rationale_fr=row.rationale_fr,
                               error=row.error, program_id=row.program_id, created_at=row.created_at)
 

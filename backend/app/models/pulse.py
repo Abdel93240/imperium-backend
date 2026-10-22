@@ -212,6 +212,7 @@ class PulseProgram(UUIDPrimaryKeyMixin, Base):
     mesocycle: Mapped[dict] = mapped_column(JSONB, nullable=False)
     doctrine_sheet_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False)
+    hydration_target: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # min / bien / très bien (ml), 0136
     created_by_run: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("pulse_procedure_runs.id", ondelete="SET NULL"), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
@@ -416,6 +417,7 @@ class PulseProgramRequest(UUIDPrimaryKeyMixin, Base):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default="create")  # create | revision (0136)
     inputs: Mapped[dict] = mapped_column(JSONB, nullable=False)
     design: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     rationale_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
