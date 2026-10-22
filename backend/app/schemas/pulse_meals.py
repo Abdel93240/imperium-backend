@@ -29,6 +29,7 @@ class MealDraftCreate(MealMacrosIn):
 
     description: str = Field(min_length=1, max_length=2000)
     source: Literal["text", "voice", "manual", "chatbot"] = "text"
+    plan_meal_id: UUID | None = None  # repas prévu par la diète : marqué mangé à la validation
 
     @field_validator("description")
     @classmethod
@@ -87,6 +88,7 @@ class MealRead(BaseModel):
     macros_estimated: bool = False  # macros proposées par l'estimation de la photo, à vérifier
     confidence: float | None = None
     stock_items: list[FoodStockItemRead] = Field(default_factory=list)
+    plan_meal_id: UUID | None = None
     confirmed_at: datetime | None
     created_at: datetime
 

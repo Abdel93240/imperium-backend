@@ -249,7 +249,7 @@ def test_frontend_architecture_widgets_tablet_and_offline_strategy_are_canonical
         "Mission en cours",
         "Ajouter une transaction",
         "Raccourci Path",
-        "Raccourci Pulse",
+        "panneau de cinq actions (kit Pulse 2026-10-22)",
         "Raccourci Vector",
         "SYSTEM_ALERT_WINDOW",
         "pas de succès local",

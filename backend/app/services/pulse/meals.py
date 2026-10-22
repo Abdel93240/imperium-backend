@@ -34,7 +34,7 @@ from app.schemas.pulse_meals import (
 )
 from app.services.events.emitter import build_event
 from app.services.path import fasting
-from app.services.pulse import food_stock
+from app.services.pulse import diet, food_stock
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.pantry_scan import match_stock, normalize_name
 from app.services.pulse.stock_declaration import DeclaredLine, parse_declaration
@@ -95,9 +95,11 @@ def create_draft(
     eaten_at = payload.eaten_at or datetime.now(UTC)
     if fasting_warning := fasting.meal_warning(db, current_user, eaten_at):
         warnings.insert(0, fasting_warning)
+    if payload.plan_meal_id is not None:
+        diet.check_plan_meal(db, current_user, payload.plan_meal_id)
     meal = PulseMeal(
         user_id=current_user.id, status="draft", label=payload.label or payload.description[:120],
-        description=payload.description, source=payload.source, eaten_at=eaten_at,
+        description=payload.description, source=payload.source, eaten_at=eaten_at, plan_meal_id=payload.plan_meal_id,
         **macros, proposal=[line.model_dump(mode="json") for line in lines], warnings=warnings[:20],
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )
@@ -170,6 +172,8 @@ def confirm_meal(
         db.refresh(item)
     meal.status = "confirmed"
     meal.confirmed_at = datetime.now(UTC)
+    if meal.plan_meal_id is not None:
+        diet.mark_eaten(db, current_user, meal.plan_meal_id, meal.id)
     meal.stock_decrement_applied = bool(touched)
     meal.result = {"stock_items": [FoodStockItemRead.model_validate(item).model_dump(mode="json") for item in touched]}
     meal.confirm_idempotency_key, meal.confirm_request_hash = idempotency_key, fingerprint
@@ -282,5 +286,5 @@ def _read(meal: PulseMeal) -> MealRead:
         stock_decrement_applied=meal.stock_decrement_applied, macros_estimated=meal.macros_estimated,
         confidence=float(meal.confidence) if meal.confidence is not None else None,
         stock_items=[FoodStockItemRead.model_validate(item) for item in (meal.result or {}).get("stock_items", [])],
-        confirmed_at=meal.confirmed_at, created_at=meal.created_at,
+        plan_meal_id=meal.plan_meal_id, confirmed_at=meal.confirmed_at, created_at=meal.created_at,
     )

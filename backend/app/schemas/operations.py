@@ -151,7 +151,7 @@ class IntrinsicMissionCreate(_Strict):
     deadline_at: datetime | None = None
     planned_start_at: datetime | None = None
     estimated_minutes: int | None = Field(default=None, ge=1, le=1440)
-    source: Literal["manual", "chatbot"] = "manual"
+    source: Literal["manual", "chatbot", "pulse"] = "manual"
 
     @field_validator("title")
     @classmethod

@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.pulse_meals import MealConfirmRequest, MealDayRead, MealDraftCreate, MealRead
-from app.services.pulse import meal_photo, meals
+from app.services.pulse import diet, meal_photo, meals
 from app.services.pulse.expiry import paris_today
 
 router = APIRouter()
@@ -47,6 +47,9 @@ def create_meal_draft_route(
     except meals.MealIdempotencyConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except diet.DietNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     if duplicate:
         response.status_code = status.HTTP_200_OK
     return read

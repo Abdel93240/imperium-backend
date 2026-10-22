@@ -1290,9 +1290,10 @@ class FoodStockItem(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("quantity > 0", name="quantity_positive"),
         CheckConstraint("unit IN ('piece', 'kg', 'g', 'l', 'cl', 'ml')", name="unit_check"),
         CheckConstraint("expiry_type IN ('DLC', 'DDM', 'unknown')", name="expiry_type_check"),
-        CheckConstraint("source IN ('manual', 'vault_receipt', 'pantry_scan', 'chatbot')", name="source_check"),
+        CheckConstraint("source IN ('manual', 'vault_receipt', 'pantry_scan', 'chatbot', 'preparation')", name="source_check"),
         CheckConstraint("status IN ('active', 'consumed', 'removed')", name="status_check"),
         CheckConstraint("version >= 1", name="version_positive"),
+        CheckConstraint("kind IN ('raw', 'prepared')", name="kind_check"),
         Index("food_stock_items_user_status_idx", "user_id", "status"),
         Index("food_stock_items_user_source_ref_idx", "user_id", "source_ref", unique=True,
               postgresql_where=text("source_ref IS NOT NULL")),
@@ -1310,6 +1311,14 @@ class FoodStockItem(UUIDPrimaryKeyMixin, Base):
     source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
+    # Portions cuisinées (diète, migration 0131) : `prepared`, une pièce = une portion, apports par portion.
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default="raw", server_default=text("'raw'"))
+    recipe_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_recipes.id"), nullable=True)
+    portion_weight_g: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    calories: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    protein_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    carbs_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    fat_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -1381,6 +1390,8 @@ class PulseMeal(UUIDPrimaryKeyMixin, Base):
     confidence: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
     macros_estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     photo_sha256: Mapped[str | None] = mapped_column(Text, nullable=True)  # la photo n'est jamais conservée
+    plan_meal_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_diet_plan_meals.id"),
+                                                       nullable=True)  # repas prévu par la diète (0131)
     idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
     request_hash: Mapped[str] = mapped_column(Text, nullable=False)
     confirm_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
