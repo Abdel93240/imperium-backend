@@ -213,6 +213,14 @@ def validate_item(db: Session, *, current_user: User, item_id: UUID, payload: In
             labs.store_from_inbox(db, current_user=current_user, item=item, final=item.extraction_final)
         except ValueError as exc:
             raise InboxStateError(str(exc)) from exc
+    if payload.destination == "recipe":
+        from app.services.pulse import recipe_intake  # recette → catalogue de Pulse
+
+        try:
+            recipe_intake.store_from_inbox(db, current_user=current_user, item=item, final=item.extraction_final)
+        except ValueError as exc:
+            raise InboxStateError(str(exc)) from exc
+        item = _get(db, current_user=current_user, item_id=item_id)
     item.status = "validated"
     item.validated_at = datetime.now(UTC)
     _emit(db, current_user.id, "inbox.document.validated", item, {"destination": payload.destination})

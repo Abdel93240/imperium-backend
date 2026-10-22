@@ -74,6 +74,14 @@ SWAP_TYPES = ("technique", "mobility", "cardio")
 SWAP_LOAD = 3
 
 
+class AdaptationUnavailableError(RuntimeError):
+    """Adaptation demandée par l'utilisateur impossible maintenant (fonction ou modèle local éteints)."""
+
+
+ADAPT_REASONS = {"fatigue": "fatigue déclarée", "pain": "douleur ou gêne déclarée", "short_time": "peu de temps aujourd'hui",
+                 "other": "l'utilisateur veut alléger ou déplacer"}
+
+
 class RealSlotNotCodedError(RuntimeError):
     pass
 
@@ -126,6 +134,30 @@ def queue_from_dispatch(db: Session, *, dispatch: PulseDispatchLog, named: list[
         runs.append(run)
     db.flush()
     return runs
+
+
+def adapt_now(db: Session, *, current_user: User, workout_id: UUID, reason: str,
+              now: datetime | None = None) -> tuple[ProposalRead | None, str]:
+    """« Adapter à mon état » (trigger pre_session, demandé par l'utilisateur) : P1 tout de suite sur cette séance.
+    Jamais en essai à blanc : sans modèle local branché, rien n'est proposé (message clair). (proposition, raison)."""
+    now = now or datetime.now(UTC)
+    procedure = db.scalar(select(PulseProcedure).where(PulseProcedure.code == P1, PulseProcedure.active.is_(True)))
+    if not proposals_enabled(db) or procedure is None:
+        raise AdaptationUnavailableError("L'adaptation des séances n'est pas encore activée sur le serveur.")
+    if local_executor.slot_mode(db, ai_slots.CHOOSE_MOVE_SLOT) != "live":
+        raise AdaptationUnavailableError("Le modèle local qui adapte les séances n'est pas branché.")
+    run = PulseProcedureRun(id=uuid4(), user_id=current_user.id, procedure_id=procedure.id,
+                            procedure_version=procedure.version, inputs={"workout_id": str(workout_id), "urgency": "now",
+                                                                       "trigger": "pre_session", "reason": reason},
+                            dry_run=False, status="running", steps_log=[], created_at=now, started_at=now)
+    db.add(run)
+    db.flush()
+    _run_p1(db, run, current_user, now)
+    proposal = db.scalar(select(PulseProposal).where(PulseProposal.procedure_run_id == run.id))
+    read = ProposalRead.model_validate(proposal) if proposal is not None else None
+    outcome = "proposed" if read else (run.result or {}).get("reason", "aborted")
+    db.commit()
+    return read, outcome
 
 
 def run_queued(db: Session, *, now: datetime | None = None, limit: int = 20) -> RunnerStats:
@@ -244,7 +276,9 @@ def _choose_move(db: Session, run: PulseProcedureRun, workout: PulseWorkout, men
         board = ai_slots.board_lines(snapshot.board) if snapshot is not None else ""
     legal = [move for move in menu if move["legal"]]
     menu_text = "\n".join(f"{move['code']} — options : {move['options'] or 'aucun paramètre'}" for move in legal)
-    user_prompt = ai_slots.assemble(session=session, board=board, menu=menu_text)
+    reason = ADAPT_REASONS.get(run.inputs.get("reason") or "")  # code choisi dans une liste, jamais du texte libre
+    user_prompt = ai_slots.assemble(session=session, board=board, constraints=f"demande : {reason}" if reason else "",
+                                    menu=menu_text)
     return ai_slots.run_slot(slot_code=ai_slots.CHOOSE_MOVE_SLOT, mode=mode, system=ai_slots.CHOOSE_MOVE_SYSTEM,
                              user=user_prompt, schema=ai_slots.move_schema([move["code"] for move in legal]),
                              validate=lambda out: validate_choice(_normalized(out), menu), related_id=run.id)

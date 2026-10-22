@@ -39,15 +39,17 @@ from app.models.imperium import ImperiumMission, ImperiumProject
 from app.schemas.chat import ChatMessageRead, ChatProposalRead, ChatSessionCreate, ChatSessionRead, ChatTurnRead
 from app.schemas.imperium import CalendarEventCreate
 from app.schemas.operations import IntrinsicMissionCreate, ProjectCreate, ProjectMissionCreate, RoutineCreate
+from app.schemas.pulse_diet import RecipeCreate
 from app.services.ai import cloud, escalation, local_executor
 from app.services.imperium import calendar, calendar_recurrence, operations
 from app.services.imperium.decision_framework import get_canonical_priority_order
 from app.services.imperium.missions import get_current_active_mission
 from app.services.imperium.planning_days import get_current_planning_day
+from app.services.pulse import diet
 from app.services.params import get_parameter
 
 SLOT = "chat.converse"
-ACTIONS = ("create_project", "add_project_mission", "create_mission", "create_routine", "add_event")
+ACTIONS = ("create_project", "add_project_mission", "create_mission", "create_routine", "add_event", "add_recipe")
 PARIS = ZoneInfo("Europe/Paris")
 WEEKDAYS_FR = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 HISTORY_MESSAGES = 12
@@ -65,6 +67,8 @@ DEFAULT_REQUIREMENTS = {
     "create_mission": {"required": [["title", "ce qu'il faut faire"]]},
     "add_event": {"required": [["title", "ce que c'est"], ["date", "le jour"]]},
     "create_routine": {"required": [["name", "le nom de la routine"], ["frequency", "sa fréquence (chaque jour, semaine, 2 semaines ou mois)"]]},
+    "add_recipe": {"required": [["title", "le nom de la recette"], ["servings", "pour combien de portions"],
+                                ["ingredients", "les ingrédients avec leurs quantités"], ["steps", "les étapes"]]},
 }
 
 
@@ -72,7 +76,8 @@ DEFAULT_AGENTS = {
     "general": {"enabled": True, "label": "Général",
                 "role": "Tu es l'assistant général d'Imperium : tu aides l'utilisateur à créer des projets complets, à "
                         "ajouter des missions à ses projets, à noter des missions hors projet (démarches, paperasse…), "
-                        "à créer des routines et à remplir son calendrier (rendez-vous, échéances, vacances).",
+                        "à créer des routines, à remplir son calendrier (rendez-vous, échéances, vacances) et à ajouter "
+                        "des recettes au catalogue de Pulse.",
                 "actions": list(ACTIONS)},
 }
 CONTEXT_AGENT = {"project": "project", "mission": "mission"}  # contexte de session → agent ; le reste → Général
@@ -91,6 +96,12 @@ ACTION_HELP = {
                       "null ; demande l'échéance s'il n'en a donné aucune et ne l'invente pas ; domain "
                       "religious|business|finance|health seulement s'il est évident, sinon null",
     "create_routine": "créer une routine (frequency daily|weekly|biweekly|monthly, priority low|medium|high)",
+    "add_recipe": "ajouter une recette au catalogue de Pulse (le cerveau s'en sert pour les semaines de diète) : "
+                  "title, servings = nombre de portions, ingredients = [{name, quantity, unit g|kg|ml|cl|l|piece}] "
+                  "pour ce nombre de portions, steps = étapes simples, packaging = conditionnement et conservation "
+                  "(bocaux, stérilisation, refroidissement) s'il les donne, sinon [], shelf_life_days = durée de "
+                  "conservation en jours s'il la donne, sinon null ; recopie ce qu'il dicte ou colle, n'invente aucune "
+                  "quantité",
     "add_event": "ajouter un événement au calendrier : event_type event (rendez-vous qui bloque un créneau), "
                  "deadline (échéance : date et heure limite, task = ce qu'il faut avoir fait, prep_minutes = temps "
                  "estimé), vacation (vacances ou voyage, date et end_date), blocked_period (période où une activité "
@@ -188,6 +199,14 @@ def output_schema(aliases: list[str], actions: list[str] | tuple[str, ...] = ACT
             "task": notes, "prep_minutes": minutes, "urgency": {"enum": ["low", "normal", "high", "critical"]},
             "repeat": {"enum": ["none", "daily", "weekly", "monthly", "yearly"]},
             "weekdays": {"type": "array", "items": {"enum": list(calendar_recurrence.DAYS)}, "maxItems": 7}}),
+        _variant("add_recipe", ["title", "servings", "ingredients", "steps", "packaging", "shelf_life_days"], {
+            "title": text, "servings": {"type": "integer"},
+            "ingredients": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                                       "required": ["name", "quantity", "unit"],
+                                                       "properties": {"name": text, "quantity": {"type": "number"},
+                                                                      "unit": {"enum": ["g", "kg", "ml", "cl", "l", "piece"]}}}},
+            "steps": {"type": "array", "items": text}, "packaging": {"type": "array", "items": text},
+            "shelf_life_days": {"type": ["integer", "null"]}}),
         _variant("create_routine", ["name", "frequency", "estimated_minutes", "priority", "notes"],
                  {"name": text, "frequency": {"enum": ["daily", "weekly", "biweekly", "monthly"]}, "estimated_minutes": minutes,
                   "priority": {"enum": ["low", "medium", "high"]}, "notes": notes}),
@@ -560,6 +579,8 @@ def _check(proposal: dict, projects: set[str], sheets: dict, allowed=ACTIONS) ->
             _intrinsic(params)
         elif action == "add_event":
             _event(params)
+        elif action == "add_recipe":
+            _recipe(params)
         elif action == "create_routine":
             RoutineCreate(name=params.get("name", ""), frequency=params.get("frequency", "daily"),
                           estimated_minutes=params.get("estimated_minutes"), priority=params.get("priority", "medium"),
@@ -596,6 +617,10 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
                                                            idempotency_key=key, request_method="POST",
                                                            request_path="/api/imperium/chat/add_event")
         return {"calendar_event_id": str(event.id), "title": event.title}
+    if action == "add_recipe":
+        recipe, _replayed = diet.create_recipe(db, current_user=user, payload=_recipe(params), idempotency_key=key,
+                                               source="chatbot")
+        return {"recipe_id": str(recipe.id), "title": recipe.title}
     if action == "create_mission":
         mission = operations.create_intrinsic_mission(db, current_user=user, idempotency_key=key, payload=_intrinsic(params))
         return {"mission_id": str(mission.id), "title": mission.title}
@@ -605,6 +630,14 @@ def _execute(db: Session, user: User, action: str, params: dict, key: str) -> di
             priority=params.get("priority", "medium"), notes=params.get("notes")))
         return {"routine_id": str(routine.id), "name": routine.name}
     raise ValueError(f"Unknown action {action}.")
+
+
+def _recipe(params: dict) -> RecipeCreate:
+    """Paramètres de la proposition → recette du catalogue Pulse (apports par portion inconnus : jamais devinés)."""
+    return RecipeCreate(title=params.get("title") or "", servings=params.get("servings") or 0,
+                        ingredients=params.get("ingredients") or [], steps=params.get("steps") or [],
+                        packaging=[p for p in params.get("packaging") or [] if str(p).strip()],
+                        shelf_life_days=params.get("shelf_life_days"))
 
 
 def _event(params: dict) -> CalendarEventCreate:

@@ -30,6 +30,7 @@ class MealDraftCreate(MealMacrosIn):
     description: str = Field(min_length=1, max_length=2000)
     source: Literal["text", "voice", "manual", "chatbot"] = "text"
     plan_meal_id: UUID | None = None  # repas prévu par la diète : marqué mangé à la validation
+    estimate: bool = False  # « Autre » : apports estimés par le serveur depuis la description, marqués estimation
 
     @field_validator("description")
     @classmethod
