@@ -20,7 +20,8 @@ from app.db.base import Base, UUIDPrimaryKeyMixin
 class RidesSession(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "rides_sessions"
     __table_args__ = (
-        CheckConstraint("status IN ('active', 'completed')", name="status_check"),
+        CheckConstraint("status IN ('active', 'paused', 'completed')", name="status_check"),
+        CheckConstraint("(status = 'paused') = (paused_at IS NOT NULL)", name="paused_has_time"),
         CheckConstraint("target_ca_cents IS NULL OR target_ca_cents BETWEEN 1 AND 10000000", name="target_range"),
         CheckConstraint("status <> 'completed' OR ended_at IS NOT NULL", name="completed_has_end"),
         CheckConstraint("version >= 1", name="version_positive"),
@@ -33,6 +34,8 @@ class RidesSession(UUIDPrimaryKeyMixin, Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default="active")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # pause en cours (0137)
+    paused_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")  # pauses finies
     target_ca_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     strategic_direction: Mapped[str | None] = mapped_column(Text, nullable=True)
     mission_id: Mapped[UUID | None] = mapped_column(

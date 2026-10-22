@@ -154,7 +154,7 @@ def record_outcome(
         raise OfferVersionConflictError(RideOfferRead.model_validate(offer))
     if offer.decision != "accepted":
         raise OfferStateError("Seule une course acceptée a un résultat.")
-    if payload.record_revenue and db.get(RidesSession, offer.session_id).status != "active":
+    if payload.record_revenue and db.get(RidesSession, offer.session_id).status not in ("active", "paused"):
         raise OfferStateError("Session close : enregistre le résultat avec record_revenue à false, le revenu est déjà au Vault.")
     mobilized = payload.approach_minutes + payload.wait_minutes + payload.ride_minutes + payload.return_minutes
     offer.actual_earning_cents, offer.mobilized_minutes = payload.actual_earning_cents, mobilized

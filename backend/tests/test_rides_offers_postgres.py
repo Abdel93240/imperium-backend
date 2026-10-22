@@ -183,3 +183,42 @@ def test_future_offer_is_refused(db) -> None:
                             payload=RideOfferCreate(price_cents=1000, offered_at=datetime.now(PARIS) + timedelta(hours=1)),
                             idempotency_key=uuid4().hex)
     assert client.get(f"{BASE}/offers/{uuid4()}").status_code == 404
+
+
+def test_pause_resume_and_ride_counters(db) -> None:
+    """Kit Vector : pause/reprise (durée active hors pauses), courses faites = résultat réel, refusées = décision."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.services.vector import sessions as session_service
+
+    user = _user(db)
+    client = _client(db, user)
+    session = _session(client)
+    sid = session["id"]
+    accepted, refused, pending = (_offer(client, sid) for _ in range(3))
+    client.post(f"{BASE}/offers/{accepted['id']}/decision", json={"version": 1, "decision": "accepted"})
+    client.post(f"{BASE}/offers/{accepted['id']}/outcome", json={"version": 2, "actual_earning_cents": 1500,
+                                                                  "approach_minutes": 5, "ride_minutes": 20})
+    client.post(f"{BASE}/offers/{refused['id']}/decision", json={"version": 1, "decision": "refused"})
+    client.post(f"{BASE}/offers/{pending['id']}/decision", json={"version": 1, "decision": "accepted"})  # pas encore réalisée
+    kpis = client.get(f"{BASE}/sessions/current").json()["session"]["kpis"]
+    assert (kpis["rides_done"], kpis["rides_refused"], kpis["revenue_cents"]) == (1, 1, 1500)
+
+    start = datetime.now(UTC)
+    paused = session_service.pause_session(db, current_user=user, session_id=sid, now=start)
+    assert paused.status == "paused" and paused.paused_at is not None
+    assert session_service.pause_session(db, current_user=user, session_id=sid, now=start + timedelta(minutes=1)).paused_at == paused.paused_at
+    assert client.get(f"{BASE}/sessions/current").json()["session"]["status"] == "paused"
+    assert client.post(f"{BASE}/sessions/{sid}/offers", headers=_key(), json={"platform": "uber", "price_cents": 1000,
+                                                                              "ride_type": "immediate"}).status_code == 409
+    resumed = session_service.resume_session(db, current_user=user, session_id=sid, now=start + timedelta(minutes=30))
+    assert resumed.status == "active"
+    again = session_service.pause_session(db, current_user=user, session_id=sid, now=start + timedelta(minutes=40))
+    done = session_service.complete_session(
+        db, current_user=user, session_id=sid, payload=session_service.SessionComplete(), idempotency_key="end",
+        request_path="/end", now=start + timedelta(minutes=50))
+    assert again.status == "paused" and done.status == "completed" and done.paused_at is None
+    # 30 min + 10 min de pause retirées de la durée active.
+    assert done.kpis.elapsed_minutes - done.kpis.active_minutes == 40
+    assert client.post(f"{BASE}/sessions/{sid}/pause").status_code == 409
+    assert client.post(f"{BASE}/sessions", headers=_key(), json={}).status_code == 201  # plus de session ouverte
