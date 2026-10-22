@@ -109,6 +109,7 @@ from app.services.imperium.calendar import (
     CalendarEventNotFoundError,
     CalendarEventValidationError,
     create_calendar_event,
+    read as calendar_read,
     delete_calendar_event,
     list_calendar_events,
 )
@@ -473,6 +474,9 @@ def create_calendar_event_route(
     except CalendarEventIdempotencyConflictError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except CalendarEventValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -503,7 +507,7 @@ def list_calendar_events_route(
         )
     except CalendarEventValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    return [CalendarEventRead.model_validate(event) for event in events]
+    return [calendar_read(event) for event in events]
 
 
 @router.delete("/calendar/events/{event_id}", response_model=CalendarEventDeleteResponse)

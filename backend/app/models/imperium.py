@@ -486,7 +486,7 @@ class ImperiumCalendarEvent(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_calendar_events"
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('event', 'deadline', 'vacation')",
+            "event_type IN ('event', 'deadline', 'vacation', 'blocked_period')",
             name="imperium_calendar_events_event_type_check",
         ),
         CheckConstraint(
@@ -505,6 +505,20 @@ class ImperiumCalendarEvent(UUIDPrimaryKeyMixin, Base):
     blocks_time: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
     location: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Calendrier V1 (doc 51, migration 0129).
+    all_day: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    urgency: Mapped[str] = mapped_column(Text, nullable=False, default="normal", server_default=text("'normal'"))
+    task: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prep_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pause_vtc: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    pause_pulse: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    pause_path: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    recurrence_rrule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active", server_default=text("'active'"))
+    prep_proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    prep_mission_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_missions.id", ondelete="SET NULL"), nullable=True)
+    last_urgent_on: Mapped[date | None] = mapped_column(Date(), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by: Mapped[str | None] = mapped_column(Text, nullable=True)
     deletion_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -522,6 +536,26 @@ class ImperiumCalendarEvent(UUIDPrimaryKeyMixin, Base):
         nullable=False,
     )
 
+
+
+class ImperiumCalendarOverride(UUIDPrimaryKeyMixin, Base):
+    """Une occurrence d'un événement récurrent sautée ou déplacée (doc 51 §7.2) ; la série ne change pas."""
+
+    __tablename__ = "imperium_calendar_overrides"
+    __table_args__ = (
+        CheckConstraint("override_type IN ('skip', 'move')", name="calendar_override_type_check"),
+        CheckConstraint("override_type = 'skip' OR new_starts_at IS NOT NULL", name="calendar_override_move_check"),
+        UniqueConstraint("event_id", "occurrence_at", name="calendar_override_occurrence_unique"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("imperium_calendar_events.id", ondelete="CASCADE"), nullable=False)
+    occurrence_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    override_type: Mapped[str] = mapped_column(Text, nullable=False)
+    new_starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    new_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class ImperiumMissionScore(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "imperium_mission_scores"
