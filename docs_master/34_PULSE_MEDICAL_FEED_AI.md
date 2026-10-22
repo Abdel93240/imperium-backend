@@ -644,7 +644,11 @@ un envoi propre à Pulse ; Santé affiche ensuite les dernières valeurs mesuré
   `POST /lab-results` (saisie à la main, Idempotency-Key), `DELETE /lab-results/{id}`.
 - Diète (doc 40 §10.6) : les dernières valeurs hors de la norme du labo entrent dans le contexte du planificateur,
   avec la consigne d'orienter les aliments sans diagnostic ni promesse.
-- Pas encore : règles médicales tirées automatiquement d'un compte rendu (§9), alerte sur une valeur critique.
+- Règles proposées (bloc 2, 2026-10-22, migration 0136) : le job `pulse.daily_cycle` relit chaque prise de sang
+  validée qui a des valeurs hors norme du labo et fait proposer au plus 5 règles prudentes (spécialiste santé, slot
+  `pulse.lab_rules`, sinon modèle local `pulse.lab_rules_local`) : statut `proposed`, citation de la valeur, jamais
+  actives sans les trois confirmations du §10.1 (accusé pour une règle critique) ; l'appli les montre dans Santé.
+  Sans cerveau branché, la prise de sang attend. Pas encore : alerte immédiate sur une valeur critique.
 
 ## 17. Out Of Scope V1
 

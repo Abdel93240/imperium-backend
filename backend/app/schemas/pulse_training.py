@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Mesocycle(BaseModel):
@@ -148,6 +148,23 @@ class DesignSession(BaseModel):
     exercises: list[DesignExercise] = Field(min_length=1, max_length=12)
 
 
+class HydrationTarget(BaseModel):
+    """Fourchette d'eau quotidienne personnalisée (doc 40 §12) : min < bien < très bien, en ml."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_ml: int = Field(ge=1000, le=6000)
+    good_ml: int = Field(ge=1000, le=6000)
+    very_good_ml: int = Field(ge=1000, le=6000)
+    rationale_fr: str = Field(min_length=1, max_length=300)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "HydrationTarget":
+        if not self.min_ml < self.good_ml < self.very_good_ml:
+            raise ValueError("min_ml < good_ml < very_good_ml")
+        return self
+
+
 class ProgramDesign(BaseModel):
     """Sortie du cerveau relue par le code ; les cibles hebdomadaires se calculent depuis les séances."""
 
@@ -160,11 +177,13 @@ class ProgramDesign(BaseModel):
     recovery_fr: str = Field(min_length=1, max_length=400)
     rationale_fr: str = Field(min_length=1, max_length=600)
     sessions: list[DesignSession] = Field(min_length=1, max_length=7)
+    hydration: HydrationTarget | None = None
 
 
 class ProgramRequestRead(BaseModel):
     id: UUID
     status: str
+    kind: str = "create"  # revision : révision toutes les 4 semaines
     inputs: dict
     design: ProgramDesign | None
     weekly_sets: dict[str, int]

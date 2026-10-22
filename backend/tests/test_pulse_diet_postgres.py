@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -133,7 +133,7 @@ def _proposed(db, client, user, *, output=None) -> dict:
     assert response.status_code == 202, response.text
     assert response.json()["status"] == "generating"
     now = datetime.combine(week, time(6), tzinfo=PARIS)
-    diet_planner.process_requested(db, call=_fake([output or _plan_output(week)]), now=now)
+    diet_planner.generate(db, UUID(response.json()["id"]), call=_fake([output or _plan_output(week)]), now=now)
     plan = client.get(f"{P}/diet/plans/{response.json()['id']}").json()
     assert plan["status"] == "proposed", plan
     return plan
@@ -172,7 +172,7 @@ def test_planner_proposes_a_checked_week_and_retries_an_invalid_one(db, enabled)
     client.post(f"{P}/recipes", headers=_key(), json=CHILI)
     plan_id = client.post(f"{P}/diet/plans", headers=_key(), json={"week_start": week.isoformat()}).json()["id"]
     fake = _fake([bad, good])
-    diet_planner.process_requested(db, call=fake, now=datetime.combine(week, time(6), tzinfo=PARIS))
+    diet_planner.generate(db, UUID(plan_id), call=fake, now=datetime.combine(week, time(6), tzinfo=PARIS))
     assert len(fake.calls) == 2 and "conservation" in fake.calls[1]
     plan = client.get(f"{P}/diet/plans/{plan_id}").json()
     assert plan["status"] == "proposed" and plan["source"] == "cloud"
@@ -193,7 +193,7 @@ def test_planner_without_brain_fails_honestly(db, enabled):
     week = _next_monday()
     plan_id = client.post(f"{P}/diet/plans", headers=_key(), json={"week_start": week.isoformat()}).json()["id"]
     assert client.post(f"{P}/diet/plans", headers=_key(), json={"week_start": week.isoformat()}).status_code == 409
-    diet_planner.process_requested(db, now=datetime.combine(week, time(6), tzinfo=PARIS))
+    diet_planner.generate(db, UUID(plan_id), now=datetime.combine(week, time(6), tzinfo=PARIS))
     plan = client.get(f"{P}/diet/plans/{plan_id}").json()
     assert plan["status"] == "failed" and "Aucun cerveau" in plan["error"]
     assert client.post(f"{P}/diet/plans/{plan_id}/reject").json()["status"] == "rejected"

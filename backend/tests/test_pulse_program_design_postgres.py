@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -140,7 +140,7 @@ def test_design_is_checked_retried_and_proposed(db, enabled):
                              "exercises": [*[_exercise("Développé couché", "chest", sets=10, equipment=["barre"])] * 3,
                                            {**_exercise("Planche", "core"), "reps": None}]}])
     fake = _fake([bad, _design()])
-    program_design.process_requested(db, call=fake)
+    program_design.generate(db, UUID(requested["id"]), call=fake)
     assert len(fake.calls) == 2
     retry = fake.calls[1]
     for expected in ("jour non disponible", "60 min", "« barre », absent", "plus que 25", "des répétitions OU une durée"):
@@ -156,7 +156,7 @@ def test_design_is_checked_retried_and_proposed(db, enabled):
 def test_without_a_brain_the_request_fails_honestly(db, enabled):
     client = _client(db, _user(db))
     requested = _requested(client)
-    program_design.process_requested(db)
+    program_design.generate(db, UUID(requested["id"]))
     latest = client.get(f"{P}/programs/requests/latest").json()["request"]
     assert latest["status"] == "failed" and "Aucun cerveau" in latest["error"]
     assert client.post(f"{P}/programs/requests/{requested['id']}/reject").json()["status"] == "rejected"
@@ -177,7 +177,7 @@ def test_accepting_creates_the_program_targets_and_sessions(db, enabled):
                         idempotency_key="old-w", request_hash="h"))
     db.commit()
     requested = _requested(client)
-    program_design.process_requested(db, call=_fake([_design()]))
+    program_design.generate(db, UUID(requested["id"]), call=_fake([_design()]))
     today = datetime.now(PARIS).date()
     monday = today - timedelta(days=today.weekday()) + timedelta(days=7)
     accepted = program_design.accept(db, current_user=user, request_id=requested["id"],

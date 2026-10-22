@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -114,7 +114,8 @@ def test_program_and_diet_are_built_on_the_ranked_goals(db):
         assert requested.status_code == 202 and requested.json()["inputs"]["goals"] == ["1. Abdos visibles",
                                                                                       "2. 25 tractions d'affilée"]
         prompts = []
-        program_design.process_requested(db, call=lambda s, p, sc: (prompts.append(p), (None, "cloud", {}))[1])
+        program_design.generate(db, UUID(requested.json()["id"]),
+                                call=lambda s, p, sc: (prompts.append(p), (None, "cloud", {}))[1])
         assert "1. Abdos visibles\n2. 25 tractions d'affilée" in prompts[0]
     finally:
         set_parameter(db, code="pulse.programs_enabled", value=False, origin="user", rationale_fr="Test.")
