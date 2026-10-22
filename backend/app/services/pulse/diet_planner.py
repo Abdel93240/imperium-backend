@@ -4,7 +4,7 @@ Réveillé par `pulse.diet.plan_requested`. Rôle santé d'abord (slot cloud `pu
 local (slot `pulse.diet_weekly_program_local`) ; tous deux semés éteints : aucun branché → le plan passe `failed`
 avec la raison, rien n'est inventé.
 
-Contexte en LISTE BLANCHE : jours à planifier, consigne de la demande, catalogue de recettes actives (repères R1…),
+Contexte en LISTE BLANCHE : objectifs dans l'ordre de l'utilisateur, jours à planifier, consigne de la demande, catalogue de recettes actives (repères R1…),
 stock brut (nom, quantité, date limite), portions déjà prêtes, matériel, analyses de sang hors norme du labo (accord
 « medical » actif seulement). Sortie contrainte par schéma puis relue
 par le code : recettes citées existantes, jours de la semaine (pas de jour passé), portions mangées couvertes par
@@ -28,7 +28,7 @@ from app.models.imperium import FoodStockItem, PulseOwnedEquipment
 from app.models.pulse import PulseDietPlan, PulseDietPlanMeal, PulsePreparation, PulseRecipe
 from app.schemas.pulse_diet import RecipeCreate
 from app.services.ai import cloud, local_executor
-from app.services.pulse import diet, labs
+from app.services.pulse import diet, goals, labs
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,9 @@ SYSTEM = (
     "portion sont tes estimations honnêtes, ou null si tu ne sais pas. Les noms d'ingrédients sont ceux du magasin "
     "(« riz basmati », « oignon »), unités g, kg, ml, cl, l ou piece seulement. Une préparation produit des portions ; "
     "un repas en mange ; on ne mange jamais un plat avant de l'avoir préparé ni après sa durée de conservation. "
-    "Respecte la consigne de l'utilisateur. Pas de conseil médical, pas de promesse de santé. Réponds en français, "
+    "La semaine sert les objectifs de l'utilisateur dans l'ordre de priorité qu'il a fixé (le premier pèse le plus) ; "
+    "rationale_fr dit comment. Respecte la consigne de l'utilisateur. Pas de conseil médical, pas de promesse de "
+    "santé. Réponds en français, "
     "en tutoyant, uniquement selon le schéma JSON."
 )
 
@@ -162,7 +164,10 @@ def build_prompt(db: Session, user: User, plan: PulseDietPlan, days: list[date],
     blood = ("\n## Analyses de sang hors de la norme du labo (dernières valeurs validées)\n" + "\n".join(analyses)
              + "\nOriente les aliments en conséquence, sans diagnostic ni promesse ; dis-le dans rationale_fr.\n"
              if analyses else "")
+    ranked = goals.ranked_lines(db, user)
     return (
+        "## Objectifs de l'utilisateur, dans SON ordre de priorité (le 1 d'abord)\n"
+        + ("\n".join(ranked) or "aucun dans la liste") + "\n\n"
         f"Semaine du {plan.week_start.isoformat()}. Jours à planifier : {', '.join(_day_label(d) for d in days)}.\n"
         f"Consigne de l'utilisateur : {plan.note or 'aucune'}.\n"
         "Par défaut : le déjeuner et le dîner de chaque jour, une ou deux préparations dans la semaine.\n\n"

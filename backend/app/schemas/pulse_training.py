@@ -100,11 +100,12 @@ MUSCLE_GROUPS = ("chest", "back", "shoulders", "biceps", "triceps", "quads", "ha
 
 
 class ProgramRequestCreate(BaseModel):
-    """Ce que l'utilisateur donne au cerveau : objectif, niveau, jours, durée d'une séance, heure, consigne."""
+    """Ce que l'utilisateur donne au cerveau : niveau, jours, durée d'une séance, heure, précision facultative ; les
+    objectifs eux-mêmes viennent de sa liste classée (accueil)."""
 
     model_config = ConfigDict(extra="forbid")
 
-    goal: str = Field(min_length=3, max_length=300)
+    goal: str | None = Field(default=None, max_length=300)  # précision pour ce programme
     level: Literal["beginner", "intermediate", "advanced"]
     days: list[Weekday] = Field(min_length=1, max_length=7)
     session_minutes: int = Field(ge=10, le=180)

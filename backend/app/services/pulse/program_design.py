@@ -1,8 +1,10 @@
 """Programme d'entraînement conçu par le cerveau (doc 40 §13.1 mode 1, spec Pulse P3). Job `pulse.program_designer`.
 
-1. Demande (`request`) : objectif, niveau, jours, durée d'une séance, heure, consigne → `generating` + événement.
+1. Demande (`request`) : niveau, jours, durée d'une séance, heure, précision facultative → `generating` +
+   événement. Les objectifs viennent de la liste classée par l'utilisateur (accueil, `goals`) : sans objectif ni
+   précision, la demande est refusée.
 2. Le job : rôle santé (slot `pulse.program_design`), sinon modèle local (`pulse.program_design_local`) ; aucun
-   branché → `failed` avec la raison. Contexte en LISTE BLANCHE : la demande, le matériel possédé, les douleurs en
+   branché → `failed` avec la raison. Contexte en LISTE BLANCHE : les objectifs dans l'ordre de l'utilisateur, la demande, le matériel possédé, les douleurs en
    cours (lieu, intensité, impact sur le sport), les règles médicales actives, les analyses hors norme du labo.
    Écart assumé à la spec P3 : pas de catalogue d'exercices validé (non semé) ; le cerveau compose les exercices
    à partir du matériel, comme le prévoit le doc 40 §13.1, et le code relit tout.
@@ -31,7 +33,7 @@ from app.schemas.pulse_training import MUSCLE_GROUPS, ProgramDesign, ProgramRequ
 from app.services.ai import cloud, local_executor
 from app.services.events.emitter import build_event
 from app.services.params import get_parameter
-from app.services.pulse import food_stock, labs, training
+from app.services.pulse import food_stock, goals, labs, training
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.pantry_scan import normalize_name
 
@@ -53,7 +55,9 @@ SYSTEM = (
     "créative (un même objet sert à plusieurs exercices) ou le poids du corps (equipment vide) ; jamais de "
     "matériel absent de la liste. Tu respectes les jours, la durée et le niveau demandés, et tu évites ce que les "
     "douleurs et règles médicales signalées déconseillent. muscle_group parmi la liste fournie, ou null pour le "
-    "cardio et la mobilité. Pas de diagnostic ni de promesse de résultat. Réponds en français, en tutoyant, "
+    "cardio et la mobilité. Le programme sert les objectifs de l'utilisateur dans l'ordre de priorité qu'il a fixé "
+    "(le premier pèse le plus) ; rationale_fr dit comment chaque objectif est servi. Pas de diagnostic ni de "
+    "promesse de résultat. Réponds en français, en tutoyant, "
     "uniquement selon le schéma JSON."
 )
 
@@ -83,6 +87,7 @@ def request(db: Session, *, current_user: User, payload: ProgramRequestCreate, i
             ) -> tuple[ProgramRequestRead, bool]:
     inputs = payload.model_dump(mode="json")
     fingerprint = food_stock.request_hash("pulse.program.request", inputs)
+    ranked = goals.ranked_lines(db, current_user)
     existing = db.scalar(select(PulseProgramRequest).where(PulseProgramRequest.user_id == current_user.id,
                                                            PulseProgramRequest.idempotency_key == idempotency_key))
     if existing is not None:
@@ -92,7 +97,9 @@ def request(db: Session, *, current_user: User, payload: ProgramRequestCreate, i
     if db.scalar(select(PulseProgramRequest.id).where(PulseProgramRequest.user_id == current_user.id,
                                                       PulseProgramRequest.status == "generating")) is not None:
         raise ProgramDesignStateError("A program is already being designed.")
-    row = PulseProgramRequest(user_id=current_user.id, status="generating", inputs=inputs,
+    if not ranked and not payload.goal:
+        raise ProgramDesignStateError("Ajoute au moins un objectif sur l'accueil de Pulse : le programme se construit avec eux.")
+    row = PulseProgramRequest(user_id=current_user.id, status="generating", inputs={**inputs, "goals": ranked},
                               idempotency_key=idempotency_key, request_hash=fingerprint)
     db.add(row)
     db.flush()
@@ -251,8 +258,12 @@ def build_prompt(db: Session, user: User, inputs: dict, owned: list[str]) -> str
         PulseMedicalRule.user_id == user.id, PulseMedicalRule.status == "active"))) or "aucune"
     blood = "\n".join(labs.out_of_range_lines(db, user)) or "aucune"
     days = ", ".join(DAYS_FR[d] for d in inputs["days"])
+    ranked = goals.ranked_lines(db, user) or inputs.get("goals") or []
     return (
-        f"Objectif : {inputs['goal']}\nNiveau : {LEVELS_FR[inputs['level']]}\nJours disponibles : {days}\n"
+        "## Objectifs de l'utilisateur, dans SON ordre de priorité (le 1 d'abord)\n"
+        + ("\n".join(ranked) or "aucun dans la liste") + "\n\n"
+        f"Précision pour ce programme : {inputs.get('goal') or 'aucune'}\nNiveau : {LEVELS_FR[inputs['level']]}\n"
+        f"Jours disponibles : {days}\n"
         f"Durée d'une séance : {inputs['session_minutes']} min au plus\nConsigne : {inputs.get('note') or 'aucune'}\n\n"
         f"## Matériel possédé (noms exacts)\n" + ("\n".join(f"- {name}" for name in owned) or "aucun : poids du corps")
         + f"\n\n## Groupes musculaires\n{', '.join(MUSCLE_GROUPS)}\n\n## Douleurs en cours\n{pain_lines}\n\n"
