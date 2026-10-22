@@ -92,6 +92,21 @@ DOMAIN 3 — DAILY SIGNALS
 
 ---
 
+## 4-bis. Objectifs de l'utilisateur — le socle (décision utilisateur 2026-10-22)
+
+> CODÉ (2026-10-22, migration 20261022_0134, appli 0.22.0-goals) — « la feature la plus importante de Pulse » :
+> - Accueil : « Mes objectifs », écrits par l'utilisateur et classés par lui (1 = le plus important ; ex. 1. abdos
+>   visibles, 2. 25 tractions d'affilée, 3. dos droit). Ajouter (en dernier), monter/descendre, modifier, marquer
+>   atteint, retirer. Aucune IA ici.
+> - Table `pulse_goals` (rang sans trou parmi les objectifs en cours ; atteints et retirés gardés pour
+>   l'historique). Routes toujours ouvertes : `GET /goals` (en cours par rang + atteints), `POST /goals`
+>   (Idempotency-Key), `PATCH /goals/{id}` `{title?, notes?, status active|achieved}`, `PUT /goals/order`
+>   `{ids}` (tout le classement, une fois chacun), `DELETE /goals/{id}`.
+> - Le programme d'entraînement (§13.1) et la semaine de diète (§10.6) sont construits sur cette liste, dans cet
+>   ordre (le premier pèse le plus) ; leur explication dit comment chaque objectif est servi. Une demande de
+>   programme sans objectif ni précision est refusée.
+> - Avance sur le doc F01 (objectifs prévus en V3) : décision de l'utilisateur.
+
 ## 5. Energy Score: Input, Not Computed
 
 ```text
