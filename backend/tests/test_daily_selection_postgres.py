@@ -232,11 +232,16 @@ def test_blocking_calendar_events_bound_the_time_gate_once_enabled(db) -> None:
     assert off.remaining_min == 120 and off.next_fixed_kind == "mission" and off.chosen_mission_id == long.id
 
     _flags(db, calendar_commitments_enabled=True)
+    set_parameter(db, code="calendar.event_buffer_minutes", value=0, origin="user", rationale_fr="Test.")
+    db.commit()
     row = _select(db, user)
     assert (row.remaining_min, row.next_fixed_ref, row.next_fixed_kind) == (25, dentist.id, "calendar_event")
     assert _entry(row, long)["blocked_by"] == "G4" and row.chosen_mission_id == short.id
     queue = selection.queue(db, current_user=user, now=NOW)
     assert (queue.next_fixed_ref, queue.next_fixed_kind) == (dentist.id, "calendar_event")
+    set_parameter(db, code="calendar.event_buffer_minutes", value=15, origin="user", rationale_fr="Test.")
+    db.commit()
+    assert _select(db, user).remaining_min == 10  # marge de 15 min avant l'événement (trajet pas encore calculé)
 
 
 def test_tiebreak_least_travel_inside_the_band_and_score_outside(db, no_network) -> None:

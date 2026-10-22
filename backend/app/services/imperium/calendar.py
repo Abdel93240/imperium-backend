@@ -119,7 +119,7 @@ def create_calendar_event(
     from app.services.imperium import calendar_threshold
 
     calendar_threshold.after_change(db, current_user=current_user, event=calendar_event, change="added")
-    return read(db.get(ImperiumCalendarEvent, calendar_event.id)), False
+    return read(calendar_event), False
 
 
 def read(event: ImperiumCalendarEvent) -> CalendarEventRead:

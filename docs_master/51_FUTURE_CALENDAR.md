@@ -6,6 +6,33 @@
 
 ---
 
+## Calendrier V1 — CODÉ le 2026-10-22 (avancé à la demande de l'utilisateur, migration 0129)
+
+L'utilisateur a jugé le moteur du jour « brouillon » sans calendrier : la V3 est avancée, alignée sur ce
+document (décision du 2026-10-22, point par point).
+
+- Types : `event` (bloque un créneau), `deadline` (date et heure limite, `task`, `prep_minutes`), `vacation`,
+  `blocked_period` (`pause_vtc`, `pause_pulse`, `pause_path` rangés pour le branchement des applis) ; `urgency`
+  (low | normal | high | critical), `all_day`, précisions (`notes`), `status` (active | cancelled | completed |
+  deadline_missed). Événements religieux : viendront de Path (doc 41), pas saisis ici.
+- Récurrences au format RRULE, sous-ensemble codé sans dépendance (`calendar_recurrence.py` : FREQ, INTERVAL,
+  BYDAY dont « 3TU » et « -1FR », BYMONTHDAY, UNTIL, COUNT ; l'heure locale tient aux changements d'heure) ;
+  « cette occurrence » sautée ou déplacée (`imperium_calendar_overrides`), la série ne change pas.
+- Pas de passé (§15.1), une période a sa fin ; conflits (§15.2) : `POST /calendar/conflicts`, l'écran demande.
+- Routes en plus de la fondation 7H : `GET|PATCH /calendar/events/{id}`, `GET /calendar/occurrences?from&to`,
+  `POST /calendar/events/{id}/occurrences` (skip | move), `POST /calendar/events/{id}/prep` (valider ou refuser).
+- Règle des 7 jours (`calendar_threshold.py`) : hook `user.calendar.event_<change>` ; la proposition du jour est
+  recalculée (déclencheur `calendar`) ; une échéance reçoit un créneau de préparation PROPOSÉ (slot cloud
+  `calendar.deadline_plan` s'il est servi, sinon le premier créneau libre de 8 h à 20 h à partir de la veille) ;
+  la mission hors projet n'est créée qu'à la validation. Job `calendar.morning_check` (6 h, semé désactivé) :
+  fenêtre des 7 jours, mission urgente la veille et le jour J, `deadline_missed` après coup.
+- Moteur du jour : les événements bloquants (séries dépliées) sont des engagements fixes quand
+  `daily.calendar_commitments_enabled` est vrai, avec `calendar.event_buffer_minutes` (15) de marge avant, en
+  attendant les temps de trajet.
+- Chatbot : action `add_event` ; le contexte de l'agent Général montre les 7 prochains jours.
+- Pas encore : synchronisation externe (exclue, §3 — le doc 32 §6P qui en parle est dépassé sur ce point),
+  effets réels des pauses d'applis, événements religieux venus de Path, recalcul du score des missions au hook.
+
 ## Patch 7H — Minimal Foundation
 
 Patch 7H adds only the backend storage foundation for calendar constraints.
@@ -894,5 +921,5 @@ With this context, the AI plans for the user's actual life.
 ---
 
 **Document version:** 1.0
-**Status:** V3 design specification (DO NOT IMPLEMENT before V1 + V2)
+**Status:** V3 design specification, avancée en V1 le 2026-10-22 (voir « Calendrier V1 » en tête)
 **Last updated:** 2026-04-29

@@ -899,6 +899,14 @@ class CalendarEventRead(BaseModel):
     prep_proposal: dict | None = None
     prep_mission_id: UUID | None = None
     deleted_at: datetime | None = None
+
+    @field_validator("all_day", "urgency", "pause_vtc", "pause_pulse", "pause_path", "status", mode="before")
+    @classmethod
+    def calendar_defaults(cls, value, info):
+        # Un événement pas encore relu de la base (défauts SQL non appliqués) garde les valeurs par défaut.
+        if value is not None:
+            return value
+        return {"urgency": "normal", "status": "active"}.get(info.field_name, False)
     deleted_by: str | None = None
     deletion_reason: str | None = None
     created_by: str | None = None

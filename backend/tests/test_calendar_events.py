@@ -159,7 +159,7 @@ def test_calendar_event_validation_invalid_dates() -> None:
 def test_calendar_event_validation_invalid_type() -> None:
     response = _client(FakeDb(), _user()).post(
         "/imperium/calendar/events",
-        json=_payload(event_type="blocked_period"),
+        json=_payload(event_type="birthday"),
         headers={"Idempotency-Key": "calendar-invalid-type"},
     )
 
