@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from app.api.deps import CurrentUserDep, SessionDep
 from app.schemas.pulse_health import DeletedCountRead
 from app.schemas.pulse_signals import (
+    AdaptRead,
+    AdaptRequest,
     BoardRead,
     DispatchListResponse,
     DispatchRead,
@@ -144,3 +146,14 @@ def decide_route(proposal_id: UUID, payload: ProposalDecisionRequest, current_us
     except procedures.ProposalStaleError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail={"code": "PROPOSAL_STALE", "message": str(exc)}) from exc
+
+
+@router.post("/workouts/{workout_id}/adapt", response_model=AdaptRead)
+def adapt_route(workout_id: UUID, payload: AdaptRequest, current_user: CurrentUserDep, db: SessionDep):
+    """« Adapter à mon état » : le modèle local choisit un coup légal (décaler, alléger…) ; proposition à décider."""
+    try:
+        proposal, outcome = procedures.adapt_now(db, current_user=current_user, workout_id=workout_id, reason=payload.reason)
+    except procedures.AdaptationUnavailableError as exc:
+        db.rollback()
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc), "code": "PULSE_ADAPT_UNAVAILABLE"})
+    return AdaptRead(proposal=proposal, outcome=outcome)

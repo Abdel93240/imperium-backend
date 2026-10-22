@@ -8,8 +8,8 @@ cochées, une seule fois (`stock_decrement_applied`, même clé → même répon
 Décompte : la quantité est convertie dans l'unité de la ligne de stock (g/kg,
 ml/cl/l ; la pièce ne se convertit pas). Tout utiliser, ou plus que le reste, exige
 `finish` : la ligne passe alors « consumed » ; sinon conflit, rien n'est écrit.
-Photo du repas : meal_photo (macros estimées, toujours à valider). Estimation depuis le
-texte : pas encore.
+Photo du repas : meal_photo (macros estimées, toujours à valider). Texte « Autre » avec `estimate` :
+meal_estimate (modèle local, marqué estimation, corrigeable avant validation).
 """
 
 import re
@@ -34,7 +34,7 @@ from app.schemas.pulse_meals import (
 )
 from app.services.events.emitter import build_event
 from app.services.path import fasting
-from app.services.pulse import diet, food_stock
+from app.services.pulse import diet, food_stock, meal_estimate
 from app.services.pulse.expiry import PARIS
 from app.services.pulse.pantry_scan import match_stock, normalize_name
 from app.services.pulse.stock_declaration import DeclaredLine, parse_declaration
@@ -90,6 +90,12 @@ def create_draft(
         return previous, True
     macros = {macro: getattr(payload, macro) for macro in MACROS}
     lines, warnings = propose(db, current_user, [(line, False) for line in _declared(payload.description)])
+    estimated = None
+    if payload.estimate and all(value is None for value in macros.values()):
+        estimated = meal_estimate.estimate(db, payload.description)
+        if estimated is not None:
+            macros = {macro: getattr(estimated, macro) for macro in MACROS}
+            warnings.insert(0, meal_estimate.WARNING + (f" ({estimated.assumptions_fr})" if estimated.assumptions_fr else ""))
     if all(value is None for value in macros.values()):
         warnings.insert(0, NO_MACROS)
     eaten_at = payload.eaten_at or datetime.now(UTC)
@@ -101,6 +107,7 @@ def create_draft(
         user_id=current_user.id, status="draft", label=payload.label or payload.description[:120],
         description=payload.description, source=payload.source, eaten_at=eaten_at, plan_meal_id=payload.plan_meal_id,
         **macros, proposal=[line.model_dump(mode="json") for line in lines], warnings=warnings[:20],
+        macros_estimated=estimated is not None, confidence=estimated.confidence if estimated else None,
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )
     return save_draft(db, meal), False

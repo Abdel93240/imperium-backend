@@ -161,3 +161,16 @@ class ProposalDecisionRequest(BaseModel):
         if self.decision == "modified" and not self.modified_payload:
             raise ValueError("modified_payload is required for a modified decision.")
         return self
+
+
+class AdaptRequest(BaseModel):
+    """« Adapter à mon état » : une raison choisie dans une liste (jamais de texte libre dans le prompt)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Literal["fatigue", "pain", "short_time", "other"]
+
+
+class AdaptRead(BaseModel):
+    proposal: ProposalRead | None
+    outcome: str  # proposed | session_unavailable | red_flag_block

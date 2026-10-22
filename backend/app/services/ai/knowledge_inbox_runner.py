@@ -7,7 +7,8 @@
    tant que la transcription n'est pas branchée, PDF/images sans OCR) est listé dans
    sources_unread. Service OCR injoignable → l'élément repasse « to_analyze » et sera
    repris au réveil suivant, jamais lu à moitié.
-   Une prise de sang reconnue (Pulse, `labs`) reçoit ses valeurs et la destination proposée « lab_results ».
+   Une prise de sang reconnue (Pulse, `labs`) reçoit ses valeurs et la destination proposée « lab_results » ; une
+   recette reconnue (`recipe_intake`) reçoit sa forme structurée et la destination proposée « recipe ».
 2. Vectorisation des éléments VALIDÉS vers la mémoire (destination « memory ») :
    la version corrigée est découpée, embarquée par le service local, et écrite dans
    ai_memories avec source_table/source_id. GPU injoignable → l'élément reste validé
@@ -27,7 +28,7 @@ from app.models.ai import AIMemory, KnowledgeInboxDocument, KnowledgeInboxItem
 from app.services.ai import knowledge_inbox, ocr
 from app.services.ai.knowledge_files import TEXT_EXTENSIONS, extension
 from app.services.ai.knowledge_inbox import SOURCE_TABLE, _emit
-from app.services.pulse import labs
+from app.services.pulse import labs, recipe_intake
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ ModelCall = Callable[[str], dict]
 EmbedTexts = Callable[[list[str]], list[list[float]]]
 RecognizeFile = Callable[[bytes, str, str | None], "ocr.OcrResult"]
 ExtractLabs = Callable[..., tuple[list[dict], str | None, str | None]]  # (db, text=, item_id=) → (valeurs, date, moteur)
+ExtractRecipe = Callable[..., tuple[dict | None, str | None]]  # (db, text=, item_id=) → (recette, moteur)
 
 
 def knowledge_inbox_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
@@ -53,6 +55,7 @@ def process_inbox(
     embed_texts: EmbedTexts | None | object = _DEFAULT,
     recognize_file: RecognizeFile | None | object = _DEFAULT,
     extract_labs: ExtractLabs | None = None,
+    extract_recipe: ExtractRecipe | None = None,
 ) -> None:
     db: Session = ctx.db
     model = _default_model() if call_model is _DEFAULT else call_model
@@ -60,7 +63,8 @@ def process_inbox(
     reader = _Reader(_default_recognizer() if recognize_file is _DEFAULT else recognize_file)
     analyzed = failed = deferred = vectorized = 0
     for item_id in list(db.scalars(select(KnowledgeInboxItem.id).where(KnowledgeInboxItem.status == "to_analyze").limit(BATCH))):
-        outcome = _analyze(db, item_id=item_id, model=model, reader=reader, extract_labs=extract_labs)
+        outcome = _analyze(db, item_id=item_id, model=model, reader=reader, extract_labs=extract_labs,
+                           extract_recipe=extract_recipe)
         analyzed += outcome == "analyzed"
         failed += outcome == "failed"
         deferred += outcome == "deferred"
@@ -113,7 +117,7 @@ class _Reader:
 
 
 def _analyze(db: Session, *, item_id: UUID, model: ModelCall | None, reader: _Reader,
-             extract_labs: ExtractLabs | None = None) -> str:
+             extract_labs: ExtractLabs | None = None, extract_recipe: ExtractRecipe | None = None) -> str:
     item = db.get(KnowledgeInboxItem, item_id)
     item.status = "analyzing"
     db.commit()
@@ -166,6 +170,11 @@ def _analyze(db: Session, *, item_id: UUID, model: ModelCall | None, reader: _Re
         results, measured, lab_engine = (extract_labs or labs.extract)(db, text="\n".join(texts), item_id=item.id)
         item.extraction_draft = {**item.extraction_draft, "proposed_destination": labs.DESTINATION,
                                  "lab_results": results, "measured_on": measured, "lab_engine": lab_engine}
+    elif recipe_intake.looks_like_recipe("\n".join(texts), item.context_text):
+        # Recette : lue en données structurées, corrigée puis rangée dans le catalogue de Pulse.
+        recipe, recipe_engine = (extract_recipe or recipe_intake.extract)(db, text="\n".join(texts), item_id=item.id)
+        item.extraction_draft = {**item.extraction_draft, "proposed_destination": recipe_intake.DESTINATION,
+                                 "recipe": recipe, "recipe_engine": recipe_engine}
     item.status = "to_validate"
     item.analyzed_at = datetime.now(UTC)
     _emit(db, item.user_id, "inbox.document.analyzed", item, {"engine": engine, "sources_unread": len(unread), "sources_ocr": len(ocr_sources)})

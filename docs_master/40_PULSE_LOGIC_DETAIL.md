@@ -298,6 +298,10 @@ but no stock quantity changes until the user validates the lines.
 > - `POST /meals/{id}/cancel` (brouillon seulement) ; `GET /meals/{id}` ;
 >   `GET /meals?day=AAAA-MM-JJ` : repas validés du jour de Paris, totaux, nombre sans macros.
 > - Avertissement de jeûne (Path) : pas encore.
+> - CODÉ (2026-10-22, bloc 1, migration 0135) : `POST /meals/drafts {estimate: true}` (« Autre » du kit P03) →
+>   apports estimés depuis la description par le modèle local (slot `pulse.meal_estimate`, semé éteint ; bornes
+>   vérifiées), `macros_estimated` + confiance + avertissement avec les hypothèses ; l'appli affiche l'estimation,
+>   corrigeable, avant de valider. Slot éteint → aucun apport inventé.
 
 ### 10.4 Recipe catalogue
 
@@ -424,6 +428,9 @@ Cross-module links:
 >   jour + conservation si connue), apports par portion = apports de la recette × portions prévues ÷
 >   portions réelles (la perte de masse ne multiplie pas les nutriments). `…/cancel`.
 > - Repas prévus : `POST /meals/drafts {plan_meal_id}` ; la validation du repas marque le créneau `eaten`.
+> - Recettes (bloc 1, migration 0135) : par Nexus (action `add_recipe`, carte validée, doc 72) et par Nourrir l'IA
+>   (texte reconnu comme recette → forme structurée par le modèle local, slot `pulse.recipe_extract`, corrigée dans la
+>   fenêtre, destination `recipe`, source `inbox`). Les apports par portion ne sont jamais devinés.
 > - Missions Imperium « Faire les courses » (avant la première préparation) et « Cuisiner : … » (par jour)
 >   créées à la validation si `pulse.diet_missions_enabled`.
 
@@ -701,7 +708,14 @@ Headers: Idempotency-Key
 ```
 
 Decision is NEVER auto-applied. If the user refuses, the original workout remains
-and the backend records the decision. Imperium replan is a backend handoff
+and the backend records the decision.
+
+> CODÉ (2026-10-22, bloc 1) : « Adapter à mon état » — `POST /api/imperium/pulse/workouts/{id}/adapt`
+> `{reason fatigue|pain|short_time|other}` lance P1 tout de suite (trigger pre_session) : menu des coups légaux,
+> choix par le modèle local (`pulse.p1.choose_move`, la raison entre en code dans le contexte, jamais en texte libre),
+> validation, proposition présentée. Jamais d'essai à blanc ici : `pulse.proposals_enabled` éteint, P1 inactive ou
+> modèle local éteint → 409 `PULSE_ADAPT_UNAVAILABLE`. Décision par `POST /proposals/{id}/decision` (refus avec
+> explication) ; l'appli montre aussi les propositions en attente dans Sport. Imperium replan is a backend handoff
 surfaced by a toast/banner only.
 
 ### 13.4 Recovery

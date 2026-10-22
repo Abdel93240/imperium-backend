@@ -121,7 +121,10 @@ et le slot `chat.converse` en mode `live` dans `ai.local_slot_modes`. Contexte e
 mission active, projets ouverts désignés P1, P2… et leurs missions, missions hors projet à faire, routines,
 priorités, date du jour). Actions V1 : `create_project`, `add_project_mission`, `create_mission` (mission hors
 projet, migration 0123 : titre requis ; échéance et date de début au format AAAA-MM-JJ tirées de ce que dit
-l'utilisateur, l'échéance au soir, le début au matin, sans aucune date elle commence le jour même), `create_routine` ;
+l'utilisateur, l'échéance au soir, le début au matin, sans aucune date elle commence le jour même), `create_routine`,
+`add_event` (calendrier, migration 0129), `add_recipe` (recette dictée ou collée → catalogue de Pulse : titre,
+portions, ingrédients avec quantités, étapes, conditionnement et conservation s'ils sont donnés ; aucune quantité ni
+aucun apport inventés ; migration 0135) ;
 sortie contrainte par un schéma par action, vérifiée
 par les schémas d'écriture existants (un nouvel essai, puis réponse sans proposition). Moteur local arrêté :
 réponse explicite, aucun repli cloud. Pas encore : escalade (§3), extraction à la fermeture (§6-7), micro.

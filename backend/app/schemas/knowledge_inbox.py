@@ -77,12 +77,13 @@ class ExtractionUpdate(BaseModel):
     facts: list[str] | None = Field(default=None, max_length=200)
     lab_results: list[LabResultIn] | None = Field(default=None, max_length=80)  # prise de sang : valeurs corrigées
     measured_on: date | None = None  # date du prélèvement
+    recipe: dict | None = None  # recette corrigée (champs de RecipeCreate), relue à la validation
 
 
 class InboxValidateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    destination: Literal["memory", "project", "lab_results"] = "memory"
+    destination: Literal["memory", "project", "lab_results", "recipe"] = "memory"
     project_title: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")

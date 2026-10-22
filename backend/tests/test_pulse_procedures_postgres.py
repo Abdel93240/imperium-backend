@@ -113,7 +113,7 @@ def test_seeds(db) -> None:
     assert [step["type"] for step in p1.steps] == ["code", "code", "llm_slot", "code", "user_gate", "code"]
     slots = {row.slot_code: row.tier for row in db.scalars(select(AISlotTransition).where(
         AISlotTransition.domain == "pulse"))}
-    assert len(slots) == 19 and slots["pulse.p1.choose_move"] == "local_default"  # + diète, analyses, programme (0131-0133)
+    assert len(slots) == 21 and slots["pulse.p1.choose_move"] == "local_default"  # + diète, analyses, programme, estimations et recettes (0131-0135)
     assert (slots["pulse.p2.synthesis"], slots["pulse.p3.design"]) == ("routed", "cloud_forced")
     job = db.execute(text("SELECT enabled FROM job_definitions WHERE code = 'pulse.procedure_runner'")).scalar()
     assert job is False and procedures.proposals_enabled(db) is False
