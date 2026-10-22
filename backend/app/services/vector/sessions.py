@@ -27,7 +27,7 @@ from app.models.auth import User
 from app.models.enums import PrivacyLevel, SourceApp
 from app.models.idempotency import IdempotencyKey
 from app.models.imperium import ImperiumMission, PlanningReplanEvent
-from app.models.rides import RidesDropZone, RidesRevenueEntry, RidesSession
+from app.models.rides import RidesDropZone, RidesOffer, RidesRevenueEntry, RidesSession
 from app.models.vault import ImperiumVaultTransaction
 from app.schemas.imperium import ReplanRead
 from app.schemas.rides import (
@@ -52,6 +52,7 @@ from app.services.pulse import food_stock
 from app.services.vector.zones import zone_key
 
 PARIS = ZoneInfo("Europe/Paris")
+OPEN_STATUSES = ("active", "paused")  # session ouverte : en cours ou en pause (0137)
 CLOCK_SKEW = timedelta(minutes=5)
 REVENUE_CATEGORY = "vtc"
 # Catégories VEC-05 → catégories pro du Vault (vault.category_map, business_expenses).
@@ -92,7 +93,8 @@ class RidesVersionConflictError(ValueError):
 # ---------- lecture ----------
 
 def current_session(db: Session, *, current_user: User, now: datetime | None = None) -> CurrentSessionRead:
-    session = db.scalar(select(RidesSession).where(RidesSession.user_id == current_user.id, RidesSession.status == "active"))
+    session = db.scalar(select(RidesSession).where(RidesSession.user_id == current_user.id,
+                                                   RidesSession.status.in_(OPEN_STATUSES)))
     return CurrentSessionRead(session=_read(db, session, now) if session else None)
 
 
@@ -127,7 +129,8 @@ def start_session(
             raise RidesIdempotencyConflictError("Idempotency key already used with a different session.")
         return _read(db, existing), True
     active = db.scalar(
-        select(RidesSession).where(RidesSession.user_id == current_user.id, RidesSession.status == "active").with_for_update()
+        select(RidesSession).where(RidesSession.user_id == current_user.id, RidesSession.status.in_(OPEN_STATUSES))
+        .with_for_update()
     )
     if active is not None:
         raise RidesStateError("Une session est déjà en cours.", _read(db, active))
@@ -185,8 +188,12 @@ def complete_session(
     if previous is not None:
         return previous
     now = now or datetime.now(UTC)
-    session = _active(db, current_user, session_id)
-    kpis = _kpis(db, session, now)
+    session = _open(db, current_user, session_id)
+    if session.paused_at is not None:  # arrêter pendant une pause : la pause se termine à l'arrêt
+        session.paused_seconds += int((now - session.paused_at).total_seconds())
+    with db.no_autoflush:  # chiffres lus avant la clôture (statut et pause changent ensemble)
+        session.paused_at = None
+        kpis = _kpis(db, session, now)
     session.status, session.ended_at = "completed", now
     session.final_revenue_cents, session.final_expense_cents = kpis.revenue_cents, kpis.expense_cents
     session.review_note = (payload.review_note or "").strip() or None
@@ -199,6 +206,35 @@ def complete_session(
         "objective_reached": read.kpis.objective_reached, "elapsed_minutes": read.kpis.elapsed_minutes,
     })
     food_stock.remember(db, current_user, idempotency_key, "POST", request_path, fingerprint, 200, read)
+    db.commit()
+    return read
+
+
+def pause_session(db: Session, *, current_user: User, session_id: UUID, now: datetime | None = None) -> SessionRead:
+    """Mettre en pause : rejouer sur une session déjà en pause renvoie la session (double appui sans effet)."""
+    now = now or datetime.now(UTC)
+    session = _open(db, current_user, session_id)
+    if session.status == "active":
+        session.status, session.paused_at = "paused", now
+        session.version += 1
+        _event(db, current_user, "rides.session.paused", session, {}, ref=f"{session.id}.{now.timestamp()}")
+        db.flush()
+    read = _read(db, session, now)
+    db.commit()
+    return read
+
+
+def resume_session(db: Session, *, current_user: User, session_id: UUID, now: datetime | None = None) -> SessionRead:
+    """Reprendre : la durée de la pause s'ajoute aux pauses terminées ; rejouer sur une session active est sans effet."""
+    now = now or datetime.now(UTC)
+    session = _open(db, current_user, session_id)
+    if session.status == "paused":
+        session.paused_seconds += int((now - session.paused_at).total_seconds())
+        session.status, session.paused_at = "active", None
+        session.version += 1
+        _event(db, current_user, "rides.session.resumed", session, {}, ref=f"{session.id}.{now.timestamp()}")
+        db.flush()
+    read = _read(db, session, now)
     db.commit()
     return read
 
@@ -321,7 +357,7 @@ def _vault_entry(
         if transaction is None:
             raise RidesIdempotencyConflictError("Idempotency key already used with a different request.")
         return SessionEntryResult(transaction_id=transaction.id, session=_read(db, session))
-    if session.status != "active":
+    if session.status not in OPEN_STATUSES:
         raise RidesStateError("Cette session est close.", _read(db, session))
     transaction, _ = vault_transactions.create_vault_transaction(
         db, current_user=user, payload=payload, idempotency_key=idempotency_key, request_method="POST",
@@ -358,10 +394,17 @@ def _kpis(db: Session, session: RidesSession, now: datetime | None = None) -> Se
         revenue, expense = session.final_revenue_cents or 0, session.final_expense_cents or 0
     drops = db.scalar(select(func.count()).select_from(RidesDropZone).where(RidesDropZone.session_id == session.id)) or 0
     end = session.ended_at or now or datetime.now(UTC)
+    paused = session.paused_seconds + (int((end - session.paused_at).total_seconds()) if session.paused_at else 0)
+    elapsed = max(0, int((end - session.started_at).total_seconds()))
+    done, refused = db.execute(select(
+        func.count().filter(RidesOffer.decision == "accepted", RidesOffer.outcome.is_not(None)),
+        func.count().filter(RidesOffer.decision == "refused"),
+    ).where(RidesOffer.session_id == session.id)).one()
     target = session.target_ca_cents
     return SessionKpis(
         revenue_cents=revenue, expense_cents=expense, net_cents=revenue - expense, revenue_entries=revenue_entries,
-        expense_entries=expense_entries, drop_zones=drops, elapsed_minutes=max(0, int((end - session.started_at).total_seconds() // 60)),
+        expense_entries=expense_entries, drop_zones=drops, elapsed_minutes=elapsed // 60,
+        active_minutes=max(0, elapsed - paused) // 60, rides_done=done, rides_refused=refused,
         target_progress=(Decimal(revenue) / Decimal(target)).quantize(Decimal("0.01")) if target else None,
         objective_reached=revenue >= target if target else None,
     )
@@ -370,7 +413,7 @@ def _kpis(db: Session, session: RidesSession, now: datetime | None = None) -> Se
 def _read(db: Session, session: RidesSession, now: datetime | None = None) -> SessionRead:
     return SessionRead(
         id=session.id, status=session.status, started_at=session.started_at, ended_at=session.ended_at,
-        target_ca_cents=session.target_ca_cents, strategic_direction=session.strategic_direction, mission_id=session.mission_id,
+        paused_at=session.paused_at, target_ca_cents=session.target_ca_cents, strategic_direction=session.strategic_direction, mission_id=session.mission_id,
         review_note=session.review_note, version=session.version, kpis=_kpis(db, session, now),
         replan_event_id=session.replan_event_id,
     )
@@ -385,10 +428,19 @@ def _get(db: Session, user: User, session_id: UUID) -> RidesSession:
     return session
 
 
+def _open(db: Session, user: User, session_id: UUID) -> RidesSession:
+    """Session ouverte : en cours ou en pause."""
+    session = _get(db, user, session_id)
+    if session.status not in OPEN_STATUSES:
+        raise RidesStateError("Cette session est close.", _read(db, session))
+    return session
+
+
 def _active(db: Session, user: User, session_id: UUID) -> RidesSession:
     session = _get(db, user, session_id)
     if session.status != "active":
-        raise RidesStateError("Cette session est close.", _read(db, session))
+        raise RidesStateError("La session est en pause." if session.status == "paused" else "Cette session est close.",
+                              _read(db, session))
     return session
 
 

@@ -92,15 +92,19 @@ class SessionKpis(BaseModel):
     expense_entries: int
     drop_zones: int
     elapsed_minutes: int
+    active_minutes: int = 0  # écoulé moins les pauses (kit Vector)
+    rides_done: int = 0  # offres acceptées dont le résultat réel est enregistré (accepté ≠ réalisé)
+    rides_refused: int = 0  # offres refusées par l'utilisateur
     target_progress: Decimal | None  # CA / cible, None sans cible
     objective_reached: bool | None  # None sans cible
 
 
 class SessionRead(BaseModel):
     id: UUID
-    status: Literal["active", "completed"]
+    status: Literal["active", "paused", "completed"]
     started_at: datetime
     ended_at: datetime | None
+    paused_at: datetime | None = None
     target_ca_cents: int | None
     strategic_direction: str | None
     mission_id: UUID | None

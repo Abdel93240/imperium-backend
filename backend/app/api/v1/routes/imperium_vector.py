@@ -216,6 +216,24 @@ def complete_session_route(
         return _error(db, exc)
 
 
+@router.post("/sessions/{session_id}/pause", response_model=SessionRead)
+def pause_session_route(session_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """Mettre en pause (kit Vector) : le temps de pause ne compte pas dans la durée active ; rejouer est sans effet."""
+    try:
+        return sessions.pause_session(db, current_user=current_user, session_id=session_id)
+    except _ERRORS as exc:
+        return _error(db, exc)
+
+
+@router.post("/sessions/{session_id}/resume", response_model=SessionRead)
+def resume_session_route(session_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    """Reprendre une session en pause ; rejouer sur une session en cours est sans effet."""
+    try:
+        return sessions.resume_session(db, current_user=current_user, session_id=session_id)
+    except _ERRORS as exc:
+        return _error(db, exc)
+
+
 @router.post("/sessions/{session_id}/replan", response_model=SessionReplanResponse, status_code=status.HTTP_201_CREATED)
 def replan_after_session_route(session_id: UUID, response: Response, current_user: CurrentUserDep, db: SessionDep):
     """VEC-11 → Imperium : replan de la journée après la clôture, à la demande ; demande ouverte → 200."""
