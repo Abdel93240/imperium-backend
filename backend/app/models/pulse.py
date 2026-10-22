@@ -2,9 +2,10 @@
 CHECK constraints live in migrations 0106, 0108, 0109, 0111, 0112 ; métriques 0110)."""
 
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, SmallInteger, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -267,3 +268,120 @@ class PulseLegalMove(UUIDPrimaryKeyMixin, Base):
     doctrine_refs: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+# --- Diète (doc 40 §10.4–§10.9, migration 0131) -----------------------------------------------------------------
+
+class PulseDietPlan(UUIDPrimaryKeyMixin, Base):
+    """Plan d'une semaine (lundi) : demandé → proposé par le cerveau → validé (un seul `active` par semaine)."""
+
+    __tablename__ = "pulse_diet_plans"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    week_start: Mapped[date] = mapped_column(Date(), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rationale_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())
+
+
+class PulseRecipe(UUIDPrimaryKeyMixin, Base):
+    """Recette du catalogue : ingrédients [{name, quantity, unit}] pour `servings` portions, étapes, conditionnement
+    et conservation, apports PAR PORTION (facultatifs)."""
+
+    __tablename__ = "pulse_recipes"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    servings: Mapped[int] = mapped_column(Integer, nullable=False)
+    portion_weight_g: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    ingredients: Mapped[list] = mapped_column(JSONB, nullable=False)
+    steps: Mapped[list] = mapped_column(JSONB, nullable=False)
+    packaging: Mapped[list] = mapped_column(JSONB, nullable=False)
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    calories: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    protein_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    carbs_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    fat_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 1), nullable=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    plan_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_diet_plans.id", ondelete="SET NULL"),
+                                                 nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())
+
+
+class PulsePreparation(UUIDPrimaryKeyMixin, Base):
+    """Préparation (batch cooking) d'une recette : consomme les ingrédients, crée une ligne de portions."""
+
+    __tablename__ = "pulse_preparations"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_diet_plans.id", ondelete="CASCADE"),
+                                          nullable=False)
+    recipe_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_recipes.id"), nullable=False)
+    planned_day: Mapped[date] = mapped_column(Date(), nullable=False)
+    portions_planned: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="planned")
+    missing: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    missing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    portions_made: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    portion_weight_g: Mapped[Decimal | None] = mapped_column(Numeric(7, 1), nullable=True)
+    stock_item_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("food_stock_items.id"), nullable=True)
+    consumed: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    complete_idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    complete_request_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())
+
+
+class PulseDietPlanMeal(UUIDPrimaryKeyMixin, Base):
+    """Repas prévu : un créneau d'un jour, une recette, des portions ; `eaten` quand un repas validé le désigne."""
+
+    __tablename__ = "pulse_diet_plan_meals"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_diet_plans.id", ondelete="CASCADE"),
+                                          nullable=False)
+    day: Mapped[date] = mapped_column(Date(), nullable=False)
+    slot: Mapped[str] = mapped_column(Text, nullable=False)
+    recipe_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_recipes.id"), nullable=False)
+    portions: Mapped[Decimal] = mapped_column(Numeric(4, 2), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="planned")
+    meal_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_meals.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())
+
+
+class PulseShoppingItem(UUIDPrimaryKeyMixin, Base):
+    """Ligne de courses née d'un plan validé ; `bought` quand le stock la couvre, `removed` à la demande."""
+
+    __tablename__ = "pulse_shopping_items"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    plan_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_diet_plans.id", ondelete="CASCADE"),
+                                          nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
+    checked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())

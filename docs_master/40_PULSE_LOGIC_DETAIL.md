@@ -379,6 +379,39 @@ Cross-module links:
 - Recipe add = the local model + web (light); diet programming = the health specialist (grouped, on
   the WR). Clean separation: collection (light) vs exploitation (the health specialist).
 
+> CODÉ (2026-10-22, migration 20261022_0131, kit Pulse P02/P05/P06/P08 ; tout semé éteint) :
+> - Routes `/api/imperium/pulse` fermées (409 `PULSE_DIET_DISABLED`) tant que `pulse.diet_enabled` est faux.
+> - Catalogue `pulse_recipes` : titre, portions (`servings`), poids d'une portion, ingrédients
+>   `{name, quantity, unit}`, étapes, **conditionnement et conservation** (liste), durée de conservation,
+>   apports PAR PORTION facultatifs. `GET/POST /recipes`, `GET/DELETE /recipes/{id}` (archive). Saisie par le
+>   chatbot et recherche web : pas encore.
+> - Semaine (lundi → dimanche) : `POST /diet/plans {week_start?, note?}` (Idempotency-Key) crée un plan
+>   `generating` et l'événement `pulse.diet.plan_requested` ; le job `pulse.diet_planner` le traite : rôle
+>   santé (slot `pulse.diet_weekly_program`), sinon modèle local (slot `pulse.diet_weekly_program_local`),
+>   sinon le plan passe `failed` avec la raison. Contexte en liste blanche (jours restants, consigne,
+>   catalogue, stock brut, portions prêtes, matériel). La sortie (recettes nouvelles, préparations, repas
+>   par créneau) est relue par le code : recettes existantes, jours de la semaine, un repas par créneau,
+>   portions mangées ≤ portions préparées ou prêtes, jamais avant la préparation ni après la conservation ;
+>   invalide → un nouvel essai avec les erreurs, puis échec. Écart assumé : le plan est `proposed` et
+>   l'utilisateur le valide (`/diet/plans/{id}/activate`, ou `/reject`) — le cerveau propose, l'utilisateur
+>   agit ; un nouveau plan validé remplace l'ancien (`superseded`, préparations ouvertes annulées).
+>   Déclenchement par la Weekly Review : pas encore (demande depuis Pulse).
+> - Courses : calculées par le CODE à la validation (jamais par le modèle) = ingrédients des préparations
+>   à l'échelle des portions − stock brut (FEFO, rapprochement par nom normalisé dans la même famille
+>   d'unités). `GET /shopping-list` relit contre le stock : une ligne couverte passe `bought` (la liste se
+>   vide quand le stock arrive) ; `PATCH {checked}` ne crédite jamais le stock ; `DELETE` = retrait
+>   (`removed`, événement `pulse.shopping.item_removed` gardé pour l'apprentissage du WR, non lu encore).
+> - Préparation : `GET /preparations/{id}` (recette, besoins comparés au stock) ; `POST …/start` → manque
+>   d'ingrédient = 409 `INGREDIENTS_MISSING` avec la liste, gardée sur la préparation (attention requise
+>   dans Imperium, lue par `GET /diet/attention`, vide si la diète est éteinte) et ajoutée aux courses, aucune substitution ;
+>   `POST …/complete {portions, portion_weight_g}` (Idempotency-Key) en une transaction : ingrédients
+>   décomptés (FEFO) + une ligne de stock `kind = prepared` (une pièce = une portion, même poids, DLC =
+>   jour + conservation si connue), apports par portion = apports de la recette × portions prévues ÷
+>   portions réelles (la perte de masse ne multiplie pas les nutriments). `…/cancel`.
+> - Repas prévus : `POST /meals/drafts {plan_meal_id}` ; la validation du repas marque le créneau `eaten`.
+> - Missions Imperium « Faire les courses » (avant la première préparation) et « Cuisiner : … » (par jour)
+>   créées à la validation si `pulse.diet_missions_enabled`.
+
 ---
 
 ## 11. Food Stock

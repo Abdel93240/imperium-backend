@@ -170,6 +170,13 @@ class FoodStockItemRead(BaseModel):
     status: str
     version: int
     created_at: datetime
+    kind: str = "raw"  # prepared = portions cuisinées : une pièce = une portion, apports par portion
+    recipe_id: UUID | None = None
+    portion_weight_g: Decimal | None = None
+    calories: Decimal | None = None
+    protein_g: Decimal | None = None
+    carbs_g: Decimal | None = None
+    fat_g: Decimal | None = None
 
 
 class FoodStockExpiryAlertRead(BaseModel):
