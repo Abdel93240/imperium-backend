@@ -407,3 +407,25 @@ class PulseLabResult(UUIDPrimaryKeyMixin, Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class PulseProgramRequest(UUIDPrimaryKeyMixin, Base):
+    """Demande de programme (P3) : demandée → proposée par le cerveau → acceptée (programme créé) ; migration 0133."""
+
+    __tablename__ = "pulse_program_requests"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    inputs: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    design: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    rationale_fr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    trace: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    program_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("pulse_programs.id", ondelete="SET NULL"),
+                                                    nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(Text, nullable=False)
+    request_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
+                                                 onupdate=func.now())
