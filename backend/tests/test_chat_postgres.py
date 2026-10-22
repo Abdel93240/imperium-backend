@@ -441,7 +441,7 @@ def test_calendar_event_from_the_chat(db, fake) -> None:
         "action": "add_event", "summary_fr": "Ajouter « Médecin »",
         "params": {"title": "Médecin", "event_type": "event", "date": tuesday, "time": "15:00", "end_date": None,
                    "end_time": None, "location": "Cabinet", "notes": None, "task": None, "prep_minutes": None,
-                   "urgency": "normal", "repeat": "none"}}})
+                   "urgency": "normal", "repeat": "none", "weekdays": []}}})
     turn = _say(client, sid, "J'ai le médecin mardi à 15 h")
     assert "Calendrier, 7 prochains jours : rien" in fake.prompts[-1]
     done = client.post(f"{P}/{sid}/proposals/{turn['proposal']['id']}/validate").json()
