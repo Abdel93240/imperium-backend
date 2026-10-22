@@ -626,6 +626,26 @@ Sans extraction automatique (le spécialiste santé n'est pas branché) :
 - Chiffrement au repos : celui du disque (§12.3, ops). Notification immédiate d'une règle
   critique et notification d'échéance : pas encore (la règle est saisie par l'utilisateur).
 
+### 16-ter. Prises de sang par Nourrir l'IA (CODÉ le 2026-10-22, migration 20261022_0132)
+
+Décision utilisateur (2026-10-22) : une prise de sang s'envoie par le bouton **Nourrir l'IA** (doc 70), pas par
+un envoi propre à Pulse ; Santé affiche ensuite les dernières valeurs mesurées au lieu d'une ligne « non mesuré ».
+- Analyse du dépôt (job `ai.knowledge_inbox`) : texte lu par l'OCR (PDF, photos) ; s'il ressemble à un compte
+  rendu de biologie, les valeurs sont extraites (spécialiste santé, slot `pulse.lab_results_extract` ; sinon
+  modèle local `pulse.lab_results_extract_local` ; les deux semés éteints) : nom tel qu'écrit, résultat chiffré
+  ou texte, unité, norme DU LABO, date du prélèvement — rien d'inventé, aucune interprétation. Destination
+  proposée `lab_results`. Sans cerveau branché, les valeurs se saisissent dans la même fenêtre.
+- Validation par l'utilisateur après correction ligne à ligne : accord « medical » exigé (403 `CONSENT_REQUIRED`,
+  accord donné dans la fenêtre) ; au moins une valeur et la date. Les valeurs entrent dans `pulse_lab_results`,
+  jamais dans la mémoire vectorisée. Supprimer l'élément de Nourrir l'IA supprime ses valeurs.
+- Lectures (accord « medical ») : `GET /api/imperium/pulse/lab-results/latest` (dernière valeur par analyse, la
+  précédente, nombre de mesures, place par rapport à la norme du labo below|within|above|unknown — un repère, pas
+  un diagnostic ; `pending_inbox` = prises de sang à vérifier), `GET /lab-results?analyte=` (historique),
+  `POST /lab-results` (saisie à la main, Idempotency-Key), `DELETE /lab-results/{id}`.
+- Diète (doc 40 §10.6) : les dernières valeurs hors de la norme du labo entrent dans le contexte du planificateur,
+  avec la consigne d'orienter les aliments sans diagnostic ni promesse.
+- Pas encore : règles médicales tirées automatiquement d'un compte rendu (§9), alerte sur une valeur critique.
+
 ## 17. Out Of Scope V1
 
 ```text

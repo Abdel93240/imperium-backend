@@ -177,8 +177,9 @@ def update_extraction(db: Session, *, current_user: User, item_id: UUID, payload
     if item.status != "to_validate":
         raise InboxStateError("Only an analyzed item can be corrected.")
     draft = dict(item.extraction_draft or {})
+    values = payload.model_dump(mode="json")
     for field in payload.model_fields_set:
-        draft[field] = getattr(payload, field)
+        draft[field] = values[field]
     draft["edited_by_user"] = True
     item.extraction_draft = draft
     db.commit()
@@ -205,6 +206,13 @@ def validate_item(db: Session, *, current_user: User, item_id: UUID, payload: In
         item = _get(db, current_user=current_user, item_id=item_id)
         item.created_entity_type = "project"
         item.created_entity_id = project.id
+    if payload.destination == "lab_results":
+        from app.services.pulse import labs  # prise de sang → Pulse, jamais la mémoire vectorisée
+
+        try:
+            labs.store_from_inbox(db, current_user=current_user, item=item, final=item.extraction_final)
+        except ValueError as exc:
+            raise InboxStateError(str(exc)) from exc
     item.status = "validated"
     item.validated_at = datetime.now(UTC)
     _emit(db, current_user.id, "inbox.document.validated", item, {"destination": payload.destination})
@@ -242,9 +250,13 @@ def delete_item(db: Session, *, current_user: User, item_id: UUID) -> int:
         memory.is_active = False
         memory.correction_reason = "Supprimé par l'utilisateur (Nourrir l'IA)."
         neutralized += 1
+    from app.services.pulse import labs
+
+    lab_results = labs.delete_for_item(db, user_id=current_user.id, item_id=item.id)
     item.status = "deleted"
     item.deleted_at = now
-    _emit(db, current_user.id, "inbox.document.deleted", item, {"memories_neutralized": neutralized})
+    _emit(db, current_user.id, "inbox.document.deleted", item,
+          {"memories_neutralized": neutralized, "lab_results_deleted": lab_results})
     db.commit()
     return neutralized
 

@@ -295,7 +295,9 @@ B10) : un ÉLÉMENT regroupe un texte de contexte et zéro, un ou plusieurs fich
 - `knowledge_inbox_items` : entry_app (provenance seulement), title, context_text,
   status uploading|to_analyze|analyzing|to_validate|validated|vectorized|failed|deleted
   (UI : À analyser / À valider / Enregistré / Erreur), extraction_draft, extraction_final,
-  destination memory|project, created_entity_type/id, horodatages, deleted_at.
+  destination memory|project|lab_results, created_entity_type/id, horodatages, deleted_at.
+  `lab_results` (2026-10-22, migration 0132) : prise de sang reconnue à l'analyse, valeurs corrigées dans le
+  brouillon (`lab_results`, `measured_on`) puis rangées dans Pulse, jamais vectorisées (doc 34 §16-ter).
 - `knowledge_inbox_documents` : sources toujours conservées — original_filename, kind,
   mime_type, size_bytes, sha256, storage_pointer (relatif à KNOWLEDGE_INBOX_STORAGE_DIR,
   VPS en V1), storage_location vps_local|nas, source_retained_at, deleted_at.

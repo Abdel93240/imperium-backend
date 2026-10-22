@@ -385,3 +385,25 @@ class PulseShoppingItem(UUIDPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(),
                                                  onupdate=func.now())
+
+
+class PulseLabResult(UUIDPrimaryKeyMixin, Base):
+    """Valeur d'analyse VALIDÉE par l'utilisateur (prise de sang via Nourrir l'IA, ou saisie) ; migration 0132."""
+
+    __tablename__ = "pulse_lab_results"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    inbox_item_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("knowledge_inbox_items.id", ondelete="SET NULL"), nullable=True)
+    analyte: Mapped[str] = mapped_column(Text, nullable=False)
+    analyte_key: Mapped[str] = mapped_column(Text, nullable=False)
+    value: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unit: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ref_low: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    ref_high: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    ref_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    measured_on: Mapped[date] = mapped_column(Date(), nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

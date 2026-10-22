@@ -13,6 +13,7 @@ from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 
 from app.api.deps import CurrentUserDep, SessionDep
+from app.api.v1.routes.imperium_pulse_health import consent_required_response
 from app.schemas.knowledge_inbox import (
     ExtractionUpdate,
     InboxItemCreate,
@@ -24,6 +25,7 @@ from app.schemas.knowledge_inbox import (
 )
 from app.services.ai import knowledge_inbox as inbox
 from app.services.ai.knowledge_files import SIZE_LIMITS, KnowledgeFileError
+from app.services.pulse import health_consent
 
 router = APIRouter()
 MAX_UPLOAD_BYTES = max(SIZE_LIMITS.values())
@@ -128,6 +130,9 @@ def update_extraction_route(item_id: UUID, payload: ExtractionUpdate, current_us
 def validate_item_route(item_id: UUID, payload: InboxValidateRequest, current_user: CurrentUserDep, db: SessionDep) -> InboxItemRead:
     try:
         return inbox.validate_item(db, current_user=current_user, item_id=item_id, payload=payload)
+    except health_consent.ConsentRequiredError as exc:  # prise de sang : accord « medical » exigé
+        db.rollback()
+        return consent_required_response(exc)
     except _ERRORS as exc:
         raise _http(db, exc) from exc
 

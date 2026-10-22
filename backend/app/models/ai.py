@@ -234,7 +234,7 @@ class KnowledgeInboxItem(UUIDPrimaryKeyMixin, Base):
             "status IN ('uploading', 'to_analyze', 'analyzing', 'to_validate', 'validated', 'vectorized', 'failed', 'deleted')",
             name="status_check",
         ),
-        CheckConstraint("destination IS NULL OR destination IN ('memory', 'project')", name="destination_check"),
+        CheckConstraint("destination IS NULL OR destination IN ('memory', 'project', 'lab_results')", name="destination_check"),
         CheckConstraint("created_entity_type IS NULL OR created_entity_type IN ('project')", name="created_entity_type_check"),
         Index("knowledge_inbox_items_user_status_idx", "user_id", "status"),
         Index(

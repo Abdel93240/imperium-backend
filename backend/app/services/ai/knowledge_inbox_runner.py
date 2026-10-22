@@ -7,6 +7,7 @@
    tant que la transcription n'est pas branchée, PDF/images sans OCR) est listé dans
    sources_unread. Service OCR injoignable → l'élément repasse « to_analyze » et sera
    repris au réveil suivant, jamais lu à moitié.
+   Une prise de sang reconnue (Pulse, `labs`) reçoit ses valeurs et la destination proposée « lab_results ».
 2. Vectorisation des éléments VALIDÉS vers la mémoire (destination « memory ») :
    la version corrigée est découpée, embarquée par le service local, et écrite dans
    ai_memories avec source_table/source_id. GPU injoignable → l'élément reste validé
@@ -26,6 +27,7 @@ from app.models.ai import AIMemory, KnowledgeInboxDocument, KnowledgeInboxItem
 from app.services.ai import knowledge_inbox, ocr
 from app.services.ai.knowledge_files import TEXT_EXTENSIONS, extension
 from app.services.ai.knowledge_inbox import SOURCE_TABLE, _emit
+from app.services.pulse import labs
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ _DEFAULT = object()
 ModelCall = Callable[[str], dict]
 EmbedTexts = Callable[[list[str]], list[list[float]]]
 RecognizeFile = Callable[[bytes, str, str | None], "ocr.OcrResult"]
+ExtractLabs = Callable[..., tuple[list[dict], str | None, str | None]]  # (db, text=, item_id=) → (valeurs, date, moteur)
 
 
 def knowledge_inbox_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
@@ -49,6 +52,7 @@ def process_inbox(
     call_model: ModelCall | None | object = _DEFAULT,
     embed_texts: EmbedTexts | None | object = _DEFAULT,
     recognize_file: RecognizeFile | None | object = _DEFAULT,
+    extract_labs: ExtractLabs | None = None,
 ) -> None:
     db: Session = ctx.db
     model = _default_model() if call_model is _DEFAULT else call_model
@@ -56,7 +60,7 @@ def process_inbox(
     reader = _Reader(_default_recognizer() if recognize_file is _DEFAULT else recognize_file)
     analyzed = failed = deferred = vectorized = 0
     for item_id in list(db.scalars(select(KnowledgeInboxItem.id).where(KnowledgeInboxItem.status == "to_analyze").limit(BATCH))):
-        outcome = _analyze(db, item_id=item_id, model=model, reader=reader)
+        outcome = _analyze(db, item_id=item_id, model=model, reader=reader, extract_labs=extract_labs)
         analyzed += outcome == "analyzed"
         failed += outcome == "failed"
         deferred += outcome == "deferred"
@@ -108,7 +112,8 @@ class _Reader:
         return "unread", None, None
 
 
-def _analyze(db: Session, *, item_id: UUID, model: ModelCall | None, reader: _Reader) -> str:
+def _analyze(db: Session, *, item_id: UUID, model: ModelCall | None, reader: _Reader,
+             extract_labs: ExtractLabs | None = None) -> str:
     item = db.get(KnowledgeInboxItem, item_id)
     item.status = "analyzing"
     db.commit()
@@ -156,6 +161,11 @@ def _analyze(db: Session, *, item_id: UUID, model: ModelCall | None, reader: _Re
         "proposed_destination": "memory",
         "engine": engine,
     }
+    if labs.looks_like_lab("\n".join(texts), item.context_text):
+        # Prise de sang : valeurs proposées à corriger, destination « analyses » (Pulse), pas la mémoire.
+        results, measured, lab_engine = (extract_labs or labs.extract)(db, text="\n".join(texts), item_id=item.id)
+        item.extraction_draft = {**item.extraction_draft, "proposed_destination": labs.DESTINATION,
+                                 "lab_results": results, "measured_on": measured, "lab_engine": lab_engine}
     item.status = "to_validate"
     item.analyzed_at = datetime.now(UTC)
     _emit(db, item.user_id, "inbox.document.analyzed", item, {"engine": engine, "sources_unread": len(unread), "sources_ocr": len(ocr_sources)})
