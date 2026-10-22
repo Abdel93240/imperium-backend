@@ -1,10 +1,12 @@
 """Contrats de Nourrir l'IA (doc 70)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.pulse_labs import LabResultIn
 
 
 class InboxItemCreate(BaseModel):
@@ -73,12 +75,14 @@ class ExtractionUpdate(BaseModel):
 
     summary: str | None = Field(default=None, max_length=20000)
     facts: list[str] | None = Field(default=None, max_length=200)
+    lab_results: list[LabResultIn] | None = Field(default=None, max_length=80)  # prise de sang : valeurs corrigées
+    measured_on: date | None = None  # date du prélèvement
 
 
 class InboxValidateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    destination: Literal["memory", "project"] = "memory"
+    destination: Literal["memory", "project", "lab_results"] = "memory"
     project_title: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")

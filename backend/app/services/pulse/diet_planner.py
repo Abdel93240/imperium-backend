@@ -5,7 +5,8 @@ local (slot `pulse.diet_weekly_program_local`) ; tous deux semés éteints : auc
 avec la raison, rien n'est inventé.
 
 Contexte en LISTE BLANCHE : jours à planifier, consigne de la demande, catalogue de recettes actives (repères R1…),
-stock brut (nom, quantité, date limite), portions déjà prêtes, matériel. Sortie contrainte par schéma puis relue
+stock brut (nom, quantité, date limite), portions déjà prêtes, matériel, analyses de sang hors norme du labo (accord
+« medical » actif seulement). Sortie contrainte par schéma puis relue
 par le code : recettes citées existantes, jours de la semaine (pas de jour passé), portions mangées couvertes par
 les préparations (ou les portions déjà prêtes), conservation respectée, un repas par créneau. Invalide → un nouvel
 essai avec les erreurs, puis échec. Le plan proposé attend la validation de l'utilisateur (`diet.activate_plan`).
@@ -27,7 +28,7 @@ from app.models.imperium import FoodStockItem, PulseOwnedEquipment
 from app.models.pulse import PulseDietPlan, PulseDietPlanMeal, PulsePreparation, PulseRecipe
 from app.schemas.pulse_diet import RecipeCreate
 from app.services.ai import cloud, local_executor
-from app.services.pulse import diet
+from app.services.pulse import diet, labs
 
 logger = logging.getLogger(__name__)
 
@@ -157,12 +158,16 @@ def build_prompt(db: Session, user: User, plan: PulseDietPlan, days: list[date],
         for item in stock_rows) or "stock vide"
     equipment = ", ".join(db.scalars(select(PulseOwnedEquipment.name).where(
         PulseOwnedEquipment.user_id == user.id, PulseOwnedEquipment.status == "active"))) or "non renseigné"
+    analyses = labs.out_of_range_lines(db, user)
+    blood = ("\n## Analyses de sang hors de la norme du labo (dernières valeurs validées)\n" + "\n".join(analyses)
+             + "\nOriente les aliments en conséquence, sans diagnostic ni promesse ; dis-le dans rationale_fr.\n"
+             if analyses else "")
     return (
         f"Semaine du {plan.week_start.isoformat()}. Jours à planifier : {', '.join(_day_label(d) for d in days)}.\n"
         f"Consigne de l'utilisateur : {plan.note or 'aucune'}.\n"
         "Par défaut : le déjeuner et le dîner de chaque jour, une ou deux préparations dans la semaine.\n\n"
         f"## Catalogue (repères R…)\n{catalogue}\n\n## Stock (matières premières)\n{stock}\n\n"
-        f"## Matériel\n{equipment}\n\n"
+        f"## Matériel\n{equipment}\n{blood}\n"
         "Nouvelles recettes : repère N1, N2… dans new_recipes, puis cite-les par ce repère. Chaque recette citée par "
         "un repas doit être préparée avant (ou avoir des portions déjà prêtes)."
     )

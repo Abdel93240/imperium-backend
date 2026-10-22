@@ -37,7 +37,8 @@ from app.schemas.pulse_health import (
     RedFlagResolveRequest,
 )
 from app.services.imperium import replan
-from app.services.pulse import body, health_consent, medical, pain, red_flags
+from app.schemas.pulse_labs import LabHistory, LabLatestList, LabResultCreate, LabResultRead
+from app.services.pulse import body, health_consent, labs, medical, pain, red_flags
 
 router = APIRouter()
 
@@ -394,3 +395,51 @@ def resolve_red_flag_route(
     except red_flags.RedFlagStateError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+# ---------- Analyses de sang (entrée par Nourrir l'IA ; accord « medical ») ----------
+
+@router.get("/lab-results/latest", response_model=LabLatestList)
+def latest_lab_results_route(current_user: CurrentUserDep, db: SessionDep):
+    """Dernière valeur de chaque analyse, la précédente, sa place par rapport à la norme du labo."""
+    try:
+        return labs.latest(db, current_user=current_user)
+    except health_consent.ConsentRequiredError as exc:
+        return consent_required_response(exc)
+
+
+@router.get("/lab-results", response_model=LabHistory)
+def lab_history_route(analyte: str, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        return labs.history(db, current_user=current_user, key=analyte)
+    except health_consent.ConsentRequiredError as exc:
+        return consent_required_response(exc)
+
+
+@router.post("/lab-results", response_model=LabResultRead, status_code=status.HTTP_201_CREATED)
+def create_lab_result_route(
+    payload: LabResultCreate,
+    response: Response,
+    current_user: CurrentUserDep,
+    db: SessionDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+):
+    """Saisie à la main d'une valeur."""
+    try:
+        read, duplicate = labs.create(db, current_user=current_user, payload=payload,
+                                      idempotency_key=_require_key(idempotency_key))
+    except health_consent.ConsentRequiredError as exc:
+        db.rollback()
+        return consent_required_response(exc)
+    if duplicate:
+        response.status_code = status.HTTP_200_OK
+    return read
+
+
+@router.delete("/lab-results/{result_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_lab_result_route(result_id: UUID, current_user: CurrentUserDep, db: SessionDep):
+    try:
+        labs.remove(db, current_user=current_user, result_id=result_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
