@@ -99,3 +99,20 @@ def test_other_users_equipment_is_not_found(db) -> None:
     item = _client(db, owner).post(BASE, json={"name": "Kettlebell"}).json()
     assert _client(db, other).delete(f"{BASE}/{item['id']}").status_code == 404
     assert _client(db, other).get(BASE).json()["items"] == []
+
+
+def test_rename_and_change_the_note(db) -> None:
+    user = _user(db)
+    client = _client(db, user)
+    bar = client.post(BASE, json={"name": "Barre", "notes": "Porte"}).json()
+    client.post(BASE, json={"name": "Élastique"})
+    renamed = client.patch(f"{BASE}/{bar['id']}", json={"name": "Barre de traction", "notes": None})
+    assert renamed.status_code == 200
+    assert (renamed.json()["name"], renamed.json()["notes"]) == ("Barre de traction", None)
+    assert client.patch(f"{BASE}/{bar['id']}", json={"name": "elastique"}).status_code == 409
+    assert client.patch(f"{BASE}/{uuid4()}", json={"name": "X"}).status_code == 404
+    client.delete(f"{BASE}/{bar['id']}")
+    assert client.patch(f"{BASE}/{bar['id']}", json={"name": "Y"}).status_code == 404
+    actions = [e.payload["action"] for e in db.scalars(
+        select(Event).where(Event.user_id == user.id, Event.event_type == "pulse.equipment.updated").order_by(Event.created_at))]
+    assert actions == ["added", "added", "renamed", "removed"]

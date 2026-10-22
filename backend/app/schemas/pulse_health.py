@@ -91,7 +91,8 @@ class PainLogCreate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    body_zone: PainZone
+    body_zone: PainZone = "other"
+    location: str | None = Field(default=None, max_length=200)  # texte libre de l'appli Pulse
     side: Literal["left", "right", "both"] | None = None
     severity: int = Field(ge=0, le=10)
     pain_type: str | None = Field(default=None, max_length=80)
@@ -106,6 +107,7 @@ class PainLogRead(BaseModel):
 
     id: UUID
     body_zone: str
+    location: str | None = None
     side: str | None
     severity: int
     pain_type: str | None

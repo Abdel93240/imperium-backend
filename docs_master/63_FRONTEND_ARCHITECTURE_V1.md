@@ -759,6 +759,26 @@ Navigation :
 
 ### 9.4 `feature_pulse/`
 
+> **LIVRÉ (2026-10-22, appli 0.18.0-pulse, kit Pulse du 2026-10-22).** Les fiches du kit (P01-P29)
+> remplacent la liste PUL-xx ci-dessous pour l'écran ; les routes restent celles du backend.
+> - Même APK qu'Imperium, deuxième icône (`PulseActivity`, tâche séparée) ; une seule session
+>   (`AppSession` dans `core/network`) : se connecter dans l'une connecte l'autre.
+> - Thème propre au kit (ivoire, saumon, Manrope / Inter / JetBrains Mono locales, figées en
+>   graisses statiques), rail de six destinations : Aujourd'hui, Repas, Sport, Stock, Santé, Réglages.
+> - Branché : tableau du jour, J'ai bu (eau ou autre), J'ai mangé (article du stock décompté après
+>   validation serveur, ou « Autre » en un champ), repas du jour et brouillons, stock (correction
+>   avec version, retrait), achats manuels, ticket photographié → lignes corrigibles → confirmation,
+>   séances de la semaine, détail, déroulé local (brouillon gardé sur l'appareil, résultats envoyés
+>   en un bloc à la fin), santé (valeurs sourcées, inconnu = tiret), douleurs, relevés, accords
+>   demandés au moment du parcours, matériel, connexion, autorisations, bulle.
+> - Indisponible et affiché comme tel (pas de route inventée) : plan de diète, recettes,
+>   préparation → portions, liste de courses calculée (lot B côté serveur) ; programme
+>   d'entraînement et signaux calculés tant que `pulse.programs_enabled` / `pulse.board_enabled`
+>   sont éteints (409 `…_DISABLED` lu comme « pas encore activé ») ; Nourrir l'IA s'ouvre dans
+>   Imperium (même boîte, même serveur).
+> - Pas encore : file d'actions hors ligne (aujourd'hui : clé d'idempotence stable par fenêtre,
+>   saisie gardée en cas d'échec), dictée vocale.
+
 Screens V1 :
 
 - `PUL-01` Dashboard ;
@@ -856,12 +876,12 @@ Navigation :
 | Mission en cours | Imperium | mission active unique (titre, échéance, progression) | Terminer ; Échouer (raison obligatoire, cf. 59 §12.4) ; Demander une replanification complète de la journée |
 | Ajouter une transaction | Vault | formulaire court | Saisir une transaction : revenu OU dépense, montant, catégorie préremplie (table des libellés puis IA, doc 42 §7.0), livre business/perso déduit |
 | Raccourci Path | Path | aucun panneau | Tap = ouvre directement l'app Path |
-| Raccourci Pulse | Pulse | aucun panneau | Tap = ouvre directement l'app Pulse |
+| Pulse | Pulse | panneau de cinq actions (kit Pulse 2026-10-22) | J'ai bu ; J'ai mangé ; Photographier le ticket ; Liste des courses ; Ouvrir Pulse — chaque action ouvre Pulse sur le même formulaire que dans l'appli ; ni séance ni douleur |
 | Raccourci Vector | Vector | aucun panneau | Tap = ouvre directement l'app Vector |
 
-Les cinq apps ont leur bulle (décision 2026-10-15, révisée le même jour). Seules
-Imperium et Vault ont un panneau avec actions ; Path, Pulse et Vector sont de
-simples raccourcis de lancement. La bulle Vector est un lanceur optionnel : Vector
+Les cinq apps ont leur bulle (décision 2026-10-15, révisée le même jour). Imperium,
+Vault et Pulse (kit du 2026-10-22, qui remplace le simple raccourci) ont un panneau
+avec actions ; Path et Vector sont de simples raccourcis de lancement. La bulle Vector est un lanceur optionnel : Vector
 V1 ne DÉPEND d'aucun overlay pour fonctionner, la règle du doc 08 reste respectée.
 
 ### 10.2 Technique et règles

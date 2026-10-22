@@ -163,3 +163,13 @@ def test_day_view_uses_the_paris_day_and_has_no_target_yet(db) -> None:
     assert [log["amount_ml"] for log in day["logs"]] == [250, 1000]
     assert day["target"] is None
     assert day["target_message"] == "Objectif personnalisé pas encore calculé."
+
+
+def test_other_drink_is_logged_but_never_takes_water_from_the_stock(db) -> None:
+    client = _client(db, _user(db))
+    water = _stock(client, "Eau", 1, "l")
+    body = client.post(LOGS, headers=_key(), json={"amount_ml": 250, "drink": "  Thé à la menthe "}).json()
+    assert (body["log"]["drink"], body["log"]["stock_decrement_applied"], body["stock_items"]) == ("Thé à la menthe", False, [])
+    assert _stock_by_id(client)[water["id"]]["quantity"] == "1.000"
+    plain = client.post(LOGS, headers=_key(), json={"amount_ml": 250}).json()
+    assert plain["log"]["drink"] is None and plain["log"]["stock_decrement_applied"] is True

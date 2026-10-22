@@ -475,6 +475,10 @@ Headers: Idempotency-Key
 
 Payload stores `amount_ml`, `logged_at`, `source`, and Path constraint context.
 
+> CODÉ (2026-10-22, migration 20261022_0130, appli Pulse « J'ai bu ») : champ facultatif `drink`
+> (texte libre, 80 caractères) — absent : de l'eau ; présent : une autre boisson, comptée dans le total
+> du jour mais qui ne décompte JAMAIS l'eau du stock. Boire n'est pas l'hydratation du corps.
+>
 > CODÉ (2026-10-17, migration 20261017_0058, table `pulse_hydration_logs`) :
 > - `POST` `{amount_ml 1..5000 (entier), logged_at?, source quick|manual|chatbot, decrement_stock = true}`
 >   → `{log, stock_items, warnings}`. Même clé + même contenu → même réponse ; contenu
@@ -673,6 +677,10 @@ The health specialist exploits it creatively (one item → many exercises).
 > le rajouter renvoie la ligne existante, 200), `DELETE /{id}` (statut removed, jamais
 > supprimé ; déjà retiré → même réponse). Événement `pulse.equipment.updated`. Utilisation
 > par le programme de séances (modes 1 et 3) : pas encore.
+> CODÉ (2026-10-22, appli Pulse, réglage Matériel) : `PATCH /equipment/{id}` `{name, notes?}` —
+> renommer ou changer la note ; un nom déjà porté par un autre matériel actif → 409, matériel
+> retiré ou inconnu → 404 ; événement `pulse.equipment.updated` (action `renamed`). Liste ouverte :
+> sport comme cuisine.
 
 ### 13-PARK. Park equipment & day-continuity routing
 
@@ -816,6 +824,12 @@ POST /api/imperium/pulse/pain-logs   (CODÉ 2026-10-17)
 Headers: Idempotency-Key
 ```
 
+> CODÉ (2026-10-22, migration 20261022_0130, appli Pulse « Signaler une douleur ») : champ
+> `location` en texte libre (« Où ressens-tu la gêne ? », 200 caractères) ; la zone devient
+> facultative (`other` par défaut). L'appli envoie le lieu, l'intensité, une précision
+> (`limitation_notes`) et l'impact sur les mouvements (`pain_type` + `workout_impact`) ; pas de
+> séance liée choisie à la main (l'association revient à l'IA).
+>
 > CODÉ (2026-10-17, migration 20261017_0062, table `pulse_pain_logs`), sous consentement
 > « pain » (doc 08 PULSE-004) :
 > - `POST` : zone (liste fermée : head, neck, shoulder, upper_back, lower_back, chest,
