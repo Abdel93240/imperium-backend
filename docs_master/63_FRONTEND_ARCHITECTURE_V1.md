@@ -720,6 +720,24 @@ Navigation :
 
 ### 9.3 `feature_vector/`
 
+> **LIVRÉ (2026-10-22, appli 0.25.0-vector, lot V1 du kit Vector final du 2026-10-22).** Les décisions du kit
+> remplacent la liste VEC-xx ci-dessous pour l'écran (pas d'écran Démarrer ni de saisie objectif/direction, pas de
+> mode conduite, pas de dépenses/net, pas de connexion propre à Vector).
+> - Même APK, troisième icône (`VectorActivity`, tâche séparée), session commune ; non connecté → « Connecte-toi
+>   dans Imperium ». Thème du kit (vert forêt, ivoire, sauge, champagne ; Exo 2, Inter, JetBrains Mono ; logo
+>   original non redessiné ; 54 pictogrammes convertis), barre latérale à trois entrées.
+> - Branché : Ma session (Démarrer sans formulaire, Mettre en pause / Reprendre, Arrêter avec confirmation et clé
+>   stable ; CA, courses effectuées = acceptées avec résultat réel, refusées ; objectif IA affiché s'il existe,
+>   sinon « pas encore fixé »), Conseil de zone (trois zones au plus, GPS direct par l'appli de navigation avec le
+>   nom de la zone), Historique (périodes en Europe/Paris, totaux, sessions, détail avec offres Toutes / Effectuées /
+>   Refusées : « Offre » pour un refus, « CA » pour une course faite), terminal (chatbot commun, rôles VECTOR et
+>   VOUS, actions proposées à valider), Réglages en quatre entrées (assistant : signaux, sons et aperçu, animations
+>   réduites ; notifications ; Nourrir l'IA ouvert dans Imperium ; autorisations réelles).
+> - Indisponible et dit comme tel : les sept flux d'information (avions, événements, métro-RER-Transilien, bus,
+>   météo, SNCF, autoroutes : lot V2, sources autorisées par l'utilisateur), l'assistant de prise de course
+>   (interrupteur présent mais grisé : capture des offres pas encore branchée), la dictée du terminal, l'envoi des
+>   notifications.
+
 Screens V1 :
 
 - `VEC-01` Dashboard ;

@@ -40,6 +40,13 @@ Vector does not use the following as decision inputs in V1:
 
 Imperium can use those signals globally. Pulse can use health signals. Vault can use finance signals. Vector remains VTC profitability only.
 
+> CODÉ (2026-10-22, migration 20261022_0137, kit Vector final) : pause et reprise d'une session —
+> `POST /api/imperium/vector/sessions/{id}/pause` et `/resume` (rejouer sans effet), statut `paused`, `paused_at`,
+> `paused_seconds` ; une seule session ouverte (en cours ou en pause) ; arrêter pendant une pause clôt la pause ;
+> offres refusées pendant la pause (résultats et recettes acceptés). KPI : `active_minutes` (écoulé moins les
+> pauses), `rides_done` (offres acceptées AVEC résultat réel : accepté ≠ réalisé), `rides_refused` ; le CA reste celui
+> des résultats écrits au Vault, jamais le nombre de lignes financières.
+
 ## 3. VTC Inputs
 
 Vector can use:
