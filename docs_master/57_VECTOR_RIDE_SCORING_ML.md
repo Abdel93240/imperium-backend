@@ -277,6 +277,19 @@ REASON: Google annonce 10 min → réalité souvent 13-14 min
 PRINCIPE: pas de multiplicateur en dur, le modèle apprend.
 ```
 
+### 4.13 Rule R12 — Économique : €/h global et zone d'arrivée (décision utilisateur 2026-10-23)
+
+> CODÉ (migration 20261023_0142, `services/vector/economics.py`). €/h global = prix ÷ (approche + course). La zone
+> d'arrivée est notée 0–10 au moment où la course finit : note posée par l'utilisateur (`rides_zone_scores`, code
+> postal ou département, créneau ou « all »), sinon note par défaut (Paris, aéroports, La Défense, 92, 93, 94,
+> grande couronne, hors Île-de-France, par créneau) ; + 2 si un événement finit près de l'arrivée, + 1 s'il y pleut.
+> Zone ≥ 8 → vert même sous le seuil ; zone < 4 → on ajoute le temps de repositionnement vers la zone ≥ 6 la plus
+> proche (vol d'oiseau à 30 km/h + 5 min) ; vert si le €/h obtenu ≥ 25 €/h, rouge sinon (pas de zone neutre). Une
+> règle rouge R1–R3 l'emporte (prudence) ; R7/R8 deviennent des variables. Sans durée de course lue : aucun avis.
+> Paramètres `vector.economic_rule`. Variables gardées : `hourly_global_eur`, `dest_zone_score`(+ source, raisons),
+> `reposition_min`, `hourly_effective_eur`, `economic_signal`. Les notes par défaut sont un point de départ : elles
+> seront remplacées par l'historique (doc 39) et par le modèle.
+
 ### 4.12 Rule storage schema
 
 ```sql
