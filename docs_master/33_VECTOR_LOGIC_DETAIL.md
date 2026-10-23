@@ -142,8 +142,8 @@ CatBoost ride verdict → 2 outcomes only:
 
 > CODÉ (2026-10-23, appli 0.34.0-courses) — lecture calée sur 13 captures Bolt réelles. Offre : puces Priorité,
 > gamme (« Bolt »), Carte / Espèces / Client Business, « +x € inclus » (majoration incluse ; avec Priorité, c'est la
-> priorité qui la crée), prix « (net, TTC) », couples « 5 min • 1.7 km », adresses (rue jamais envoyée : commune et
-> quartier seulement), boutons Refuser / Accepter ou Répondre (même sens ; sans eux, pas d'offre). Le serveur déduit
+> priorité qui la crée), prix « (net, TTC) », couples « 5 min • 1.7 km », adresses (commune et
+> quartier, plus l'adresse complète depuis 2026-10-23 : décision utilisateur, la position GPS la donnait déjà), boutons Refuser / Accepter ou Répondre (même sens ; sans eux, pas d'offre). Le serveur déduit
 > le code postal et la position de la commune ou du quartier (liste officielle des communes d'Île-de-France, 80
 > quartiers de Paris, aéroports ; `services/vector/geo.py`) : arrivée sans code postal résolue, météo de la case
 > d'arrivée, distance au centre de Paris. Chronométrage sans saisie : étape d'approche (« En route vers l'adresse de

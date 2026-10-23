@@ -86,7 +86,8 @@ def record_offer(
         raise OfferInputError("L'heure de la course ne peut pas être dans le futur.")
     session = sessions._active(db, current_user, session_id)
     # L'arrivée d'une offre Bolt n'a presque jamais de code postal : la commune ou le quartier lu le donne.
-    places = {side: geo.resolve(getattr(payload, f"{side}_zone")) for side in ("pickup", "destination")}
+    places = {side: geo.resolve(getattr(payload, f"{side}_address") or getattr(payload, f"{side}_zone"))
+              for side in ("pickup", "destination")}
     sources = {side: "read" if getattr(payload, f"{side}_zone_code") else ("resolved" if places[side] and places[side].postal_code
                                                                           else None) for side in places}
     payload = payload.model_copy(update={
@@ -110,7 +111,9 @@ def record_offer(
         surge_multiplier=payload.surge_multiplier, pickup_zone=(payload.pickup_zone or "").strip() or None,
         destination_zone=(payload.destination_zone or "").strip() or None, payment_type=payload.payment_type,
         ride_type=payload.ride_type, features=variables, pickup_zone_code=payload.pickup_zone_code,
-        destination_zone_code=payload.destination_zone_code, signal=signal, signal_source="rules_only",
+        destination_zone_code=payload.destination_zone_code, signal=signal,
+        pickup_address=(payload.pickup_address or "").strip() or None,
+        destination_address=(payload.destination_address or "").strip() or None, signal_source="rules_only",
         signal_reason=reason, triggered_rules=fired, version=1,
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )

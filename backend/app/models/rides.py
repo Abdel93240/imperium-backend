@@ -193,6 +193,8 @@ class RidesOffer(UUIDPrimaryKeyMixin, Base):
     revenue_transaction_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     pickup_zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     destination_zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pickup_address: Mapped[str | None] = mapped_column(Text, nullable=True)  # adresse lue sur l'offre, rue comprise
+    destination_address: Mapped[str | None] = mapped_column(Text, nullable=True)
     signal: Mapped[str | None] = mapped_column(Text, nullable=True)
     signal_source: Mapped[str | None] = mapped_column(Text, nullable=True)
     signal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
