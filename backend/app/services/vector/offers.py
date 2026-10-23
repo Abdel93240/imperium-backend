@@ -36,7 +36,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, drops, economics, events, geo, grid, priority, school, sessions, weather
+from app.services.vector import calendar, drops, economics, events, feeds, geo, grid, priority, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -314,6 +314,12 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         "dest_zone": grid.zone_at(dest_place.lat, dest_place.lng).code if dest_place else None,
         "slot_10min": grid.slot_of(offered_at),
         "day_type": grid.day_type(offered_at),
+        # Perturbations IDFM, trafic TomTom, avions OpenSky : Île-de-France, autour de la tablette, autour de l'arrivée.
+        **feeds.context(db, offered_at, {
+            "pickup": (float(payload.driver_lat), float(payload.driver_lng))
+            if payload.driver_lat is not None and payload.driver_lng is not None else None,
+            "dest": (dest_place.lat, dest_place.lng) if dest_place else None,
+        }),
         # Course Priority (le client paie plus pour être pris vite) et propension de la zone à cette heure.
         "is_priority": payload.is_priority,
         **priority.history_features(db, session.user_id, cell=cell, hour=local.hour, at=offered_at),

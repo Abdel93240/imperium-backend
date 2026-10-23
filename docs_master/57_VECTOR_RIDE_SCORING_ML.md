@@ -546,6 +546,18 @@ TRAFFIC:
 > `events_ending_within_60min_idf`, `road_closures_active`, `rail_works_active` ; vides avant le premier scan.
 > Restent : avions (OpenSky), trafic (TomTom), perturbations en temps réel (IDFM, SNCF), clés attendues.
 
+> CODÉ (2026-10-23, migration 20261023_0144, `services/vector/feeds.py`) — flux en temps réel, relevés seulement
+> pendant une session, gardés : perturbations IDFM PRIM des modes lourds (métro, RER, Transilien, tram ; bloquante
+> ou perturbée, en cours ; arrêts touchés placés dans la grille fine, positions demandées une fois et gardées),
+> trafic TomTom (4 rectangles couvrant l'Île-de-France ; bouchons avec retard, fermetures des axes numérotés),
+> avions OpenSky autour de Roissy-CDG, Orly, Beauvais (approche finale < 900 m en descente à < 15 km ; atterrissages
+> = avions distincts vus en approche finale). Variables de chaque offre : `transit_heavy_disruptions`,
+> `transit_blocking`, `rer_lines_disrupted`, `metro_lines_disrupted`, `traffic_incidents_idf`,
+> `traffic_delay_idf_min`, `traffic_closures_idf`, `cdg/ory/bva_landings_30_60_min` et `_last_30_min`, et pour la
+> tablette (`pickup_`) et l'arrivée (`dest_`) : ligne perturbée à < 1,5 km (et laquelle), bloquante, retard des
+> bouchons à < 3 km, axe fermé. Chaque mesure après dépose garde la même situation au lieu et à l'heure de la
+> dépose (`context`, avec la pluie de la case). SNCF : clé refusée (à vérifier), non branchée. Clés dans `.env`.
+
 ### 5.7 Rule-derived features (CRITICAL)
 
 Ces features encodent explicitement les règles. **Le modèle apprend ainsi s'il doit les suivre ou les contourner.**
