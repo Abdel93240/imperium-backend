@@ -148,6 +148,35 @@ def refresh_transit(db: Session, *, now: datetime | None = None, fetch_bulk=None
 
 # --- TomTom ----------------------------------------------------------------------------------------------------
 
+def road_class(roads: list[str]) -> str:
+    """Importance de la route, que TomTom ne donne pas : A / N / périphérique = « major », D = « departmental »,
+    sinon « street ». TomTom ne note pas la gravité d'une fermeture (toujours 4, « indéterminée »)."""
+    names = [r.upper().replace(" ", "") for r in roads or []]
+    if any(n[:1] in ("A", "N") or n.startswith("BP") or "PERIPH" in n for n in names):
+        return "major"
+    if any(n[:1] == "D" for n in names):
+        return "departmental"
+    return "street"
+
+
+TOMTOM_FLOW = "https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json"
+FLOW_CHECKS = 20  # fermetures mesurées par relevé au plus (offre gratuite TomTom)
+# Importance d'une route selon sa classe TomTom (FRC0 autoroute … FRC6 rue de quartier), sur 100.
+FRC_WEIGHT = {"FRC0": 100, "FRC1": 85, "FRC2": 70, "FRC3": 55, "FRC4": 40, "FRC5": 25, "FRC6": 10}
+
+
+def closure_impact(frc: str | None, current: int | None, free_flow: int | None, closed: bool = False) -> int | None:
+    """Note d'impact sur 100 : importance de la route × (moitié fixe + moitié selon le ralentissement mesuré) ;
+    route entièrement coupée (TomTom : 0/0 km/h, `roadClosure`) = ralentissement total."""
+    weight = FRC_WEIGHT.get(frc or "")
+    if weight is None:
+        return None
+    if closed or (current == 0 and not free_flow):
+        return weight
+    slowdown = max(0.0, 1 - current / free_flow) if current is not None and free_flow else 0.0
+    return round(weight * (0.5 + 0.5 * slowdown))
+
+
 def _middle(coordinates) -> tuple[float, float] | None:
     points = coordinates if coordinates and isinstance(coordinates[0], list) else [coordinates] if coordinates else []
     if not points:
@@ -156,7 +185,7 @@ def _middle(coordinates) -> tuple[float, float] | None:
     return float(lat), float(lng)
 
 
-def refresh_traffic(db: Session, *, now: datetime | None = None, fetch=None) -> int:
+def refresh_traffic(db: Session, *, now: datetime | None = None, fetch=None, flow=None) -> int:
     now = now or datetime.now(UTC)
     key = get_settings().tomtom_api_key
     if fetch is None:
@@ -165,6 +194,10 @@ def refresh_traffic(db: Session, *, now: datetime | None = None, fetch=None) -> 
         fetch = lambda box: _get(TOMTOM + "?" + urllib.parse.urlencode({  # noqa: E731
             "key": key, "bbox": ",".join(map(str, box)), "fields": TOMTOM_FIELDS, "language": "fr-FR",
             "timeValidityFilter": "present"}))
+    if flow is None and key:
+        flow = lambda lat, lng: _get(TOMTOM_FLOW + "?" + urllib.parse.urlencode({  # noqa: E731
+            "point": f"{lat},{lng}", "unit": "KMPH", "key": key})).get("flowSegmentData") or {}
+    added: list[RidesTrafficIncident] = []
     rows, seen = 0, set()
     for box in TOMTOM_BOXES:
         for incident in fetch(box).get("incidents") or []:
@@ -175,14 +208,28 @@ def refresh_traffic(db: Session, *, now: datetime | None = None, fetch=None) -> 
             if ident in seen:  # incident à cheval sur deux rectangles
                 continue
             seen.add(ident)
-            db.add(RidesTrafficIncident(
+            incident = RidesTrafficIncident(
                 id=uuid4(), fetched_at=now, category=props.get("iconCategory"), magnitude=props.get("magnitudeOfDelay"),
                 delay_s=props.get("delay"), length_m=int(props["length"]) if props.get("length") is not None else None,
                 roads=props.get("roadNumbers") or [], from_text=(props.get("from") or "")[:200] or None,
                 to_text=(props.get("to") or "")[:200] or None, lat=middle[0], lng=middle[1],
                 zone_code=grid.zone_at(*middle).code,
-            ))
+            )
+            db.add(incident)
+            added.append(incident)
             rows += 1
+    # Fermetures des axes numérotés, grands axes d'abord : classe de la route et ralentissement mesurés sur place.
+    closures = sorted((i for i in added if i.category == 8 and i.roads),
+                      key=lambda i: road_class(i.roads) != "major")[:FLOW_CHECKS]
+    for incident in closures if flow else []:
+        try:
+            data = flow(float(incident.lat), float(incident.lng))
+        except FeedUnavailableError:
+            break
+        incident.frc, incident.current_speed, incident.free_flow_speed = (
+            data.get("frc"), data.get("currentSpeed"), data.get("freeFlowSpeed"))
+        incident.impact = closure_impact(incident.frc, incident.current_speed, incident.free_flow_speed,
+                                         closed=bool(data.get("roadClosure")))
     db.flush()
     return rows
 
@@ -260,13 +307,22 @@ def context(db: Session, at: datetime, places: dict[str, tuple[float, float] | N
     incidents = list(db.scalars(select(RidesTrafficIncident).where(RidesTrafficIncident.fetched_at == t_fetched))) \
         if t_fetched else None
     if incidents is None:
-        out.update({"traffic_incidents_idf": None, "traffic_delay_idf_min": None, "traffic_closures_idf": None})
+        out.update({"traffic_incidents_idf": None, "traffic_delay_idf_min": None, "traffic_closures_idf": None,
+                    "traffic_closures_major_idf": None, "traffic_closures_departmental_idf": None,
+                    "traffic_jams_major_idf": None, "traffic_jams_on_major_roads_idf": None,
+                    "traffic_closures_high_impact_idf": None})
     else:
         out.update({
             "traffic_incidents_idf": len(incidents),
             "traffic_delay_idf_min": round(sum(i.delay_s or 0 for i in incidents) / 60),
-            # Fermetures : axes numérotés seulement (A, N, D, périphérique…) ; les petites rues en travaux sont légion.
+            # Fermetures par importance de la route (TomTom ne donne aucune gravité aux fermetures) ; bouchons par
+            # gravité TomTom (1 léger, 2 modéré, 3 important).
+            "traffic_closures_major_idf": sum(1 for i in incidents if i.category == 8 and road_class(i.roads) == "major"),
+            "traffic_closures_departmental_idf": sum(1 for i in incidents if i.category == 8 and road_class(i.roads) == "departmental"),
             "traffic_closures_idf": sum(1 for i in incidents if i.category == 8 and i.roads),
+            "traffic_jams_major_idf": sum(1 for i in incidents if i.category == 6 and (i.magnitude or 0) >= 3),
+            "traffic_closures_high_impact_idf": sum(1 for i in incidents if i.category == 8 and (i.impact or 0) >= 50),
+            "traffic_jams_on_major_roads_idf": sum(1 for i in incidents if i.category == 6 and road_class(i.roads) == "major"),
         })
     for code in AIRPORTS:
         key = code.lower()
@@ -288,6 +344,12 @@ def context(db: Session, at: datetime, places: dict[str, tuple[float, float] | N
             f"{name}_transit_lines": sorted({d.line_name for d in near}) if near else [],
             f"{name}_traffic_delay_min": round(sum(i.delay_s or 0 for i in close) / 60) if incidents is not None else None,
             f"{name}_road_closed": any(i.category == 8 and i.roads for i in close) if incidents is not None else None,
+            f"{name}_major_road_closed": any(i.category == 8 and road_class(i.roads) == "major" for i in close)
+            if incidents is not None else None,
+            f"{name}_jam_level": max((i.magnitude or 0 for i in close if i.category == 6), default=0)
+            if incidents is not None else None,
+            f"{name}_closure_impact_max": max((i.impact or 0 for i in close if i.category == 8), default=0)
+            if incidents is not None else None,
         })
     return out
 
