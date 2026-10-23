@@ -35,7 +35,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, events, school, sessions, weather
+from app.services.vector import calendar, events, priority, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -226,6 +226,8 @@ def training_summary(db: Session, *, current_user: User) -> TrainingSummaryRead:
 def features(db: Session, session: RidesSession, payload: RideOfferCreate, offered_at: datetime) -> dict:
     """Variables du doc 57 §5.1, §5.2 (sans culte ni santé) et §5.4, figées au moment de l'offre."""
     local = offered_at.astimezone(PARIS)
+    cell = (weather.cell_at(float(payload.driver_lat), float(payload.driver_lng)).code
+            if payload.driver_lat is not None and payload.driver_lng is not None else None)
     duration = payload.estimated_duration_min
     approach = payload.approach_duration_min
     kpis = sessions._kpis(db, session, offered_at)
@@ -272,6 +274,11 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         **_area("dest", payload.destination_zone_code),
         "driver_lat": float(payload.driver_lat) if payload.driver_lat is not None else None,
         "driver_lng": float(payload.driver_lng) if payload.driver_lng is not None else None,
+        # Case de la grille où se trouve la tablette (découpage commun météo, Priority, majoration).
+        "zone_cell": cell,
+        # Course Priority (le client paie plus pour être pris vite) et propension de la zone à cette heure.
+        "is_priority": payload.is_priority,
+        **priority.history_features(db, session.user_id, cell=cell, hour=local.hour, at=offered_at),
         # Calendrier (doc 57 §5.2) : jours fériés calculés ; vacances scolaires (zone C) relevées.
         "is_public_holiday": calendar.is_public_holiday(local.date()),
         "is_eve_of_holiday": calendar.is_public_holiday(local.date() + timedelta(days=1)),

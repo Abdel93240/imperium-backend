@@ -13,6 +13,7 @@ from app.schemas.rides import (
     BusinessRuleRead,
     BusinessRuleUpdate,
     EventFeedRead,
+    PriorityStatsRead,
     WeatherFeedRead,
     CurrentSessionRead,
     DropZoneCreate,
@@ -39,7 +40,7 @@ from app.schemas.rides import (
 from app.services.imperium import replan, vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import events, offers, recommendations, rules, sessions, weather
+from app.services.vector import events, offers, priority, recommendations, rules, sessions, weather
 
 router = APIRouter()
 
@@ -364,6 +365,12 @@ def events_feed_route(current_user: CurrentUserDep, db: SessionDep,  # noqa: ARG
                       kind: Literal["event", "road_closure", "rail_works"] = "event") -> EventFeedRead:
     """Scan web du lundi : événements, fermetures routières ou travaux du rail des 7 prochains jours."""
     return events.feed(db, kind=kind)
+
+
+@router.get("/stats/priority", response_model=PriorityStatsRead)
+def priority_stats_route(current_user: CurrentUserDep, db: SessionDep, days: int = 90) -> PriorityStatsRead:
+    """Où et quand tombent les courses Priority : part par case de la grille et par code postal, par créneau."""
+    return priority.stats(db, current_user=current_user, days=max(1, min(days, 730)))
 
 
 @router.get("/training-summary", response_model=TrainingSummaryRead)

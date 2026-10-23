@@ -376,6 +376,13 @@ CATEGORICAL (CatBoost natif):
 > (`driver_lat/lng`, dernière position de moins de 2 min), jours fériés et veilles (calculés), €/h réel de la course
 > précédente. `is_school_holiday` reste vide (source à brancher). Culte et santé restent exclus (doc 13 §5).
 
+> CODÉ (2026-10-23) — courses « Priority » (le client paie plus pour être pris plus vite ; étiquette à gauche du prix,
+> lue par l'assistant) : `is_priority` (vide si non lue), `zone_cell` (case de la grille météo où est la tablette :
+> découpage commun météo / Priority / majoration), `priority_share_cell_hour` et `priority_offers_seen_cell_hour`
+> (part des offres Priority vues dans la même case, à une heure près, sur 90 jours, et leur nombre). `GET
+> /api/imperium/vector/stats/priority?days=90` : part par case et par code postal de prise en charge, par créneau
+> (part affichée à partir de 5 offres).
+
 ### 5.2 Temporal features
 
 ```text

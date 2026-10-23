@@ -1,7 +1,7 @@
 """PostgreSQL : règles métier Vector et signal « règles seules » (doc 57 §3.1, §4, §5.7)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -199,3 +199,23 @@ def test_french_public_holidays() -> None:
     assert calendar.easter(2027) == date(2027, 3, 28)
     assert {d for d in calendar.public_holidays(2026) if d.month in (4, 5)} == {
         date(2026, 4, 6), date(2026, 5, 1), date(2026, 5, 8), date(2026, 5, 14), date(2026, 5, 25)}
+
+
+def test_priority_offers_by_zone_and_hour(db) -> None:
+    _, client, session_id = _setup(db)
+    here = {"driver_lat": "48.853400", "driver_lng": "2.348800", "pickup_zone_code": "75004"}
+    first = _offer(client, session_id, NOON, is_priority=True, **here)["features"]
+    assert (first["is_priority"], first["zone_cell"], first["priority_offers_seen_cell_hour"]) == (True, "A-04-03", 0)
+    assert first["priority_share_cell_hour"] is None                    # rien vu avant : pas de part
+    for minutes, flag in ((5, False), (10, True), (15, False), (20, True)):
+        _offer(client, session_id, NOON + timedelta(minutes=minutes), is_priority=flag, **here)
+    _offer(client, session_id, NOON + timedelta(minutes=25), **here)    # étiquette non lue : ne compte pas
+    later = _offer(client, session_id, NOON + timedelta(minutes=30), is_priority=False, **here)["features"]
+    assert (later["priority_offers_seen_cell_hour"], later["priority_share_cell_hour"]) == (5, 0.6)
+    night = _offer(client, session_id, NIGHT, is_priority=False, **here)["features"]
+    assert night["priority_offers_seen_cell_hour"] == 0               # autre heure : autre propension
+    stats = client.get(f"{BASE}/stats/priority").json()
+    cell = next(r for r in stats["rows"] if r["by"] == "zone_cell" and r["time_block"] == "daytime")
+    assert (cell["zone"], cell["offers"], cell["priority"], cell["share"]) == ("A-04-03", 6, 3, 0.5)
+    code_night = next(r for r in stats["rows"] if r["by"] == "pickup_zone_code" and r["time_block"] == "night")
+    assert (code_night["zone"], code_night["offers"], code_night["share"]) == ("75004", 1, None)  # trop peu d'offres
