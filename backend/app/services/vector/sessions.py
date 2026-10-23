@@ -194,6 +194,7 @@ def complete_session(
     with db.no_autoflush:  # chiffres lus avant la clôture (statut et pause changent ensemble)
         session.paused_at = None
         kpis = _kpis(db, session, now)
+    _drops().interrupt(db, session.id, "session_end")
     session.status, session.ended_at = "completed", now
     session.final_revenue_cents, session.final_expense_cents = kpis.revenue_cents, kpis.expense_cents
     session.review_note = (payload.review_note or "").strip() or None
@@ -210,11 +211,17 @@ def complete_session(
     return read
 
 
+def _drops():
+    from app.services.vector import drops  # import local : drops dépend de geo/grid, pas l'inverse
+    return drops
+
+
 def pause_session(db: Session, *, current_user: User, session_id: UUID, now: datetime | None = None) -> SessionRead:
     """Mettre en pause : rejouer sur une session déjà en pause renvoie la session (double appui sans effet)."""
     now = now or datetime.now(UTC)
     session = _open(db, current_user, session_id)
     if session.status == "active":
+        _drops().interrupt(db, session.id, "pause")  # le temps de pause n'est pas de l'attente de course
         session.status, session.paused_at = "paused", now
         session.version += 1
         _event(db, current_user, "rides.session.paused", session, {}, ref=f"{session.id}.{now.timestamp()}")

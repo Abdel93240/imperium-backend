@@ -290,6 +290,18 @@ PRINCIPE: pas de multiplicateur en dur, le modèle apprend.
 > `reposition_min`, `hourly_effective_eur`, `economic_signal`. Les notes par défaut sont un point de départ : elles
 > seront remplacées par l'historique (doc 39) et par le modèle.
 
+> CODÉ (2026-10-23, migration 20261023_0143, `grid.py`, `drops.py`) — découpage fin voulu par l'utilisateur :
+> zones de 1 km² dans Paris et autour des aéroports (4 km), 3 km² en ville (commune à ≥ 1 000 hab/km²), 10 km² à la
+> campagne (densités officielles geo.api.gouv.fr ; identifiant stable « P:col:ligne ») ; créneaux de 10 minutes
+> (144 par jour) et type de jour (semaine, samedi, dimanche, férié ; vacances à part). Chaque offre porte
+> `driver_zone`, `dest_zone`, `slot_10min`, `day_type`. Mesure après chaque dépose (`rides_drop_observations`) : zone
+> et créneau de la dépose (GPS, sinon centre de la commune), attente jusqu'à la première offre, offres vues, attente
+> jusqu'à la course suivante acceptée, son gain et son temps, €/h du cycle ; pause ou fin de session = interrompue.
+> C'est la valeur mesurée d'une zone à un créneau. Suite prévue : note mesurée par zone × créneau mêlée aux notes
+> par défaut selon le nombre de mesures (note sur 100 : 50 = médiane), import de l'historique Bolt, puis modèle qui
+> prédit le €/h après dépose à partir de la zone, du créneau et du contexte (météo, avions, événements, routes, rail,
+> majoration, Priority), réentraîné chaque semaine.
+
 ### 4.12 Rule storage schema
 
 ```sql

@@ -8,7 +8,7 @@ l'utilisateur. Les revenus et dépenses d'une session sont des transactions Vaul
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, SmallInteger, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -347,3 +347,41 @@ class RidesZoneScore(UUIDPrimaryKeyMixin, Base):
     score: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class RidesDropObservation(UUIDPrimaryKeyMixin, Base):
+    """Après une dépose : attente, offres vues, course suivante, €/h du cycle — par zone fine et créneau de 10 min."""
+
+    __tablename__ = "rides_drop_observations"
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'closed', 'interrupted')", name="status_check"),
+        CheckConstraint("slot BETWEEN 0 AND 143", name="slot_range"),
+        UniqueConstraint("offer_id", name="offer_unique"),
+        Index("rides_drop_observations_open_idx", "session_id", postgresql_where=text("status = 'open'")),
+        Index("rides_drop_observations_zone_idx", "zone_code", "day_type", "slot"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    session_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("rides_sessions.id", ondelete="CASCADE"),
+                                             nullable=False)
+    offer_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("rides_offers.id", ondelete="CASCADE"),
+                                           nullable=False)
+    dropped_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    drop_lat: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    drop_lng: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    zone_source: Mapped[str | None] = mapped_column(Text, nullable=True)
+    slot: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    day_type: Mapped[str] = mapped_column(Text, nullable=False)
+    school_holiday: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    next_offer_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    wait_first_offer_min: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
+    offers_seen: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    next_offer_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    next_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    wait_to_accept_min: Mapped[float | None] = mapped_column(Numeric(6, 1), nullable=True)
+    next_earning_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_mobilized_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_hourly_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open", server_default="open")
+    closed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -63,9 +63,9 @@ def _key(text: str) -> str:
 @lru_cache(maxsize=1)
 def _tables() -> tuple[dict, dict, dict]:
     data = json.loads(resources.files("app.services.vector").joinpath("data/communes_idf.json").read_text("utf-8"))
-    communes = {_key(name): (name, codes, lat, lng) for name, codes, lat, lng in data["communes"]}
+    communes = {_key(name): (name, codes, lat, lng) for name, codes, lat, lng, _ in data["communes"]}
     by_code = {}
-    for name, codes, lat, lng in data["communes"]:
+    for name, codes, lat, lng, _ in data["communes"]:
         for code in codes:
             by_code.setdefault(code, (name, lat, lng))
     for code, (lat, lng) in data["paris"].items():
@@ -101,3 +101,11 @@ def resolve(text: str | None) -> Place | None:
             name, codes, lat, lng = communes[part]
             return Place(name, codes[0], codes[0][:2], lat, lng)
     return None
+
+
+@lru_cache(maxsize=1)
+def densities() -> tuple[tuple[float, float, int], ...]:
+    """(lat, lng, habitants/km²) du centre de chaque commune ; Paris compté par arrondissement (très dense)."""
+    data = json.loads(resources.files("app.services.vector").joinpath("data/communes_idf.json").read_text("utf-8"))
+    return tuple((lat, lng, density) for _, _, lat, lng, density in data["communes"]) + tuple(
+        (lat, lng, 20000) for lat, lng in data["paris"].values())

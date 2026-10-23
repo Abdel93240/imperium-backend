@@ -36,7 +36,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, economics, events, geo, priority, school, sessions, weather
+from app.services.vector import calendar, drops, economics, events, geo, grid, priority, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -128,6 +128,7 @@ def record_offer(
     )
     db.add(offer)
     db.flush()
+    drops.on_offer(db, session.id, offered_at)  # attente depuis la dernière dépose
     db.refresh(offer)
     read = RideOfferRead.model_validate(offer)
     db.commit()
@@ -187,6 +188,11 @@ def record_outcome(
     offer.outcome = _outcome(payload)
     offer.version += 1
     db.flush()
+    # Mesure après dépose : ferme celle qui attendait cette course, ouvre celle de sa propre dépose.
+    timeline = payload.timeline or {}
+    drops.on_outcome(db, offer, accepted_at=timeline.get("accepted"), ended_at=timeline.get("ended") or now or datetime.now(UTC),
+                     dropoff=(float(payload.dropoff_lat), float(payload.dropoff_lng))
+                     if payload.dropoff_lat is not None and payload.dropoff_lng is not None else None)
     offer_id, session_id = offer.id, offer.session_id
     db.add(
         build_event(
@@ -302,6 +308,12 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         "driver_lng": float(payload.driver_lng) if payload.driver_lng is not None else None,
         # Case de la grille où se trouve la tablette (découpage commun météo, Priority, majoration).
         "zone_cell": cell,
+        # Découpage fin (zones 1 / 3 / 10 km², créneaux de 10 min) : où est la tablette, où arrive la course, quand.
+        "driver_zone": grid.zone_at(float(payload.driver_lat), float(payload.driver_lng)).code
+        if payload.driver_lat is not None and payload.driver_lng is not None else None,
+        "dest_zone": grid.zone_at(dest_place.lat, dest_place.lng).code if dest_place else None,
+        "slot_10min": grid.slot_of(offered_at),
+        "day_type": grid.day_type(offered_at),
         # Course Priority (le client paie plus pour être pris vite) et propension de la zone à cette heure.
         "is_priority": payload.is_priority,
         **priority.history_features(db, session.user_id, cell=cell, hour=local.hour, at=offered_at),
