@@ -1,12 +1,11 @@
 """Règle économique de Vector (décision utilisateur 2026-10-23) : €/h global et note de la zone d'arrivée.
 
 1. €/h global = prix ÷ (minutes d'approche + minutes de course) × 60.
-2. La zone d'arrivée est notée (0 à 10) au moment où la course se termine :
-   - note posée par l'utilisateur (`rides_zone_scores` : code postal puis département, créneau puis « all ») ;
-   - sinon note par défaut ci-dessous (point de départ, à corriger et à remplacer par l'historique) ;
-   - + 2 si un événement finit près de l'arrivée dans l'heure de la fin de course, + 1 s'il y pleut.
-3. Zone excellente (≥ 8) → vert, même sous le seuil ; zone mauvaise (< 4) → le temps de repositionnement vers la zone
-   correcte (≥ 6) la plus proche s'ajoute avant de calculer le €/h.
+2. La zone fine d'arrivée est notée sur 100 au créneau de 10 min où la course se termine (`base_score`) :
+   mesures après dépose mêlées à la note de départ (posée par l'utilisateur, sinon par défaut ci-dessous) ;
+   + 20 si un événement finit près de l'arrivée dans l'heure de la fin de course, + 10 s'il y pleut.
+3. Zone excellente (≥ 80) → vert, même sous le seuil ; zone mauvaise (< 40) → le temps de repositionnement vers la
+   zone correcte (≥ 60) la plus proche s'ajoute avant de calculer le €/h.
 4. Vert si le €/h obtenu atteint le seuil (25 €/h), rouge en dessous. Sans durée de course lue : aucun avis.
 Paramètres : `vector.economic_rule`.
 """
@@ -21,11 +20,11 @@ from sqlalchemy.orm import Session
 
 from app.models.rides import RidesEventSignal, RidesZoneScore
 from app.services.params import get_parameter
-from app.services.vector import geo, weather
+from app.services.vector import geo, grid, measured, weather
 
 PARIS = ZoneInfo("Europe/Paris")
-DEFAULT_RULE = {"min_hourly_eur": 25, "excellent_zone": 8, "bad_zone": 4, "good_zone": 6, "reposition_speed_kmh": 30,
-                "reposition_extra_min": 5}
+DEFAULT_RULE = {"min_hourly_eur": 25, "excellent_score": 80, "bad_score": 40, "good_score": 60, "reposition_speed_kmh": 30,
+                "reposition_extra_min": 5, "prior_weight": 3, "event_bonus": 20, "rain_bonus": 10}
 BLOCKS = ("night", "morning", "daytime", "evening", "late_evening")
 # Notes par défaut (nuit, matin, journée, soirée, fin de soirée) : un point de départ, pas une vérité.
 DEFAULTS = {
@@ -46,9 +45,11 @@ REPOSITION_TARGETS = [*(f"750{n:02d}" for n in range(1, 21)), "95700", "94390"]
 
 @dataclass
 class ZoneScore:
-    score: float
-    source: str  # user | default
+    score: float  # sur 100
+    source: str  # measured | user | default
     reasons: list[str] = field(default_factory=list)
+    measured_weight: float = 0.0
+    expected_eur: float | None = None
 
 
 @dataclass
@@ -83,43 +84,65 @@ def _area(postal_code: str | None, department: str | None) -> str:
     return "outside"
 
 
-def base_score(db: Session, place: geo.Place, block: str) -> ZoneScore:
+def prior_score(db: Session, place: geo.Place, block: str) -> tuple[float, str]:
+    """Note de départ sur 100 : celle posée par l'utilisateur (0–10, × 10), sinon la note par défaut (× 10)."""
     keys = [k for k in (place.postal_code, place.department) if k]
     rows = {(row.zone_key, row.time_block): row for row in db.scalars(
         select(RidesZoneScore).where(RidesZoneScore.zone_key.in_(keys), RidesZoneScore.time_block.in_((block, "all"))))}
     for key in keys:
         for when in (block, "all"):
             if (row := rows.get((key, when))) is not None:
-                return ZoneScore(float(row.score), "user", [f"note posée {float(row.score):g}/10"])
-    score = DEFAULTS[_area(place.postal_code, place.department)][BLOCKS.index(block)]
-    return ZoneScore(float(score), "default", [f"note par défaut {score}/10"])
+                return float(row.score) * 10, "user"
+    return float(DEFAULTS[_area(place.postal_code, place.department)][BLOCKS.index(block)]) * 10, "default"
+
+
+def base_score(db: Session, place: geo.Place, end_at: datetime, params: dict | None = None) -> ZoneScore:
+    """Note sur 100 de la zone fine d'arrivée au créneau de fin : mesures après dépose, mêlées à la note de départ.
+
+    Mesure = €/h du cycle qui a suivi une dépose (attente + course suivante). Chaque mesure pèse selon sa proximité
+    dans le temps (même créneau de 10 min, puis ±10, ±20 min…), dans l'espace (même case, puis voisines), le type
+    de jour et son ancienneté (demi-vie 60 jours). La note de départ compte comme `prior_weight` mesures : avec peu
+    de mesures elle domine, puis la mesure prend le dessus. Note 50 = €/h médian des cycles mesurés (25 €/h tant
+    qu'il n'y en a pas assez), 100 = le double.
+    """
+    params = params or rule(db)
+    prior, source = prior_score(db, place, time_block(end_at))
+    reference = measured.reference_eur(db) or params["min_hourly_eur"]
+    weight, value = measured.estimate(db, place.lat, place.lng, end_at)
+    prior_eur = reference * prior / 50
+    blended = (prior_eur * params["prior_weight"] + value * weight) / (params["prior_weight"] + weight) if weight else prior_eur
+    score = max(0.0, min(100.0, 50 * blended / reference))
+    reasons = [f"note de départ {prior:.0f}/100" + (" (posée)" if source == "user" else "")]
+    if weight:
+        reasons.append(f"{weight:.1f} mesure(s) équivalente(s) : {value:.0f} €/h")
+    return ZoneScore(round(score, 1), "measured" if weight >= params["prior_weight"] else source, reasons,
+                     measured_weight=round(weight, 2), expected_eur=round(blended, 1))
 
 
 def zone_score(db: Session, place: geo.Place, end_at: datetime, now_at: datetime) -> ZoneScore:
-    block = time_block(end_at)
-    scored = base_score(db, place, block)
+    params = rule(db)
+    scored = base_score(db, place, end_at, params)
     if place.postal_code and db.scalar(select(RidesEventSignal.id).where(
         RidesEventSignal.kind == "event", RidesEventSignal.postal_code == place.postal_code,
         RidesEventSignal.ends_at.between(end_at - timedelta(minutes=30), end_at + timedelta(minutes=60)),
     ).limit(1)) is not None:
-        scored.score += 2
+        scored.score += params["event_bonus"]
         scored.reasons.append("événement qui finit près de l'arrivée")
     # Pluie relevée au moment de l'offre (maintenant et dans l'heure) sur la case d'arrivée.
     rain = weather.offer_features(db, now_at, lat=None, lng=None, dest=(place.lat, place.lng))
     if rain.get("weather_dest_is_rain") or (rain.get("weather_dest_rain_next_60min_mm") or 0) >= 0.5:
-        scored.score += 1
+        scored.score += params["rain_bonus"]
         scored.reasons.append("pluie à l'arrivée")
-    scored.score = min(10.0, scored.score)
+    scored.score = min(100.0, scored.score)
     return scored
 
 
 def reposition_minutes(db: Session, place: geo.Place, end_at: datetime, params: dict) -> int:
     """Temps pour rejoindre la zone correcte la plus proche (vol d'oiseau à la vitesse du paramètre, plus une marge)."""
-    block = time_block(end_at)
     best = None
     for code in REPOSITION_TARGETS:
         target = geo.resolve(code)
-        if target is None or base_score(db, target, block).score < params["good_zone"]:
+        if target is None or base_score(db, target, end_at, params).score < params["good_score"]:
             continue
         km = _km(place.lat, place.lng, target.lat, target.lng)
         best = km if best is None else min(best, km)
@@ -145,17 +168,19 @@ def verdict(db: Session, *, price_cents: int, approach_min: int | None, trip_min
         return Verdict(signal, f"{base:.0f} €/h global (zone d'arrivée inconnue).", features)
     scored = zone_score(db, destination, end_at, offered_at)
     features.update({"dest_zone_score": scored.score, "dest_zone_score_source": scored.source,
-                     "dest_zone_reasons": scored.reasons})
-    if scored.score >= params["excellent_zone"]:
+                     "dest_zone_reasons": scored.reasons, "dest_zone_measured_weight": scored.measured_weight,
+                     "dest_zone_expected_eur": scored.expected_eur, "dest_zone_fine": grid.zone_at(destination.lat, destination.lng).code,
+                     "dest_slot_10min": grid.slot_of(end_at)})
+    if scored.score >= params["excellent_score"]:
         features.update({"reposition_min": 0, "hourly_effective_eur": round(base, 1), "economic_signal": "green"})
-        return Verdict("green", f"{base:.0f} €/h global, arrivée en zone excellente ({scored.score:g}/10 : "
+        return Verdict("green", f"{base:.0f} €/h global, arrivée en zone excellente ({scored.score:.0f}/100 : "
                                 f"{', '.join(scored.reasons)}).", features)
-    reposition = reposition_minutes(db, destination, end_at, params) if scored.score < params["bad_zone"] else 0
+    reposition = reposition_minutes(db, destination, end_at, params) if scored.score < params["bad_score"] else 0
     effective = price_cents / 100 / ((approach + trip_min + reposition) / 60)
     signal = "green" if effective >= threshold else "red"
     features.update({"reposition_min": reposition, "hourly_effective_eur": round(effective, 1), "economic_signal": signal})
-    detail = (f"{effective:.0f} €/h avec {reposition} min pour se repositionner (zone {scored.score:g}/10)"
-              if reposition else f"{effective:.0f} €/h global, zone d'arrivée {scored.score:g}/10")
+    detail = (f"{effective:.0f} €/h avec {reposition} min pour se repositionner (zone {scored.score:.0f}/100)"
+              if reposition else f"{effective:.0f} €/h global, zone d'arrivée {scored.score:.0f}/100")
     return Verdict(signal, detail + ".", features)
 
 

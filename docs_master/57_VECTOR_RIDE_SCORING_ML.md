@@ -302,6 +302,15 @@ PRINCIPE: pas de multiplicateur en dur, le modèle apprend.
 > prédit le €/h après dépose à partir de la zone, du créneau et du contexte (météo, avions, événements, routes, rail,
 > majoration, Priority), réentraîné chaque semaine.
 
+> CODÉ (2026-10-23, `measured.py`) — note mesurée des zones, sur 100 : pour la zone fine d'arrivée au créneau de
+> 10 min de fin de course, moyenne pondérée des €/h de cycle mesurés après dépose (180 jours ; poids selon l'écart
+> de créneau, la distance à l'échelle de la case, le type de jour, l'ancienneté à demi-vie 60 jours), mêlée à la
+> note de départ (posée par l'utilisateur, sinon par défaut ×10) qui compte comme 3 mesures. 50 = €/h médian des
+> cycles mesurés (25 €/h avant 10 mesures). Seuils de la règle R12 sur 100 : excellente ≥ 80, correcte ≥ 60,
+> mauvaise < 40 ; bonus événement + 20, pluie + 10. Variables : `dest_zone_score` (/100), `dest_zone_score_source`
+> (measured | user | default), `dest_zone_measured_weight`, `dest_zone_expected_eur`, `dest_zone_fine`,
+> `dest_slot_10min`.
+
 ### 4.12 Rule storage schema
 
 ```sql
