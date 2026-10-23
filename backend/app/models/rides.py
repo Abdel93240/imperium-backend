@@ -438,6 +438,11 @@ class RidesTrafficIncident(UUIDPrimaryKeyMixin, Base):
     lat: Mapped[float] = mapped_column(Numeric(9, 6), nullable=False)
     lng: Mapped[float] = mapped_column(Numeric(9, 6), nullable=False)
     zone_code: Mapped[str] = mapped_column(Text, nullable=False)
+    # Fermetures : classe de la route (FRC0 … FRC6), vitesses mesurées, note d'impact sur 100.
+    frc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    current_speed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    free_flow_speed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    impact: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class RidesAirportSnapshot(UUIDPrimaryKeyMixin, Base):

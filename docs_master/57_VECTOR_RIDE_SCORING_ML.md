@@ -557,6 +557,12 @@ TRAFFIC:
 > tablette (`pickup_`) et l'arrivée (`dest_`) : ligne perturbée à < 1,5 km (et laquelle), bloquante, retard des
 > bouchons à < 3 km, axe fermé. Chaque mesure après dépose garde la même situation au lieu et à l'heure de la
 > dépose (`context`, avec la pluie de la case). SNCF : clé refusée (à vérifier), non branchée. Clés dans `.env`.
+> Gravité (migration 20261023_0145) : TomTom ne note pas les fermetures (gravité toujours « 4 ») et ne dit pas
+> l'importance de la route. Classe par numéro (A / N / périphérique = grand axe, D = départementale, sinon rue) et,
+> pour les fermetures d'axes numérotés (20 au plus par relevé, grands axes d'abord), flux TomTom au milieu du
+> tronçon : classe de route FRC0–FRC6 et vitesse actuelle face à la vitesse normale → note d'impact sur 100
+> (importance × ralentissement ; route coupée = impact plein). Variables : fermetures de grands axes, de
+> départementales, à fort impact (≥ 50), bouchons importants, impact maximal près de la tablette et de l'arrivée.
 
 ### 5.7 Rule-derived features (CRITICAL)
 

@@ -84,7 +84,14 @@ def test_transit_traffic_airports_feed_the_offer_context(db) -> None:
     closed = {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[2.31, 48.881], [2.312, 48.881]]},
               "properties": {"iconCategory": 8, "magnitudeOfDelay": 4, "delay": 0, "length": 300, "roadNumbers": ["D909"]}}
     north_west = feeds.TOMTOM_BOXES[2]  # le rectangle qui contient Paris nord-ouest
-    assert feeds.refresh_traffic(db, now=now, fetch=lambda box: {"incidents": [jam, closed] if box == north_west else []}) == 2
+    flows = []
+    assert feeds.refresh_traffic(db, now=now, fetch=lambda box: {"incidents": [jam, closed] if box == north_west else []},
+                                 flow=lambda lat, lng: flows.append((lat, lng)) or
+                                 {"frc": "FRC1", "currentSpeed": 20, "freeFlowSpeed": 80}) == 2
+    assert len(flows) == 1                                                # seule la fermeture est mesurée
+    assert feeds.closure_impact("FRC1", 20, 80) == 74 and feeds.closure_impact("FRC6", 30, 30) == 5
+    assert feeds.closure_impact(None, 10, 50) is None
+    assert feeds.closure_impact("FRC0", 0, 0) == 100 and feeds.closure_impact("FRC2", 30, 30, closed=True) == 70
     cdg = feeds.AIRPORTS["CDG"]
 
     def sky(box):
@@ -100,7 +107,12 @@ def test_transit_traffic_airports_feed_the_offer_context(db) -> None:
     assert (ctx["transit_heavy_disruptions"], ctx["transit_blocking"], ctx["rer_lines_disrupted"]) == (1, 1, 1)
     assert (ctx["pickup_transit_disrupted"], ctx["pickup_transit_blocking"], ctx["pickup_transit_lines"]) == (True, True, ["rer A"])
     assert (ctx["dest_transit_disrupted"], ctx["dest_traffic_delay_min"], ctx["dest_road_closed"]) == (False, 10, True)
-    assert (ctx["traffic_incidents_idf"], ctx["traffic_closures_idf"]) == (2, 1)
+    assert (ctx["traffic_incidents_idf"], ctx["traffic_closures_idf"], ctx["traffic_closures_departmental_idf"]) == (2, 1, 1)
+    assert (ctx["traffic_closures_major_idf"], ctx["traffic_jams_major_idf"], ctx["traffic_jams_on_major_roads_idf"]) == (0, 1, 1)
+    assert (ctx["dest_major_road_closed"], ctx["dest_jam_level"], ctx["dest_closure_impact_max"]) == (False, 3, 74)
+    assert ctx["traffic_closures_high_impact_idf"] == 1
+    assert [feeds.road_class(r) for r in (["A1"], ["N118"], ["BP"], ["D909"], [], ["Rue X"])] == [
+        "major", "major", "major", "departmental", "street", "street"]
     assert (ctx["cdg_landings_30_60_min"], ctx["ory_landings_30_60_min"]) == (2, 0)   # a1, a2 en approche finale
     stale = feeds.context(db, now + timedelta(hours=3), {"pickup": GARE_DE_LYON})
     assert (stale["transit_heavy_disruptions"], stale["pickup_transit_disrupted"]) == (None, None)  # relevé trop ancien
