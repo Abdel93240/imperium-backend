@@ -507,6 +507,13 @@ TRAFFIC:
 └─ pickup_zone_traffic_jam         — BOOL local jam
 ```
 
+> CODÉ (2026-10-23, migration 20261023_0140) : vacances scolaires zone C (`is_school_holiday`,
+> `school_holiday_label`, open data Éducation nationale, job du lundi semé éteint) ; variables du scan web
+> hebdomadaire (doc 31 §10) : `event_ending_within_60min_pickup` / `_dest` (même code postal, fin dans
+> [−30 min ; +60 min]), `event_ongoing_pickup`, `event_nearby_attendees`, `event_nearby_category`,
+> `events_ending_within_60min_idf`, `road_closures_active`, `rail_works_active` ; vides avant le premier scan.
+> Restent : avions (OpenSky), trafic (TomTom), perturbations en temps réel (IDFM, SNCF), clés attendues.
+
 ### 5.7 Rule-derived features (CRITICAL)
 
 Ces features encodent explicitement les règles. **Le modèle apprend ainsi s'il doit les suivre ou les contourner.**

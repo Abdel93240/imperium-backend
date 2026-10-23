@@ -7,7 +7,8 @@ modèle (`ai_role_models`, jamais en dur). Le transport est choisi par le param�
 - `subscription` : tests réels avant toute clé API (décision utilisateur 2026-10-21) — la CLI du
   fournisseur, connectée à l'abonnement de l'utilisateur (`claude -p` pour anthropic, `codex exec` pour
   openai), lancée SANS AUCUN OUTIL (ni fichiers, ni commandes, ni web, ni MCP), dans un dossier vide,
-  avec un environnement réduit et une durée maximale ; sortie contrainte par le JSON Schema du slot ;
+  avec un environnement réduit et une durée maximale ; sortie contrainte par le JSON Schema du slot ; seule
+  exception : la recherche web pour les slots de `WEB_SLOTS` (spécialiste web, doc 30 §3.8ter) ;
 - `api` (clés du doc 73) : pas encore codé.
 
 Le catalogue d'un abonnement diffère de celui de l'API (par exemple Codex avec un compte ChatGPT refuse les
@@ -51,7 +52,9 @@ SLOT_ROLES = {"wr.hypothesis_pass": "high_reasoning", "wr.exit_audit": "high_rea
               "wr.report_revision": "first_cloud_tier", "nexus.escalation": "first_cloud_tier",
               "calendar.deadline_plan": "first_cloud_tier", "pulse.diet_weekly_program": "health_specialist",
               "pulse.lab_results_extract": "health_specialist", "pulse.program_design": "health_specialist",
-              "pulse.lab_rules": "health_specialist"}
+              "pulse.lab_rules": "health_specialist", "vector.event_scan": "web_fresh_data"}
+# Seuls slots qui ont droit à la recherche web (rôle web_fresh_data, doc 30 §3.8ter) ; tous les autres restent sans outil.
+WEB_SLOTS = frozenset({"vector.event_scan"})
 # Slots dont le rôle est choisi à chaque appel par le score /200 (doc 30 §5.6) : le rôle de SLOT_ROLES est le défaut.
 ROUTED_SLOTS = frozenset({"nexus.escalation"})
 MODEL_TIERS = {"first_cloud_tier": "cloud_cheap", "high_reasoning": "cloud_premium",
@@ -140,7 +143,8 @@ def structured(db: Session, *, slot_code: str, app_name: str, system: str, user:
         try:
             if call is None:
                 raise CloudError(f"No subscription CLI for provider '{role.provider}'.")
-            output, model, input_tokens, output_tokens, cost = call(model_id, role.effort, system, user, schema)
+            output, model, input_tokens, output_tokens, cost = call(model_id, role.effort, system, user, schema,
+                                                                    web=slot_code in WEB_SLOTS)
             if not isinstance(output, dict):
                 raise CloudError("The model output is not a JSON object.")
         except (CloudError, KeyError, IndexError, TypeError, ValueError, OSError) as exc:
@@ -157,9 +161,9 @@ def structured(db: Session, *, slot_code: str, app_name: str, system: str, user:
     return result
 
 
-def _claude(model: str, effort: str | None, system: str, user: str, schema: dict):
+def _claude(model: str, effort: str | None, system: str, user: str, schema: dict, *, web: bool = False):
     args = [_binary(get_settings().claude_cli_path), "-p", "--model", model, "--output-format", "json",
-            "--json-schema", json.dumps(schema), "--system-prompt", system, "--tools", "",
+            "--json-schema", json.dumps(schema), "--system-prompt", system, "--tools", "WebSearch" if web else "",
             "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands"]
     if effort in CLAUDE_EFFORT:
         args += ["--effort", CLAUDE_EFFORT[effort]]
@@ -176,13 +180,14 @@ def _claude(model: str, effort: str | None, system: str, user: str, schema: dict
             body.get("total_cost_usd"))
 
 
-def _codex(model: str, effort: str | None, system: str, user: str, schema: dict):
+def _codex(model: str, effort: str | None, system: str, user: str, schema: dict, *, web: bool = False):
     with tempfile.TemporaryDirectory(prefix="imperium-cloud-") as work:
         root = Path(work)
         (root / "empty").mkdir()
         (root / "schema.json").write_text(json.dumps(schema), encoding="utf-8")
         args = [_binary(get_settings().codex_cli_path), "exec", "-m", model, "--ephemeral", "--skip-git-repo-check",
-                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only", "-c", "web_search=disabled",
+                "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only", "-c",
+                f"web_search={'live' if web else 'disabled'}",
                 "-C", str(root / "empty"), "--output-schema", str(root / "schema.json"),
                 "-o", str(root / "last.txt"), "--json"]
         for feature in CODEX_DISABLED:
