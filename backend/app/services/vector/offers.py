@@ -35,7 +35,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, sessions
+from app.services.vector import calendar, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -276,6 +276,8 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         "is_public_holiday": calendar.is_public_holiday(local.date()),
         "is_eve_of_holiday": calendar.is_public_holiday(local.date() + timedelta(days=1)),
         "is_school_holiday": None,
+        # Météo de l'heure de l'offre (doc 57 §5.5) : dernier relevé Open-Meteo, vide s'il manque ou date.
+        **weather.offer_features(db, offered_at),
     }
 
 
