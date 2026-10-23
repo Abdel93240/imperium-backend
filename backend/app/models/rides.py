@@ -153,7 +153,7 @@ class RidesOffer(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("price_cents BETWEEN 1 AND 1000000", name="price_range"),
         CheckConstraint("platform IN ('bolt', 'uber', 'heetch', 'other')", name="platform_check"),
         CheckConstraint("ride_type IN ('immediate', 'scheduled')", name="ride_type_check"),
-        CheckConstraint("source IN ('manual', 'ocr')", name="source_check"),
+        CheckConstraint("source IN ('manual', 'ocr', 'assistant')", name="source_check"),
         CheckConstraint(f"decision IS NULL OR decision IN ({', '.join(repr(d) for d in RIDE_DECISIONS)})", name="decision_check"),
         CheckConstraint("(decision IS NULL) = (decided_at IS NULL)", name="decision_has_time"),
         CheckConstraint("actual_hourly_rate_cents IS NULL OR decision = 'accepted'", name="outcome_only_accepted"),
