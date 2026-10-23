@@ -219,3 +219,22 @@ def test_priority_offers_by_zone_and_hour(db) -> None:
     assert (cell["zone"], cell["offers"], cell["priority"], cell["share"]) == ("A-04-03", 6, 3, 0.5)
     code_night = next(r for r in stats["rows"] if r["by"] == "pickup_zone_code" and r["time_block"] == "night")
     assert (code_night["zone"], code_night["offers"], code_night["share"]) == ("75004", 1, None)  # trop peu d'offres
+
+
+def test_places_read_on_real_bolt_offers_are_resolved(db) -> None:
+    _, client, session_id = _setup(db)
+    # Capture réelle : prise en charge avec code postal, arrivée sans (« Picpus, Paris »).
+    offer = _offer(client, session_id, NIGHT, pickup_zone="Boulogne-Billancourt 92100", destination_zone="Picpus, Paris")
+    f = offer["features"]
+    assert (offer["pickup_zone_code"], offer["destination_zone_code"]) == ("92100", "75012")
+    assert (f["pickup_code_source"], f["destination_code_source"]) == ("resolved", "resolved")
+    assert (f["dest_department"], f["dest_zone_cell"][:1], f["dest_in_paris"]) == ("75", "A", True)
+    assert offer["triggered_rules"] == ["R7"]                                      # retour vers Paris la nuit
+    far = _offer(client, session_id, NOON, destination_zone="St.-Maur-des-Fossés")
+    assert (far["destination_zone_code"], far["features"]["distance_paris_center_km"]) == ("94100", 12.0)
+    paris = _offer(client, session_id, NIGHT, destination_zone="Paris")            # Paris sans quartier
+    assert (paris["destination_zone_code"], paris["triggered_rules"]) == (None, ["R7"])
+    unknown = _offer(client, session_id, NIGHT, destination_zone="Quelque part")
+    assert (unknown["destination_zone_code"], unknown["features"]["destination_code_source"]) == (None, None)
+    read = _offer(client, session_id, NOON, destination_zone_code="75008", destination_zone="Paris")
+    assert read["features"]["destination_code_source"] == "read"

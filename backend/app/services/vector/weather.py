@@ -174,12 +174,15 @@ def _cell_features(prefix: str, row: RidesWeatherCellReading | None, at: datetim
     }
 
 
-def offer_features(db: Session, at: datetime, *, lat: float | None, lng: float | None) -> dict:
-    """Météo d'une offre : case de la tablette (prise en charge), Paris centre, part des cases sous la pluie."""
+def offer_features(db: Session, at: datetime, *, lat: float | None, lng: float | None,
+                   dest: tuple[float, float] | None = None) -> dict:
+    """Météo d'une offre : case de la tablette (prise en charge), case d'arrivée, Paris centre, part sous la pluie."""
     readings = _latest_at(db, at)
     pickup = readings.get(cell_at(lat, lng).code) if readings and lat is not None and lng is not None else None
+    arrival = readings.get(cell_at(*dest).code) if readings and dest else None
     center = readings.get(CENTER_CELL)
-    features = {**_cell_features("weather_pickup", pickup, at), **_cell_features("weather_paris", center, at)}
+    features = {**_cell_features("weather_pickup", pickup, at), **_cell_features("weather_dest", arrival, at),
+                **_cell_features("weather_paris", center, at)}
     for ring, key in (("A", "weather_rain_share_paris"), ("B", "weather_rain_share_idf")):
         ring_rows = [r for r in readings.values() if r.ring == ring]
         features[key] = (round(sum(1 for r in ring_rows if (r.current.get("precipitation") or 0) >= RAIN_MM) / len(ring_rows), 3)
