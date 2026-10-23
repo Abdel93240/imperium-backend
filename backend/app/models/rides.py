@@ -5,10 +5,10 @@ l'utilisateur. Les revenus et dépenses d'une session sont des transactions Vaul
 (source vector_manual) reliées par `external_ref` ; la session ne garde que son cadre.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -266,3 +266,64 @@ class RidesWeatherCellReading(UUIDPrimaryKeyMixin, Base):
     longitude: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
     current: Mapped[dict] = mapped_column(JSONB, nullable=False)
     minutely: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+
+class RidesSchoolHoliday(UUIDPrimaryKeyMixin, Base):
+    """Période de vacances scolaires (zone C, Paris) ; `end_day` est le jour de reprise, exclu."""
+
+    __tablename__ = "rides_school_holidays"
+    __table_args__ = (
+        UniqueConstraint("zone", "label", "start_day", name="period_unique"),
+        CheckConstraint("end_day >= start_day", name="period_order"),
+    )
+
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    zone: Mapped[str] = mapped_column(Text, nullable=False)
+    school_year: Mapped[str] = mapped_column(Text, nullable=False)
+    start_day: Mapped[date] = mapped_column(Date, nullable=False)
+    end_day: Mapped[date] = mapped_column(Date, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RidesEventScan(UUIDPrimaryKeyMixin, Base):
+    """Un passage du scan web hebdomadaire `vector.event_scan` (doc 31 §10)."""
+
+    __tablename__ = "rides_event_scans"
+    __table_args__ = (CheckConstraint("status IN ('running', 'done', 'failed')", name="status_check"),)
+
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    items: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RidesEventSignal(UUIDPrimaryKeyMixin, Base):
+    """Événement, fermeture routière ou travaux trouvés par le scan web ; signal passif (doc 31 §10)."""
+
+    __tablename__ = "rides_event_signals"
+    __table_args__ = (
+        CheckConstraint("kind IN ('event', 'road_closure', 'rail_works')", name="kind_check"),
+        CheckConstraint("confidence BETWEEN 0 AND 1", name="confidence_range"),
+        CheckConstraint("ends_at IS NULL OR ends_at >= starts_at", name="period_order"),
+        UniqueConstraint("fingerprint", name="fingerprint_unique"),
+        Index("rides_event_signals_window_idx", "starts_at", "ends_at"),
+    )
+
+    scan_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("rides_event_scans.id", ondelete="CASCADE"),
+                                          nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    venue: Mapped[str | None] = mapped_column(Text, nullable=True)
+    commune: Mapped[str | None] = mapped_column(Text, nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    road: Mapped[str | None] = mapped_column(Text, nullable=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expected_attendance: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confidence: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False)
+    fingerprint: Mapped[str] = mapped_column(Text, nullable=False)

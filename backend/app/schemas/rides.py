@@ -364,3 +364,29 @@ class WeatherFeedRead(BaseModel):
     cells: int = 0
     raining_cells_paris: int = 0  # cases de Paris et petite couronne sous la pluie
     cells_paris: int = 0
+
+
+class EventSignalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: Literal["event", "road_closure", "rail_works"]
+    category: str
+    title: str
+    venue: str | None
+    commune: str | None
+    postal_code: str | None
+    road: str | None
+    starts_at: datetime
+    ends_at: datetime | None
+    expected_attendance: int | None
+    source_url: str | None
+    confidence: Decimal
+
+
+class EventFeedRead(BaseModel):
+    """Résultat du scan web hebdomadaire pour les 7 prochains jours : ok, stale (scan de plus d'une semaine), unavailable."""
+
+    status: Literal["ok", "stale", "unavailable"]
+    scanned_at: datetime | None = None
+    message: str | None = None
+    items: list[EventSignalRead] = []

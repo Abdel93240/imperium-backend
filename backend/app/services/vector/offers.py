@@ -35,7 +35,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, sessions, weather
+from app.services.vector import calendar, events, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -272,10 +272,13 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         **_area("dest", payload.destination_zone_code),
         "driver_lat": float(payload.driver_lat) if payload.driver_lat is not None else None,
         "driver_lng": float(payload.driver_lng) if payload.driver_lng is not None else None,
-        # Calendrier (doc 57 §5.2) : jours fériés calculés ; vacances scolaires = source à brancher.
+        # Calendrier (doc 57 §5.2) : jours fériés calculés ; vacances scolaires (zone C) relevées.
         "is_public_holiday": calendar.is_public_holiday(local.date()),
         "is_eve_of_holiday": calendar.is_public_holiday(local.date() + timedelta(days=1)),
-        "is_school_holiday": None,
+        **dict(zip(("is_school_holiday", "school_holiday_label"), school.holiday_on(db, local.date()), strict=True)),
+        # Événements, fermetures, travaux du scan web hebdomadaire (doc 57 §5.6) ; vides avant le premier scan.
+        **events.offer_features(db, offered_at, pickup_code=payload.pickup_zone_code,
+                                destination_code=payload.destination_zone_code),
         # Météo de l'heure de l'offre (doc 57 §5.5) : case de la tablette, Paris, part de la région sous la pluie.
         **weather.offer_features(db, offered_at, lat=float(payload.driver_lat) if payload.driver_lat is not None else None,
                                  lng=float(payload.driver_lng) if payload.driver_lng is not None else None),

@@ -1,7 +1,7 @@
 """Vector : sessions VTC et « Où aller ? » (doc 59 §14 ; doc 13, doc 33 §5) — conseil et mesure, jamais d'action sur l'appli VTC."""
 
 from datetime import date, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
@@ -12,6 +12,7 @@ from app.schemas.rides import (
     BusinessRuleListResponse,
     BusinessRuleRead,
     BusinessRuleUpdate,
+    EventFeedRead,
     WeatherFeedRead,
     CurrentSessionRead,
     DropZoneCreate,
@@ -38,7 +39,7 @@ from app.schemas.rides import (
 from app.services.imperium import replan, vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import offers, recommendations, rules, sessions, weather
+from app.services.vector import events, offers, recommendations, rules, sessions, weather
 
 router = APIRouter()
 
@@ -356,6 +357,13 @@ def _offer_error(db: SessionDep, exc: Exception) -> JSONResponse:
 def weather_feed_route(current_user: CurrentUserDep, db: SessionDep) -> WeatherFeedRead:  # noqa: ARG001
     """Dernier relevé météo (Open-Meteo, Météo-France) : maintenant et 12 prochaines heures ; jamais inventé."""
     return weather.feed(db)
+
+
+@router.get("/feeds/events", response_model=EventFeedRead)
+def events_feed_route(current_user: CurrentUserDep, db: SessionDep,  # noqa: ARG001
+                      kind: Literal["event", "road_closure", "rail_works"] = "event") -> EventFeedRead:
+    """Scan web du lundi : événements, fermetures routières ou travaux du rail des 7 prochains jours."""
+    return events.feed(db, kind=kind)
 
 
 @router.get("/training-summary", response_model=TrainingSummaryRead)

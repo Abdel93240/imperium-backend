@@ -1428,6 +1428,14 @@ not required for passive signal
 required before official plan change unless an explicit rule says otherwise
 ```
 
+> CODÉ (2026-10-23, migration 20261023_0140, `services/vector/events.py`) : slot `vector.event_scan` (rôle
+> `web_fresh_data`, seul slot autorisé à la recherche web, `cloud.WEB_SLOTS`), job lundi 03:00, tous deux semés
+> éteints. Cherche pour la semaine : événements (lieu, code postal, début, fin, affluence, source), fermetures
+> routières et travaux (Sytadin sans API), travaux du rail. Sortie contrainte par schéma, pages lues traitées comme
+> des données ; éléments hors semaine, sans date ou en double écartés. Stockage `rides_event_scans` /
+> `rides_event_signals` (au lieu de `vector_intelligence_signals`). `GET /api/imperium/vector/feeds/events?kind=…`
+> alimente les cartes Événements et Autoroutes.
+
 ---
 
 ## 11. Vault Receipt Extraction (reference case)
