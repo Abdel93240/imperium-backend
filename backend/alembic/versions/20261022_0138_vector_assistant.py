@@ -1,8 +1,8 @@
 """vector: offres lues par l'assistant de prise de course (lot V2-A, 2026-10-22)
 
-`rides_offers.source` accepte `assistant` : offre lue à l'écran par le service d'accessibilité de l'appli, en lecture
-seule (règle VECTOR-004 : lire pour conseiller, jamais agir). Le texte brut lu ne quitte jamais l'appareil ; seuls
-les champs reconnus (prix, distances, durées, codes postaux) arrivent ici.
+`rides_offers.source` accepte `assistant` : offre lue à l'écran par l'assistant de l'appli (capture accordée à chaque
+lancement + OCR embarqué, F10 §5-quater ; lire pour conseiller, jamais agir). L'image et le texte brut ne quittent
+jamais la tablette ; seuls les champs reconnus (prix, distances, durées, codes postaux) arrivent ici.
 
 Revision ID: 20261022_0138
 Revises: 20261022_0137
