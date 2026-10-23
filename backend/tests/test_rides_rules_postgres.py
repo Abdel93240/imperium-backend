@@ -238,3 +238,11 @@ def test_places_read_on_real_bolt_offers_are_resolved(db) -> None:
     assert (unknown["destination_zone_code"], unknown["features"]["destination_code_source"]) == (None, None)
     read = _offer(client, session_id, NOON, destination_zone_code="75008", destination_zone="Paris")
     assert read["features"]["destination_code_source"] == "read"
+
+
+def test_full_addresses_are_kept_and_used(db) -> None:
+    _, client, session_id = _setup(db)
+    offer = _offer(client, session_id, NIGHT, pickup_address="66 Avenue Pierre Lefaucheux, Boulogne-Billancourt 92100",
+                   destination_address="4 Villa Mariotte, St.-Maur-des-Fossés")
+    assert offer["pickup_address"] == "66 Avenue Pierre Lefaucheux, Boulogne-Billancourt 92100"
+    assert (offer["pickup_zone_code"], offer["destination_zone_code"]) == ("92100", "94100")

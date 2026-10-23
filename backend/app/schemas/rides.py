@@ -203,6 +203,9 @@ class RideOfferCreate(BaseModel):
     driver_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
     # Étiquette « Priority » lue à gauche du prix (le client paie plus pour être pris plus vite) ; None = non lue.
     is_priority: bool | None = None
+    # Adresses complètes lues sur l'offre (rue comprise) ; jamais le prénom ni la note du client.
+    pickup_address: str | None = Field(default=None, max_length=300)
+    destination_address: str | None = Field(default=None, max_length=300)
 
 
 class RideDecisionRequest(BaseModel):
@@ -264,6 +267,8 @@ class RideOfferRead(BaseModel):
     revenue_transaction_id: UUID | None
     pickup_zone_code: str | None
     destination_zone_code: str | None
+    pickup_address: str | None = None
+    destination_address: str | None = None
     version: int
     signal: Literal["green", "red"] | None  # règles seules (doc 57 §3.1) ; aucun = à toi de juger
     signal_source: str | None
