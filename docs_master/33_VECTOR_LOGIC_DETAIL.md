@@ -122,8 +122,12 @@ CatBoost ride verdict → 2 outcomes only:
 > par **capture d'écran + OCR embarqué** sur la tablette (F10 §5-quater, doc 78 F3-05) ; l'accessibilité Android
 > n'est jamais utilisée (une première version 0.26.0 qui la lisait a été retirée). L'unique interrupteur de « Ma
 > session » demande la capture à chaque lancement (jamais un accord perpétuel) ; service au premier plan avec
-> notification « Arrêter ». Image réduite, lue en mémoire au plus toutes les 700 ms et seulement si l'écran a changé,
-> jamais écrite ni envoyée ; image entièrement noire = appli qui interdit la capture, dit dans le journal, jamais un
+> notification « Arrêter ». Lecture **seulement quand l'appli Bolt est affichée** (statistiques d'utilisation
+> d'Android, autorisation « accès à l'utilisation » donnée une fois ; appli affichée relue toutes les 200 ms) :
+> première image lue aussitôt à l'arrivée de Bolt au premier plan, puis la dernière image toutes les 700 ms tant qu'il
+> y reste ; les autres applis ne sont jamais lues (appli 0.28.0-ocr-bolt, décision utilisateur 2026-10-23 ; ce n'est
+> pas la capture continue « en arrière-plan » que VECTOR-006 interdit). Image réduite, lue en mémoire, jamais écrite
+> ni envoyée ; image entièrement noire = appli qui interdit la capture, dit dans le journal, jamais un
 > avis. Reconnaissance d'une offre : prix net (lignes de péage écartées, doc 37 §4), couples durée/distance approche
 > puis course, deux codes postaux, programmée, espèces, majoration ; sans prix ni couple, pas d'offre ; un seul code
 > postal n'est attribué à aucun côté. Seuls ces champs et la commune partent au serveur (`POST
