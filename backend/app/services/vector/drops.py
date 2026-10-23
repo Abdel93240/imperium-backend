@@ -24,8 +24,10 @@ def _minutes(start: datetime, end: datetime) -> float:
 
 
 def _open(db: Session, session_id) -> list[RidesDropObservation]:
-    return list(db.scalars(select(RidesDropObservation).where(
-        RidesDropObservation.session_id == session_id, RidesDropObservation.status == "open").with_for_update()))
+    # Sans vidage automatique : appelé au milieu d'un changement d'état de la session (pause, arrêt).
+    with db.no_autoflush:
+        return list(db.scalars(select(RidesDropObservation).where(
+            RidesDropObservation.session_id == session_id, RidesDropObservation.status == "open").with_for_update()))
 
 
 def on_offer(db: Session, session_id, offered_at: datetime) -> None:
