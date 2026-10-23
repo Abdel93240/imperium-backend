@@ -249,15 +249,20 @@ class RidesRuleRevision(UUIDPrimaryKeyMixin, Base):
     user_validated: Mapped[bool] = mapped_column(Boolean, nullable=False)
 
 
-class RidesWeatherReading(UUIDPrimaryKeyMixin, Base):
-    """Relevé Open-Meteo (modèle Météo-France) du centre de Paris : variable de demande des courses (doc 33 §3)."""
+class RidesWeatherCellReading(UUIDPrimaryKeyMixin, Base):
+    """Relevé météo d'une case de la grille (Open-Meteo, Météo-France) : pluie au quart d'heure (doc 57 §5.5, §17)."""
 
-    __tablename__ = "rides_weather_readings"
-    __table_args__ = (Index("rides_weather_readings_fetched_idx", text("fetched_at DESC")),)
+    __tablename__ = "rides_weather_cell_readings"
+    __table_args__ = (
+        CheckConstraint("ring IN ('A', 'B', 'airport')", name="ring_check"),
+        Index("rides_weather_cell_readings_fetched_idx", text("fetched_at DESC")),
+        Index("rides_weather_cell_readings_cell_idx", "cell_code", text("fetched_at DESC")),
+    )
 
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cell_code: Mapped[str] = mapped_column(Text, nullable=False)
+    ring: Mapped[str] = mapped_column(Text, nullable=False)
     latitude: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
     longitude: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
     current: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    hourly: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    source: Mapped[str] = mapped_column(Text, nullable=False, default="open-meteo", server_default="open-meteo")
+    minutely: Mapped[dict] = mapped_column(JSONB, nullable=False)

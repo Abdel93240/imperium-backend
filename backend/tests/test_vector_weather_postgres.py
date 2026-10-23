@@ -16,25 +16,36 @@ pytestmark = pytest.mark.postgres
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine, delete, select, text  # noqa: E402
+from sqlalchemy import create_engine, delete, text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.api.deps import get_current_user, get_db  # noqa: E402
 from app.api.v1.routes import imperium_vector  # noqa: E402
 from app.models.auth import User  # noqa: E402
-from app.models.rides import RidesWeatherReading  # noqa: E402
+from app.models.rides import RidesWeatherCellReading  # noqa: E402
 from app.services.vector import weather  # noqa: E402
 
 BASE = "/api/imperium/vector"
 
 
-def _body(precip: float, code: int) -> dict:
-    return {
-        "current": {"temperature_2m": 11.4, "precipitation": precip, "weather_code": code, "wind_speed_10m": 18.0,
-                    "visibility": 24000},
-        "hourly": {"time": ["2026-10-14T12:00", "2026-10-14T13:00"], "temperature_2m": [11.4, 12.0],
-                   "precipitation": [precip, 0.0], "precipitation_probability": [80, 20], "weather_code": [code, 3]},
-    }
+def _fetcher(rain_cells: set[str], *, past_mm: float = 0.0, next_mm: float = 0.0, code: int = 61, at: datetime):
+    """Faux Open-Meteo : pluie maintenant sur `rain_cells`, quarts d'heure autour de `at` (heure de Paris)."""
+    local = at.astimezone(weather.PARIS).replace(second=0, microsecond=0, tzinfo=None)
+    start = local.replace(minute=local.minute - local.minute % 15) - timedelta(minutes=30)
+    times = [(start + timedelta(minutes=15 * i)).isoformat(timespec="minutes") for i in range(10)]
+
+    def fetch(batch):
+        out = []
+        for cell in batch:
+            wet = cell.code in rain_cells
+            out.append({
+                "current": {"temperature_2m": 11.4, "precipitation": 1.2 if wet else 0.0, "weather_code": code if wet else 2,
+                            "wind_speed_10m": 18.0},
+                "minutely_15": {"time": times, "precipitation": [past_mm, past_mm] + [next_mm] * 8,
+                                "weather_code": [2] * 10},
+            })
+        return out
+    return fetch
 
 
 @pytest.fixture(scope="module")
@@ -47,11 +58,11 @@ def engine():
 @pytest.fixture()
 def db(engine):
     with Session(engine) as session:
-        session.execute(delete(RidesWeatherReading))
+        session.execute(delete(RidesWeatherCellReading))
         session.commit()
         yield session
         session.rollback()
-        session.execute(delete(RidesWeatherReading))
+        session.execute(delete(RidesWeatherCellReading))
         session.commit()
 
 
@@ -70,47 +81,67 @@ def _client(db) -> tuple[TestClient, str]:
     return client, session["id"]
 
 
-def _offer(client, session_id, at: datetime) -> dict:
+def _offer(client, session_id, at: datetime, **extra) -> dict:
     response = client.post(f"{BASE}/sessions/{session_id}/offers", headers={"Idempotency-Key": uuid4().hex},
-                           json={"price_cents": 2000, "estimated_duration_min": 25, "offered_at": at.isoformat()})
+                           json={"price_cents": 2000, "estimated_duration_min": 25, "offered_at": at.isoformat(), **extra})
     assert response.status_code == 201, response.text
     return response.json()["features"]
 
 
-def test_offer_reads_the_weather_of_its_time(db) -> None:
+NOTRE_DAME = {"driver_lat": "48.853400", "driver_lng": "2.348800"}
+
+
+def test_grid_covers_the_region() -> None:
+    grid = weather.cells()
+    assert len(grid) == 192 and len({c.code for c in grid}) == 192
+    assert weather.cell_at(48.8534, 2.3488).ring == "A"          # Paris : case fine
+    assert weather.cell_at(48.40, 2.70).ring == "B"              # Fontainebleau : case large
+    assert weather.cell_at(49.0097, 2.5479).code == "AP-CDG"
+
+
+def test_offer_gets_the_weather_of_its_own_cell(db) -> None:
     client, session_id = _client(db)
     now = datetime.now(UTC)
-    assert _offer(client, session_id, now)["weather_is_rain"] is None  # aucun relevé : rien d'inventé
-    weather.refresh(db, now=now - timedelta(minutes=20), fetcher=lambda lat, lng: _body(1.2, 61))
+    assert _offer(client, session_id, now, **NOTRE_DAME)["weather_pickup_is_rain"] is None  # aucun relevé
+    here = weather.cell_at(48.8534, 2.3488).code
+    weather.refresh(db, now=now - timedelta(minutes=10), fetcher=_fetcher({here}, next_mm=0.4, at=now))
     db.commit()
-    f = _offer(client, session_id, now)
-    assert (f["weather_temp_c"], f["weather_precip_mm"], f["weather_is_rain"], f["weather_is_snow"]) == (11.4, 1.2, True, False)
-    assert (f["weather_visibility_km"], f["weather_wind_kmh"], f["weather_rain_next_hour_pct"]) == (24.0, 18.0, 80)
-    late = _offer(client, session_id, now - timedelta(hours=3))  # relevé postérieur à l'offre : pas utilisé
-    assert late["weather_temp_c"] is None
+    f = _offer(client, session_id, now, **NOTRE_DAME)
+    assert (f["weather_pickup_cell"], f["weather_pickup_is_rain"], f["weather_pickup_rain_onset"]) == (here, True, True)
+    assert (f["weather_pickup_rain_last_30min"], f["weather_pickup_rain_next_60min_mm"]) == (False, 1.6)
+    assert f["weather_paris_is_rain"] is False                    # il pleut sur une case, pas au centre
+    assert f["weather_rain_share_paris"] == round(1 / 72, 3) and f["weather_rain_share_idf"] == 0.0
+    far = _offer(client, session_id, now, driver_lat="48.400000", driver_lng="2.700000")
+    assert (far["weather_pickup_is_rain"], far["weather_pickup_temp_c"]) == (False, 11.4)
+    blind = _offer(client, session_id, now)                      # sans position : seulement la région
+    assert blind["weather_pickup_cell"] is None and blind["weather_rain_share_paris"] is not None
 
 
-def test_stale_reading_is_not_used_and_feed_says_so(db) -> None:
+def test_stale_pass_is_ignored_and_feed_reports_it(db) -> None:
     client, session_id = _client(db)
     assert client.get(f"{BASE}/feeds/weather").json()["status"] == "unavailable"
     now = datetime.now(UTC)
-    weather.refresh(db, now=now - timedelta(hours=2), fetcher=lambda lat, lng: _body(0.0, 73))
+    weather.refresh(db, now=now - timedelta(hours=1), fetcher=_fetcher({weather.CENTER_CELL}, past_mm=0.5, at=now))
     db.commit()
-    assert _offer(client, session_id, now)["weather_is_snow"] is None
+    assert _offer(client, session_id, now, **NOTRE_DAME)["weather_pickup_is_rain"] is None
     feed = client.get(f"{BASE}/feeds/weather").json()
-    assert (feed["status"], feed["now"]["weather_code"], len(feed["hours"])) == ("stale", 73, 2)
-    weather.refresh(db, now=now, fetcher=lambda lat, lng: _body(0.0, 73))
-    db.commit()
-    assert client.get(f"{BASE}/feeds/weather").json()["status"] == "ok"
-    assert _offer(client, session_id, now)["weather_is_snow"] is True
+    assert (feed["status"], feed["cells"], feed["cells_paris"], len(feed["hours"])) == ("stale", 192, 72, 10)
+    assert feed["now"]["precipitation_mm"] == 1.2
 
 
-def test_bad_answer_and_old_readings(db) -> None:
-    with pytest.raises(weather.WeatherUnavailableError):
-        weather.refresh(db, fetcher=lambda lat, lng: {"current": None})
-    db.rollback()
-    now = datetime.now(UTC)
-    weather.refresh(db, now=now - timedelta(days=9), fetcher=lambda lat, lng: _body(0.0, 1))
-    weather.refresh(db, now=now, fetcher=lambda lat, lng: _body(0.0, 1))
+def test_job_calls_only_during_a_session(db, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(weather, "fetch", lambda batch: calls.append(len(batch)) or _fetcher(set(), at=datetime.now(UTC))(batch))
+
+    class Ctx:
+        def __init__(self): self.db, self.items_in, self.items_out, self.detail = db, 0, 0, None
+
+    db.execute(text("UPDATE rides_sessions SET status = 'completed', ended_at = now(), paused_at = NULL "
+                    "WHERE status IN ('active', 'paused')"))
     db.commit()
-    assert len(list(db.scalars(select(RidesWeatherReading)))) == 1  # plus de 7 jours : effacé
+    ctx = Ctx()
+    weather.weather_refresh_job(ctx, None)
+    assert (ctx.detail, calls) == ({"skipped": "no_open_session"}, [])
+    _client(db)  # ouvre une session
+    weather.weather_refresh_job(ctx, None)
+    assert ctx.detail == {"cells": 192} and calls == [100, 92]

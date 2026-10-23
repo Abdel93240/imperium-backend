@@ -466,12 +466,17 @@ WEATHER (Open-Meteo, FREE):
 └─ weather_visibility_km           — fog detection
 ```
 
-> CODÉ (2026-10-23, migration 20261023_0139) : relevés Open-Meteo (modèle Météo-France, centre de Paris) toutes
-> les 15 min par le job `vector.weather_refresh` (semé éteint), gardés 7 jours (`rides_weather_readings`). Chaque
-> offre lit le relevé de son heure (au plus 90 min avant) : `weather_temp_c`, `weather_precip_mm`, `weather_code`,
-> `weather_wind_kmh`, `weather_visibility_km` (souvent vide avec ce modèle), `weather_is_rain`, `weather_is_snow`,
-> `weather_is_fog`, `weather_rain_next_hour_pct` ; sans relevé frais, tout reste vide. `GET
-> /api/imperium/vector/feeds/weather` (ok, stale, unavailable) alimente la carte Météo de l'appli.
+> CODÉ (2026-10-23, migration 20261023_0139) — météo EN GRILLE (une averse couvre quelques km ; la demande et la
+> majoration montent là où il pleut) : 192 cases — Paris et petite couronne ~3 km (72), reste de l'Île-de-France
+> ~10 km (116), Roissy-CDG, Orly, Beauvais, centre de Paris. Open-Meteo (modèle Météo-France, offre gratuite,
+> choix de l'utilisateur), pluie au quart d'heure (2 passés, 8 à venir). Job `vector.weather_refresh` toutes les
+> 30 min, SEULEMENT pendant une session VTC ouverte (~3 800 appels pour 10 h), semé éteint ; passes gardées
+> (`rides_weather_cell_readings`, données d'apprentissage). Variables d'une offre : case de la tablette
+> (`weather_pickup_*` : pluie maintenant, pluie la dernière demi-heure, début d'averse, pluie dans l'heure en mm,
+> neige, température), centre de Paris (`weather_paris_*`), part des cases sous la pluie (Paris + petite couronne,
+> reste de la région), vent, brouillard ; passe de plus de 45 min → vide. Case d'arrivée : quand la position de
+> dépose sera relevée (chronométrage de la course). La même grille datée servira de variables au modèle de
+> prédiction de majoration (§17.7–17.8). `GET /api/imperium/vector/feeds/weather` alimente la carte Météo.
 
 ### 5.6 External signals (V2 — to add)
 
