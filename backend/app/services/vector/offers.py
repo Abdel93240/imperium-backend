@@ -35,7 +35,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import sessions
+from app.services.vector import calendar, sessions
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -258,6 +258,35 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         "session_target_pct": float(kpis.target_progress) if kpis.target_progress is not None else None,
         "time_since_last_ride_min": int((offered_at - previous.offered_at).total_seconds() // 60) if previous else None,
         "last_ride_destination_zone_key": zone_key(previous.destination_zone) if previous else None,
+        "last_ride_hourly_rate_cents": previous.actual_hourly_rate_cents if previous else None,
+        # Majoration sous toutes ses formes, péage, gamme, paiement (doc 57 §5.1).
+        "surge_multiplier": float(payload.surge_multiplier) if payload.surge_multiplier is not None else None,
+        "surge_percent": payload.surge_percent,
+        "surge_bonus_cents": payload.surge_bonus_cents,
+        "has_surge": any(v is not None for v in (payload.surge_multiplier, payload.surge_percent, payload.surge_bonus_cents)),
+        "toll_cents": payload.toll_cents,
+        "ride_class": payload.ride_class,
+        "payment_type": payload.payment_type,
+        # Zones (doc 57 §5.3) depuis les codes postaux ; position de la tablette à l'offre.
+        **_area("pickup", payload.pickup_zone_code),
+        **_area("dest", payload.destination_zone_code),
+        "driver_lat": float(payload.driver_lat) if payload.driver_lat is not None else None,
+        "driver_lng": float(payload.driver_lng) if payload.driver_lng is not None else None,
+        # Calendrier (doc 57 §5.2) : jours fériés calculés ; vacances scolaires = source à brancher.
+        "is_public_holiday": calendar.is_public_holiday(local.date()),
+        "is_eve_of_holiday": calendar.is_public_holiday(local.date() + timedelta(days=1)),
+        "is_school_holiday": None,
+    }
+
+
+def _area(side: str, code: str | None) -> dict:
+    """Paris, petite couronne (92, 93, 94), grande couronne (77, 78, 91, 95) ; inconnu sans code postal."""
+    prefix = code[:2] if code else None
+    known = prefix is not None
+    return {
+        f"{side}_in_paris": prefix == "75" if known else None,
+        f"{side}_in_petite_couronne": prefix in ("92", "93", "94") if known else None,
+        f"{side}_in_grande_couronne": prefix in ("77", "78", "91", "95") if known else None,
     }
 
 

@@ -168,3 +168,34 @@ def test_offer_read_by_the_assistant(db) -> None:
     bad = client.post(f"{BASE}/sessions/{session_id}/offers", headers={"Idempotency-Key": uuid4().hex},
                       json={"price_cents": 100, "source": "ocr"})
     assert bad.status_code == 422
+
+
+def test_offer_keeps_every_surge_form_and_context(db) -> None:
+    _, client, session_id = _setup(db)
+    assumption = datetime(2026, 8, 15, 12, 0, tzinfo=PARIS)  # 15 août
+    body = {"surge_multiplier": "1.4", "surge_percent": 20, "surge_bonus_cents": 240, "toll_cents": 410,
+            "ride_class": "comfort", "payment_type": "cash", "driver_lat": "48.853400", "driver_lng": "2.348800",
+            "pickup_zone_code": "92100", "destination_zone_code": "75011"}
+    offer = client.post(f"{BASE}/sessions/{session_id}/offers", headers={"Idempotency-Key": uuid4().hex},
+                        json={"price_cents": 3150, "estimated_duration_min": 35, "offered_at": NOON.isoformat(), **body})
+    assert offer.status_code == 201, offer.text
+    f = offer.json()["features"]
+    assert (f["surge_multiplier"], f["surge_percent"], f["surge_bonus_cents"], f["has_surge"]) == (1.4, 20, 240, True)
+    assert (f["toll_cents"], f["ride_class"], f["payment_type"]) == (410, "comfort", "cash")
+    assert (f["pickup_in_petite_couronne"], f["pickup_in_paris"], f["dest_in_paris"]) == (True, False, True)
+    assert (f["driver_lat"], f["driver_lng"]) == (48.8534, 2.3488)
+    assert (f["is_public_holiday"], f["is_school_holiday"]) == (False, None)
+    plain = _offer(client, session_id, assumption)["features"]
+    assert (plain["is_public_holiday"], plain["has_surge"], plain["pickup_in_paris"]) == (True, False, None)
+    eve = _offer(client, session_id, datetime(2026, 8, 14, 12, 0, tzinfo=PARIS))["features"]
+    assert eve["is_eve_of_holiday"] is True
+
+
+def test_french_public_holidays() -> None:
+    from datetime import date
+
+    from app.services.vector import calendar
+    assert calendar.easter(2026) == date(2026, 4, 5)
+    assert calendar.easter(2027) == date(2027, 3, 28)
+    assert {d for d in calendar.public_holidays(2026) if d.month in (4, 5)} == {
+        date(2026, 4, 6), date(2026, 5, 1), date(2026, 5, 8), date(2026, 5, 14), date(2026, 5, 25)}
