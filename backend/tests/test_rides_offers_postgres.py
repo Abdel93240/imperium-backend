@@ -1,8 +1,8 @@
 """PostgreSQL : courses proposées Vector — variables, décision, résultat réel (doc 57 §5–§6, doc 33 §8)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from uuid import uuid4
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -23,7 +23,7 @@ from app.api.deps import get_current_user, get_db  # noqa: E402
 from app.api.v1.routes import imperium_vector  # noqa: E402
 from app.models.auth import User  # noqa: E402
 from app.models.event import Event  # noqa: E402
-from app.models.rides import RidesRevenueEntry  # noqa: E402
+from app.models.rides import RidesOffer, RidesRevenueEntry  # noqa: E402
 from app.models.vault import ImperiumVaultTransaction  # noqa: E402
 from app.schemas.rides import RideOfferCreate  # noqa: E402
 from app.services.vector import offers  # noqa: E402
@@ -222,3 +222,22 @@ def test_pause_resume_and_ride_counters(db) -> None:
     assert done.kpis.elapsed_minutes - done.kpis.active_minutes == 40
     assert client.post(f"{BASE}/sessions/{sid}/pause").status_code == 409
     assert client.post(f"{BASE}/sessions", headers=_key(), json={}).status_code == 201  # plus de session ouverte
+
+
+def test_outcome_keeps_the_timeline_read_on_bolt_screens(db) -> None:
+    client = _client(db, _user(db))
+    session_id = _session(client)["id"]
+    offer = _offer(client, session_id, price_cents=2462, estimated_duration_min=57, source="assistant")
+    decided = client.post(f"{BASE}/offers/{offer['id']}/decision", json={"version": offer["version"], "decision": "accepted"}).json()
+    t0 = datetime(2026, 10, 23, 9, 30, tzinfo=UTC)
+    body = {"version": decided["version"], "actual_earning_cents": 2462, "approach_minutes": 5, "wait_minutes": 2,
+            "ride_minutes": 57, "record_revenue": False, "payment": "card", "price_source": "ride_screen",
+            "timeline": {"accepted": t0.isoformat(), "arrived": (t0 + timedelta(minutes=5)).isoformat(),
+                         "started": (t0 + timedelta(minutes=7)).isoformat(), "ended": (t0 + timedelta(minutes=64)).isoformat()},
+            "pickup_lat": "48.835000", "pickup_lng": "2.250000", "dropoff_lat": "48.884500", "dropoff_lng": "2.595400"}
+    done = client.post(f"{BASE}/offers/{offer['id']}/outcome", json=body)
+    assert done.status_code == 200, done.text
+    row = db.get(RidesOffer, UUID(offer["id"]))
+    assert row.outcome["timeline"]["arrived"] == "2026-10-23T09:35:00+00:00"
+    assert (row.outcome["payment"], row.outcome["price_source"], row.outcome["dropoff_zone_cell"][:1]) == ("card", "ride_screen", "B")
+    assert row.mobilized_minutes == 64

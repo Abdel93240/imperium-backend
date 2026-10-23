@@ -12,6 +12,7 @@ pas entraîné, le signal vient des règles métier seules (doc 57 §3.1, servic
 Vector n'agit jamais sur l'appli VTC.
 """
 
+import math
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from statistics import median
@@ -35,7 +36,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, events, priority, school, sessions, weather
+from app.services.vector import calendar, events, geo, priority, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -84,10 +85,20 @@ def record_offer(
     if offered_at > now + CLOCK_SKEW:
         raise OfferInputError("L'heure de la course ne peut pas être dans le futur.")
     session = sessions._active(db, current_user, session_id)
-    variables = features(db, session, payload, offered_at)
+    # L'arrivée d'une offre Bolt n'a presque jamais de code postal : la commune ou le quartier lu le donne.
+    places = {side: geo.resolve(getattr(payload, f"{side}_zone")) for side in ("pickup", "destination")}
+    sources = {side: "read" if getattr(payload, f"{side}_zone_code") else ("resolved" if places[side] and places[side].postal_code
+                                                                          else None) for side in places}
+    payload = payload.model_copy(update={
+        f"{side}_zone_code": getattr(payload, f"{side}_zone_code") or (places[side].postal_code if places[side] else None)
+        for side in places
+    })
+    variables = features(db, session, payload, offered_at, places=places)
+    variables.update({"pickup_code_source": sources["pickup"], "destination_code_source": sources["destination"]})
     rules = ensure_rules(db, current_user)
     signal, fired, reason = evaluate(rules, {
         "pickup_zone_code": payload.pickup_zone_code, "destination_zone_code": payload.destination_zone_code,
+        "destination_department": places["destination"].department if places["destination"] else None,
         "time_block": variables["time_block"], "ride_type": payload.ride_type,
     })
     # Variables dérivées des règles (doc 57 §5.7) : le modèle apprendra s'il faut les suivre.
@@ -223,8 +234,11 @@ def training_summary(db: Session, *, current_user: User) -> TrainingSummaryRead:
 
 # ---------- variables ----------
 
-def features(db: Session, session: RidesSession, payload: RideOfferCreate, offered_at: datetime) -> dict:
+def features(db: Session, session: RidesSession, payload: RideOfferCreate, offered_at: datetime,
+             places: dict | None = None) -> dict:
     """Variables du doc 57 §5.1, §5.2 (sans culte ni santé) et §5.4, figées au moment de l'offre."""
+    places = places or {}
+    pickup_place, dest_place = places.get("pickup"), places.get("destination")
     local = offered_at.astimezone(PARIS)
     cell = (weather.cell_at(float(payload.driver_lat), float(payload.driver_lng)).code
             if payload.driver_lat is not None and payload.driver_lng is not None else None)
@@ -286,9 +300,16 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         # Événements, fermetures, travaux du scan web hebdomadaire (doc 57 §5.6) ; vides avant le premier scan.
         **events.offer_features(db, offered_at, pickup_code=payload.pickup_zone_code,
                                 destination_code=payload.destination_zone_code),
-        # Météo de l'heure de l'offre (doc 57 §5.5) : case de la tablette, Paris, part de la région sous la pluie.
+        # Lieux résolus (commune ou quartier) : centre de la commune ou de l'arrondissement (doc 57 §5.3).
+        "pickup_lat": pickup_place.lat if pickup_place else None, "pickup_lng": pickup_place.lng if pickup_place else None,
+        "dest_lat": dest_place.lat if dest_place else None, "dest_lng": dest_place.lng if dest_place else None,
+        "dest_department": dest_place.department if dest_place else None,
+        "dest_zone_cell": weather.cell_at(dest_place.lat, dest_place.lng).code if dest_place else None,
+        "distance_paris_center_km": round(_km(dest_place.lat, dest_place.lng, 48.8566, 2.3522), 1) if dest_place else None,
+        # Météo de l'heure de l'offre (doc 57 §5.5) : case de la tablette, case d'arrivée, Paris, part sous la pluie.
         **weather.offer_features(db, offered_at, lat=float(payload.driver_lat) if payload.driver_lat is not None else None,
-                                 lng=float(payload.driver_lng) if payload.driver_lng is not None else None),
+                                 lng=float(payload.driver_lng) if payload.driver_lng is not None else None,
+                                 dest=(dest_place.lat, dest_place.lng) if dest_place else None),
     }
 
 
@@ -316,8 +337,27 @@ def _time_block(hour: int) -> str:
 
 
 def _outcome(payload: RideOutcomeRequest) -> dict:
-    return {"approach_minutes": payload.approach_minutes, "wait_minutes": payload.wait_minutes,
-            "ride_minutes": payload.ride_minutes, "return_minutes": payload.return_minutes}
+    """Temps mobilisé, et s'ils ont été relevés par l'assistant : étapes datées, positions, paiement, source du prix."""
+    out = {"approach_minutes": payload.approach_minutes, "wait_minutes": payload.wait_minutes,
+           "ride_minutes": payload.ride_minutes, "return_minutes": payload.return_minutes}
+    if payload.timeline:
+        out["timeline"] = {stage: at.isoformat() for stage, at in payload.timeline.items()}
+    for key in ("pickup_lat", "pickup_lng", "dropoff_lat", "dropoff_lng"):
+        if (value := getattr(payload, key)) is not None:
+            out[key] = float(value)
+    if payload.dropoff_lat is not None and payload.dropoff_lng is not None:
+        out["dropoff_zone_cell"] = weather.cell_at(float(payload.dropoff_lat), float(payload.dropoff_lng)).code
+    if payload.payment:
+        out["payment"] = payload.payment
+    if payload.price_source:
+        out["price_source"] = payload.price_source
+    return out
+
+
+def _km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    dlat, dlng = math.radians(lat2 - lat1), math.radians(lng2 - lng1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng / 2) ** 2
+    return 6371 * 2 * math.asin(math.sqrt(a))
 
 
 def _get(db: Session, user: User, offer_id: UUID, *, lock: bool = True) -> RidesOffer:

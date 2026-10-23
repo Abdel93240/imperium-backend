@@ -226,6 +226,14 @@ class RideOutcomeRequest(BaseModel):
     return_minutes: int = Field(default=0, ge=0, le=300)  # retour estimé après la dépose
     record_revenue: bool = True  # écrit aussi le revenu au Vault (évite une double saisie)
     wallet: str = Field(default="cash", min_length=1, max_length=80)
+    # Relevé par l'assistant (écrans Bolt) : étapes datées, positions de prise en charge et de dépose, paiement.
+    timeline: dict[Literal["offered", "accepted", "arrived", "started", "ended"], datetime] | None = None
+    pickup_lat: Decimal | None = Field(default=None, ge=-90, le=90, decimal_places=6)
+    pickup_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
+    dropoff_lat: Decimal | None = Field(default=None, ge=-90, le=90, decimal_places=6)
+    dropoff_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
+    payment: Literal["cash", "card", "business"] | None = None
+    price_source: Literal["confirm_screen", "ride_screen", "offer", "manual"] | None = None
 
 
 class RideOfferRead(BaseModel):

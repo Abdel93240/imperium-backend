@@ -152,7 +152,8 @@ def _matches(conditions: dict, facts: dict) -> bool:
         if not any(code in conditions["zone_codes"] for code in sides if code):
             return False
     if "destination_prefixes" in conditions:
-        destination = facts.get("destination_zone_code")
+        # Paris sans quartier reconnu : pas de code postal, mais le département (75) suffit à cette condition.
+        destination = facts.get("destination_zone_code") or facts.get("destination_department")
         if not destination or not any(destination.startswith(prefix) for prefix in conditions["destination_prefixes"]):
             return False
     if "destination_outside_prefixes" in conditions:

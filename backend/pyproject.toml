@@ -33,6 +33,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.services.ai" = ["prompts/*.txt"]
+"app.services.vector" = ["data/*.json"]
 
 [tool.ruff]
 line-length = 100

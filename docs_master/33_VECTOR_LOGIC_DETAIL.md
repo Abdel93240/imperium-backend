@@ -140,6 +140,21 @@ CatBoost ride verdict → 2 outcomes only:
 > seules), détection automatique de la décision, flux externes, réglage sur les écrans réels de Bolt (le journal sert
 > à cela).
 
+> CODÉ (2026-10-23, appli 0.34.0-courses) — lecture calée sur 13 captures Bolt réelles. Offre : puces Priorité,
+> gamme (« Bolt »), Carte / Espèces / Client Business, « +x € inclus » (majoration incluse ; avec Priorité, c'est la
+> priorité qui la crée), prix « (net, TTC) », couples « 5 min • 1.7 km », adresses (rue jamais envoyée : commune et
+> quartier seulement), boutons Refuser / Accepter ou Répondre (même sens ; sans eux, pas d'offre). Le serveur déduit
+> le code postal et la position de la commune ou du quartier (liste officielle des communes d'Île-de-France, 80
+> quartiers de Paris, aéroports ; `services/vector/geo.py`) : arrivée sans code postal résolue, météo de la case
+> d'arrivée, distance au centre de Paris. Chronométrage sans saisie : étape d'approche (« En route vers l'adresse de
+> prise en charge », « Arrivé ») = acceptation (au plus 5 min après l'offre), « Attente » / « Commencer la course » =
+> arrivée, « Finir la course » = départ, « Confirmer le prix » / « Noter le passager » = fin, avec le montant final
+> et les espèces ; « Commande annulée » = note sur la décision. À la fin, le résultat part seul : gain (écran de fin,
+> sinon puce de course, sinon offre), approche, attente, course à la minute, étapes datées, positions de prise en
+> charge et de dépose, paiement ; revenu au Vault (portefeuille cash ou bolt). Les étapes sont vues quand Bolt est à
+> l'écran : la bulle Bolt de Waze est désactivée par l'utilisateur (les appuis se font dans Bolt). Le temps de
+> retour après dépose reste à 0 (à calculer plus tard depuis l'offre suivante). Courses programmées : dossier V2.
+
 Note: this is the accept-a-ride feature ONLY. **Zone recommendation (§5) is a separate, already-documented feature and is unchanged** — it keeps its short textual reason (the driver is not mid-ride when repositioning, so a brief reason is useful there).
 
 ## 5. Zone Recommendation
