@@ -81,9 +81,9 @@ def test_default_rules_and_not_coded_list(db) -> None:
     _, client, _ = _setup(db)
     body = client.get(f"{BASE}/rules").json()
     assert [(r["rule_code"], r["action"], r["is_active"]) for r in body["items"]] == [
-        ("R1", "red", True), ("R2", "red", True), ("R7", "green", True), ("R8", "green", True),
+        ("R1", "red", True), ("R2", "red", True), ("R3", "red", True), ("R7", "green", True), ("R8", "green", True),
     ]
-    assert body["not_coded"] == ["R3", "R4", "R5", "R6", "R9", "R10", "R11"]
+    assert body["not_coded"] == ["R4", "R5", "R6", "R9", "R10", "R11"]
 
 
 def test_red_and_green_signals(db) -> None:
@@ -138,3 +138,33 @@ def test_rule_revision_with_history(db) -> None:
     assert client.patch(f"{BASE}/rules/R99", json={"version": 1, "reason": "Inconnue"}).status_code == 404
     applied = {r["rule_code"]: r["times_applied"] for r in client.get(f"{BASE}/rules").json()["items"]}
     assert applied["R2"] == 1
+
+
+def test_r3_far_destination_in_daytime(db) -> None:
+    _, client, session_id = _setup(db)
+    far = _offer(client, session_id, NOON, destination_zone_code="77700")  # Marne-la-Vallée, au-delà de Noisy-le-Grand
+    assert (far["signal"], far["triggered_rules"]) == ("red", ["R3"])
+    for code in ("75011", "92100", "78000", "95700", "91300"):  # Paris, petite couronne, communes en deçà, Roissy-CDG
+        assert _offer(client, session_id, NOON, destination_zone_code=code)["triggered_rules"] == [], code
+    assert _offer(client, session_id, NIGHT, destination_zone_code="77700")["triggered_rules"] == []
+    assert _offer(client, session_id, NOON)["triggered_rules"] == []  # sans code postal : rien n'est supposé
+    rules = {r["rule_code"]: r for r in client.get(f"{BASE}/rules").json()["items"]}
+    allowed = client.patch(f"{BASE}/rules/R3", json={
+        "version": rules["R3"]["version"], "reason": "Marne-la-Vallée me convient.",
+        "conditions": {**rules["R3"]["conditions"],
+                       "destination_allowed_codes": [*rules["R3"]["conditions"]["destination_allowed_codes"], "77700"]},
+    })
+    assert allowed.status_code == 200, allowed.text
+    assert _offer(client, session_id, NOON, destination_zone_code="77700")["signal"] is None
+    lonely = client.patch(f"{BASE}/rules/R3", json={"version": 2, "reason": "x", "conditions": {"destination_allowed_codes": ["77700"]}})
+    assert lonely.status_code == 422
+
+
+def test_offer_read_by_the_assistant(db) -> None:
+    _, client, session_id = _setup(db)
+    read = _offer(client, session_id, NOON, source="assistant", destination_zone_code="75008")
+    assert (read["source"], read["signal"]) == ("assistant", "red")
+    assert _offer(client, session_id, NOON)["source"] == "manual"
+    bad = client.post(f"{BASE}/sessions/{session_id}/offers", headers={"Idempotency-Key": uuid4().hex},
+                      json={"price_cents": 100, "source": "ocr"})
+    assert bad.status_code == 422

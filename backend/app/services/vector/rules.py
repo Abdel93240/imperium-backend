@@ -3,9 +3,12 @@
 Règles codées, calculables sans donnée externe (codes postaux, créneau, type de course) :
 - R1 : pas de 8e arrondissement (prise en charge ou dépose 75008) → rouge ;
 - R2 : 18e / 19e en journée (prise en charge 75018, 75019, 10 h–16 h) → rouge ;
+- R3 : en journée, arrivée au-delà de Poissy, L'Isle-Adam, Noisy-le-Grand ou Corbeil-Essonnes → rouge. Sans
+  coordonnées, la limite est une liste de départ : Paris et petite couronne (75, 92, 93, 94) plus les communes de
+  grande couronne en deçà des limites (codes postaux, modifiable) ; Roissy-CDG reste autorisé (cas spécial du §4.3) ;
 - R7 : retour vers Paris la nuit (dépose 75…, créneaux night / late_evening) → vert ;
 - R8 : course programmée la nuit → vert.
-R3, R5, R6, R10 attendent la géographie ou des flux externes ; R4, R9, R11 ne notent pas
+R5, R6, R10 attendent la géographie fine ou des flux externes ; R4, R9, R11 ne notent pas
 une course (doc 57 §4.4, §4.9, §4.11).
 
 Signal : une règle rouge déclenchée → rouge (prudence, même si une verte l'est aussi) ;
@@ -27,17 +30,33 @@ from app.services.events.emitter import build_event
 from app.services.vector.scoring import VECTOR_ABSTENTION_MESSAGE
 
 NIGHT = ["night", "late_evening"]
+# Grande couronne en deçà de Poissy (ouest), L'Isle-Adam (nord), Noisy-le-Grand (est), Corbeil-Essonnes (sud).
+R3_ALLOWED = [
+    # Yvelines
+    "78000", "78100", "78110", "78140", "78150", "78160", "78170", "78220", "78230", "78290", "78300", "78350",
+    "78360", "78380", "78400", "78420", "78500", "78600", "78280", "78180", "78960",
+    # Val-d'Oise (dont Roissy-CDG 95700)
+    "95000", "95100", "95120", "95130", "95140", "95150", "95160", "95190", "95200", "95210", "95220", "95230",
+    "95240", "95290", "95300", "95310", "95400", "95500", "95600", "95700", "95800", "95870", "95880",
+    # Essonne
+    "91000", "91080", "91100", "91120", "91140", "91160", "91170", "91190", "91200", "91220", "91230", "91240",
+    "91260", "91300", "91330", "91370", "91380", "91390", "91400", "91420", "91550", "91600", "91700", "91800",
+    "91940",
+]
 DEFAULT_RULES = (
     ("R1", "Éviter le 8e arrondissement", "Mauvais flux, faible rentabilité réelle, perte de temps.",
      {"zone_codes": ["75008"], "applies_to": ["pickup", "destination"]}, "red"),
     ("R2", "Éviter le 18e et le 19e en journée", "Zones peu rentables en journée : mieux vaut se repositionner.",
      {"zone_codes": ["75018", "75019"], "applies_to": ["pickup"], "time_blocks": ["daytime"]}, "red"),
+    ("R3", "Pas trop loin de Paris en journée", "En journée, mieux vaut rester près de Paris pour se repositionner.",
+     {"destination_outside_prefixes": ["75", "92", "93", "94"], "destination_allowed_codes": R3_ALLOWED,
+      "time_blocks": ["daytime"]}, "red"),
     ("R7", "Retour vers Paris la nuit", "Revenir progressivement vers la zone dense, même après une course extérieure.",
      {"destination_prefixes": ["75"], "time_blocks": NIGHT}, "green"),
     ("R8", "Course programmée la nuit", "Une course programmée la nuit sécurise le chiffre d'affaires.",
      {"ride_types": ["scheduled"], "time_blocks": NIGHT}, "green"),
 )
-NOT_CODED = ["R3", "R4", "R5", "R6", "R9", "R10", "R11"]
+NOT_CODED = ["R4", "R5", "R6", "R9", "R10", "R11"]
 
 
 class RuleNotFoundError(ValueError):
@@ -135,6 +154,12 @@ def _matches(conditions: dict, facts: dict) -> bool:
     if "destination_prefixes" in conditions:
         destination = facts.get("destination_zone_code")
         if not destination or not any(destination.startswith(prefix) for prefix in conditions["destination_prefixes"]):
+            return False
+    if "destination_outside_prefixes" in conditions:
+        destination = facts.get("destination_zone_code")
+        if not destination or any(destination.startswith(prefix) for prefix in conditions["destination_outside_prefixes"]):
+            return False
+        if destination in conditions.get("destination_allowed_codes", []):
             return False
     if "time_blocks" in conditions and facts.get("time_block") not in conditions["time_blocks"]:
         return False

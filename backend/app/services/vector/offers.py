@@ -93,7 +93,7 @@ def record_offer(
     # Variables dérivées des règles (doc 57 §5.7) : le modèle apprendra s'il faut les suivre.
     variables.update({f"rule_{rule.rule_code}_triggered": rule.rule_code in fired for rule in rules})
     offer = RidesOffer(
-        user_id=current_user.id, session_id=session.id, offered_at=offered_at, source="manual", platform=payload.platform,
+        user_id=current_user.id, session_id=session.id, offered_at=offered_at, source=payload.source, platform=payload.platform,
         price_cents=payload.price_cents, distance_km=payload.distance_km, estimated_duration_min=payload.estimated_duration_min,
         approach_distance_km=payload.approach_distance_km, approach_duration_min=payload.approach_duration_min,
         surge_multiplier=payload.surge_multiplier, pickup_zone=(payload.pickup_zone or "").strip() or None,

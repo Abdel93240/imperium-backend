@@ -118,6 +118,19 @@ CatBoost ride verdict → 2 outcomes only:
 - Output is a **signal only**: halo + sound. **No natural-language explanation in real time.** Goal: speed and efficiency while driving, zero friction, zero text.
 - The score still includes the existing economics (hourly_rate_estimate, dead_return_penalty, pickup_waste_penalty, traffic_risk_penalty, strategic_zone_bonus, event_or_airport_bonus) — but its **user-facing output** is the binary halo/sound, not a label list.
 
+> CODÉ (2026-10-22, lot V2-A, migration 20261022_0138) — assistant de prise de course. Côté appli : service
+> d'accessibilité limité à l'appli conducteur Bolt, en lecture seule (VECTOR-004 : lire pour conseiller, jamais agir ;
+> aucun clic, aucun geste), allumé par l'unique interrupteur de « Ma session ». Il reconnaît une offre (prix, couples
+> durée/distance approche puis course, deux codes postaux, programmée, espèces, majoration) ; sans prix ni couple, pas
+> d'offre ; un seul code postal n'est attribué à aucun côté. Seuls ces champs et la commune partent au serveur
+> (`POST …/sessions/{id}/offers`, `source: assistant`) ; le texte lu et les adresses restent sur la tablette (journal de
+> lecture en mémoire, Réglages › Assistant). Halo par-dessus l'appli VTC, sans toucher : vert / rouge selon le signal
+> des règles (doc 57 §3.1), blanc = présence, blanc marqué « ? » = aucun avis, gris = pas de session active ou serveur
+> injoignable (jamais favorable). Sons : aigu favorable, grave double défavorable, bip à l'activation, aucun son sans
+> avis. La décision (acceptée, refusée, manquée) se confirme d'un appui sur le tableau de bord (donnée de
+> comportement). Pas encore : modèle CatBoost (phase règles seules), détection automatique de la décision, flux
+> externes, réglage de la lecture sur les écrans réels de Bolt (le journal sert à cela).
+
 Note: this is the accept-a-ride feature ONLY. **Zone recommendation (§5) is a separate, already-documented feature and is unchanged** — it keeps its short textual reason (the driver is not mid-ride when repositioning, so a brief reason is useful there).
 
 ## 5. Zone Recommendation

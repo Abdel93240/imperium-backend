@@ -191,6 +191,8 @@ class RideOfferCreate(BaseModel):
     destination_zone_code: str | None = Field(default=None, pattern=r"^\d{5}$")
     payment_type: Literal["card", "cash", "pro"] | None = None
     ride_type: Literal["immediate", "scheduled"] = "immediate"
+    # manual : saisie ; assistant : lue à l'écran par l'assistant de prise de course (lecture seule, VECTOR-004).
+    source: Literal["manual", "assistant"] = "manual"
 
 
 class RideDecisionRequest(BaseModel):
@@ -280,11 +282,18 @@ class RuleConditions(BaseModel):
     destination_prefixes: list[Annotated[str, StringConstraints(pattern=r"^\d{2,5}$")]] | None = Field(default=None, max_length=50)
     time_blocks: list[RideTimeBlock] | None = None
     ride_types: list[Literal["immediate", "scheduled"]] | None = None
+    # R3 : arrivée hors des préfixes et hors des codes autorisés (communes en deçà des limites) ; code absent → non déclenchée.
+    destination_outside_prefixes: list[Annotated[str, StringConstraints(pattern=r"^\d{2,5}$")]] | None = Field(
+        default=None, max_length=50)
+    destination_allowed_codes: list[Annotated[str, StringConstraints(pattern=r"^\d{5}$")]] | None = Field(
+        default=None, max_length=300)
 
     @model_validator(mode="after")
     def coherent(self):
         if (self.zone_codes is None) != (self.applies_to is None):
             raise ValueError("zone_codes and applies_to go together.")
+        if self.destination_allowed_codes is not None and self.destination_outside_prefixes is None:
+            raise ValueError("destination_allowed_codes needs destination_outside_prefixes.")
         if all(value is None for value in self.model_dump().values()):
             raise ValueError("At least one condition is required.")
         return self
