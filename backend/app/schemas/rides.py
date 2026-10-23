@@ -201,6 +201,8 @@ class RideOfferCreate(BaseModel):
     # Position de la tablette quand l'offre arrive (doc 57 §5.3) ; reste dans la base de l'utilisateur.
     driver_lat: Decimal | None = Field(default=None, ge=-90, le=90, decimal_places=6)
     driver_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
+    # Étiquette « Priority » lue à gauche du prix (le client paie plus pour être pris plus vite) ; None = non lue.
+    is_priority: bool | None = None
 
 
 class RideDecisionRequest(BaseModel):
@@ -390,3 +392,19 @@ class EventFeedRead(BaseModel):
     scanned_at: datetime | None = None
     message: str | None = None
     items: list[EventSignalRead] = []
+
+
+class PriorityStatRow(BaseModel):
+    by: Literal["zone_cell", "pickup_zone_code"]  # case de la grille ou code postal de prise en charge
+    zone: str
+    time_block: str | None
+    offers: int
+    priority: int
+    share: float | None  # None sous le minimum d'offres
+
+
+class PriorityStatsRead(BaseModel):
+    days: int
+    offers: int
+    min_offers: int
+    rows: list[PriorityStatRow]
