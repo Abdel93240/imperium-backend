@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # The WR bridges are now direct backend calls (app/services/imperium/wr_bridge.py)
     # and the only execution mechanism is the runner. Kept until the VPS container is
     # confirmed exported and cut (user action, out of pass).
+    # Flux Vector (clés dans .env, jamais dans le code ni la base ; décision utilisateur 2026-10-23).
+    idfm_prim_api_key: str | None = None
+    sncf_api_key: str | None = None
+    tomtom_api_key: str | None = None
+    opensky_client_id: str | None = None
+    opensky_client_secret: str | None = None
     n8n_base_url: str | None = None
     n8n_webhook_secret: str | None = None
     n8n_request_timeout_seconds: int = 10

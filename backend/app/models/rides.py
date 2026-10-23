@@ -385,3 +385,69 @@ class RidesDropObservation(UUIDPrimaryKeyMixin, Base):
     cycle_hourly_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="open", server_default="open")
     closed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)  # pluie, perturbations, bouchons, avions à la dépose
+
+
+class RidesTransitStop(Base):
+    """Position d'un arrêt IDFM (demandée une fois, gardée) et sa zone fine."""
+
+    __tablename__ = "rides_transit_stops"
+
+    stop_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lat: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    lng: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
+    zone_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RidesTransitDisruption(UUIDPrimaryKeyMixin, Base):
+    """Perturbation en cours (métro, RER, Transilien, tram) relevée sur IDFM PRIM, avec les zones des arrêts touchés."""
+
+    __tablename__ = "rides_transit_disruptions"
+    __table_args__ = (Index("rides_transit_disruptions_fetched_idx", text("fetched_at DESC")),)
+
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    disruption_id: Mapped[str] = mapped_column(Text, nullable=False)
+    line_id: Mapped[str] = mapped_column(Text, nullable=False)
+    line_name: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(Text, nullable=False)
+    severity: Mapped[str] = mapped_column(Text, nullable=False)
+    cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stop_ids: Mapped[list] = mapped_column(JSONB, nullable=False)
+    zone_codes: Mapped[list] = mapped_column(JSONB, nullable=False)
+
+
+class RidesTrafficIncident(UUIDPrimaryKeyMixin, Base):
+    """Bouchon, fermeture ou travaux relevés sur TomTom, placés au milieu du tronçon dans la grille fine."""
+
+    __tablename__ = "rides_traffic_incidents"
+    __table_args__ = (Index("rides_traffic_incidents_fetched_idx", text("fetched_at DESC")),)
+
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    category: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    magnitude: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    delay_s: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    length_m: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    roads: Mapped[list] = mapped_column(JSONB, nullable=False)
+    from_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    to_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lat: Mapped[float] = mapped_column(Numeric(9, 6), nullable=False)
+    lng: Mapped[float] = mapped_column(Numeric(9, 6), nullable=False)
+    zone_code: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RidesAirportSnapshot(UUIDPrimaryKeyMixin, Base):
+    """Avions en approche finale et au sol autour d'un aéroport (OpenSky) à un instant."""
+
+    __tablename__ = "rides_airport_snapshots"
+    __table_args__ = (Index("rides_airport_snapshots_idx", "airport", text("fetched_at DESC")),)
+
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    airport: Mapped[str] = mapped_column(Text, nullable=False)
+    approaching: Mapped[int] = mapped_column(Integer, nullable=False)
+    on_ground: Mapped[int] = mapped_column(Integer, nullable=False)
+    final_icao: Mapped[list] = mapped_column(JSONB, nullable=False)

@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.rides import RidesDropObservation, RidesOffer
-from app.services.vector import geo, grid, school
+from app.services.vector import feeds, geo, grid, school
 
 
 def _minutes(start: datetime, end: datetime) -> float:
@@ -64,6 +64,7 @@ def on_outcome(db: Session, offer: RidesOffer, *, accepted_at: datetime | None, 
         id=uuid4(), user_id=offer.user_id, session_id=offer.session_id, offer_id=offer.id, dropped_at=ended_at,
         drop_lat=lat, drop_lng=lng, zone_code=zone.code if zone else None, zone_source=source,
         slot=grid.slot_of(ended_at), day_type=grid.day_type(ended_at), school_holiday=holiday, status="open",
+        context=feeds.drop_context(db, ended_at, lat, lng),
     )
     db.add(obs)
     db.flush()
