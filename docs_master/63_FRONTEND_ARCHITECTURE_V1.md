@@ -736,11 +736,11 @@ Navigation :
 > - Indisponible et dit comme tel : les sept flux d'information (avions, événements, métro-RER-Transilien, bus,
 >   météo, SNCF, autoroutes : lot V2, sources autorisées par l'utilisateur), la dictée du terminal, l'envoi des
 >   notifications.
-> - **LIVRÉ (appli 0.26.0-assistant, lot V2-A)** : assistant de prise de course (doc 33, note « assistant de prise de
->   course ») — service d'accessibilité en lecture seule sur l'appli conducteur Bolt, halo par-dessus sans toucher,
->   sons, interrupteur actif dans Ma session (autorisation Android expliquée), carte « Dernière offre lue » pour
->   classer l'offre (acceptée / refusée / manquée), journal de lecture local dans Réglages › Assistant. Autorisations :
->   localisation, microphone, lecture des offres (la superposition et la capture d'écran ne sont pas nécessaires).
+> - **LIVRÉ (appli 0.27.0-ocr, lot V2-A)** : assistant de prise de course (doc 33, note « assistant de prise de
+>   course ») — capture d'écran demandée à chaque lancement + OCR embarqué (jamais l'accessibilité, F10 §5-quater),
+>   halo en superposition sans toucher, sons, interrupteur actif dans Ma session (superposition expliquée d'abord),
+>   carte « Dernière offre lue » pour classer l'offre (acceptée / refusée / manquée), journal de lecture local dans
+>   Réglages › Assistant. Autorisations du kit : localisation, microphone, superposition, capture d'écran.
 
 Screens V1 :
 
