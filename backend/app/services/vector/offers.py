@@ -36,7 +36,7 @@ from app.schemas.rides import (
 )
 from app.services.events.emitter import build_event
 from app.services.pulse import food_stock
-from app.services.vector import calendar, events, geo, priority, school, sessions, weather
+from app.services.vector import calendar, economics, events, geo, priority, school, sessions, weather
 from app.services.vector.rules import ensure_rules, evaluate
 from app.services.vector.zones import zone_key
 
@@ -104,6 +104,15 @@ def record_offer(
     })
     # Variables dérivées des règles (doc 57 §5.7) : le modèle apprendra s'il faut les suivre.
     variables.update({f"rule_{rule.rule_code}_triggered": rule.rule_code in fired for rule in rules})
+    # Règle économique (décision utilisateur 2026-10-23) : €/h global et note de la zone d'arrivée. Une règle rouge
+    # l'emporte (prudence) ; sinon le verdict économique ; sans durée lue, la règle verte éventuelle ; sinon aucun avis.
+    economic = economics.verdict(db, price_cents=payload.price_cents, approach_min=payload.approach_duration_min,
+                                 trip_min=payload.estimated_duration_min, destination=places["destination"],
+                                 offered_at=offered_at)
+    variables.update(economic.features)
+    source = "rules_only"
+    if signal != "red" and economic.signal is not None:
+        signal, reason, source = economic.signal, economic.reason, "economic"
     offer = RidesOffer(
         user_id=current_user.id, session_id=session.id, offered_at=offered_at, source=payload.source, platform=payload.platform,
         price_cents=payload.price_cents, distance_km=payload.distance_km, estimated_duration_min=payload.estimated_duration_min,
@@ -113,7 +122,7 @@ def record_offer(
         ride_type=payload.ride_type, features=variables, pickup_zone_code=payload.pickup_zone_code,
         destination_zone_code=payload.destination_zone_code, signal=signal,
         pickup_address=(payload.pickup_address or "").strip() or None,
-        destination_address=(payload.destination_address or "").strip() or None, signal_source="rules_only",
+        destination_address=(payload.destination_address or "").strip() or None, signal_source=source,
         signal_reason=reason, triggered_rules=fired, version=1,
         idempotency_key=idempotency_key, request_hash=fingerprint,
     )

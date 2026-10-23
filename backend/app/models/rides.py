@@ -329,3 +329,21 @@ class RidesEventSignal(UUIDPrimaryKeyMixin, Base):
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False)
     fingerprint: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RidesZoneScore(UUIDPrimaryKeyMixin, Base):
+    """Note d'une zone (0 à 10) posée par l'utilisateur : code postal ou département, par créneau (ou « all »)."""
+
+    __tablename__ = "rides_zone_scores"
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 0 AND 10", name="score_range"),
+        CheckConstraint("time_block IN ('night', 'morning', 'daytime', 'evening', 'late_evening', 'all')",
+                        name="time_block_check"),
+        UniqueConstraint("zone_key", "time_block", name="zone_block_unique"),
+    )
+
+    zone_key: Mapped[str] = mapped_column(Text, nullable=False)
+    time_block: Mapped[str] = mapped_column(Text, nullable=False)
+    score: Mapped[float] = mapped_column(Numeric(3, 1), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

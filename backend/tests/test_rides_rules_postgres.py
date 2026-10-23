@@ -71,7 +71,8 @@ def _setup(db):
 
 
 def _offer(client, session_id, at: datetime, **extra) -> dict:
-    body = {"price_cents": 2000, "estimated_duration_min": 25, "offered_at": at.isoformat(), **extra}
+    # Sans durée de course : seules les règles parlent (la règle économique se tait), c'est ce que ces tests vérifient.
+    body = {"price_cents": 2000, "offered_at": at.isoformat(), **extra}
     response = client.post(f"{BASE}/sessions/{session_id}/offers", headers={"Idempotency-Key": uuid4().hex}, json=body)
     assert response.status_code == 201, response.text
     return response.json()

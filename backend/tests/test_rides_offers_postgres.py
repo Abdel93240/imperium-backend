@@ -97,7 +97,9 @@ def test_offer_features_without_verdict(db) -> None:
     )
     assert (features["pickup_zone_key"], features["destination_zone_key"]) == ("gare du nord", "la defense")
     assert not any("prayer" in name or "ramadan" in name or "fatigue" in name for name in features)
-    assert (offer["signal"], offer["decision"], offer["source"]) == (None, None, "manual")
+    # 24 € pour 6 + 30 min = 40 €/h global ≥ 25 €/h, arrivée « La Défense » non résolue : vert sur le seul €/h.
+    assert (offer["signal"], offer["signal_source"], offer["decision"], offer["source"]) == ("green", "economic", None, "manual")
+    assert (features["hourly_global_eur"], features["economic_signal"]) == (40.0, "green")
     assert client.post(f"{BASE}/sessions/{session['id']}/offers", headers=key, json=body).status_code == 200
     assert client.post(f"{BASE}/sessions/{session['id']}/offers", headers=key, json={**body, "price_cents": 1}).status_code == 409
 
