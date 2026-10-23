@@ -369,6 +369,13 @@ CATEGORICAL (CatBoost natif):
 └─ ride_class                      — 'standard'|'comfort'|'xl'|'pet'
 ```
 
+> CODÉ (2026-10-23) — variables gardées avec chaque offre (`rides_offers.features`) : majoration sous ses trois
+> formes (`surge_multiplier` « x1,2 / majo 1,4 / 1,5x », `surge_percent` « +20 % », `surge_bonus_cents` « +2,40 € »,
+> `has_surge`), `toll_cents` (péage hors prix), `ride_class` (standard, comfort, xl, pet), `payment_type`, zones
+> Paris / petite / grande couronne au départ et à l'arrivée (codes postaux), position de la tablette à l'offre
+> (`driver_lat/lng`, dernière position de moins de 2 min), jours fériés et veilles (calculés), €/h réel de la course
+> précédente. `is_school_holiday` reste vide (source à brancher). Culte et santé restent exclus (doc 13 §5).
+
 ### 5.2 Temporal features
 
 ```text

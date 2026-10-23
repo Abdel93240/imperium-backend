@@ -191,8 +191,16 @@ class RideOfferCreate(BaseModel):
     destination_zone_code: str | None = Field(default=None, pattern=r"^\d{5}$")
     payment_type: Literal["card", "cash", "pro"] | None = None
     ride_type: Literal["immediate", "scheduled"] = "immediate"
-    # manual : saisie ; assistant : lue à l'écran par l'assistant de prise de course (lecture seule, VECTOR-004).
+    # manual : saisie ; assistant : lue à l'écran par l'assistant de prise de course (capture + OCR embarqué).
     source: Literal["manual", "assistant"] = "manual"
+    # Majoration sous ses autres formes (« +20 % », « +2,40 € ») ; le multiplicateur reste surge_multiplier.
+    surge_percent: int | None = Field(default=None, ge=1, le=500)
+    surge_bonus_cents: int | None = Field(default=None, ge=1, le=100_000)
+    toll_cents: int | None = Field(default=None, ge=1, le=100_000)  # péage payé par le client, hors prix (doc 37 §4)
+    ride_class: Literal["standard", "comfort", "xl", "pet", "other"] | None = None
+    # Position de la tablette quand l'offre arrive (doc 57 §5.3) ; reste dans la base de l'utilisateur.
+    driver_lat: Decimal | None = Field(default=None, ge=-90, le=90, decimal_places=6)
+    driver_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
 
 
 class RideDecisionRequest(BaseModel):
