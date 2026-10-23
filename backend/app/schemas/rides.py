@@ -354,10 +354,13 @@ class WeatherHour(BaseModel):
 
 
 class WeatherFeedRead(BaseModel):
-    """Flux météo de Vector : ok, stale (relevé de plus de 90 min) ou unavailable (aucun relevé)."""
+    """Flux météo de Vector (grille) : ok, stale (dernière passe de plus de 45 min) ou unavailable (aucune)."""
 
     status: Literal["ok", "stale", "unavailable"]
     fetched_at: datetime | None = None
     message: str | None = None
-    now: WeatherNow | None = None
-    hours: list[WeatherHour] = []
+    now: WeatherNow | None = None  # centre de Paris
+    hours: list[WeatherHour] = []  # quarts d'heure au centre de Paris (2 passés, 8 à venir)
+    cells: int = 0
+    raining_cells_paris: int = 0  # cases de Paris et petite couronne sous la pluie
+    cells_paris: int = 0

@@ -276,8 +276,9 @@ def features(db: Session, session: RidesSession, payload: RideOfferCreate, offer
         "is_public_holiday": calendar.is_public_holiday(local.date()),
         "is_eve_of_holiday": calendar.is_public_holiday(local.date() + timedelta(days=1)),
         "is_school_holiday": None,
-        # Météo de l'heure de l'offre (doc 57 §5.5) : dernier relevé Open-Meteo, vide s'il manque ou date.
-        **weather.offer_features(db, offered_at),
+        # Météo de l'heure de l'offre (doc 57 §5.5) : case de la tablette, Paris, part de la région sous la pluie.
+        **weather.offer_features(db, offered_at, lat=float(payload.driver_lat) if payload.driver_lat is not None else None,
+                                 lng=float(payload.driver_lng) if payload.driver_lng is not None else None),
     }
 
 
