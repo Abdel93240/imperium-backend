@@ -336,3 +336,28 @@ class BusinessRuleUpdate(BaseModel):
 class BusinessRuleListResponse(BaseModel):
     items: list[BusinessRuleRead]
     not_coded: list[str]  # règles du doc 57 §4 qui attendent des données (géographie, flux externes)
+
+
+class WeatherNow(BaseModel):
+    temperature_c: float | None = None
+    precipitation_mm: float | None = None
+    weather_code: int | None = None
+    wind_kmh: float | None = None
+
+
+class WeatherHour(BaseModel):
+    time: str
+    temperature_c: float | None = None
+    precipitation_mm: float | None = None
+    precipitation_probability: int | None = None
+    weather_code: int | None = None
+
+
+class WeatherFeedRead(BaseModel):
+    """Flux météo de Vector : ok, stale (relevé de plus de 90 min) ou unavailable (aucun relevé)."""
+
+    status: Literal["ok", "stale", "unavailable"]
+    fetched_at: datetime | None = None
+    message: str | None = None
+    now: WeatherNow | None = None
+    hours: list[WeatherHour] = []

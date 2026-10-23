@@ -12,6 +12,7 @@ from app.schemas.rides import (
     BusinessRuleListResponse,
     BusinessRuleRead,
     BusinessRuleUpdate,
+    WeatherFeedRead,
     CurrentSessionRead,
     DropZoneCreate,
     DropZoneRead,
@@ -37,7 +38,7 @@ from app.schemas.rides import (
 from app.services.imperium import replan, vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import offers, recommendations, rules, sessions
+from app.services.vector import offers, recommendations, rules, sessions, weather
 
 router = APIRouter()
 
@@ -349,6 +350,12 @@ def _offer_error(db: SessionDep, exc: Exception) -> JSONResponse:
         db.rollback()
         return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(exc)})
     return _error(db, exc)
+
+
+@router.get("/feeds/weather", response_model=WeatherFeedRead)
+def weather_feed_route(current_user: CurrentUserDep, db: SessionDep) -> WeatherFeedRead:  # noqa: ARG001
+    """Dernier relevé météo (Open-Meteo, Météo-France) : maintenant et 12 prochaines heures ; jamais inventé."""
+    return weather.feed(db)
 
 
 @router.get("/training-summary", response_model=TrainingSummaryRead)

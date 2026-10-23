@@ -466,6 +466,13 @@ WEATHER (Open-Meteo, FREE):
 └─ weather_visibility_km           — fog detection
 ```
 
+> CODÉ (2026-10-23, migration 20261023_0139) : relevés Open-Meteo (modèle Météo-France, centre de Paris) toutes
+> les 15 min par le job `vector.weather_refresh` (semé éteint), gardés 7 jours (`rides_weather_readings`). Chaque
+> offre lit le relevé de son heure (au plus 90 min avant) : `weather_temp_c`, `weather_precip_mm`, `weather_code`,
+> `weather_wind_kmh`, `weather_visibility_km` (souvent vide avec ce modèle), `weather_is_rain`, `weather_is_snow`,
+> `weather_is_fog`, `weather_rain_next_hour_pct` ; sans relevé frais, tout reste vide. `GET
+> /api/imperium/vector/feeds/weather` (ok, stale, unavailable) alimente la carte Météo de l'appli.
+
 ### 5.6 External signals (V2 — to add)
 
 ```text

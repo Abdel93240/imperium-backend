@@ -247,3 +247,17 @@ class RidesRuleRevision(UUIDPrimaryKeyMixin, Base):
     new: Mapped[dict] = mapped_column(JSONB, nullable=False)
     proposed_by: Mapped[str] = mapped_column(Text, nullable=False)
     user_validated: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class RidesWeatherReading(UUIDPrimaryKeyMixin, Base):
+    """Relevé Open-Meteo (modèle Météo-France) du centre de Paris : variable de demande des courses (doc 33 §3)."""
+
+    __tablename__ = "rides_weather_readings"
+    __table_args__ = (Index("rides_weather_readings_fetched_idx", text("fetched_at DESC")),)
+
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    latitude: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
+    longitude: Mapped[float] = mapped_column(Numeric(8, 5), nullable=False)
+    current: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    hourly: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="open-meteo", server_default="open-meteo")
