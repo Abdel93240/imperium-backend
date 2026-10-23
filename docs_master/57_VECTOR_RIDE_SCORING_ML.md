@@ -335,6 +335,10 @@ CREATE TABLE vector_rule_revisions (
 > variables `rule_Rx_triggered` (§5.7). `GET /api/imperium/vector/rules`, `PATCH …/rules/{code}`
 > (activer, rendre ferme, conditions ; raison et version obligatoires). Pas encore : R3, R5, R6,
 > R10 (géographie, flux externes) ; R4, R9, R11 ne notent pas une course.
+> CODÉ (2026-10-22, lot V2-A) : R3 en journée, arrivée hors de Paris et petite couronne (75, 92, 93, 94) et hors
+> d'une liste de départ de communes de grande couronne en deçà de Poissy, L'Isle-Adam, Noisy-le-Grand et
+> Corbeil-Essonnes (codes postaux, Roissy-CDG compris) → rouge ; sans code postal d'arrivée, rien n'est supposé.
+> Conditions modifiables (`destination_outside_prefixes`, `destination_allowed_codes`). Restent : R5, R6, R10.
 
 ---
 
