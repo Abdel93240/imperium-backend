@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from app.api.deps import get_current_user, get_db  # noqa: E402
 from app.api.v1.routes import imperium_vector  # noqa: E402
 from app.models.auth import User  # noqa: E402
-from app.models.rides import RidesDropObservation  # noqa: E402
+from app.models.rides import RidesDropObservation, RidesOffer  # noqa: E402
 from app.services.vector import grid  # noqa: E402
 
 BASE = "/api/imperium/vector"
@@ -111,3 +111,25 @@ def test_measure_after_drop_until_next_ride(db) -> None:
     last = db.scalars(select(RidesDropObservation).where(RidesDropObservation.session_id == UUID(session_id))
                       .order_by(RidesDropObservation.dropped_at.desc())).first()
     assert (last.status, last.closed_reason) == ("interrupted", "pause")
+
+
+def test_paid_cancellation_counts_as_earning_without_a_drop(db) -> None:
+    client = _client(db)
+    session_id = client.post(f"{BASE}/sessions", headers=_key(), json={}).json()["id"]
+    t0 = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=20)
+    offer = client.post(f"{BASE}/sessions/{session_id}/offers", headers=_key(), json={
+        "price_cents": 957, "estimated_duration_min": 11, "approach_duration_min": 1, "offered_at": t0.isoformat(),
+        "source": "assistant"}).json()
+    decided = client.post(f"{BASE}/offers/{offer['id']}/decision", json={
+        "version": offer["version"], "decision": "accepted", "note": "annulée par le passager"}).json()
+    body = {"version": decided["version"], "actual_earning_cents": 532, "approach_minutes": 2, "wait_minutes": 5,
+            "ride_minutes": 0, "record_revenue": False, "price_source": "cancellation_fee",
+            "timeline": {"accepted": t0.isoformat(), "ended": (t0 + timedelta(minutes=7)).isoformat()}}
+    assert client.post(f"{BASE}/offers/{offer['id']}/outcome", json=body).status_code == 422   # sans course ni annulation
+    done = client.post(f"{BASE}/offers/{offer['id']}/outcome", json={**body, "cancelled": True})
+    assert done.status_code == 200, done.text
+    # Cas réel du 24/10 : 5,32 € de frais pour 7 min mobilisées → 45,60 €/h ; aucune mesure de zone à l'annulation.
+    assert (done.json()["actual_earning_cents"], done.json()["actual_hourly_rate_cents"]) == (532, 4560)
+    db.expire_all()
+    assert db.get(RidesOffer, UUID(offer["id"])).outcome["cancelled"] is True
+    assert db.scalar(select(RidesDropObservation).where(RidesDropObservation.offer_id == UUID(offer["id"]))) is None

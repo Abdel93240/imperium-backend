@@ -180,7 +180,7 @@ def record_outcome(
         raise OfferStateError("Seule une course acceptée a un résultat.")
     if payload.record_revenue and db.get(RidesSession, offer.session_id).status not in ("active", "paused"):
         raise OfferStateError("Session close : enregistre le résultat avec record_revenue à false, le revenu est déjà au Vault.")
-    mobilized = payload.approach_minutes + payload.wait_minutes + payload.ride_minutes + payload.return_minutes
+    mobilized = max(1, payload.approach_minutes + payload.wait_minutes + payload.ride_minutes + payload.return_minutes)
     offer.actual_earning_cents, offer.mobilized_minutes = payload.actual_earning_cents, mobilized
     offer.actual_hourly_rate_cents = int(
         (Decimal(payload.actual_earning_cents) * 60 / Decimal(mobilized)).quantize(Decimal("1"), ROUND_HALF_UP)
@@ -188,17 +188,20 @@ def record_outcome(
     offer.outcome = _outcome(payload)
     offer.version += 1
     db.flush()
-    # Mesure après dépose : ferme celle qui attendait cette course, ouvre celle de sa propre dépose.
+    # Mesure après dépose : ferme celle qui attendait cette course, ouvre celle de sa propre dépose. Une annulation
+    # payée n'a pas de dépose : aucune mesure de zone ne part de là.
     timeline = payload.timeline or {}
-    drops.on_outcome(db, offer, accepted_at=timeline.get("accepted"), ended_at=timeline.get("ended") or now or datetime.now(UTC),
-                     dropoff=(float(payload.dropoff_lat), float(payload.dropoff_lng))
-                     if payload.dropoff_lat is not None and payload.dropoff_lng is not None else None)
+    if not payload.cancelled:
+        drops.on_outcome(db, offer, accepted_at=timeline.get("accepted"), ended_at=timeline.get("ended") or now or datetime.now(UTC),
+                         dropoff=(float(payload.dropoff_lat), float(payload.dropoff_lng))
+                         if payload.dropoff_lat is not None and payload.dropoff_lng is not None else None)
     offer_id, session_id = offer.id, offer.session_id
     db.add(
         build_event(
             db, user_id=current_user.id, event_type="rides.ride.completed",
             payload={"offer_id": str(offer_id), "session_id": str(session_id), "earning_cents": payload.actual_earning_cents,
-                     "mobilized_minutes": mobilized, "hourly_rate_cents": offer.actual_hourly_rate_cents},
+                     "mobilized_minutes": mobilized, "hourly_rate_cents": offer.actual_hourly_rate_cents,
+                     "cancelled": payload.cancelled},
             idempotency_key=f"rides.ride.completed.{offer_id}", source_app=SourceApp.vector, privacy_level=PrivacyLevel.medium,
         )
     )
@@ -379,6 +382,8 @@ def _outcome(payload: RideOutcomeRequest) -> dict:
         out["dropoff_zone_cell"] = weather.cell_at(float(payload.dropoff_lat), float(payload.dropoff_lng)).code
     if payload.payment:
         out["payment"] = payload.payment
+    if payload.cancelled:
+        out["cancelled"] = True
     if payload.price_source:
         out["price_source"] = payload.price_source
     return out
