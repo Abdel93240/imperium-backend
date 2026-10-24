@@ -1,0 +1,81 @@
+# Inventaire des routes extrait du routeur FastAPI
+
+Snapshot du 24 octobre 2026. Les routes présentes dans le dépôt ne prouvent pas leur activation en production.
+
+- `POST /api/auth/login` — Login
+- `POST /api/auth/logout` — Logout
+- `POST /api/auth/refresh` — Refresh Token
+- `GET /api/imperium/path/adhkar/routines` — List Routines Route
+- `POST /api/imperium/path/adhkar/routines` — Create Routine Route
+- `PATCH /api/imperium/path/adhkar/routines/{routine_id}` — Update Routine Route
+- `DELETE /api/imperium/path/adhkar/routines/{routine_id}` — Delete Routine Route
+- `POST /api/imperium/path/adhkar/routines/{routine_id}/increment` — Increment Route
+- `POST /api/imperium/path/adhkar/routines/{routine_id}/reset` — Reset Route
+- `GET /api/imperium/path/adhkar/suggestions` — Adhkar Suggestions Route
+- `POST /api/imperium/path/calendar/confirm-date` — Confirm Date Route
+- `GET /api/imperium/path/calendar/events` — Calendar Events Route
+- `GET /api/imperium/path/calendar/hijri` — Hijri Day Route
+- `GET /api/imperium/path/calendar/personal-events` — List Personal Route
+- `POST /api/imperium/path/calendar/personal-events` — Add Personal Route
+- `DELETE /api/imperium/path/calendar/personal-events/{event_id}` — Delete Personal Route
+- `GET /api/imperium/path/check-ins` — List Path Check Ins Route
+- `GET /api/imperium/path/check-ins/{check_in_id}` — Get Path Check In Detail Route
+- `GET /api/imperium/path/dashboard` — Path Dashboard Route
+- `GET /api/imperium/path/day` — Path Day Route
+- `GET /api/imperium/path/fasting/state` — Fasting State Route
+- `GET /api/imperium/path/fasts` — List Fasts Route
+- `POST /api/imperium/path/fasts` — Start Fast Route
+- `POST /api/imperium/path/fasts/{fast_id}/break` — Break Fast Route
+- `POST /api/imperium/path/fasts/{fast_id}/cancel` — Cancel Fast Route
+- `POST /api/imperium/path/fasts/{fast_id}/end` — End Fast Route
+- `GET /api/imperium/path/ghusl` — Ghusl Current Route
+- `GET /api/imperium/path/ghusl-addresses` — List Addresses Route
+- `POST /api/imperium/path/ghusl-addresses` — Create Address Route
+- `PATCH /api/imperium/path/ghusl-addresses/{address_id}` — Update Address Route
+- `DELETE /api/imperium/path/ghusl-addresses/{address_id}` — Delete Address Route
+- `POST /api/imperium/path/ghusl/activate` — Activate Ghusl Route
+- `POST /api/imperium/path/ghusl/complete` — Complete Ghusl Route
+- `POST /api/imperium/path/habits` — Create Path Habit Route
+- `GET /api/imperium/path/habits` — List Path Habits Route
+- `GET /api/imperium/path/habits/{habit_id}` — Get Path Habit Detail Route
+- `POST /api/imperium/path/habits/{habit_id}/archive` — Archive Path Habit Route
+- `POST /api/imperium/path/habits/{habit_id}/check-ins` — Create Path Check In Route
+- `POST /api/imperium/path/habits/{habit_id}/reactivate` — Reactivate Path Habit Route
+- `GET /api/imperium/path/invocations` — List Invocations Route
+- `POST /api/imperium/path/invocations` — Create Invocation Route
+- `GET /api/imperium/path/invocations/daily` — Daily Invocations Route
+- `PATCH /api/imperium/path/invocations/{invocation_id}` — Update Invocation Route
+- `DELETE /api/imperium/path/invocations/{invocation_id}` — Delete Invocation Route
+- `POST /api/imperium/path/invocations/{invocation_id}/check` — Check Invocation Route
+- `PATCH /api/imperium/path/invocations/{invocation_id}/favorite` — Favorite Invocation Route
+- `POST /api/imperium/path/items` — Create Path Item Route
+- `POST /api/imperium/path/items/{item_id}/cancel` — Cancel Path Item Route
+- `POST /api/imperium/path/items/{item_id}/complete` — Complete Path Item Route
+- `POST /api/imperium/path/items/{item_id}/skip` — Skip Path Item Route
+- `POST /api/imperium/path/items/{item_id}/start` — Start Path Item Route
+- `GET /api/imperium/path/mosques` — List Mosques Route
+- `POST /api/imperium/path/mosques` — Create Mosque Route
+- `GET /api/imperium/path/mosques/{mosque_id}` — Mosque Detail Route
+- `PATCH /api/imperium/path/mosques/{mosque_id}` — Update Mosque Route
+- `DELETE /api/imperium/path/mosques/{mosque_id}` — Delete Mosque Route
+- `GET /api/imperium/path/prayers` — Prayer Day Route
+- `POST /api/imperium/path/prayers/{prayer_name}/clear` — Clear Prayer Route
+- `POST /api/imperium/path/prayers/{prayer_name}/mark` — Mark Prayer Route
+- `GET /api/imperium/path/quran/continuation` — Quran Continuation Route
+- `POST /api/imperium/path/quran/khatm` — Quran Khatm Route
+- `PATCH /api/imperium/path/quran/objective` — Quran Objective Route
+- `POST /api/imperium/path/quran/plans` — Create Plan Route
+- `POST /api/imperium/path/quran/plans/{plan_id}/stop` — Stop Plan Route
+- `POST /api/imperium/path/quran/progress` — Quran Progress Route
+- `GET /api/imperium/path/recent` — Path Recent Route
+- `GET /api/imperium/path/sadaqa/donations` — List Donations Route
+- `POST /api/imperium/path/sadaqa/donations` — Create Donation Route
+- `DELETE /api/imperium/path/sadaqa/donations/{donation_id}` — Delete Donation Route
+- `POST /api/imperium/path/sadaqa/donations/{donation_id}/vault-retry` — Retry Vault Route
+- `GET /api/imperium/path/sadaqa/settings` — Sadaqa Settings Route
+- `PATCH /api/imperium/path/sadaqa/settings` — Update Sadaqa Settings Route
+- `GET /api/imperium/path/sadaqa/summary` — Sadaqa Summary Route
+- `GET /api/imperium/path/settings` — Path Settings Route
+- `PATCH /api/imperium/path/settings` — Update Path Settings Route
+- `GET /api/imperium/path/stats/summary` — Get Path Stats Summary Route
+- `GET /api/imperium/path/today` — Path Today Route
