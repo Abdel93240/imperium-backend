@@ -126,6 +126,8 @@ def test_paid_cancellation_counts_as_earning_without_a_drop(db) -> None:
             "ride_minutes": 0, "record_revenue": False, "price_source": "cancellation_fee",
             "timeline": {"accepted": t0.isoformat(), "ended": (t0 + timedelta(minutes=7)).isoformat()}}
     assert client.post(f"{BASE}/offers/{offer['id']}/outcome", json=body).status_code == 422   # sans course ni annulation
+    absurd = client.post(f"{BASE}/offers/{offer['id']}/outcome", json={**body, "cancelled": True, "actual_earning_cents": 95800})
+    assert absurd.status_code == 422 and "invraisemblable" in absurd.text   # 958 € pour une offre à 9,57 €
     done = client.post(f"{BASE}/offers/{offer['id']}/outcome", json={**body, "cancelled": True})
     assert done.status_code == 200, done.text
     # Cas réel du 24/10 : 5,32 € de frais pour 7 min mobilisées → 45,60 €/h ; aucune mesure de zone à l'annulation.
