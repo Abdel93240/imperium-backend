@@ -163,5 +163,9 @@ def test_only_the_scan_slot_may_search_the_web(monkeypatch) -> None:
         except Exception:  # noqa: BLE001 - sortie vide : seul l'argument compte ici
             pass
     assert "web_search=live" in seen[0] and "web_search=disabled" in seen[1]
+    # L'hôte de code porte la recherche web de Codex : gardé pour le slot web seulement (scan vide le 24/10 sans lui).
+    disabled = [[a[i + 1] for i, x in enumerate(a) if x == "--disable"] for a in seen]
+    assert "code_mode_host" not in disabled[0] and "code_mode_host" in disabled[1]
+    assert "shell_tool" in disabled[0] and "browser_use" in disabled[0]   # le reste reste coupé
     assert cloud.WEB_SLOTS == frozenset({"vector.event_scan"})
     assert cloud.SLOT_ROLES["vector.event_scan"] == "web_fresh_data"
