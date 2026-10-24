@@ -101,6 +101,19 @@ def test_no_ride_duration_no_opinion_and_unknown_destination(db) -> None:
     assert (blind.signal, blind.features["dest_zone_score"]) == ("green", None)
 
 
+def test_arrival_outside_idf_counts_the_way_back(db) -> None:
+    # Cas réel du 24/10 : 26,22 € en carte, 16 min d'approche, 34 min vers Gouvieux (Oise) : 31 €/h « global »,
+    # mais 39 min pour revenir → rouge. Avant, l'arrivée inconnue passait au vert sans retour compté.
+    text = "21 Bis 4ème Avenue, Gouvieux 60270"
+    assert geo.resolve(text) is None and economics.outside_idf(text) and not economics.outside_idf("Créteil 94000")
+    v = economics.verdict(db, price_cents=2622, approach_min=16, trip_min=34, destination=None,
+                          offered_at=EVENING, destination_text=text)
+    assert (v.signal, v.features["reposition_min"], v.features["dest_outside_idf"]) == ("red", 39, True)
+    assert v.reason == "18 €/h avec 39 min pour revenir (arrivée hors Île-de-France)."
+    assert economics.verdict(db, price_cents=9000, approach_min=10, trip_min=40, destination=None,
+                             offered_at=EVENING, destination_text=text).signal == "green"   # très bien payée : 57 €/h
+
+
 def _measure(db, lat, lng, at, eur_h):
     from sqlalchemy import text
 

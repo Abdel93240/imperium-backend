@@ -582,6 +582,9 @@ TRAFFIC:
 > Démarrage (migration 20261024_0146) : `vector.session_kickoff`, abonné à `rides.session.started` et
 > `rides.session.resumed`, relève aussitôt météo, perturbations, trafic et avions (sans lui, la météo restait
 > « ancienne » jusqu'à 30 min après le démarrage) ; une source en panne n'empêche pas les autres.
+> Règle économique, arrivée hors Île-de-France (2026-10-24, cas réel Gouvieux 60270) : la commune n'est pas dans
+> les tables, mais le code postal lu suffit ; retour à vide compté aussi long que la course (+ marge). Avant, une
+> arrivée non reconnue passait au vert sur le seul €/h global.
 
 ### 5.7 Rule-derived features (CRITICAL)
 

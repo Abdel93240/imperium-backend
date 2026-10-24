@@ -108,7 +108,7 @@ def record_offer(
     # l'emporte (prudence) ; sinon le verdict économique ; sans durée lue, la règle verte éventuelle ; sinon aucun avis.
     economic = economics.verdict(db, price_cents=payload.price_cents, approach_min=payload.approach_duration_min,
                                  trip_min=payload.estimated_duration_min, destination=places["destination"],
-                                 offered_at=offered_at)
+                                 offered_at=offered_at, destination_text=payload.destination_address)
     variables.update(economic.features)
     source = "rules_only"
     if signal != "red" and economic.signal is not None:
