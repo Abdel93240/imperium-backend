@@ -108,6 +108,10 @@ def _no_paris(url):
     return {"results": []}
 
 
+def _no_oa(url):
+    return {"agendas": [], "events": []}
+
+
 def _paris(at: datetime | None) -> str | None:
     """Heure locale de Paris sans décalage, comme la demande la consigne du spécialiste web."""
     return at.astimezone(events.PARIS).replace(tzinfo=None).isoformat(timespec="minutes") if at else None
@@ -133,12 +137,12 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
         _item(title="Sans date", starts=None),                                                  # écarté
         _item(title="Trop loin", starts=now + timedelta(days=30)),                              # hors semaine
     ]
-    run = events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call(items))
+    run = events.scan(db, now=now, fetch_paris=_no_paris, fetch_openagenda=_no_oa, call=_fake_call(items))
     db.commit()
     assert (run.status, run.items, run.model) == ("done", 3, "web-model")   # 5 recherches ciblées, sans doublon
     shifted = events._when("2026-10-26T20:45:00+02:00")                     # décalage faux après le changement d'heure
     assert (shifted.hour, shifted.utcoffset()) == (20, timedelta(hours=1))
-    again = events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call(items[:1]))                                # même concert : pas de doublon
+    again = events.scan(db, now=now, fetch_paris=_no_paris, fetch_openagenda=_no_oa, call=_fake_call(items[:1]))                                # même concert : pas de doublon
     db.commit()
     assert again.items == 0
     f = _offer(client, session_id, now, pickup_zone_code="75012", destination_zone_code="93420")
@@ -152,7 +156,7 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
     roads = client.get(f"{BASE}/feeds/events", params={"kind": "road_closure"}).json()
     assert [i["road"] for i in roads["items"]] == ["A86"]
     run.status, run.error = "failed", "remplacé par un nouveau scan"                           # scan remplacé : ignoré
-    events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call([]))
+    events.scan(db, now=now, fetch_paris=_no_paris, fetch_openagenda=_no_oa, call=_fake_call([]))
     db.commit()
     assert client.get(f"{BASE}/feeds/events").json()["items"] == []
 
@@ -165,7 +169,7 @@ def test_failed_scan_is_recorded_and_feed_unavailable(db) -> None:
         raise cloud.CloudError("Cloud slot 'vector.event_scan' is off.")
     def down(url):
         raise agendas.AgendaUnavailableError("URLError")
-    run = events.scan(db, call=off, fetch_paris=down)
+    run = events.scan(db, call=off, fetch_paris=down, fetch_openagenda=down)
     db.commit()
     assert (run.status, run.items) == ("failed", 0) and "off" in run.error
     assert client.get(f"{BASE}/feeds/events").json()["status"] == "unavailable"
@@ -200,10 +204,42 @@ def test_paris_open_data_sessions_become_events(db) -> None:
     assert [(i["title"], i["starts_at"], i["ends_at"], i["category"]) for i in items] == [
         ("Jam de nuit", "2026-10-27T23:00", "2026-10-28T02:00", "concert")]           # finit le lendemain, hors semaine écartée
     run = events.scan(db, now=start + timedelta(hours=3), call=_fake_call([]),
-                      fetch_paris=lambda url: {"results": [record]})
+                      fetch_paris=lambda url: {"results": [record]}, fetch_openagenda=_no_oa)
     db.commit()
     assert (run.status, run.items) == ("done", 1)
     daily = events.scan(db, now=start + timedelta(days=1, hours=12), daily=True, call=_fake_call([]),
-                        fetch_paris=lambda url: {"results": [record]})
+                        fetch_paris=lambda url: {"results": [record]}, fetch_openagenda=_no_oa)
     db.commit()
     assert (daily.week_start, daily.items) == (date(2026, 10, 27), 0)                 # même séance : pas de doublon
+
+
+def test_openagenda_agendas_found_on_monday_and_reused_daily(db) -> None:
+    from app.services.params import get_parameter
+
+    calls = []
+    agenda_list = {"agendas": [{"uid": 1, "title": "Sortir à Montreuil"}, {"uid": 2, "title": "Agenda emploi Montreuil"},
+                               {"uid": 3, "title": "Le Chinois"}]}
+    timing = {"begin": "2026-10-27T23:00:00+01:00", "end": "2026-10-28T05:00:00+01:00"}
+    party = {"uid": 10, "title": "Soirée afro", "keywords": ["dj"], "status": 1, "attendanceMode": 1, "timings": [timing],
+             "location": {"name": "La Marbrerie", "postalCode": "93100", "city": "Montreuil"}}
+    kids = {**party, "uid": 11, "title": "Atelier DJ enfants"}
+    cancelled = {**party, "uid": 12, "title": "Concert annulé", "status": 6}
+    elsewhere = {**party, "uid": 13, "title": "Concert à Lille", "location": {"postalCode": "59000", "city": "Lille"}}
+
+    def fetch(url):
+        calls.append(url)
+        return agenda_list if "/agendas?" in url else {"events": [party, kids, cancelled, elsewhere], "after": None}
+    assert agendas.discover_openagenda(fetch=fetch, terms=["Montreuil"]) == [1]          # « Le Chinois » : aucun mot utile
+    start = datetime(2026, 10, 26, tzinfo=events.PARIS)
+    items = agendas.openagenda_events([1], start, start + timedelta(days=7), fetch=fetch)
+    assert [(i["title"], i["category"], i["starts_at"], i["ends_at"], i["postal_code"]) for i in items] == [
+        ("Soirée afro", "club", "2026-10-27T23:00", "2026-10-28T05:00", "93100")]
+    calls.clear()
+    run = events.scan(db, now=start + timedelta(hours=3), call=_fake_call([]), fetch_paris=_no_paris, fetch_openagenda=fetch)
+    db.commit()
+    assert run.items == 1 and get_parameter(db, "vector.openagenda_agendas") == [1]
+    searches = sum("/agendas?" in url for url in calls)
+    calls.clear()
+    events.scan(db, now=start + timedelta(days=1, hours=12), daily=True, call=_fake_call([]), fetch_paris=_no_paris,
+                fetch_openagenda=fetch)
+    assert searches > 0 and not any("/agendas?" in url for url in calls)              # le quotidien relit la liste
