@@ -572,6 +572,13 @@ TRAFFIC:
 > tronçon : classe de route FRC0–FRC6 et vitesse actuelle face à la vitesse normale → note d'impact sur 100
 > (importance × ralentissement ; route coupée = impact plein). Variables : fermetures de grands axes, de
 > départementales, à fort impact (≥ 50), bouchons importants, impact maximal près de la tablette et de l'arrivée.
+> Cartes du tableau de bord (2026-10-24, appli 0.39.0) : `GET /api/imperium/vector/feeds/transit` (lignes perturbées
+> au dernier relevé, interrompues d'abord puis fin annoncée la plus proche, messages IDFM sans doublon),
+> `/feeds/airports` (par aéroport : en approche finale, au sol, atterrissages observés sur 0–30 et 30–60 min ;
+> OpenSky ne donne ni horaires, ni terminaux, ni statut de vol : le tableau des vols du kit attend une autre source)
+> et `/feeds/traffic` (synthèse Île-de-France et incidents des grands axes, fermetures notées d'abord). Statut `ok`,
+> `stale` (relevé de plus de 20 min, hors session) ou `unavailable` ; une ligne absente n'est pas dite « normale ».
+> Bus (non relevé) et SNCF restent « Flux non branché ».
 
 ### 5.7 Rule-derived features (CRITICAL)
 

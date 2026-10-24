@@ -407,6 +407,68 @@ class EventFeedRead(BaseModel):
     items: list[EventSignalRead] = []
 
 
+class TransitLineRead(BaseModel):
+    """Une ligne perturbée : pire gravité de ses perturbations en cours, messages IDFM sans doublon."""
+
+    line_id: str
+    label: str  # « Métro 11 », « RER B », « Transilien L », « Tram 3a »
+    mode: Literal["metro", "rer", "transilien", "tram"]
+    status: Literal["interrupted", "disrupted"]  # BLOQUANTE / PERTURBEE chez IDFM
+    messages: list[str] = []
+    ends_at: datetime | None = None
+
+
+class TransitFeedRead(BaseModel):
+    """Perturbations IDFM en cours (métro, RER, Transilien, tram) : ok, stale (relevé de plus de 20 min), unavailable.
+    Une ligne absente n'a aucune perturbation signalée par IDFM au moment du relevé."""
+
+    status: Literal["ok", "stale", "unavailable"]
+    fetched_at: datetime | None = None
+    message: str | None = None
+    lines: list[TransitLineRead] = []
+
+
+class AirportRead(BaseModel):
+    """Avions vus par OpenSky : pas d'horaires ni de terminaux, seulement ce qui vole ou roule autour de l'aéroport."""
+
+    airport: Literal["CDG", "ORY", "BVA"]
+    approaching: int  # en approche finale au moment du relevé
+    on_ground: int
+    landings_last_30_min: int | None = None  # avions distincts vus en approche finale (≈ atterrissages)
+    landings_30_60_min: int | None = None
+
+
+class AirportFeedRead(BaseModel):
+    status: Literal["ok", "stale", "unavailable"]
+    fetched_at: datetime | None = None
+    message: str | None = None
+    airports: list[AirportRead] = []
+
+
+class TrafficItemRead(BaseModel):
+    """Fermeture, bouchon, travaux… sur un grand axe (A, N, périphérique), relevé par TomTom."""
+
+    kind: Literal["closure", "jam", "works", "lane_closed", "accident", "breakdown", "danger", "other"]
+    roads: list[str]
+    from_text: str | None = None
+    to_text: str | None = None
+    delay_min: int | None = None
+    length_km: float | None = None
+    jam_level: int | None = None  # bouchons : 1 léger, 2 modéré, 3 important
+    impact: int | None = None  # fermetures : note sur 100 (importance de la route × ralentissement mesuré)
+
+
+class TrafficFeedRead(BaseModel):
+    status: Literal["ok", "stale", "unavailable"]
+    fetched_at: datetime | None = None
+    message: str | None = None
+    incidents: int = 0  # toute l'Île-de-France, toutes routes
+    delay_min: int = 0
+    major_closures: int = 0
+    major_jams: int = 0
+    items: list[TrafficItemRead] = []  # grands axes seulement, les plus gênants d'abord
+
+
 class PriorityStatRow(BaseModel):
     by: Literal["zone_cell", "pickup_zone_code"]  # case de la grille ou code postal de prise en charge
     zone: str
