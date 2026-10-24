@@ -63,34 +63,65 @@ def schema() -> dict:
             "properties": {"items": {"type": "array", "maxItems": MAX_ITEMS, "items": item}}}
 
 
-# Une recherche par thème : une seule recherche générale survole (cas réel du 24/10 : 2 événements, sans le PSG).
+# Une recherche par thème et par territoire (décision utilisateur 2026-10-24 : scan profond et complet, même les petits
+# événements, surtout en banlieue où ils font les retours payants depuis Paris). Une recherche générale survole.
+_SMALL = ("Inclus aussi les petits événements (dès quelques dizaines de personnes) et les annonces publiques des "
+          "billetteries et réseaux (Shotgun, Dice, Resident Advisor, Eventbrite, Billetweb, Facebook, Instagram). ")
+_SUBURB = ("kind=event, {dep} : concerts, soirées et clubs, salles de spectacle et théâtres municipaux, salles des fêtes "
+           "et polyvalentes, galas, soirées étudiantes, fêtes communautaires et religieuses, festivals, matchs locaux. "
+           "Cherche l'agenda de chaque ville importante. " + _SMALL)
 FOCUSES = (
     ("sport", "kind=event : les matchs et compétitions — PSG au Parc des Princes, Paris FC, Stade de France (football, "
               "rugby), Paris La Défense Arena (Racing 92), Accor Arena (basket, tennis), Roland-Garros, hippodromes. "
               "Cherche le calendrier de chaque club et de chaque stade."),
-    ("concerts", "kind=event : concerts et grands spectacles — Accor Arena, Stade de France, Paris La Défense Arena, "
-                 "Zénith de Paris, Olympia, Adidas Arena, Dôme de Paris, Salle Pleyel, Bercy, Seine Musicale, Palais des "
-                 "Sports, Folies Bergère, grands clubs. Cherche l'agenda de chaque salle."),
+    ("grandes salles", "kind=event : concerts et grands spectacles — Accor Arena, Stade de France, Paris La Défense Arena, "
+                       "Zénith de Paris, Olympia, Adidas Arena, Dôme de Paris, Salle Pleyel, Seine Musicale, Palais des "
+                       "Sports, Folies Bergère, Grand Rex, Casino de Paris. Cherche l'agenda de chaque salle."),
+    ("petites salles", "kind=event : concerts dans les salles moyennes et petites de Paris — Bataclan, Cigale, Trianon, "
+                       "Élysée Montmartre, Trabendo, Cabaret Sauvage, Bellevilloise, Point Éphémère, Petit Bain, Supersonic, "
+                       "Maroquinerie, Café de la Danse, Alhambra, Bus Palladium, Gaîté Lyrique, New Morning, Sunset-Sunside, "
+                       "Duc des Lombards, Baiser Salé, caves à jazz, bars-concerts. " + _SMALL),
+    ("clubs", "kind=event, category=club : soirées en club et boîtes de nuit à Paris (Rex Club, Djoon, La Machine du "
+              "Moulin Rouge, Badaboum, Wanderlust, Chalet du Lac, Bridge, Kilomètre 25, Mia Mao, péniches…) ; ends_at = "
+              "heure de fermeture réelle (souvent 5 h–7 h). " + _SMALL),
+    ("soirées", "kind=event : soirées afro, urbaines, orientales, latines, LGBT, étudiantes, privées sur billetterie, "
+                "dans Paris et toute l'Île-de-France ; ends_at = heure de fin réelle. " + _SMALL),
+    ("spectacles", "kind=event : théâtre, humour, comédies musicales, opéra, danse, cirque à Paris (grands théâtres, "
+                   "cafés-théâtres, Opéra Bastille, Garnier, Châtelet, Mogador, Théâtre de Paris…). " + _SMALL),
+    ("banlieue 92", _SUBURB.format(dep="Hauts-de-Seine (92)")),
+    ("banlieue 93", _SUBURB.format(dep="Seine-Saint-Denis (93)")),
+    ("banlieue 94", _SUBURB.format(dep="Val-de-Marne (94)")),
+    ("banlieue 77", _SUBURB.format(dep="Seine-et-Marne (77)")),
+    ("banlieue 78", _SUBURB.format(dep="Yvelines (78)")),
+    ("banlieue 91", _SUBURB.format(dep="Essonne (91)")),
+    ("banlieue 95", _SUBURB.format(dep="Val-d'Oise (95)")),
+    ("réceptions", "kind=event : galas, soirées de réception, mariages et fêtes dans les salles de réception, châteaux "
+                   "et domaines événementiels d'Île-de-France quand ils sont annoncés publiquement ; dîners-spectacles, "
+                   "cabarets (Lido, Moulin Rouge, Crazy Horse, Paradis Latin)."),
     ("salons", "kind=event : salons, congrès et grands rassemblements — Paris Expo Porte de Versailles, Paris Nord "
-               "Villepinte, Le Bourget, Palais des Congrès, Carrousel du Louvre, Grand Palais ; festivals, manifestations "
-               "déclarées, grands événements en plein air."),
+               "Villepinte, Le Bourget, Palais des Congrès, Carrousel du Louvre, Grand Palais, hôtels de congrès près des "
+               "aéroports ; festivals, manifestations déclarées, marches, grands événements en plein air."),
     ("routes", "kind=road_closure : fermetures et travaux routiers — boulevard périphérique, A1, A3, A4, A6, A13, A14, "
                "A86, N118, tunnels, fermetures de nuit, bretelles, grandes rues de Paris — d'après DiRIF / Sytadin, Bison "
                "Futé, Ville de Paris ; road = la voie."),
     ("rail", "kind=rail_works : lignes RER, Transilien, métro ou tram fermées ou interrompues pour travaux (RATP, SNCF, "
              "IDFM) ; road = la ligne (ex. « RER A », « Ligne 14 »), title = le tronçon et les horaires."),
 )
+# Mise à jour quotidienne des 48 h à venir : ce qui s'annonce tard (soirées, petites salles, banlieue).
+DAILY_FOCUSES = ("petites salles", "clubs", "soirées", "réceptions")
+DAILY_SUBURBS = ("kind=event, toute la banlieue d'Île-de-France (92, 93, 94, 77, 78, 91, 95) : concerts, soirées, "
+                 "galas, fêtes, matchs locaux annoncés pour ces deux jours. " + _SMALL)
 
 
-def prompt(week_start: date, focus: str = "") -> str:
-    end = week_start + timedelta(days=6)
+def prompt(start: date, focus: str = "", days: int = 7) -> str:
+    end = start + timedelta(days=days - 1)
     return (
-        f"Semaine du lundi {week_start.isoformat()} au dimanche {end.isoformat()}, en Île-de-France.\n"
+        f"Du {start.isoformat()} au {end.isoformat()} inclus, en Île-de-France.\n"
         f"Cherche sur le web : {focus}\n"
         "Fais plusieurs recherches si besoin ; donne le lieu, la commune, le code postal du lieu, l'heure de début, "
-        "l'heure de fin (estimée si besoin) et l'affluence attendue quand elle est connue. Heures locales de Paris, au "
-        "format AAAA-MM-JJTHH:MM, sans décalage horaire. Uniquement des éléments datés dans cette semaine, avec une "
-        "source (URL). confidence = ta certitude sur la date et le lieu (0 à 1)."
+        "l'heure de fin (estimée si besoin) et l'affluence attendue — à défaut, la capacité de la salle. Heures "
+        "locales de Paris, au format AAAA-MM-JJTHH:MM, sans décalage horaire. Uniquement des éléments datés dans cette "
+        "période, avec une source (URL). confidence = ta certitude sur la date et le lieu (0 à 1)."
     )
 
 
@@ -115,30 +146,40 @@ def week_of(now: datetime) -> date:
     return today - timedelta(days=today.weekday())
 
 
-def scan(db: Session, *, now: datetime | None = None, call=None) -> RidesEventScan:
-    """Un passage : appelle le spécialiste web, garde les éléments valides de la semaine, sans doublon."""
+def scan(db: Session, *, now: datetime | None = None, call=None, daily: bool = False, fetch_paris=None) -> RidesEventScan:
+    """Un passage : recherches ciblées du spécialiste web, puis l'open data de la Ville de Paris ; éléments valides de
+    la période, sans doublon. Hebdomadaire : la semaine du lundi ; quotidien (`daily`) : aujourd'hui et demain."""
     now = now or datetime.now(UTC)
-    week = week_of(now)
-    run = RidesEventScan(id=uuid4(), started_at=now, week_start=week, status="running")
+    start, days = (now.astimezone(PARIS).date(), 2) if daily else (week_of(now), 7)
+    run = RidesEventScan(id=uuid4(), started_at=now, week_start=start, status="running")
     db.add(run)
     db.flush()
+    named = dict(FOCUSES)
+    focuses = [(n, named[n]) for n in DAILY_FOCUSES] + [("banlieue", DAILY_SUBURBS)] if daily else list(FOCUSES)
     found, errors, model = [], [], None
-    for name, focus in FOCUSES:
+    for name, focus in focuses:
         try:
             result = (call or cloud.structured)(db, slot_code=SLOT, app_name="vector", system=SYSTEM,
-                                                user=prompt(week, focus), schema=schema(),
+                                                user=prompt(start, focus, days), schema=schema(),
                                                 related_entity_type="rides_event_scan", related_entity_id=run.id)
         except cloud.CloudError as exc:
             errors.append(f"{name} : {exc}")
             continue
         found += (result.output.get("items") or [])[:MAX_ITEMS]
         model = result.model
-    if model is None:  # toutes les recherches ont échoué
+    window_start = datetime.combine(start - timedelta(days=1), time.min, PARIS)
+    window_end = datetime.combine(start + timedelta(days=days + 1), time.min, PARIS)
+    from app.services.vector import agendas  # sources structurées (évite l'import circulaire)
+    try:
+        found += agendas.paris_events(datetime.combine(start, time.min, PARIS),
+                                      datetime.combine(start + timedelta(days=days), time.min, PARIS), fetch=fetch_paris)
+        model = model or "open data"
+    except agendas.AgendaUnavailableError as exc:
+        errors.append(f"open data Paris : {exc}")
+    if model is None:  # toutes les sources ont échoué
         run.status, run.error, run.finished_at = "failed", " ; ".join(errors)[:500], datetime.now(UTC)
         db.flush()
         return run
-    window_start = datetime.combine(week - timedelta(days=1), time.min, PARIS)
-    window_end = datetime.combine(week + timedelta(days=8), time.min, PARIS)
     kept = 0
     for item in found:
         starts, ends = _when(item.get("starts_at")), _when(item.get("ends_at"))
@@ -226,8 +267,12 @@ def feed(db: Session, *, kind: str, now: datetime | None = None) -> EventFeedRea
                          items=[EventSignalRead.model_validate(row) for row in rows])
 
 
-def event_scan_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
-    run = scan(ctx.db)
+def event_scan_daily_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
+    event_scan_job(ctx, window, daily=True)
+
+
+def event_scan_job(ctx, window, daily: bool = False) -> None:  # noqa: ARG001 - signature du runner
+    run = scan(ctx.db, daily=daily)
     ctx.db.commit()
     ctx.items_in = ctx.items_out = run.items
     ctx.detail = {"status": run.status, "items": run.items, **({"error": run.error} if run.error else {})}
