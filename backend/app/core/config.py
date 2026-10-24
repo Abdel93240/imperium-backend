@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     idfm_prim_api_key: str | None = None
     sncf_api_key: str | None = None
     tomtom_api_key: str | None = None
+    openagenda_api_key: str | None = None
     opensky_client_id: str | None = None
     opensky_client_secret: str | None = None
     n8n_base_url: str | None = None

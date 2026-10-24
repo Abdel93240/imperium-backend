@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from app.models.rides import RidesEventScan, RidesEventSignal
 from app.schemas.rides import EventFeedRead, EventSignalRead
 from app.services.ai import cloud
+from app.services.params import get_parameter, set_parameter
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +147,9 @@ def week_of(now: datetime) -> date:
     return today - timedelta(days=today.weekday())
 
 
-def scan(db: Session, *, now: datetime | None = None, call=None, daily: bool = False, fetch_paris=None) -> RidesEventScan:
-    """Un passage : recherches ciblées du spécialiste web, puis l'open data de la Ville de Paris ; éléments valides de
+def scan(db: Session, *, now: datetime | None = None, call=None, daily: bool = False, fetch_paris=None,
+         fetch_openagenda=None) -> RidesEventScan:
+    """Un passage : recherches ciblées du spécialiste web, puis l'open data de Paris et OpenAgenda ; éléments valides de
     la période, sans doublon. Hebdomadaire : la semaine du lundi ; quotidien (`daily`) : aujourd'hui et demain."""
     now = now or datetime.now(UTC)
     start, days = (now.astimezone(PARIS).date(), 2) if daily else (week_of(now), 7)
@@ -176,6 +178,14 @@ def scan(db: Session, *, now: datetime | None = None, call=None, daily: bool = F
         model = model or "open data"
     except agendas.AgendaUnavailableError as exc:
         errors.append(f"open data Paris : {exc}")
+    try:
+        found += agendas.openagenda_events(_openagenda_uids(db, refresh=not daily, fetch=fetch_openagenda),
+                                           datetime.combine(start, time.min, PARIS),
+                                           datetime.combine(start + timedelta(days=days), time.min, PARIS),
+                                           fetch=fetch_openagenda)
+        model = model or "open data"
+    except agendas.AgendaUnavailableError as exc:
+        errors.append(f"OpenAgenda : {exc}")
     if model is None:  # toutes les sources ont échoué
         run.status, run.error, run.finished_at = "failed", " ; ".join(errors)[:500], datetime.now(UTC)
         db.flush()
@@ -204,6 +214,20 @@ def scan(db: Session, *, now: datetime | None = None, call=None, daily: bool = F
     run.error = " ; ".join(errors)[:500] or None
     db.flush()
     return run
+
+
+def _openagenda_uids(db: Session, *, refresh: bool, fetch=None) -> list[int]:
+    """Agendas OpenAgenda utiles : cherchés de nouveau le lundi (gardés dans `vector.openagenda_agendas`), relus
+    les autres jours."""
+    from app.services.vector import agendas
+    kept = get_parameter(db, "vector.openagenda_agendas", default=None)
+    if kept and not refresh:
+        return list(kept)
+    uids = agendas.discover_openagenda(fetch=fetch)
+    if uids and uids != kept:
+        set_parameter(db, code="vector.openagenda_agendas", value=uids, origin="system",
+                      rationale_fr="Agendas OpenAgenda utiles (villes, salles, sorties), recherchés commune par commune.")
+    return uids
 
 
 def _short(value, size: int = 200) -> str | None:

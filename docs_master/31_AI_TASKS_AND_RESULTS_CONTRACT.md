@@ -1441,8 +1441,11 @@ required before official plan change unless an explicit rule says otherwise
 > salles, clubs, soirées, spectacles, banlieue département par département, réceptions et cabarets, salons, routes,
 > rail), heures locales de Paris sans décalage ; `vector.event_scan_daily` (12:00, migration 20261024_0147) refait les
 > 48 h à venir (petites salles, clubs, soirées, réceptions, banlieue). Plus l'open data « Que faire à Paris » (séances
-> de concerts, soirées, spectacles, festivals ; ateliers, expositions et activités pour enfants écartés). OpenAgenda :
-> accordé, branché quand la clé est déposée. Seuls les scans faits alimentent cartes et offres.
+> de concerts, soirées, spectacles, festivals ; ateliers, expositions et activités pour enfants écartés). OpenAgenda
+> (clé gratuite, sans droit « transverse ») : le lundi, agendas utiles cherchés commune par commune (163 termes :
+> départements, grandes villes, 140 communes les plus denses) et gardés dans `vector.openagenda_agendas`, relus les
+> autres jours ; séances d'Île-de-France seulement, stages, ateliers, enfants, visites, en ligne ou annulées écartés.
+> Seuls les scans faits alimentent cartes et offres.
 
 ---
 
