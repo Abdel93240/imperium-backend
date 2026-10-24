@@ -25,7 +25,7 @@ from app.api.v1.routes import imperium_vector  # noqa: E402
 from app.models.auth import User  # noqa: E402
 from app.models.rides import RidesEventScan, RidesEventSignal, RidesSchoolHoliday  # noqa: E402
 from app.services.ai import cloud  # noqa: E402
-from app.services.vector import events, school  # noqa: E402
+from app.services.vector import agendas, events, school  # noqa: E402
 
 BASE = "/api/imperium/vector"
 PARIS = events.PARIS
@@ -99,9 +99,13 @@ def _scan_now() -> datetime:
 
 def _fake_call(items):
     def call(db, **kwargs):
-        assert kwargs["slot_code"] == "vector.event_scan" and "Semaine du lundi" in kwargs["user"]
+        assert kwargs["slot_code"] == "vector.event_scan" and kwargs["user"].startswith("Du ")
         return SimpleNamespace(output={"items": items}, model="web-model")
     return call
+
+
+def _no_paris(url):
+    return {"results": []}
 
 
 def _paris(at: datetime | None) -> str | None:
@@ -129,12 +133,12 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
         _item(title="Sans date", starts=None),                                                  # écarté
         _item(title="Trop loin", starts=now + timedelta(days=30)),                              # hors semaine
     ]
-    run = events.scan(db, now=now, call=_fake_call(items))
+    run = events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call(items))
     db.commit()
     assert (run.status, run.items, run.model) == ("done", 3, "web-model")   # 5 recherches ciblées, sans doublon
     shifted = events._when("2026-10-26T20:45:00+02:00")                     # décalage faux après le changement d'heure
     assert (shifted.hour, shifted.utcoffset()) == (20, timedelta(hours=1))
-    again = events.scan(db, now=now, call=_fake_call(items[:1]))                                # même concert : pas de doublon
+    again = events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call(items[:1]))                                # même concert : pas de doublon
     db.commit()
     assert again.items == 0
     f = _offer(client, session_id, now, pickup_zone_code="75012", destination_zone_code="93420")
@@ -148,7 +152,7 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
     roads = client.get(f"{BASE}/feeds/events", params={"kind": "road_closure"}).json()
     assert [i["road"] for i in roads["items"]] == ["A86"]
     run.status, run.error = "failed", "remplacé par un nouveau scan"                           # scan remplacé : ignoré
-    events.scan(db, now=now, call=_fake_call([]))
+    events.scan(db, now=now, fetch_paris=_no_paris, call=_fake_call([]))
     db.commit()
     assert client.get(f"{BASE}/feeds/events").json()["items"] == []
 
@@ -159,7 +163,9 @@ def test_failed_scan_is_recorded_and_feed_unavailable(db) -> None:
 
     def off(db, **kwargs):
         raise cloud.CloudError("Cloud slot 'vector.event_scan' is off.")
-    run = events.scan(db, call=off)
+    def down(url):
+        raise agendas.AgendaUnavailableError("URLError")
+    run = events.scan(db, call=off, fetch_paris=down)
     db.commit()
     assert (run.status, run.items) == ("failed", 0) and "off" in run.error
     assert client.get(f"{BASE}/feeds/events").json()["status"] == "unavailable"
@@ -180,3 +186,24 @@ def test_only_the_scan_slot_may_search_the_web(monkeypatch) -> None:
     assert "shell_tool" in disabled[0] and "browser_use" in disabled[0]   # le reste reste coupé
     assert cloud.WEB_SLOTS == frozenset({"vector.event_scan"})
     assert cloud.SLOT_ROLES["vector.event_scan"] == "web_fresh_data"
+
+
+def test_paris_open_data_sessions_become_events(db) -> None:
+    record = {"title": "Jam de nuit", "qfap_tags": "Concert", "address_name": "Le Baiser Salé", "address_zipcode": "75001",
+              "address_city": "Paris", "url": "https://www.paris.fr/x", "date_start": "2026-10-27T00:00:00+00:00",
+              "date_end": "2026-10-31T23:59:59+00:00",
+              "occurrences": "2026-10-27T23:00:00+02:00_2026-10-27T02:00:00+02:00;2026-11-20T21:00:00+01:00_2026-11-20T22:00:00+01:00"}
+    expo = {**record, "title": "Expo", "qfap_tags": "Expo", "occurrences": None}
+    kids = {**record, "title": "Concert enfants", "qfap_tags": "Concert;Enfants"}
+    start = datetime(2026, 10, 26, tzinfo=events.PARIS)
+    items = agendas.paris_events(start, start + timedelta(days=7), fetch=lambda url: {"results": [record, expo, kids]})
+    assert [(i["title"], i["starts_at"], i["ends_at"], i["category"]) for i in items] == [
+        ("Jam de nuit", "2026-10-27T23:00", "2026-10-28T02:00", "concert")]           # finit le lendemain, hors semaine écartée
+    run = events.scan(db, now=start + timedelta(hours=3), call=_fake_call([]),
+                      fetch_paris=lambda url: {"results": [record]})
+    db.commit()
+    assert (run.status, run.items) == ("done", 1)
+    daily = events.scan(db, now=start + timedelta(days=1, hours=12), daily=True, call=_fake_call([]),
+                        fetch_paris=lambda url: {"results": [record]})
+    db.commit()
+    assert (daily.week_start, daily.items) == (date(2026, 10, 27), 0)                 # même séance : pas de doublon

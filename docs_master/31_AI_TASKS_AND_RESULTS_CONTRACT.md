@@ -1435,6 +1435,14 @@ required before official plan change unless an explicit rule says otherwise
 > des données ; éléments hors semaine, sans date ou en double écartés. Stockage `rides_event_scans` /
 > `rides_event_signals` (au lieu de `vector_intelligence_signals`). `GET /api/imperium/vector/feeds/events?kind=…`
 > alimente les cartes Événements et Autoroutes.
+> Premier vrai test (2026-10-24) : la CLI Codex échouait fermée sans son hôte de code (`code_mode_host`), qui porte
+> la recherche web ; il reste autorisé pour les slots web seulement. Scan profond (décision utilisateur du même jour :
+> tous les événements, même petits, surtout en banlieue) : 17 recherches ciblées le lundi (sport, grandes et petites
+> salles, clubs, soirées, spectacles, banlieue département par département, réceptions et cabarets, salons, routes,
+> rail), heures locales de Paris sans décalage ; `vector.event_scan_daily` (12:00, migration 20261024_0147) refait les
+> 48 h à venir (petites salles, clubs, soirées, réceptions, banlieue). Plus l'open data « Que faire à Paris » (séances
+> de concerts, soirées, spectacles, festivals ; ateliers, expositions et activités pour enfants écartés). OpenAgenda :
+> accordé, branché quand la clé est déposée. Seuls les scans faits alimentent cartes et offres.
 
 ---
 
