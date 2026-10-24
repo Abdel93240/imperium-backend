@@ -7,6 +7,8 @@
 3. Zone excellente (≥ 80) → vert, même sous le seuil ; zone mauvaise (< 40) → le temps de repositionnement vers la
    zone correcte (≥ 60) la plus proche s'ajoute avant de calculer le €/h.
 4. Vert si le €/h obtenu atteint le seuil (25 €/h), rouge en dessous. Sans durée de course lue : aucun avis.
+5. Arrivée hors Île-de-France (code postal lu, commune hors de nos tables) : retour à vide compté aussi long que la
+   course, plus la marge.
 Paramètres : `vector.economic_rule`.
 """
 
@@ -151,8 +153,18 @@ def reposition_minutes(db: Session, place: geo.Place, end_at: datetime, params: 
     return round(best / params["reposition_speed_kmh"] * 60 + params["reposition_extra_min"])
 
 
+IDF_DEPARTMENTS = {"75", "77", "78", "91", "92", "93", "94", "95"}
+
+
+def outside_idf(text: str | None) -> bool:
+    """Code postal lu hors Île-de-France (ex. Gouvieux 60270) : la commune n'est pas dans nos tables, mais on sait
+    qu'il faudra revenir de loin."""
+    found = geo.CODE.search(text or "")
+    return found is not None and found.group(1)[:2] not in IDF_DEPARTMENTS
+
+
 def verdict(db: Session, *, price_cents: int, approach_min: int | None, trip_min: int | None,
-            destination: geo.Place | None, offered_at: datetime) -> Verdict:
+            destination: geo.Place | None, offered_at: datetime, destination_text: str | None = None) -> Verdict:
     params = rule(db)
     if not trip_min:
         return Verdict(None, "Durée de course non lue : à toi de juger.", {"economic_signal": None})
@@ -161,6 +173,15 @@ def verdict(db: Session, *, price_cents: int, approach_min: int | None, trip_min
     base = price_cents / 100 / ((approach + trip_min) / 60)
     features = {"hourly_global_eur": round(base, 1), "ride_end_block": time_block(end_at)}
     threshold = params["min_hourly_eur"]
+    if destination is None and outside_idf(destination_text):
+        # Hors Île-de-France : retour à vide estimé aussi long que la course (jamais un vert « gratuit »).
+        reposition = trip_min + params["reposition_extra_min"]
+        effective = price_cents / 100 / ((approach + trip_min + reposition) / 60)
+        signal = "green" if effective >= threshold else "red"
+        features.update({"dest_zone_score": None, "dest_outside_idf": True, "reposition_min": reposition,
+                         "hourly_effective_eur": round(effective, 1), "economic_signal": signal})
+        return Verdict(signal, f"{effective:.0f} €/h avec {reposition} min pour revenir (arrivée hors Île-de-France).",
+                       features)
     if destination is None:
         signal = "green" if base >= threshold else "red"
         features.update({"dest_zone_score": None, "reposition_min": None, "hourly_effective_eur": round(base, 1),
