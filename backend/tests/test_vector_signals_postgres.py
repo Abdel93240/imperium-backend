@@ -104,10 +104,15 @@ def _fake_call(items):
     return call
 
 
+def _paris(at: datetime | None) -> str | None:
+    """Heure locale de Paris sans décalage, comme la demande la consigne du spécialiste web."""
+    return at.astimezone(events.PARIS).replace(tzinfo=None).isoformat(timespec="minutes") if at else None
+
+
 def _item(kind="event", title="Concert", starts=None, ends=None, code="75012", attendance=20000, **extra):
     return {"kind": kind, "category": extra.pop("category", "concert"), "title": title, "venue": extra.pop("venue", "Accor Arena"),
             "commune": "Paris", "postal_code": code, "road": extra.pop("road", None),
-            "starts_at": starts.isoformat() if starts else None, "ends_at": ends.isoformat() if ends else None,
+            "starts_at": _paris(starts), "ends_at": _paris(ends),
             "expected_attendance": attendance, "source_url": "https://example.test/x", "confidence": 0.9, **extra}
 
 
@@ -126,7 +131,9 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
     ]
     run = events.scan(db, now=now, call=_fake_call(items))
     db.commit()
-    assert (run.status, run.items, run.model) == ("done", 3, "web-model")
+    assert (run.status, run.items, run.model) == ("done", 3, "web-model")   # 5 recherches ciblées, sans doublon
+    shifted = events._when("2026-10-26T20:45:00+02:00")                     # décalage faux après le changement d'heure
+    assert (shifted.hour, shifted.utcoffset()) == (20, timedelta(hours=1))
     again = events.scan(db, now=now, call=_fake_call(items[:1]))                                # même concert : pas de doublon
     db.commit()
     assert again.items == 0
@@ -140,6 +147,10 @@ def test_scan_keeps_valid_items_once_and_feeds_offers(db) -> None:
     assert feed["status"] == "ok" and [i["title"] for i in feed["items"]] == ["Salon", "Concert"]
     roads = client.get(f"{BASE}/feeds/events", params={"kind": "road_closure"}).json()
     assert [i["road"] for i in roads["items"]] == ["A86"]
+    run.status, run.error = "failed", "remplacé par un nouveau scan"                           # scan remplacé : ignoré
+    events.scan(db, now=now, call=_fake_call([]))
+    db.commit()
+    assert client.get(f"{BASE}/feeds/events").json()["items"] == []
 
 
 def test_failed_scan_is_recorded_and_feed_unavailable(db) -> None:

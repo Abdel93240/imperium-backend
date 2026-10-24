@@ -50,8 +50,8 @@ def schema() -> dict:
             "venue": text, "commune": text,
             "postal_code": {"type": ["string", "null"], "pattern": "^[0-9]{5}$"},
             "road": text,
-            "starts_at": {"type": "string", "description": "ISO 8601 avec fuseau, ex. 2026-10-24T20:00:00+02:00"},
-            "ends_at": {"type": ["string", "null"], "description": "ISO 8601 avec fuseau ; fin estimée si inconnue"},
+            "starts_at": {"type": "string", "description": "heure de Paris, AAAA-MM-JJTHH:MM, ex. 2026-10-26T20:45"},
+            "ends_at": {"type": ["string", "null"], "description": "heure de Paris ; fin estimée si inconnue"},
             "expected_attendance": {"type": ["integer", "null"]},
             "source_url": text,
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
@@ -63,22 +63,34 @@ def schema() -> dict:
             "properties": {"items": {"type": "array", "maxItems": MAX_ITEMS, "items": item}}}
 
 
-def prompt(week_start: date) -> str:
+# Une recherche par thème : une seule recherche générale survole (cas réel du 24/10 : 2 événements, sans le PSG).
+FOCUSES = (
+    ("sport", "kind=event : les matchs et compétitions — PSG au Parc des Princes, Paris FC, Stade de France (football, "
+              "rugby), Paris La Défense Arena (Racing 92), Accor Arena (basket, tennis), Roland-Garros, hippodromes. "
+              "Cherche le calendrier de chaque club et de chaque stade."),
+    ("concerts", "kind=event : concerts et grands spectacles — Accor Arena, Stade de France, Paris La Défense Arena, "
+                 "Zénith de Paris, Olympia, Adidas Arena, Dôme de Paris, Salle Pleyel, Bercy, Seine Musicale, Palais des "
+                 "Sports, Folies Bergère, grands clubs. Cherche l'agenda de chaque salle."),
+    ("salons", "kind=event : salons, congrès et grands rassemblements — Paris Expo Porte de Versailles, Paris Nord "
+               "Villepinte, Le Bourget, Palais des Congrès, Carrousel du Louvre, Grand Palais ; festivals, manifestations "
+               "déclarées, grands événements en plein air."),
+    ("routes", "kind=road_closure : fermetures et travaux routiers — boulevard périphérique, A1, A3, A4, A6, A13, A14, "
+               "A86, N118, tunnels, fermetures de nuit, bretelles, grandes rues de Paris — d'après DiRIF / Sytadin, Bison "
+               "Futé, Ville de Paris ; road = la voie."),
+    ("rail", "kind=rail_works : lignes RER, Transilien, métro ou tram fermées ou interrompues pour travaux (RATP, SNCF, "
+             "IDFM) ; road = la ligne (ex. « RER A », « Ligne 14 »), title = le tronçon et les horaires."),
+)
+
+
+def prompt(week_start: date, focus: str = "") -> str:
     end = week_start + timedelta(days=6)
     return (
-        f"Semaine du lundi {week_start.isoformat()} au dimanche {end.isoformat()} (heure de Paris).\n"
-        "Cherche sur le web, en Île-de-France :\n"
-        "1. kind=event : les événements qui déplacent du monde et créent de la demande VTC à leur fin — concerts "
-        "(Accor Arena, Stade de France, Zénith, La Défense Arena, Olympia…), matchs (Parc des Princes, Stade de France, "
-        "Roland-Garros…), salons (Paris Expo Porte de Versailles, Paris Nord Villepinte, Le Bourget), grands "
-        "spectacles, festivals, manifestations déclarées, soirées en club importantes. Donne le lieu, la commune, le "
-        "code postal du lieu, l'heure de début, l'heure de fin (estimée si besoin) et l'affluence attendue.\n"
-        "2. kind=road_closure : fermetures et travaux routiers (boulevard périphérique, A1, A3, A4, A6, A13, A86, N118, "
-        "tunnels, fermetures de nuit, bretelles), d'après DiRIF / Sytadin, Bison Futé, Ville de Paris ; road = la voie.\n"
-        "3. kind=rail_works : lignes RER, Transilien ou métro fermées ou partiellement interrompues pour travaux ; "
-        "road = la ligne.\n"
-        "Uniquement des éléments datés dans cette semaine, avec une source (URL). confidence = ta certitude sur la "
-        "date et le lieu (0 à 1)."
+        f"Semaine du lundi {week_start.isoformat()} au dimanche {end.isoformat()}, en Île-de-France.\n"
+        f"Cherche sur le web : {focus}\n"
+        "Fais plusieurs recherches si besoin ; donne le lieu, la commune, le code postal du lieu, l'heure de début, "
+        "l'heure de fin (estimée si besoin) et l'affluence attendue quand elle est connue. Heures locales de Paris, au "
+        "format AAAA-MM-JJTHH:MM, sans décalage horaire. Uniquement des éléments datés dans cette semaine, avec une "
+        "source (URL). confidence = ta certitude sur la date et le lieu (0 à 1)."
     )
 
 
@@ -89,7 +101,8 @@ def _when(value: str | None) -> datetime | None:
         parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
-    return parsed if parsed.tzinfo else parsed.replace(tzinfo=PARIS)
+    # Heure locale de Paris : un décalage donné quand même est ignoré (le modèle se trompe après un changement d'heure).
+    return parsed.replace(tzinfo=PARIS)
 
 
 def _fingerprint(kind: str, title: str, starts_at: datetime, place: str | None) -> str:
@@ -109,17 +122,25 @@ def scan(db: Session, *, now: datetime | None = None, call=None) -> RidesEventSc
     run = RidesEventScan(id=uuid4(), started_at=now, week_start=week, status="running")
     db.add(run)
     db.flush()
-    try:
-        result = (call or cloud.structured)(db, slot_code=SLOT, app_name="vector", system=SYSTEM, user=prompt(week),
-                                            schema=schema(), related_entity_type="rides_event_scan", related_entity_id=run.id)
-    except cloud.CloudError as exc:
-        run.status, run.error, run.finished_at = "failed", str(exc)[:500], datetime.now(UTC)
+    found, errors, model = [], [], None
+    for name, focus in FOCUSES:
+        try:
+            result = (call or cloud.structured)(db, slot_code=SLOT, app_name="vector", system=SYSTEM,
+                                                user=prompt(week, focus), schema=schema(),
+                                                related_entity_type="rides_event_scan", related_entity_id=run.id)
+        except cloud.CloudError as exc:
+            errors.append(f"{name} : {exc}")
+            continue
+        found += (result.output.get("items") or [])[:MAX_ITEMS]
+        model = result.model
+    if model is None:  # toutes les recherches ont échoué
+        run.status, run.error, run.finished_at = "failed", " ; ".join(errors)[:500], datetime.now(UTC)
         db.flush()
         return run
     window_start = datetime.combine(week - timedelta(days=1), time.min, PARIS)
     window_end = datetime.combine(week + timedelta(days=8), time.min, PARIS)
     kept = 0
-    for item in (result.output.get("items") or [])[:MAX_ITEMS]:
+    for item in found:
         starts, ends = _when(item.get("starts_at")), _when(item.get("ends_at"))
         title = str(item.get("title") or "").strip()
         if (item.get("kind") not in KINDS or not title or starts is None or not window_start <= starts < window_end
@@ -138,7 +159,8 @@ def scan(db: Session, *, now: datetime | None = None, call=None) -> RidesEventSc
             fingerprint=_fingerprint(item["kind"], title, starts, place),
         ).on_conflict_do_nothing(constraint="fingerprint_unique").returning(RidesEventSignal.id))
         kept += inserted.scalar() is not None
-    run.status, run.items, run.model, run.finished_at = "done", kept, result.model, datetime.now(UTC)
+    run.status, run.items, run.model, run.finished_at = "done", kept, model, datetime.now(UTC)
+    run.error = " ; ".join(errors)[:500] or None
     db.flush()
     return run
 
@@ -148,6 +170,12 @@ def _short(value, size: int = 200) -> str | None:
     return text[:size] or None
 
 
+def _done_scans():
+    """Seuls les scans faits comptent : un scan remplacé (marqué échoué, « remplacé par un nouveau scan ») garde ses
+    éléments en base mais n'alimente plus ni les cartes ni les offres."""
+    return select(RidesEventScan.id).where(RidesEventScan.status == "done")
+
+
 def offer_features(db: Session, at: datetime, *, pickup_code: str | None, destination_code: str | None) -> dict:
     """Variables du doc 57 §5.6 : événement qui finit près du départ ou de l'arrivée, fermetures, travaux du rail."""
     if db.scalar(select(func.count()).select_from(RidesEventScan).where(RidesEventScan.status == "done")) == 0:
@@ -155,6 +183,7 @@ def offer_features(db: Session, at: datetime, *, pickup_code: str | None, destin
                                       "event_ongoing_pickup", "event_nearby_attendees", "event_nearby_category",
                                       "events_ending_within_60min_idf", "road_closures_active", "rail_works_active")}
     signals = list(db.scalars(select(RidesEventSignal).where(
+        RidesEventSignal.scan_id.in_(_done_scans()),
         RidesEventSignal.starts_at <= at + timedelta(hours=2),
         func.coalesce(RidesEventSignal.ends_at, RidesEventSignal.starts_at + timedelta(hours=3)) >= at - timedelta(hours=1),
     )))
@@ -187,6 +216,7 @@ def feed(db: Session, *, kind: str, now: datetime | None = None) -> EventFeedRea
         return EventFeedRead(status="unavailable", message="Aucun scan : le scan web du lundi n'est pas encore activé.")
     rows = db.scalars(select(RidesEventSignal).where(
         RidesEventSignal.kind == kind,
+        RidesEventSignal.scan_id.in_(_done_scans()),
         func.coalesce(RidesEventSignal.ends_at, RidesEventSignal.starts_at) >= now,
         RidesEventSignal.starts_at <= now + timedelta(days=7),
     ).order_by(RidesEventSignal.starts_at).limit(60))
