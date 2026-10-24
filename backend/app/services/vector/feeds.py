@@ -33,6 +33,14 @@ from app.models.rides import (
     RidesTransitDisruption,
     RidesTransitStop,
 )
+from app.schemas.rides import (
+    AirportFeedRead,
+    AirportRead,
+    TrafficFeedRead,
+    TrafficItemRead,
+    TransitFeedRead,
+    TransitLineRead,
+)
 from app.services.vector import grid, weather
 
 logger = logging.getLogger(__name__)
@@ -360,6 +368,81 @@ def drop_context(db: Session, at: datetime, lat: float | None, lng: float | None
     rain = weather.offer_features(db, at, lat=lat, lng=lng) if where else {}
     return {**context(db, at, {"drop": where}),
             **{k.replace("weather_pickup", "drop_weather"): v for k, v in rain.items() if k.startswith("weather_pickup")}}
+
+
+# --- Cartes du tableau de bord (dernier relevé, jamais inventé) --------------------------------------------------
+
+MODE_LABELS = {"metro": "Métro", "rer": "RER", "transilien": "Transilien", "tram": "Tram"}
+TRAFFIC_KINDS = {8: "closure", 6: "jam", 9: "works", 7: "lane_closed", 1: "accident", 14: "breakdown", 3: "danger"}
+STALE_MESSAGE = "Dernier relevé de plus de 20 min (hors session VTC, les flux ne sont pas relevés)."
+
+
+def _freshness(fetched: datetime | None, now: datetime, missing: str) -> tuple[str, str | None]:
+    if fetched is None:
+        return "unavailable", missing
+    return ("stale", STALE_MESSAGE) if fetched < now - FRESH else ("ok", None)
+
+
+def transit_feed(db: Session, *, now: datetime | None = None) -> TransitFeedRead:
+    """Lignes perturbées au dernier relevé : interrompues d'abord, puis par fin annoncée la plus proche."""
+    now = now or datetime.now(UTC)
+    fetched = db.scalar(select(func.max(RidesTransitDisruption.fetched_at)))
+    status, message = _freshness(fetched, now, "Aucun relevé : les perturbations sont relevées pendant les sessions VTC.")
+    if fetched is None:
+        return TransitFeedRead(status=status, message=message)
+    by_line: dict[str, list[RidesTransitDisruption]] = {}
+    for d in db.scalars(select(RidesTransitDisruption).where(RidesTransitDisruption.fetched_at == fetched)):
+        by_line.setdefault(d.line_id, []).append(d)
+    lines = []
+    for line_id, items in by_line.items():
+        blocking = [d for d in items if d.severity == "BLOQUANTE"]
+        worst = blocking or items
+        ends = [d.ends_at for d in worst if d.ends_at]
+        lines.append(TransitLineRead(
+            line_id=line_id, label=f"{MODE_LABELS[items[0].mode]} {items[0].line_name.split(' ', 1)[-1]}",
+            mode=items[0].mode, status="interrupted" if blocking else "disrupted",
+            messages=list(dict.fromkeys(d.title for d in worst + [d for d in items if d not in worst] if d.title)),
+            ends_at=min(ends) if ends else None,
+        ))
+    lines.sort(key=lambda line: (line.status != "interrupted", line.ends_at or datetime.max.replace(tzinfo=UTC), line.label))
+    return TransitFeedRead(status=status, fetched_at=fetched, message=message, lines=lines)
+
+
+def airport_feed(db: Session, *, now: datetime | None = None) -> AirportFeedRead:
+    now = now or datetime.now(UTC)
+    fetched = db.scalar(select(func.max(RidesAirportSnapshot.fetched_at)))
+    status, message = _freshness(fetched, now, "Aucun relevé : les avions sont relevés pendant les sessions VTC.")
+    if fetched is None:
+        return AirportFeedRead(status=status, message=message)
+    snapshots = {s.airport: s for s in db.scalars(select(RidesAirportSnapshot).where(RidesAirportSnapshot.fetched_at == fetched))}
+    return AirportFeedRead(status=status, fetched_at=fetched, message=message, airports=[
+        AirportRead(airport=code, approaching=s.approaching, on_ground=s.on_ground,
+                    landings_last_30_min=landings(db, code, fetched - timedelta(minutes=30), fetched),
+                    landings_30_60_min=landings(db, code, fetched - timedelta(minutes=60), fetched - timedelta(minutes=30)))
+        for code in AIRPORTS if (s := snapshots.get(code)) is not None])
+
+
+def traffic_feed(db: Session, *, now: datetime | None = None, limit: int = 30) -> TrafficFeedRead:
+    """Synthèse Île-de-France et incidents des grands axes : fermetures notées d'abord, puis par retard."""
+    now = now or datetime.now(UTC)
+    fetched = db.scalar(select(func.max(RidesTrafficIncident.fetched_at)))
+    status, message = _freshness(fetched, now, "Aucun relevé : le trafic est relevé pendant les sessions VTC.")
+    if fetched is None:
+        return TrafficFeedRead(status=status, message=message)
+    incidents = list(db.scalars(select(RidesTrafficIncident).where(RidesTrafficIncident.fetched_at == fetched)))
+    major = [i for i in incidents if road_class(i.roads) == "major"]
+    major.sort(key=lambda i: (-(i.impact or 0), i.category != 8, -(i.delay_s or 0), -(i.length_m or 0)))
+    return TrafficFeedRead(
+        status=status, fetched_at=fetched, message=message, incidents=len(incidents),
+        delay_min=round(sum(i.delay_s or 0 for i in incidents) / 60),
+        major_closures=sum(1 for i in major if i.category == 8),
+        major_jams=sum(1 for i in major if i.category == 6),
+        items=[TrafficItemRead(
+            kind=TRAFFIC_KINDS.get(i.category, "other"), roads=i.roads, from_text=i.from_text, to_text=i.to_text,
+            delay_min=round(i.delay_s / 60) if i.delay_s else None,
+            length_km=round(i.length_m / 1000, 1) if i.length_m else None,
+            jam_level=i.magnitude if i.category == 6 else None, impact=i.impact) for i in major[:limit]],
+    )
 
 
 # --- Jobs (seulement pendant une session VTC ouverte) ------------------------------------------------------------

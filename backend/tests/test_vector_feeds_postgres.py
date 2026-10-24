@@ -126,3 +126,52 @@ def test_missing_keys_say_so(db, monkeypatch) -> None:
         feeds.refresh_transit(db)
     with pytest.raises(feeds.FeedUnavailableError):
         feeds.refresh_traffic(db)
+
+
+def test_dashboard_cards_read_the_latest_pass(db) -> None:
+    now = datetime.now(UTC).replace(microsecond=0)
+    assert feeds.transit_feed(db, now=now).status == "unavailable"            # aucun relevé : rien d'inventé
+    assert feeds.airport_feed(db, now=now).airports == []
+    assert feeds.traffic_feed(db, now=now).status == "unavailable"
+    old, last = now - timedelta(minutes=10), now - timedelta(minutes=5)
+
+    def disruption(at, line, mode, severity, title, ends):
+        return RidesTransitDisruption(fetched_at=at, disruption_id=title, line_id=line, line_name=f"{mode} {line[-1]}",
+                                      mode=mode, severity=severity, title=title, ends_at=now + timedelta(hours=ends),
+                                      stop_ids=[], zone_codes=[])
+    db.add_all([
+        disruption(old, "line:C", "rer", "BLOQUANTE", "ancien relevé", 1),
+        disruption(last, "line:4", "metro", "PERTURBEE", "Métro 4 : ralenti", 1),
+        disruption(last, "line:4", "metro", "BLOQUANTE", "Métro 4 : interrompu", 3),
+        disruption(last, "line:4", "metro", "BLOQUANTE", "Métro 4 : interrompu", 3),
+        disruption(last, "line:A", "rer", "BLOQUANTE", "RER A : panne", 2),
+        disruption(last, "line:L", "transilien", "PERTURBEE", "Transilien L : retards", 1),
+    ])
+
+    def incident(category, roads, **kw):
+        return RidesTrafficIncident(fetched_at=last, category=category, roads=roads, lat=48.85, lng=2.35, zone_code="75", **kw)
+    db.add_all([
+        incident(6, ["A86"], magnitude=3, delay_s=900, length_m=4200),
+        incident(8, ["A14"], impact=100, length_m=4000),
+        incident(8, ["D909"], impact=70),                                     # route départementale : synthèse seulement
+        incident(9, ["BP"], delay_s=60),
+    ])
+    db.add_all([RidesAirportSnapshot(fetched_at=at, airport="CDG", approaching=n, on_ground=4, final_icao=icao)
+                for at, n, icao in ((now - timedelta(minutes=40), 1, ["a1"]), (last, 2, ["a2", "a3"]))])
+    db.commit()
+
+    transit = feeds.transit_feed(db, now=now)
+    assert transit.status == "ok" and transit.fetched_at == last
+    assert [(line.label, line.status) for line in transit.lines] == [
+        ("RER A", "interrupted"), ("Métro 4", "interrupted"), ("Transilien L", "disrupted")]  # interrompues, fin la plus proche
+    assert transit.lines[1].messages == ["Métro 4 : interrompu", "Métro 4 : ralenti"]  # pire d'abord, sans doublon
+    assert feeds.transit_feed(db, now=now + timedelta(minutes=30)).status == "stale"
+
+    traffic = feeds.traffic_feed(db, now=now)
+    assert (traffic.incidents, traffic.delay_min, traffic.major_closures, traffic.major_jams) == (4, 16, 1, 1)
+    assert [(i.kind, i.roads) for i in traffic.items] == [("closure", ["A14"]), ("jam", ["A86"]), ("works", ["BP"])]
+    assert (traffic.items[1].delay_min, traffic.items[1].length_km, traffic.items[1].jam_level) == (15, 4.2, 3)
+
+    airports = feeds.airport_feed(db, now=now)
+    assert [(a.airport, a.approaching, a.on_ground, a.landings_last_30_min, a.landings_30_60_min)
+            for a in airports.airports] == [("CDG", 2, 4, 2, 1)]

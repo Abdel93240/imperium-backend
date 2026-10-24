@@ -12,6 +12,7 @@ from app.schemas.rides import (
     BusinessRuleListResponse,
     BusinessRuleRead,
     BusinessRuleUpdate,
+    AirportFeedRead,
     EventFeedRead,
     PriorityStatsRead,
     WeatherFeedRead,
@@ -35,12 +36,14 @@ from app.schemas.rides import (
     SessionReplanResponse,
     SessionStart,
     SessionUpdate,
+    TrafficFeedRead,
     TrainingSummaryRead,
+    TransitFeedRead,
 )
 from app.services.imperium import replan, vault_transactions
 from app.services.path.fasting import paris_today
 from app.services.pulse import food_stock
-from app.services.vector import events, offers, priority, recommendations, rules, sessions, weather
+from app.services.vector import events, feeds, offers, priority, recommendations, rules, sessions, weather
 
 router = APIRouter()
 
@@ -365,6 +368,24 @@ def events_feed_route(current_user: CurrentUserDep, db: SessionDep,  # noqa: ARG
                       kind: Literal["event", "road_closure", "rail_works"] = "event") -> EventFeedRead:
     """Scan web du lundi : événements, fermetures routières ou travaux du rail des 7 prochains jours."""
     return events.feed(db, kind=kind)
+
+
+@router.get("/feeds/transit", response_model=TransitFeedRead)
+def transit_feed_route(current_user: CurrentUserDep, db: SessionDep) -> TransitFeedRead:  # noqa: ARG001
+    """Lignes de métro, RER, Transilien et tram perturbées au dernier relevé IDFM ; jamais « normal » par défaut."""
+    return feeds.transit_feed(db)
+
+
+@router.get("/feeds/airports", response_model=AirportFeedRead)
+def airport_feed_route(current_user: CurrentUserDep, db: SessionDep) -> AirportFeedRead:  # noqa: ARG001
+    """Avions OpenSky autour de Roissy-CDG, Orly, Beauvais : approche finale, au sol, atterrissages observés."""
+    return feeds.airport_feed(db)
+
+
+@router.get("/feeds/traffic", response_model=TrafficFeedRead)
+def traffic_feed_route(current_user: CurrentUserDep, db: SessionDep) -> TrafficFeedRead:  # noqa: ARG001
+    """Trafic TomTom : synthèse Île-de-France et incidents des grands axes, les plus gênants d'abord."""
+    return feeds.traffic_feed(db)
 
 
 @router.get("/stats/priority", response_model=PriorityStatsRead)
