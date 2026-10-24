@@ -175,3 +175,23 @@ def test_dashboard_cards_read_the_latest_pass(db) -> None:
     airports = feeds.airport_feed(db, now=now)
     assert [(a.airport, a.approaching, a.on_ground, a.landings_last_30_min, a.landings_30_60_min)
             for a in airports.airports] == [("CDG", 2, 4, 2, 1)]
+
+
+def test_session_kickoff_reads_everything_at_once(db, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from app.services.vector import weather
+
+    def broken(db):
+        raise weather.WeatherUnavailableError("Open-Meteo injoignable")
+    monkeypatch.setattr(weather, "refresh", broken)
+    monkeypatch.setattr(feeds, "refresh_transit", lambda db: 31)
+    monkeypatch.setattr(feeds, "refresh_traffic", lambda db: 700)
+    monkeypatch.setattr(feeds, "refresh_airports", lambda db: 3)
+    ctx = SimpleNamespace(db=db)
+    monkeypatch.setattr(weather, "session_open", lambda db: False)
+    feeds.session_kickoff_job(ctx, None)
+    assert ctx.detail == {"skipped": "no_open_session"}                    # session déjà close : aucun appel
+    monkeypatch.setattr(weather, "session_open", lambda db: True)
+    feeds.session_kickoff_job(ctx, None)
+    assert ctx.detail == {"weather": "erreur : Open-Meteo injoignable", "transit": 31, "traffic": 700, "airports": 3}

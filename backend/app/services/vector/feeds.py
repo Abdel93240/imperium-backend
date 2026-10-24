@@ -458,7 +458,7 @@ def _run(ctx, steps) -> None:
             count = step(ctx.db)
             ctx.db.commit()
             detail[name], total = count, total + count
-        except FeedUnavailableError as exc:
+        except (FeedUnavailableError, weather.WeatherUnavailableError) as exc:
             ctx.db.rollback()
             logger.warning("vector.%s: %s", name, exc)
             detail[name] = f"erreur : {exc}"
@@ -472,3 +472,9 @@ def transit_traffic_job(ctx, window) -> None:  # noqa: ARG001 - signature du run
 
 def airports_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
     _run(ctx, [("airports", refresh_airports)])
+
+
+def session_kickoff_job(ctx, window) -> None:  # noqa: ARG001 - signature du runner
+    """Session démarrée ou reprise : tout est relevé aussitôt, sans attendre la prochaine passe (météo : 30 min)."""
+    _run(ctx, [("weather", weather.refresh), ("transit", refresh_transit), ("traffic", refresh_traffic),
+               ("airports", refresh_airports)])

@@ -579,6 +579,9 @@ TRAFFIC:
 > et `/feeds/traffic` (synthèse Île-de-France et incidents des grands axes, fermetures notées d'abord). Statut `ok`,
 > `stale` (relevé de plus de 20 min, hors session) ou `unavailable` ; une ligne absente n'est pas dite « normale ».
 > Bus (non relevé) et SNCF restent « Flux non branché ».
+> Démarrage (migration 20261024_0146) : `vector.session_kickoff`, abonné à `rides.session.started` et
+> `rides.session.resumed`, relève aussitôt météo, perturbations, trafic et avions (sans lui, la météo restait
+> « ancienne » jusqu'à 30 min après le démarrage) ; une source en panne n'empêche pas les autres.
 
 ### 5.7 Rule-derived features (CRITICAL)
 
