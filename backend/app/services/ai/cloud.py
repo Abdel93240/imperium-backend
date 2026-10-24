@@ -65,6 +65,7 @@ CODEX_DISABLED = ("shell_tool", "unified_exec", "apps", "browser_use", "browser_
                   "in_app_browser", "image_generation", "multi_agent", "plugins", "remote_plugin", "view_image",
                   "sleep_tool", "tool_suggest", "skill_search", "code_mode_host", "shell_snapshot",
                   "skill_mcp_dependency_install")
+CODEX_WEB_NEEDS = frozenset({"code_mode_host"})
 ENV_KEPT = ("HOME", "PATH", "LANG", "USER", "CODEX_HOME")
 # Quota de l'abonnement atteint (messages des CLI) ; l'heure de retour quand la CLI la donne.
 QUOTA = re.compile(r"usage limit|rate limit|hit your limit|limit reached|quota|too many requests|\b429\b", re.I)
@@ -190,8 +191,11 @@ def _codex(model: str, effort: str | None, system: str, user: str, schema: dict,
                 f"web_search={'live' if web else 'disabled'}",
                 "-C", str(root / "empty"), "--output-schema", str(root / "schema.json"),
                 "-o", str(root / "last.txt"), "--json"]
+        # L'hôte de code porte les outils de Codex, recherche web comprise : désactivé, Codex échoue fermé et répond
+        # sans chercher (cas réel du 24/10 : scan vide). Gardé seulement pour les slots web (lecture seule, sans shell).
         for feature in CODEX_DISABLED:
-            args += ["--disable", feature]
+            if not (web and feature in CODEX_WEB_NEEDS):
+                args += ["--disable", feature]
         if effort:
             args += ["-c", f"model_reasoning_effort={effort}"]
         events = _execute([*args, "-"], f"{system}\n\n{user}", work)
