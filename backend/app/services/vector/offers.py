@@ -178,6 +178,10 @@ def record_outcome(
         raise OfferVersionConflictError(RideOfferRead.model_validate(offer))
     if offer.decision != "accepted":
         raise OfferStateError("Seule une course acceptée a un résultat.")
+    # Gain démesuré face à l'offre : lecture ratée (« 9,58 € » lu « 958 € », cas réel du 24/10), jamais écrit au Vault.
+    if payload.actual_earning_cents > offer.price_cents * 3 + 2_000:
+        raise OfferInputError(
+            f"Gain de {payload.actual_earning_cents / 100:.2f} € invraisemblable pour une offre à {offer.price_cents / 100:.2f} €.")
     if payload.record_revenue and db.get(RidesSession, offer.session_id).status not in ("active", "paused"):
         raise OfferStateError("Session close : enregistre le résultat avec record_revenue à false, le revenu est déjà au Vault.")
     mobilized = max(1, payload.approach_minutes + payload.wait_minutes + payload.ride_minutes + payload.return_minutes)
