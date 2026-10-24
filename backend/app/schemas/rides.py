@@ -225,8 +225,10 @@ class RideOutcomeRequest(BaseModel):
     actual_earning_cents: int = Field(ge=1, le=1_000_000, strict=True)
     approach_minutes: int = Field(ge=0, le=180)
     wait_minutes: int = Field(default=0, ge=0, le=180)  # attente au point de prise en charge
-    ride_minutes: int = Field(ge=1, le=600)
+    ride_minutes: int = Field(ge=0, le=600)  # 0 seulement pour une annulation payée
     return_minutes: int = Field(default=0, ge=0, le=300)  # retour estimé après la dépose
+    # Annulation par le passager avec frais versés au chauffeur : le gain est la somme des frais, sans course.
+    cancelled: bool = False
     record_revenue: bool = True  # écrit aussi le revenu au Vault (évite une double saisie)
     wallet: str = Field(default="cash", min_length=1, max_length=80)
     # Relevé par l'assistant (écrans Bolt) : étapes datées, positions de prise en charge et de dépose, paiement.
@@ -236,7 +238,13 @@ class RideOutcomeRequest(BaseModel):
     dropoff_lat: Decimal | None = Field(default=None, ge=-90, le=90, decimal_places=6)
     dropoff_lng: Decimal | None = Field(default=None, ge=-180, le=180, decimal_places=6)
     payment: Literal["cash", "card", "business"] | None = None
-    price_source: Literal["confirm_screen", "ride_screen", "offer", "manual"] | None = None
+    price_source: Literal["confirm_screen", "ride_screen", "offer", "manual", "cancellation_fee"] | None = None
+
+    @model_validator(mode="after")
+    def _ride_unless_cancelled(self) -> "RideOutcomeRequest":
+        if not self.cancelled and self.ride_minutes < 1:
+            raise ValueError("ride_minutes doit valoir au moins 1, sauf pour une annulation payée.")
+        return self
 
 
 class RideOfferRead(BaseModel):
